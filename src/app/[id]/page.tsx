@@ -17,6 +17,9 @@ export default async function TrajectoryPage({
     mode: 'lines',
     type: 'scatter3d',
     name: 'Ist',
+    line: {
+      width: 6,
+    },
   };
 
   const idealTraject: Data = {
@@ -26,6 +29,9 @@ export default async function TrajectoryPage({
     mode: 'lines',
     type: 'scatter3d',
     name: 'Soll',
+    line: {
+      width: 6,
+    },
   };
 
   return (
