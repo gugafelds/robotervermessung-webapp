@@ -3,8 +3,8 @@
 import BarsIcon from '@heroicons/react/16/solid/Bars4Icon';
 import Link from 'next/link';
 import { useState } from 'react';
-import { TrajectoriesSlideOver } from 'src/app/components/TrajectoriesSlideOver';
 
+import { TrajectoriesSlideOver } from '@/src/app/components/TrajectoriesSlideOver';
 import { Typography } from '@/src/components/Typography';
 
 export const Navbar = () => {

@@ -6,8 +6,8 @@ import { Inter } from 'next/font/google';
 import type { ReactNode } from 'react';
 
 import { getTrajectories } from '@/src/actions/trajectory.service';
+import { Navbar } from '@/src/app/components/Navbar';
 import { AppProvider } from '@/src/app/provider';
-import { Navbar } from '@/src/components/Navbar';
 import { json } from '@/src/lib/functions';
 import { ModalsProvider } from '@/src/providers/slideover.provider';
 
