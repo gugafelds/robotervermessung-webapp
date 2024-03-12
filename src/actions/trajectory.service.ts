@@ -3,22 +3,35 @@
 import { ObjectId } from 'mongodb';
 
 import { getMongoDb } from '@/src/lib/mongodb';
+import {
+  transformTrajectoriesResult,
+  transformTrajectoryResult,
+} from '@/src/lib/transformer';
+import type { Trajectory, TrajectoryRaw } from '@/types/main';
 
 export const getTrajectories = async () => {
   const mongo = await getMongoDb();
 
-  return mongo
+  const trajectoriesResult = await mongo
     .collection('trajectories')
-    .find<any>({}, { projection: { data: 0 } })
+    .find<TrajectoryRaw>({}, { projection: { data: 0 } })
     .sort({ recording_date: -1 })
     .toArray();
+
+  return transformTrajectoriesResult(trajectoriesResult);
 };
 
 export const getTrajectoryById = async (id: string) => {
   const mongo = await getMongoDb();
 
-  return mongo
+  const trajectoryResult = await mongo
     .collection('trajectories')
-    .find<any>({ _id: new ObjectId(id) })
+    .find<TrajectoryRaw>({ _id: new ObjectId(id) })
     .next();
+
+  if (!trajectoryResult) {
+    return {} as Trajectory;
+  }
+
+  return transformTrajectoryResult(trajectoryResult);
 };

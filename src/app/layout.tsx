@@ -7,9 +7,8 @@ import type { ReactNode } from 'react';
 
 import { getTrajectories } from '@/src/actions/trajectory.service';
 import { Navbar } from '@/src/app/components/Navbar';
-import { AppProvider } from '@/src/app/provider';
 import { json } from '@/src/lib/functions';
-import { ModalsProvider } from '@/src/providers/slideover.provider';
+import { AppProvider } from '@/src/providers/app.provider';
 
 const inter = Inter({ subsets: ['latin'], display: 'swap' });
 
@@ -45,7 +44,7 @@ export default async function RootLayout({
       <body className={inter.className}>
         <AppProvider trajectoriesDb={json(trajectories)}>
           <Navbar />
-          <ModalsProvider>{children}</ModalsProvider>
+          {children}
           <SpeedInsights />
         </AppProvider>
       </body>

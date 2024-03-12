@@ -1,42 +1,36 @@
-import type { Data } from 'plotly.js';
+import type { PlotData } from 'plotly.js';
 
 import { getTrajectoryById } from '@/src/actions/trajectory.service';
 import TrajectoryPlot from '@/src/app/[id]/components/TrajectoryPlot';
+import { dataPlotConfig } from '@/src/lib/plot-config';
 
-export default async function TrajectoryPage({
-  params,
-}: {
+type TrajectoryPageProps = {
   params: { id: string };
-}) {
+};
+
+export default async function TrajectoryPage({ params }: TrajectoryPageProps) {
   const trajectory = await getTrajectoryById(params.id);
 
-  const realTraject: Data = {
-    x: trajectory.data.x_ist,
-    y: trajectory.data.y_ist,
-    z: trajectory.data.z_ist,
-    mode: 'lines',
-    type: 'scatter3d',
-    name: 'Ist',
-    line: {
-      width: 6,
-    },
+  const realTrajectory: Partial<PlotData> = {
+    ...dataPlotConfig('Ist'),
+    x: trajectory.data.xIst,
+    y: trajectory.data.yIst,
+    z: trajectory.data.zIst,
   };
 
-  const idealTraject: Data = {
-    x: trajectory.data.x_soll,
-    y: trajectory.data.y_soll,
-    z: trajectory.data.z_soll,
-    mode: 'lines',
-    type: 'scatter3d',
-    name: 'Soll',
-    line: {
-      width: 6,
-    },
+  const idealTrajectory: Partial<PlotData> = {
+    ...dataPlotConfig('Soll'),
+    x: trajectory.data.xSoll,
+    y: trajectory.data.ySoll,
+    z: trajectory.data.zSoll,
   };
 
   return (
     <main>
-      <TrajectoryPlot realTraject={realTraject} idealTraject={idealTraject} />
+      <TrajectoryPlot
+        realTrajectory={realTrajectory}
+        idealTrajectory={idealTrajectory}
+      />
     </main>
   );
 }

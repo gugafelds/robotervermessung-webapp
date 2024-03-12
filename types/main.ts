@@ -1,43 +1,50 @@
 import type { ObjectId } from 'mongodb';
 
-import type { Colors } from '@/src/components/ColorPicker';
-
-export interface UserObject {
-  _id?: ObjectId;
-  username: string;
-  email: string;
-  password: string;
+export enum TrajectoryType {
+  CIRCLE = 'circle',
+  SQUARE = 'square',
 }
 
-export interface List {
-  _id: string | any;
-  id: string;
-  title: string;
-  color: Colors;
-  emoji: string;
-
-  index: number;
-
-  createdAt: string;
+export interface AxisDataRaw {
+  x_ist: number[];
+  y_ist: number[];
+  z_ist: number[];
+  x_soll: number[];
+  y_soll: number[];
+  z_soll: number[];
+  x_vicon: number[];
+  y_vicon: number[];
+  z_vicon: number[];
 }
 
-export interface Todo {
-  _id?: ObjectId | string;
-  title: string;
-
-  listId: ObjectId | string;
-
-  description: string;
-
-  complete: boolean;
-  completeDisabled: boolean;
-
-  location?: string;
-
-  index?: number;
-
-  createdAt: string;
-  completedAt?: string;
+export interface AxisData {
+  xIst: number[];
+  yIst: number[];
+  zIst: number[];
+  xSoll: number[];
+  ySoll: number[];
+  zSoll: number[];
+  xVicon: number[];
+  yVicon: number[];
+  zVicon: number[];
 }
 
-export type TodosResponse = List & { todos: Todo[] };
+export interface TrajectoryRaw {
+  _id: ObjectId | string;
+  robot_name: string;
+  trajectory_type: TrajectoryType;
+  carthesian: true;
+  path_solver: string;
+  recording_date: string;
+  data: AxisDataRaw;
+}
+
+export interface Trajectory {
+  _id: ObjectId | string;
+  robotName: string;
+  trajectoryType: TrajectoryType;
+  carthesian: true;
+  pathSolver: string;
+  recordingDate: string;
+  data: AxisData;
+}

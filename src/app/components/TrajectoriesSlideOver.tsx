@@ -1,9 +1,9 @@
 import Link from 'next/link';
 
-import { useApp } from '@/src/app/provider';
 import SlideOver from '@/src/components/SlideOver';
 import { Typography } from '@/src/components/Typography';
 import { formatDate } from '@/src/lib/functions';
+import { useApp } from '@/src/providers/app.provider';
 
 type AddListSlideOverProps = {
   open: boolean;
@@ -24,16 +24,16 @@ export const TrajectoriesSlideOver = ({
     >
       {trajectories.map((trajectory) => (
         <Link
-          key={trajectory._id}
-          href={`/${trajectory._id}`}
+          key={trajectory._id.toString()}
+          href={`/${trajectory._id.toString()}`}
           onClick={() => setOpen(false)}
         >
           <div className="p-5 betterhover:hover:bg-gray-200">
             <Typography as="h2" className="font-semibold">
-              {trajectory.robot_name}
+              {trajectory.robotName}
             </Typography>
             <Typography as="h4">
-              {formatDate(trajectory.recording_date)}
+              {formatDate(trajectory.recordingDate)}
             </Typography>
           </div>
         </Link>

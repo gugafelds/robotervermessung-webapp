@@ -3,13 +3,15 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useMemo, useState } from 'react';
 
+import type { Trajectory } from '@/types/main';
+
 export interface AppState {
-  trajectories: any[];
+  trajectories: Trajectory[];
 }
 
 type AppProviderProps = {
   children: ReactNode;
-  trajectoriesDb: any[];
+  trajectoriesDb: Trajectory[];
 };
 
 const AppContext = createContext<AppState>({} as AppState);
