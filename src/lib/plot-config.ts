@@ -16,7 +16,7 @@ export const plotLayoutConfig: Partial<Layout> = {
     y: 1,
     traceorder: 'normal',
     font: {
-      family: 'sans-serif',
+      family: 'helvetica',
       size: 12,
       color: '#000',
     },
@@ -25,10 +25,10 @@ export const plotLayoutConfig: Partial<Layout> = {
     borderwidth: 2,
   },
   width: 800,
-  height: 600,
+  height: 800,
   scene: {
-    xaxis: { title: 'X Axis' },
-    yaxis: { title: 'Y Axis' },
-    zaxis: { title: 'Z Axis' },
+    xaxis: { title: 'x [m]' },
+    yaxis: { title: 'y [m]' },
+    zaxis: { title: 'z [m]' },
   },
 };
