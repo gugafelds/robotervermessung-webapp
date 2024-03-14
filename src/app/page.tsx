@@ -1,9 +1,9 @@
-import { EmptyState } from '@/src/app/components/EmptyState';
+import { Sidebar } from '@/src/app/components/Sidebar';
 
 export default async function Home() {
   return (
     <main>
-      <EmptyState />
+      <Sidebar />
     </main>
   );
 }

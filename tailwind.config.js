@@ -6,7 +6,7 @@ module.exports = {
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     colors: ({ colors }) => ({
-      primary: '#3664FF',
+      primary: '#003560',
       danger: '#DE623E',
       success: '#21e824',
       palette_one: '#F55C30',
