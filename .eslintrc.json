@@ -11,7 +11,7 @@
       "error",
       {
         "singleQuote": true,
-        "endOfLine": "auto"
+        "endOfLine": "off"
       }
     ]
     // Avoid conflict rule between Prettier and Airbnb Eslint
@@ -44,7 +44,7 @@
           "error",
           {
             "singleQuote": true,
-            "endOfLine": "auto"
+            "endOfLine": "off"
           }
         ],
         // Avoid conflict rule between Prettier and Airbnb Eslint
