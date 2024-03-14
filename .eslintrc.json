@@ -11,7 +11,7 @@
       "error",
       {
         "singleQuote": true,
-        "endOfLine": "off"
+        "endOfLine": "auto"
       }
     ]
     // Avoid conflict rule between Prettier and Airbnb Eslint
@@ -40,13 +40,7 @@
         "project": "./tsconfig.json"
       },
       "rules": {
-        "prettier/prettier": [
-          "error",
-          {
-            "singleQuote": true,
-            "endOfLine": "off"
-          }
-        ],
+        "prettier/prettier": "off",
         // Avoid conflict rule between Prettier and Airbnb Eslint
         "import/extensions": "off",
         // Avoid missing file extension errors, TypeScript already provides a similar feature
