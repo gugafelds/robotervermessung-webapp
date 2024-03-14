@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 
 import { getTrajectories } from '@/src/actions/trajectory.service';
 import { Navbar } from '@/src/app/components/Navbar';
+import { Sidebar } from '@/src/app/components/Sidebar';
 import { json } from '@/src/lib/functions';
 import { AppProvider } from '@/src/providers/app.provider';
 
@@ -44,7 +45,10 @@ export default async function RootLayout({
       <body className={inter.className}>
         <AppProvider trajectoriesDb={json(trajectories)}>
           <Navbar />
-          {children}
+          <div className="flex flex-row">
+            <Sidebar />
+            {children}
+          </div>
           <SpeedInsights />
         </AppProvider>
       </body>

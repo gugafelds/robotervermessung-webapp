@@ -1,10 +1,10 @@
 'use client';
 
-import BarsIcon from '@heroicons/react/16/solid/Bars4Icon';
+import SettingsIcon from '@heroicons/react/16/solid/CogIcon';
 import Link from 'next/link';
 import { useState } from 'react';
 
-import { TrajectoriesSlideOver } from '@/src/app/components/TrajectoriesSlideOver';
+import { SettingsSlideOver } from '@/src/app/components/SettingsSlideOver';
 import { Typography } from '@/src/components/Typography';
 
 export const Navbar = () => {
@@ -21,13 +21,13 @@ export const Navbar = () => {
         <button
           type="button"
           className="ml-auto rounded-full px-3 py-0.5 text-base
-          text-primary transition hover:bg-gray-200"
+          text-primary transition hover:bg-gray-300"
           onClick={() => setOpen(!open)}
         >
-          <BarsIcon aria-label="bars" className="size-6" />
+          <SettingsIcon aria-label="bars" className="size-6" />
         </button>
       </div>
-      <TrajectoriesSlideOver open={open} setOpen={setOpen} />
+      <SettingsSlideOver open={open} setOpen={setOpen} />
     </header>
   );
 };

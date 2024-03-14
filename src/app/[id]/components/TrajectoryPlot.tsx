@@ -19,7 +19,7 @@ export default function TrajectoryPlot({
   const data: Data[] = [idealTrajectory, realTrajectory];
 
   return (
-    <div className="flex size-full w-full place-items-center justify-center">
+    <div className="flex size-full w-full">
       <Plot data={data} layout={plotLayoutConfig} />
     </div>
   );

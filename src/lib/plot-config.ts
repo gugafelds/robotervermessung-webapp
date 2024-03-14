@@ -24,8 +24,8 @@ export const plotLayoutConfig: Partial<Layout> = {
     bordercolor: '#FFFFFF',
     borderwidth: 2,
   },
-  width: 700,
-  height: 700,
+  width: 600,
+  height: 600,
   scene: {
     xaxis: { title: 'x [m]' },
     yaxis: { title: 'y [m]' },
