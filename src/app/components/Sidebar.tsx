@@ -4,7 +4,7 @@ import CollapseIcon from '@heroicons/react/20/solid/ChevronDoubleLeftIcon';
 import LogoIcon from '@heroicons/react/20/solid/ListBulletIcon';
 import classNames from 'classnames';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { redirect, usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 import { Typography } from '@/src/components/Typography';
@@ -16,6 +16,10 @@ export const Sidebar = () => {
   const pathname = usePathname();
   const [toggleCollapse, setToggleCollapse] = useState(false);
   const [isCollapsible, setIsCollapsible] = useState(false);
+
+  if (pathname === '/') {
+    redirect(`/${trajectories[0]._id}`);
+  }
 
   const onMouseOver = () => {
     setIsCollapsible(!isCollapsible);
