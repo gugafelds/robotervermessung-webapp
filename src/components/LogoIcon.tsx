@@ -1,6 +1,6 @@
-import * as React from "react";
+import * as React from 'react';
 
-function LogoIcon({ fill = "#3B81F6", ...rest }) {
+function LogoIcon({ fill = '#3B81F6', ...rest }) {
   return (
     <svg
       width={40}
