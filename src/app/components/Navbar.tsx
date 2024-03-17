@@ -14,7 +14,7 @@ export const Navbar = () => {
     <header className="bg-gray-200">
       <div className="mx-auto my-0 flex flex-row items-center px-6 py-3 ">
         <Link href="/">
-          <Typography as="h1" className="text-xl font-semibold text-primary">
+          <Typography as="h1" className="p-2 text-3xl font-bold text-primary">
             robotervermessung // dfg 47-1
           </Typography>
         </Link>

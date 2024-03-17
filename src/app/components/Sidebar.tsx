@@ -33,7 +33,7 @@ export const Sidebar = () => {
   });
 
   const collapseIconClasses = classNames(
-    'p-4 rounded bg-light-lighter absolute right-0 hover:bg-gray-100 transition-all',
+    'p-3 rounded bg-light-lighter absolute right-0 hover:bg-gray-100 transition-all',
     {
       'rotate-180': toggleCollapse,
     },
@@ -48,7 +48,7 @@ export const Sidebar = () => {
         trajectory.trajectoryType.toLowerCase().includes(filter.toLowerCase()) ||
         trajectory.robotName.toLowerCase().includes(filter.toLowerCase()) ||
         trajectory.recordingDate.toLowerCase().includes(filter.toLowerCase()),
-        //to-do: add parameter robotType (Victor muss es noch ergänzen)
+        // to-do: add parameter robotType (Victor muss es noch ergänzen)
     );
     setFilteredTrajectories(filtered);
   };
@@ -84,7 +84,7 @@ export const Sidebar = () => {
           )}
         </div>
       </div>
-      <SearchFilter onFilterChange={handleFilterChange} />
+      {!toggleCollapse && <SearchFilter onFilterChange={handleFilterChange} />}
       {!toggleCollapse && (
         <div className="mt-4">
           {filteredTrajectories.map((trajectory) => (
@@ -93,20 +93,20 @@ export const Sidebar = () => {
               href={`/${trajectory.dataId.toString()}`}
             >
               <div
-                className={`mt-1 p-5 betterhover:hover:bg-gray-200 ${
+                className={`mt-1 p-3 betterhover:hover:bg-gray-200 ${
                   pathname === `/${trajectory.dataId.toString()}`
                     ? 'bg-gray-200'
                     : ''
                 }`}
               >
-                <Typography as="h1" className="font-semibold text-primary">
-                  {trajectory.trajectoryType}
+                <Typography as="h1" className="font-extrabold text-primary">
+                  type: {trajectory.trajectoryType}
                 </Typography>
                 <Typography as="h3" className="font-semibold text-primary">
-                  {trajectory.robotName}
+                  robot name: {trajectory.robotName}
                 </Typography>
                 <Typography as="h5" className="text-primary">
-                  {formatDate(trajectory.recordingDate)}
+                  date: {formatDate(trajectory.recordingDate)}
                 </Typography>
               </div>
             </Link>

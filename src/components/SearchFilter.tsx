@@ -1,4 +1,4 @@
-import type { ChangeEvent} from 'react';
+import type { ChangeEvent } from 'react';
 import { useState } from 'react';
 
 type SearchFilterProps = {
@@ -18,9 +18,10 @@ const SearchFilter: React.FC<SearchFilterProps> = ({ onFilterChange }) => {
     <div>
       <input
         type="text"
-        placeholder="  filter trajectories"
+        placeholder="filter trajectories"
         value={filter}
         onChange={handleChange}
+        className='bg-gray-0 mt-3 h-10 w-full rounded-xl p-4 ps-4 text-lg font-extralight shadow-md'
       />
     </div>
   );
