@@ -39,7 +39,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts"
-  ],
+, "src/app/[id]/csv.js"  ],
   "exclude": [
     "node_modules"
   ]

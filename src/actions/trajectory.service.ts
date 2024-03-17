@@ -1,20 +1,18 @@
 'use server';
 
-import { ObjectId } from 'mongodb';
-
 import { getMongoDb } from '@/src/lib/mongodb';
 import {
   transformTrajectoriesResult,
   transformTrajectoryResult,
 } from '@/src/lib/transformer';
-import type { Trajectory, TrajectoryRaw } from '@/types/main';
+import type { AxisData, AxisDataRaw, TrajectoryRaw } from '@/types/main';
 
 export const getTrajectories = async () => {
   const mongo = await getMongoDb();
 
   const trajectoriesResult = await mongo
-    .collection('trajectories')
-    .find<TrajectoryRaw>({}, { projection: { data: 0 } })
+    .collection('header')
+    .find<TrajectoryRaw>({})
     .sort({ recording_date: -1 })
     .toArray();
 
@@ -25,12 +23,12 @@ export const getTrajectoryById = async (id: string) => {
   const mongo = await getMongoDb();
 
   const trajectoryResult = await mongo
-    .collection('trajectories')
-    .find<TrajectoryRaw>({ _id: new ObjectId(id) })
+    .collection('data')
+    .find<AxisDataRaw>({ trajectory_header_id: id })
     .next();
 
   if (!trajectoryResult) {
-    return {} as Trajectory;
+    return {} as AxisData;
   }
 
   return transformTrajectoryResult(trajectoryResult);

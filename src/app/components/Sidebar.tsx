@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { redirect, usePathname } from 'next/navigation';
 import { useState } from 'react';
 
+import SearchFilter from '@/src/components/SearchFilter';
 import { Typography } from '@/src/components/Typography';
 import { formatDate } from '@/src/lib/functions';
 import { useApp } from '@/src/providers/app.provider';
@@ -16,22 +17,20 @@ export const Sidebar = () => {
   const pathname = usePathname();
   const [toggleCollapse, setToggleCollapse] = useState(false);
   const [isCollapsible, setIsCollapsible] = useState(false);
+  const [filteredTrajectories, setFilteredTrajectories] = useState(trajectories);
 
   if (pathname === '/') {
-    redirect(`/${trajectories[0]._id}`);
+    redirect(`/${trajectories[0].dataId}`);
   }
 
   const onMouseOver = () => {
     setIsCollapsible(!isCollapsible);
   };
 
-  const wrapperClasses = classNames(
-    'h-screen p-4 bg-gray-100 flex justify-between flex-col',
-    {
-      'w-80': !toggleCollapse,
-      'w-20': toggleCollapse,
-    },
-  );
+  const wrapperClasses = classNames('h-screen p-4 bg-gray-100 flex flex-col', {
+    'w-80': !toggleCollapse,
+    'w-20': toggleCollapse,
+  });
 
   const collapseIconClasses = classNames(
     'p-4 rounded bg-light-lighter absolute right-0 hover:bg-gray-100 transition-all',
@@ -42,6 +41,16 @@ export const Sidebar = () => {
 
   const handleSidebarToggle = () => {
     setToggleCollapse(!toggleCollapse);
+  };
+
+  const handleFilterChange = (filter: string) => {
+    const filtered = trajectories.filter((trajectory) =>
+        trajectory.trajectoryType.toLowerCase().includes(filter.toLowerCase()) ||
+        trajectory.robotName.toLowerCase().includes(filter.toLowerCase()) ||
+        trajectory.recordingDate.toLowerCase().includes(filter.toLowerCase()),
+        //to-do: add parameter robotType (Victor muss es noch ergänzen)
+    );
+    setFilteredTrajectories(filtered);
   };
 
   return (
@@ -75,24 +84,28 @@ export const Sidebar = () => {
           )}
         </div>
       </div>
+      <SearchFilter onFilterChange={handleFilterChange} />
       {!toggleCollapse && (
         <div className="mt-4">
-          {trajectories.map((trajectory) => (
+          {filteredTrajectories.map((trajectory) => (
             <Link
-              key={trajectory._id.toString()}
-              href={`/${trajectory._id.toString()}`}
+              key={trajectory.dataId.toString()}
+              href={`/${trajectory.dataId.toString()}`}
             >
               <div
                 className={`mt-1 p-5 betterhover:hover:bg-gray-200 ${
-                  pathname === `/${trajectory._id.toString()}`
+                  pathname === `/${trajectory.dataId.toString()}`
                     ? 'bg-gray-200'
                     : ''
                 }`}
               >
-                <Typography as="h2" className="font-semibold text-primary">
+                <Typography as="h1" className="font-semibold text-primary">
+                  {trajectory.trajectoryType}
+                </Typography>
+                <Typography as="h3" className="font-semibold text-primary">
                   {trajectory.robotName}
                 </Typography>
-                <Typography as="h4" className="text-primary">
+                <Typography as="h5" className="text-primary">
                   {formatDate(trajectory.recordingDate)}
                 </Typography>
               </div>

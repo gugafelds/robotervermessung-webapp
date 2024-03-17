@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+
 body {
   overscroll-behavior: none;
 }
@@ -12,4 +13,11 @@ button,
 select,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+*{
+  -ms-overflow-style: none;
+}
+::-webkit-scrollbar {
+  display: none;
 }

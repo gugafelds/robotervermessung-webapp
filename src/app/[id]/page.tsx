@@ -12,17 +12,17 @@ export default async function TrajectoryPage({ params }: TrajectoryPageProps) {
   const trajectory = await getTrajectoryById(params.id);
 
   const realTrajectory: Partial<PlotData> = {
-    ...dataPlotConfig('Ist'),
-    x: trajectory.data.xIst,
-    y: trajectory.data.yIst,
-    z: trajectory.data.zIst,
+    ...dataPlotConfig('ist'),
+    x: trajectory.xIst,
+    y: trajectory.yIst,
+    z: trajectory.zIst,
   };
 
   const idealTrajectory: Partial<PlotData> = {
-    ...dataPlotConfig('Soll'),
-    x: trajectory.data.xSoll,
-    y: trajectory.data.ySoll,
-    z: trajectory.data.zSoll,
+    ...dataPlotConfig('soll'),
+    x: trajectory.xSoll,
+    y: trajectory.ySoll,
+    z: trajectory.zSoll,
   };
 
   return (
