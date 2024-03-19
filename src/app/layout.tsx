@@ -5,7 +5,11 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import type { ReactNode } from 'react';
 
-import { getTrajectories } from '@/src/actions/trajectory.service';
+import {
+  getTrajectoriesData,
+  getTrajectoriesHeader,
+  getTrajectoryById,
+} from '@/src/actions/trajectory.service';
 import { Navbar } from '@/src/app/components/Navbar';
 import { Sidebar } from '@/src/app/components/Sidebar';
 import { json } from '@/src/lib/functions';
@@ -34,16 +38,26 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({
   children,
+  id,
 }: {
   children: ReactNode;
+  id: string;
 }) {
-  const trajectories = await getTrajectories();
+  const trajectoriesHeader = await getTrajectoriesHeader();
+  const trajectoriesData = await getTrajectoriesData();
+  const currentTrajectory = await getTrajectoryById(id);
+
+  console.log(trajectoriesData[0]);
 
   return (
     <html lang="en">
       <head />
       <body className={inter.className}>
-        <AppProvider trajectoriesDb={json(trajectories)}>
+        <AppProvider
+          trajectoriesHeaderDB={json(trajectoriesHeader)}
+          trajectoriesDataDB={json(trajectoriesData)}
+          currentTrajectoryDB={json(currentTrajectory)}
+        >
           <Navbar />
           <div className="flex flex-row">
             <Sidebar />

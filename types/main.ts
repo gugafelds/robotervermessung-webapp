@@ -1,6 +1,6 @@
 import type { ObjectId } from 'mongodb';
 
-export interface AxisDataRaw {
+export interface TrajectoryDataRaw {
   _id: ObjectId | string;
   trajectory_header_id: string;
   timestamp_ist: number[];
@@ -23,7 +23,7 @@ export interface AxisDataRaw {
   joint_states_soll: number[][];
 }
 
-export interface AxisData {
+export interface TrajectoryData {
   _id: ObjectId | string;
   trajectoryHeaderId: string;
   timestampIst: number[];
@@ -46,9 +46,23 @@ export interface AxisData {
   jointStatesSoll: number[][];
 }
 
+export interface TrajectoryHeaderRaw {
+  _id: ObjectId | string;
+  data_id: string;
+  robot_name: string;
+  trajectory_type: string;
+  carthesian: boolean;
+  path_solver: string;
+  recording_date: string;
+  real_robot: boolean;
+  number_of_points_ist: number;
+  number_of_points_soll: number;
+  sample_frequency_ist: number;
+  sample_frequency_soll: number;
+}
 
 
-export interface Trajectory {
+export interface TrajectoryHeader {
   _id: ObjectId | string;
   dataId: string;
   robotName: string;

@@ -13,14 +13,15 @@ import { formatDate } from '@/src/lib/functions';
 import { useApp } from '@/src/providers/app.provider';
 
 export const Sidebar = () => {
-  const { trajectories } = useApp();
+  const { trajectoriesHeader } = useApp();
   const pathname = usePathname();
   const [toggleCollapse, setToggleCollapse] = useState(false);
   const [isCollapsible, setIsCollapsible] = useState(false);
-  const [filteredTrajectories, setFilteredTrajectories] = useState(trajectories);
+  const [filteredTrajectories, setFilteredTrajectories] =
+    useState(trajectoriesHeader);
 
   if (pathname === '/') {
-    redirect(`/${trajectories[0].dataId}`);
+    redirect(`/${trajectoriesHeader[0].dataId}`);
   }
 
   const onMouseOver = () => {
@@ -44,11 +45,14 @@ export const Sidebar = () => {
   };
 
   const handleFilterChange = (filter: string) => {
-    const filtered = trajectories.filter((trajectory) =>
-        trajectory.trajectoryType.toLowerCase().includes(filter.toLowerCase()) ||
+    const filtered = trajectoriesHeader.filter(
+      (trajectory) =>
+        trajectory.trajectoryType
+          .toLowerCase()
+          .includes(filter.toLowerCase()) ||
         trajectory.robotName.toLowerCase().includes(filter.toLowerCase()) ||
         trajectory.recordingDate.toLowerCase().includes(filter.toLowerCase()),
-        // to-do: add parameter robotType (Victor muss es noch ergänzen)
+      // to-do: add parameter robotType (Victor muss es noch ergänzen)
     );
     setFilteredTrajectories(filtered);
   };

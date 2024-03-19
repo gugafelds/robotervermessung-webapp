@@ -1,41 +1,51 @@
+'use client';
+
 import { usePathname } from 'next/navigation';
 import { CSVLink } from 'react-csv';
-
 import SlideOver from '@/src/components/SlideOver';
 import { Typography } from '@/src/components/Typography';
 import { useApp } from '@/src/providers/app.provider';
-
+import { json } from '@/src/lib/functions';
 
 type AddListSlideOverProps = {
   open: boolean;
   setOpen: (open: boolean) => void;
+
 };
 
-export const SettingsSlideOver = ({ setOpen, open }: AddListSlideOverProps) => {
-  const { trajectories } = useApp();
-  const { currentTrajectory } = useApp();
+export const SettingsSlideOver = ({ setOpen, open}: AddListSlideOverProps) => { 
+  const { trajectoriesHeader, trajectoriesData } = useApp();
   const pathname = usePathname();
   const searchedIndex = pathname.substring(1, pathname.length);
 
-  const currentTrajectoryIndex = trajectories.findIndex(
+  const currentTrajectoryIndex = trajectoriesHeader.findIndex(
     (item) => item.dataId === searchedIndex,
   );
   
-  const currentTrajectoryData = trajectories[currentTrajectoryIndex];
+  const currentTrajectoryHeader = trajectoriesHeader[currentTrajectoryIndex];
+  const currentTrajectoryData = trajectoriesData[currentTrajectoryIndex];
 
-  console.log(currentTrajectory)
+  const headerKeys = Object.keys(currentTrajectoryHeader).filter(
+    (key) => !key.includes('_'),
+  );
 
-  // final das contas eu consegui é fazer quase porra nenhuma do .csv
-  // minha ideia era que eu pudesse ler o Index da atual trajetória e poder gerar automaticamente os headers do .csv
-  // com isso, eu iria imprimir todos os valores que eu tenho dos arquivos .json em .csv de posição e orientação do robô
+  const dataKeys = Object.keys(currentTrajectoryData).filter(
+    (key) => !key.includes('_'),
+  );
 
+  const createHeaderArray = (keys: any[]) => {
+    return keys.map(key => ({ label: String(key), key }));
+  };
 
-  const data = [['robot_name', trajectories[searchedIndex]]];
+  const combinedHeaders = [...createHeaderArray(headerKeys), ...createHeaderArray(dataKeys)];
+
+  const csvData = [combinedHeaders];
+
 
   return (
     <SlideOver title="options" open={open} onClose={() => setOpen(false)}>
       <div className="cursor-pointer p-5 betterhover:hover:bg-gray-200">
-        <CSVLink data={data}>save to .csv</CSVLink>
+        <CSVLink data={json(csvData)}>save to .csv</CSVLink>
       </div>
     </SlideOver>
   );

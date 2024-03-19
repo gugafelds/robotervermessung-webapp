@@ -2,21 +2,42 @@
 
 import { getMongoDb } from '@/src/lib/mongodb';
 import {
-  transformTrajectoriesResult,
+  transformTrajectoriesDataResult,
+  transformTrajectoriesHeadersResult,
   transformTrajectoryResult,
 } from '@/src/lib/transformer';
-import type { AxisData, AxisDataRaw, Trajectory } from '@/types/main';
+import type {
+  TrajectoryData,
+  TrajectoryDataRaw,
+  TrajectoryHeaderRaw,
+} from '@/types/main';
 
-export const getTrajectories = async () => {
+export const getTrajectoriesHeader = async () => {
   const mongo = await getMongoDb();
 
-  const trajectoriesResult = await mongo
+  const trajectoriesHeaderResult = await mongo
     .collection('header')
-    .find<Trajectory>({})
+    .find<TrajectoryHeaderRaw>({})
     .sort({ recording_date: -1 })
     .toArray();
 
-  return transformTrajectoriesResult(trajectoriesResult);
+  return transformTrajectoriesHeadersResult(trajectoriesHeaderResult);
+};
+
+export const getTrajectoriesData = async () => {
+  const mongo = await getMongoDb();
+
+  const trajectoriesDataResult = await mongo
+    .collection('data')
+    .find<TrajectoryDataRaw>({})
+    .sort({ recording_date: -1 })
+    .toArray();
+
+  if (!trajectoriesDataResult) {
+    return {} as TrajectoryData[];
+  }
+
+  return transformTrajectoriesDataResult(trajectoriesDataResult);
 };
 
 export const getTrajectoryById = async (id: string) => {
@@ -24,11 +45,11 @@ export const getTrajectoryById = async (id: string) => {
 
   const trajectoryResult = await mongo
     .collection('data')
-    .find<AxisDataRaw>({ trajectory_header_id: id })
+    .find<TrajectoryDataRaw>({ trajectory_header_id: id })
     .next();
 
   if (!trajectoryResult) {
-    return {} as AxisData;
+    return {} as TrajectoryData;
   }
 
   return transformTrajectoryResult(trajectoryResult);
