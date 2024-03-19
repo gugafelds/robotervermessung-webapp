@@ -22,7 +22,9 @@
     "classnames": "^2.5.1",
     "export-to-csv": "^1.2.4",
     "graceful-fs": "^4.2.11",
-    "mongodb": "^6.3.0",
+    "mongodb": "^6.5.0",
+    "mongodb-uri": "^0.9.7",
+    "mongoose": "^8.2.2",
     "next": "^14.0.4",
     "plotly.js": "^2.30.0",
     "react": "^18.2.0",
@@ -62,5 +64,10 @@
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3"
-  }
+  },
+  "description": "This example uses [`next-pwa`](https://github.com/shadowwalker/next-pwa) to create a progressive web app (PWA) powered by [Workbox](https://developers.google.com/web/tools/workbox/).",
+  "main": "ReactCSV.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }

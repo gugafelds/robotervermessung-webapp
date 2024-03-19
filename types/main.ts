@@ -46,20 +46,6 @@ export interface AxisData {
   jointStatesSoll: number[][];
 }
 
-export interface TrajectoryRaw {
-  _id: ObjectId | string;
-  data_id: string;
-  robot_name: string;
-  trajectory_type: string;
-  carthesian: boolean;
-  path_solver: string;
-  recording_date: string;
-  real_robot: boolean;
-  number_of_points_ist: number;
-  number_of_points_soll: number;
-  sample_frequency_ist: number;
-  sample_frequency_soll: number;
-}
 
 
 export interface Trajectory {

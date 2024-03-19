@@ -5,14 +5,14 @@ import {
   transformTrajectoriesResult,
   transformTrajectoryResult,
 } from '@/src/lib/transformer';
-import type { AxisData, AxisDataRaw, TrajectoryRaw } from '@/types/main';
+import type { AxisData, AxisDataRaw, Trajectory } from '@/types/main';
 
 export const getTrajectories = async () => {
   const mongo = await getMongoDb();
 
   const trajectoriesResult = await mongo
     .collection('header')
-    .find<TrajectoryRaw>({})
+    .find<Trajectory>({})
     .sort({ recording_date: -1 })
     .toArray();
 
