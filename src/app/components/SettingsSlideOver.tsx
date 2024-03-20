@@ -1,3 +1,4 @@
+import type { ObjectId } from 'mongodb';
 import { usePathname } from 'next/navigation';
 import { CSVLink } from 'react-csv';
 
@@ -5,77 +6,86 @@ import SlideOver from '@/src/components/SlideOver';
 import { useApp } from '@/src/providers/app.provider';
 import type { TrajectoryData } from '@/types/main';
 
-type AddListSlideOverProps = {
+interface SettingsSlideOverProps {
   open: boolean;
   setOpen: (open: boolean) => void;
-};
+}
 
-type Row = {
-  [key: string]: any;
-};
+interface CSVRow {
+  [key: string]:
+    | ObjectId
+    | number[]
+    | string
+    | number
+    | boolean
+    | null
+    | undefined;
+}
 
-export const SettingsSlideOver = ({ setOpen, open }: AddListSlideOverProps) => {
+export const SettingsSlideOver = ({
+  setOpen,
+  open,
+}: SettingsSlideOverProps) => {
   const { trajectoriesData } = useApp();
   const searchedIndex = usePathname().substring(1);
 
-  const trajectoryData: TrajectoryData[] = [];
-
-  if (searchedIndex !== '') {
-    const currentTrajectoryIndex = trajectoriesData.findIndex(
-      (item) => item.trajectoryHeaderId === searchedIndex,
-    );
-
-    if (currentTrajectoryIndex !== -1) {
-      trajectoryData.push(trajectoriesData[currentTrajectoryIndex]);
+  const filterTrajectoriesData = (): TrajectoryData[] => {
+    if (searchedIndex !== '') {
+      return trajectoriesData.filter(
+        (item: TrajectoryData) => item.trajectoryHeaderId === searchedIndex,
+      );
     }
-  }
+    return [];
+  };
 
-  // Encontrando o maior comprimento de array
-  const maxArrayLength = Math.max(
-    ...trajectoryData.flatMap((curr) =>
-      Object.values(curr)
-        .filter((val) => Array.isArray(val))
-        .map((arr) => arr.length),
-    ),
-  );
+  const getCSVData = (data: TrajectoryData[]): CSVRow[] => {
+    let maxLength = 0;
 
-  // Criando um conjunto para armazenar IDs únicos
-  const uniqueIds = new Set();
-  const uniqueHeaderIds = new Set();
-
-  // Remodelando os dados para cada linha no CSV
-  const csvData = trajectoryData.reduce((acc, curr) => {
-    // Adicionando ID único ao conjunto
-    uniqueIds.add(curr._id);
-    uniqueHeaderIds.add(curr.trajectoryHeaderId);
-
-    // Iterando sobre o comprimento máximo do array
-    for (let i = 0; i < maxArrayLength; i += 1) {
-      const row: Row = []; // Tipagem explícita para row
-
-      // Adicionando cada valor correspondente ao objeto da linha
-      Object.keys(curr).forEach((key) => {
-        if (Array.isArray(curr[key as keyof TrajectoryData])) {
-          // Usando o índice i para pegar o valor correspondente do array, ou vazio se não houver elemento
-          row[key] = (curr[key as keyof TrajectoryData] as number[])[i] ?? '';
-        } else if (!key.includes('_')) {
-          // Adicionando o ID, trajectoryHeaderId ou keys sem underscore apenas uma vez
-          row[key] = i === 0 ? curr[key as keyof TrajectoryData] : '';
+    // Encontrar o comprimento máximo de array em todos os cabeçalhos
+    data.forEach((item: TrajectoryData) => {
+      Object.keys(item).forEach((key: string) => {
+        if (Array.isArray(item[key as keyof TrajectoryData])) {
+          maxLength = Math.max(
+            maxLength,
+            (item[key as keyof TrajectoryData] as any[]).length,
+          );
         }
       });
+    });
 
-      acc.push(); // Adicionando a linha remodelada ao acumulador
-    }
+    return data.reduce((acc: CSVRow[], curr: TrajectoryData) => {
+      const rows: CSVRow[] = [];
 
-    return acc;
-  }, []);
+      // Criar uma linha para cada elemento do array de maior comprimento
+      for (let i = 0; i < maxLength; i += 1) {
+        const row: CSVRow = {};
 
-  const headers = Object.keys(trajectoryData[0])
-    .filter((key) => !key.includes('_'))
-    .map((key) => ({
-      label: key,
-      key,
-    }));
+        Object.keys(curr).forEach((key: string) => {
+          if (!key.includes('_')) {
+            // Ignorar variáveis com sublinhados no nome
+            if (Array.isArray(curr[key as keyof TrajectoryData])) {
+              row[key] = (curr[key as keyof TrajectoryData] as any[])[i] ?? ''; // Usar o elemento correspondente do array
+            } else {
+              row[key] = curr[key as keyof TrajectoryData];
+            }
+          }
+        });
+
+        rows.push(row);
+      }
+
+      acc.push(...rows);
+      return acc;
+    }, []);
+  };
+
+  const trajectoryData: TrajectoryData[] = filterTrajectoriesData();
+  const csvData: CSVRow[] = getCSVData(trajectoryData);
+
+  const headers = Object.keys(csvData[0] || {}).map((key: string) => ({
+    label: key,
+    key,
+  }));
 
   const csvTrajectory = {
     data: csvData,
@@ -87,7 +97,7 @@ export const SettingsSlideOver = ({ setOpen, open }: AddListSlideOverProps) => {
     <SlideOver title="options" open={open} onClose={() => setOpen(false)}>
       <div className="cursor-pointer p-5 betterhover:hover:bg-gray-300">
         <CSVLink {...csvTrajectory} separator=";">
-          save to .csv
+          Save to .csv
         </CSVLink>
       </div>
     </SlideOver>
