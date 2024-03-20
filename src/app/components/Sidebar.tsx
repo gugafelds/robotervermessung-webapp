@@ -107,7 +107,7 @@ export const Sidebar = () => {
                   type: {trajectory.trajectoryType}
                 </Typography>
                 <Typography as="h3" className="font-semibold text-primary">
-                  robot name: {trajectory.robotName}
+                  robot model: {trajectory.robotModel}
                 </Typography>
                 <Typography as="h5" className="text-primary">
                   date: {formatDate(trajectory.recordingDate)}

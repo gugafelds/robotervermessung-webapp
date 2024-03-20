@@ -25,7 +25,7 @@ export const TrajectoryContainer = ({
   const { setCurrentTrajectory } = useApp();
   useEffect(() => {
     setCurrentTrajectory(currentTrajectory);
-  }, []);
+  }, [currentTrajectory, setCurrentTrajectory]);
 
   return (
     <main>

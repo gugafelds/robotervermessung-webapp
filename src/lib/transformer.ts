@@ -27,8 +27,8 @@ export const transformTrajectoryResult = (
   q2Soll: trajectoryRaw.q2_soll,
   q3Soll: trajectoryRaw.q3_soll,
   q4Soll: trajectoryRaw.q4_soll,
-  jointStatesIst: trajectoryRaw.joint_states_ist,
-  jointStatesSoll: trajectoryRaw.joint_states_soll,
+  jointStateIst: trajectoryRaw.joint_state_ist,
+  jointStateSoll: trajectoryRaw.joint_state_soll,
 });
 
 export const transformTrajectoriesDataResult = (
@@ -55,8 +55,8 @@ export const transformTrajectoriesDataResult = (
       q2Soll: trajectoryRaw.q2_soll,
       q3Soll: trajectoryRaw.q3_soll,
       q4Soll: trajectoryRaw.q4_soll,
-      jointStatesIst: trajectoryRaw.joint_states_ist,
-      jointStatesSoll: trajectoryRaw.joint_states_soll,
+      jointStateIst: trajectoryRaw.joint_state_ist,
+      jointStateSoll: trajectoryRaw.joint_state_soll,
     }),
   );
 };
@@ -70,6 +70,7 @@ export const transformTrajectoriesHeadersResult = (
       _id: trajectory._id,
       dataId: trajectory.data_id,
       robotName: trajectory.robot_name,
+      robotModel: trajectory.robot_model,
       trajectoryType: trajectory.trajectory_type,
       carthesian: trajectory.carthesian,
       pathSolver: trajectory.path_solver,

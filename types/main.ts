@@ -19,8 +19,8 @@ export interface TrajectoryDataRaw {
   q2_soll: number[];
   q3_soll: number[];
   q4_soll: number[];
-  joint_states_ist: number[][];
-  joint_states_soll: number[][];
+  joint_state_ist: number[];
+  joint_state_soll: number[];
 }
 
 export interface TrajectoryData {
@@ -42,14 +42,15 @@ export interface TrajectoryData {
   q2Soll: number[];
   q3Soll: number[];
   q4Soll: number[];
-  jointStatesIst: number[][];
-  jointStatesSoll: number[][];
+  jointStateIst: number[];
+  jointStateSoll: number[];
 }
 
 export interface TrajectoryHeaderRaw {
   _id: ObjectId | string;
   data_id: string;
   robot_name: string;
+  robot_model: string;
   trajectory_type: string;
   carthesian: boolean;
   path_solver: string;
@@ -61,11 +62,11 @@ export interface TrajectoryHeaderRaw {
   sample_frequency_soll: number;
 }
 
-
 export interface TrajectoryHeader {
   _id: ObjectId | string;
   dataId: string;
   robotName: string;
+  robotModel: string;
   trajectoryType: string;
   carthesian: boolean;
   pathSolver: string;

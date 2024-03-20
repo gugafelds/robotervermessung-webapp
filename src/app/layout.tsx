@@ -47,8 +47,6 @@ export default async function RootLayout({
   const trajectoriesData = await getTrajectoriesData();
   const currentTrajectory = await getTrajectoryById(id);
 
-  console.log(trajectoriesData[0]);
-
   return (
     <html lang="en">
       <head />
