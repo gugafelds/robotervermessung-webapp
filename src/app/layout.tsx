@@ -8,10 +8,8 @@ import type { ReactNode } from 'react';
 import {
   getTrajectoriesData,
   getTrajectoriesHeader,
-  getTrajectoryById,
 } from '@/src/actions/trajectory.service';
 import { Navbar } from '@/src/app/components/Navbar';
-import { Sidebar } from '@/src/app/components/Sidebar';
 import { json } from '@/src/lib/functions';
 import { AppProvider } from '@/src/providers/app.provider';
 
@@ -38,14 +36,11 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({
   children,
-  id,
 }: {
   children: ReactNode;
-  id: string;
 }) {
   const trajectoriesHeader = await getTrajectoriesHeader();
   const trajectoriesData = await getTrajectoriesData();
-  const currentTrajectory = await getTrajectoryById(id);
 
   return (
     <html lang="en">
@@ -54,13 +49,9 @@ export default async function RootLayout({
         <AppProvider
           trajectoriesHeaderDB={json(trajectoriesHeader)}
           trajectoriesDataDB={json(trajectoriesData)}
-          currentTrajectoryDB={json(currentTrajectory)}
         >
           <Navbar />
-          <div className="flex flex-row">
-            <Sidebar />
-            {children}
-          </div>
+          {children}
           <SpeedInsights />
         </AppProvider>
       </body>

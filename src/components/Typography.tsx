@@ -29,7 +29,7 @@ const TypographyComponent = (
         {
           ...rest,
           ref,
-          className,
+          className: 'text-3xl font-bold text-primary',
         },
         children,
       );
@@ -40,7 +40,7 @@ const TypographyComponent = (
         {
           ...rest,
           ref,
-          className,
+          className: 'text-2xl font-semibold text-primary',
         },
         children,
       );
@@ -51,7 +51,7 @@ const TypographyComponent = (
         {
           ...rest,
           ref,
-          className,
+          className: 'text-xl font-normal text-primary mt-6',
         },
         children,
       );
@@ -62,7 +62,7 @@ const TypographyComponent = (
         {
           ...rest,
           ref,
-          className,
+          className: 'text-3xl font-semibold text-primary mt-8',
         },
         children,
       );
@@ -73,7 +73,7 @@ const TypographyComponent = (
         {
           ...rest,
           ref,
-          className,
+          className: 'text-lg font-light text-primary',
         },
         children,
       );

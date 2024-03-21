@@ -19,8 +19,16 @@ export default function TrajectoryPlot({
   const data: Data[] = [idealTrajectory, realTrajectory];
 
   return (
-    <div className="flex size-full w-full">
-      <Plot data={data} layout={plotLayoutConfig} />
+    <div className="flex">
+      <Plot
+        data={data}
+        layout={plotLayoutConfig}
+        config={{
+          displaylogo: false,
+          modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+          fillFrame: true,
+        }}
+      />
     </div>
   );
 }

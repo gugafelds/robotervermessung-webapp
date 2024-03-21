@@ -11,14 +11,35 @@ export const dataPlotConfig = (name: string) =>
   }) as Partial<PlotData>;
 
 export const plotLayoutConfig: Partial<Layout> = {
-  legend: {
-    x: 0,
-    y: 1,
-    traceorder: 'normal',
+  title: {
+    text: '3D position plot',
+    yref: 'paper',
     font: {
-      family: 'sans-serif',
-      size: 14,
-      color: '#000',
+      size: 30,
+      family: 'Arial, sans-serif',
+      color: '#003560',
+    },
+    pad: {
+      r: 90,
+    },
+  },
+  modebar: {
+    orientation: 'v',
+    color: '#E2E2E2',
+  },
+  hovermode: 'closest',
+  margin: {
+    l: 1,
+    b: 1,
+    r: 5,
+  },
+  legend: {
+    x: 1,
+    y: 0,
+    traceorder: 'grouped',
+    font: {
+      family: 'Tahoma, sans-serif',
+      size: 15,
     },
     bgcolor: '#E2E2E2',
     bordercolor: '#FFFFFF',

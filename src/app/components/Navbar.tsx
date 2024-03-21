@@ -1,33 +1,34 @@
 'use client';
 
-import SettingsIcon from '@heroicons/react/16/solid/CogIcon';
 import Link from 'next/link';
-import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 
-import { SettingsSlideOver } from '@/src/app/components/SettingsSlideOver';
 import { Typography } from '@/src/components/Typography';
 
 export const Navbar = () => {
-  const [open, setOpen] = useState(false);
-
+  const pathname = usePathname();
   return (
     <header className="bg-gray-200">
-      <div className="mx-auto my-0 flex flex-row items-center px-6 py-3 ">
+      <div className="mx-auto my-0 flex flex-row items-center px-6 py-4">
         <Link href="/">
-          <Typography as="h1" className="p-2 text-3xl font-bold text-primary">
-            robotervermessung // dfg 47-1
-          </Typography>
+          <div
+            className={`flex flex-row items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300 ${
+              pathname === `/` ? 'bg-gray-300' : ''
+            }`}
+          >
+            <Typography as="h1">robotervermessung // dfg 47-1</Typography>
+          </div>
         </Link>
-        <button
-          type="button"
-          className="ml-auto rounded-full px-3 py-0.5 text-base
-          text-primary transition hover:bg-gray-300"
-          onClick={() => setOpen(!open)}
-        >
-          <SettingsIcon aria-label="bars" className="size-6" />
-        </button>
+        <Link href="/trajectories">
+          <div
+            className={`mx-20 my-0 flex flex-row items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300 ${
+              pathname.slice(1, 13) === `trajectories` ? 'bg-gray-300' : ''
+            }`}
+          >
+            <Typography as="h2">trajectories</Typography>
+          </div>
+        </Link>
       </div>
-      <SettingsSlideOver open={open} setOpen={setOpen} />
     </header>
   );
 };

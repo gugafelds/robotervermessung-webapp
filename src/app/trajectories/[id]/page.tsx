@@ -7,7 +7,8 @@ import {
 import { json } from '@/src/lib/functions';
 import { dataPlotConfig } from '@/src/lib/plot-config';
 
-import { TrajectoryContainer } from './components/TrajectoryContainer';
+import TrajectoryPlot from './components/TrajectoryPlot';
+import TrajectorySidebar from './components/TrajectorySidebar';
 
 type TrajectoryPageProps = {
   params: { id: string };
@@ -32,11 +33,15 @@ export default async function TrajectoryPage({ params }: TrajectoryPageProps) {
   };
 
   return (
-    <TrajectoryContainer
-      currentTrajectory={json(currentTrajectory)}
-      idealTrajectory={json(idealTrajectory)}
-      realTrajectory={json(realTrajectory)}
-      trajectoriesHeader={json(trajectoriesHeader)}
-    />
+    <div className="flex space-x-32">
+      <TrajectorySidebar
+        currentTrajectory={json(currentTrajectory)}
+        trajectoriesHeader={json(trajectoriesHeader)}
+      />
+      <TrajectoryPlot
+        idealTrajectory={json(idealTrajectory)}
+        realTrajectory={json(realTrajectory)}
+      />
+    </div>
   );
 }
