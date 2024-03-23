@@ -1,6 +1,7 @@
 'use client';
 
 import OptionsIcon from '@heroicons/react/24/outline/CogIcon';
+import ErrorIcon from '@heroicons/react/24/outline/FaceFrownIcon';
 import InfoIcon from '@heroicons/react/24/outline/InformationCircleIcon';
 import React from 'react';
 import { CSVLink } from 'react-csv';
@@ -23,10 +24,16 @@ export default function TrajectorySidebar({
     (item) => item.dataId === searchedIndex,
   );
 
-  if (trajectoriesHeader.length === 0 || currentTrajectoryID === -1) {
-    return <Typography as="h1">no trajectory found</Typography>;
+  if (currentTrajectoryID === -1) {
+    return (
+      <span className="inline-flex flex-row justify-center p-10">
+        <Typography as="h2">no trajectory found</Typography>
+        <span>
+          <ErrorIcon className="mx-2 my-0.5 w-7 " />
+        </span>
+      </span>
+    );
   }
-
   const currentTrajectoryData = trajectoriesHeader[currentTrajectoryID];
 
   const csvData = getCSVData(currentTrajectory);
@@ -71,8 +78,8 @@ export default function TrajectorySidebar({
           options
         </span>
       </span>
-      <CSVLink {...csvTrajectory} separator=";" className="text-xl font-normal">
-        <div className="mx-2 rounded-xl px-6 py-4 transition-colors duration-200 ease-in betterhover:hover:bg-gray-200">
+      <CSVLink {...csvTrajectory} separator="," className="text-xl font-normal">
+        <div className="mx-2 w-fit rounded-xl px-6 py-4 text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200">
           save to .csv
         </div>
       </CSVLink>

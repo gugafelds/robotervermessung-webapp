@@ -38,9 +38,12 @@ export default async function TrajectoryPage({ params }: TrajectoryPageProps) {
         currentTrajectory={json(currentTrajectory)}
         trajectoriesHeader={json(trajectoriesHeader)}
       />
+
       <TrajectoryPlot
         idealTrajectory={json(idealTrajectory)}
         realTrajectory={json(realTrajectory)}
+        trajectoriesHeader={json(trajectoriesHeader)}
+        currentTrajectory={json(currentTrajectory)}
       />
     </div>
   );

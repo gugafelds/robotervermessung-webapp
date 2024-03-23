@@ -4,14 +4,12 @@ import { Typography } from '@/src/components/Typography';
 
 export const ProjectInfo = () => {
   return (
-    <section className="mx-10 mt-8 flex h-screen flex-col items-start text-justify">
-      <Typography as="h1" className="py-5">
-        projektinfo
-      </Typography>
+    <div className="flex-col text-balance sm:p-5 md:p-20 lg:p-40">
+      <Typography as="h1">projektinfo</Typography>
 
       <Typography as="h4">
         Autonome Messung und effiziente Speicherung von
-        Industrieroboterbewegungsdaten{' '}
+        Industrieroboterbewegungsdaten
       </Typography>
       <Typography as="h3">
         In diesem Projekt soll die Grundlage für eine
@@ -24,8 +22,8 @@ export const ProjectInfo = () => {
       </Typography>
       <Typography as="h3">
         Diese Website dient als Remote-Anwendung mit direkter Visualisierung der
-        Daten, die in der MongoDB-Atlas-Datenbank gespeichert sind.{' '}
+        Daten, die in der MongoDB-Atlas-Datenbank gespeichert sind.
       </Typography>
-    </section>
+    </div>
   );
 };
