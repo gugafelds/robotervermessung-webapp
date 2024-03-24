@@ -1,8 +1,8 @@
 import React from 'react';
 
-import { Sidebar } from './components/Sidebar';
+import { Sidebar } from '@/src/app/trajectories/components/Sidebar';
 
-export default async function TrajectoriesPageLayout({
+export default async function TrajectoryPageLayout({
   children,
 }: {
   children: React.ReactNode;

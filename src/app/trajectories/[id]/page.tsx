@@ -1,5 +1,5 @@
 import { getTrajectoryById } from '@/src/actions/trajectory.service';
-import { TrajectoryContainer } from '@/src/app/trajectories/[id]/components/TrajectoryContainer';
+import { TrajectoryContainer } from '@/src/app/trajectories/components/TrajectoryContainer';
 import { json } from '@/src/lib/functions';
 
 type TrajectoryPageProps = {
