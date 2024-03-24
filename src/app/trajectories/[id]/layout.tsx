@@ -8,7 +8,7 @@ export default async function TrajectoriesPageLayout({
   children: React.ReactNode;
 }) {
   return (
-    <main style={{ display: 'flex' }}>
+    <main className="flex">
       <Sidebar />
       <div>{children}</div>
     </main>

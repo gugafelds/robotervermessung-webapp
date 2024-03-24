@@ -2,10 +2,10 @@
 
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import dynamic from 'next/dynamic';
-import type { Data } from 'plotly.js';
+import type { PlotData } from 'plotly.js';
 
 import { Typography } from '@/src/components/Typography';
-import { plotLayoutConfig } from '@/src/lib/plot-config';
+import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
 import type { TrajectoryData, TrajectoryHeader } from '@/types/main';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -13,17 +13,25 @@ const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 type TrajectoryPlotProps = {
   trajectoriesHeader: TrajectoryHeader[];
   currentTrajectory: TrajectoryData;
-  idealTrajectory: Data;
-  realTrajectory: Data;
 };
 
-export default function TrajectoryPlot({
+export const TrajectoryPlot = ({
   trajectoriesHeader,
   currentTrajectory,
-  idealTrajectory,
-  realTrajectory,
-}: TrajectoryPlotProps) {
-  const data: Data[] = [idealTrajectory, realTrajectory];
+}: TrajectoryPlotProps) => {
+  const realTrajectory: Partial<PlotData> = {
+    ...dataPlotConfig('ist'),
+    x: currentTrajectory.xIst,
+    y: currentTrajectory.yIst,
+    z: currentTrajectory.zIst,
+  };
+
+  const idealTrajectory: Partial<PlotData> = {
+    ...dataPlotConfig('soll'),
+    x: currentTrajectory.xSoll,
+    y: currentTrajectory.ySoll,
+    z: currentTrajectory.zSoll,
+  };
 
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
   const currentTrajectoryID = trajectoriesHeader.findIndex(
@@ -44,7 +52,7 @@ export default function TrajectoryPlot({
   return (
     <div className="flex">
       <Plot
-        data={data}
+        data={[idealTrajectory, realTrajectory]}
         layout={plotLayoutConfig}
         config={{
           displaylogo: false,
@@ -54,4 +62,4 @@ export default function TrajectoryPlot({
       />
     </div>
   );
-}
+};
