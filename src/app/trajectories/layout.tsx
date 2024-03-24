@@ -1,16 +1,22 @@
 import React from 'react';
 
-import { Sidebar } from './components/Sidebar';
+import { getTrajectoriesHeader } from '@/src/actions/trajectory.service';
+import { Sidebar } from '@/src/app/trajectories/components/Sidebar';
+import { TrajectoryProvider } from '@/src/providers/trajectory.provider';
 
-export default async function TrajectoriesPageLayout({
+export default async function TrajectoriesLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const trajectoriesHeader = await getTrajectoriesHeader();
+
   return (
-    <main style={{ display: 'flex' }}>
-      <Sidebar />
-      <div>{children}</div>
-    </main>
+    <TrajectoryProvider trajectoriesHeaderDB={trajectoriesHeader}>
+      <main className="flex">
+        <Sidebar />
+        {children}
+      </main>
+    </TrajectoryProvider>
   );
 }

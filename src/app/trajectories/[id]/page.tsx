@@ -1,14 +1,6 @@
-import type { PlotData } from 'plotly.js';
-
-import {
-  getTrajectoriesHeader,
-  getTrajectoryById,
-} from '@/src/actions/trajectory.service';
-import { json } from '@/src/lib/functions';
-import { dataPlotConfig } from '@/src/lib/plot-config';
-
-import TrajectoryPlot from './components/TrajectoryPlot';
-import TrajectorySidebar from './components/TrajectorySidebar';
+import { getTrajectoryById } from '@/src/actions/trajectory.service';
+import { TrajectoryInfo } from '@/src/app/trajectories/[id]/components/TrajectoryInfo';
+import { TrajectoryPlot } from '@/src/app/trajectories/[id]/components/TrajectoryPlot';
 
 type TrajectoryPageProps = {
   params: { id: string };
@@ -16,35 +8,12 @@ type TrajectoryPageProps = {
 
 export default async function TrajectoryPage({ params }: TrajectoryPageProps) {
   const currentTrajectory = await getTrajectoryById(params.id);
-  const trajectoriesHeader = await getTrajectoriesHeader();
-
-  const realTrajectory: Partial<PlotData> = {
-    ...dataPlotConfig('ist'),
-    x: currentTrajectory.xIst,
-    y: currentTrajectory.yIst,
-    z: currentTrajectory.zIst,
-  };
-
-  const idealTrajectory: Partial<PlotData> = {
-    ...dataPlotConfig('soll'),
-    x: currentTrajectory.xSoll,
-    y: currentTrajectory.ySoll,
-    z: currentTrajectory.zSoll,
-  };
 
   return (
     <div className="flex space-x-32">
-      <TrajectorySidebar
-        currentTrajectory={json(currentTrajectory)}
-        trajectoriesHeader={json(trajectoriesHeader)}
-      />
+      <TrajectoryInfo currentTrajectory={currentTrajectory} />
 
-      <TrajectoryPlot
-        idealTrajectory={json(idealTrajectory)}
-        realTrajectory={json(realTrajectory)}
-        trajectoriesHeader={json(trajectoriesHeader)}
-        currentTrajectory={json(currentTrajectory)}
-      />
+      <TrajectoryPlot currentTrajectory={currentTrajectory} />
     </div>
   );
 }

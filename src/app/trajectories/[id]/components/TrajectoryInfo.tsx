@@ -8,17 +8,16 @@ import { CSVLink } from 'react-csv';
 
 import { Typography } from '@/src/components/Typography';
 import { getCSVData } from '@/src/lib/csv-utils';
+import { useTrajectory } from '@/src/providers/trajectory.provider';
 import type { TrajectoryData, TrajectoryHeader } from '@/types/main';
 
 type TrajectoryCardProps = {
   currentTrajectory: TrajectoryData;
-  trajectoriesHeader: TrajectoryHeader[];
 };
 
-export default function TrajectorySidebar({
-  currentTrajectory,
-  trajectoriesHeader,
-}: TrajectoryCardProps) {
+export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
+  const { trajectoriesHeader } = useTrajectory();
+
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
   const currentTrajectoryID = trajectoriesHeader.findIndex(
     (item) => item.dataId === searchedIndex,
@@ -78,11 +77,15 @@ export default function TrajectorySidebar({
           options
         </span>
       </span>
-      <CSVLink {...csvTrajectory} separator="," className="text-xl font-normal">
-        <div className="mx-2 w-fit rounded-xl px-6 py-4 text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200">
-          save to .csv
-        </div>
+      <CSVLink
+        {...csvTrajectory}
+        separator=","
+        className="mx-2 w-fit rounded-xl px-6 py-4 text-xl font-normal
+        text-primary shadow-md transition-colors duration-200
+        ease-in betterhover:hover:bg-gray-200"
+      >
+        save to <span className="italic">.csv</span>
       </CSVLink>
     </div>
   );
-}
+};
