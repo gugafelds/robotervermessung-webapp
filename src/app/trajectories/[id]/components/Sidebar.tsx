@@ -24,7 +24,9 @@ export const Sidebar = () => {
           .toLowerCase()
           .includes(filter.toLowerCase()) ||
         trajectory.robotName.toLowerCase().includes(filter.toLowerCase()) ||
-        trajectory.recordingDate.toLowerCase().includes(filter.toLowerCase()),
+        formatDate(trajectory.recordingDate.toLowerCase()).includes(
+          filter.toLowerCase(),
+        ),
       // to-do: add parameter robotType (Victor muss es noch ergänzen)
     );
     setFilteredTrajectories(filtered);
