@@ -4,7 +4,7 @@ import { getTrajectoriesHeader } from '@/src/actions/trajectory.service';
 import { Sidebar } from '@/src/app/trajectories/components/Sidebar';
 import { TrajectoryProvider } from '@/src/providers/trajectory.provider';
 
-export default async function TrajectoryPageLayout({
+export default async function TrajectoriesPageLayout({
   children,
 }: {
   children: React.ReactNode;
