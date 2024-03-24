@@ -1,6 +1,6 @@
 import { getTrajectoryById } from '@/src/actions/trajectory.service';
-import { TrajectoryContainer } from '@/src/app/trajectories/components/TrajectoryContainer';
-import { json } from '@/src/lib/functions';
+import { TrajectoryInfo } from '@/src/app/trajectories/[id]/components/TrajectoryInfo';
+import { TrajectoryPlot } from '@/src/app/trajectories/[id]/components/TrajectoryPlot';
 
 type TrajectoryPageProps = {
   params: { id: string };
@@ -9,5 +9,11 @@ type TrajectoryPageProps = {
 export default async function TrajectoryPage({ params }: TrajectoryPageProps) {
   const currentTrajectory = await getTrajectoryById(params.id);
 
-  return <TrajectoryContainer currentTrajectory={json(currentTrajectory)} />;
+  return (
+    <div className="flex space-x-32">
+      <TrajectoryInfo currentTrajectory={currentTrajectory} />
+
+      <TrajectoryPlot currentTrajectory={currentTrajectory} />
+    </div>
+  );
 }

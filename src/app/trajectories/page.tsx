@@ -2,10 +2,12 @@
 
 import { redirect } from 'next/navigation';
 
-import { useApp } from '@/src/providers/app.provider';
+import { useTrajectory } from '@/src/providers/trajectory.provider';
 
 export default function TrajectoriesPage() {
-  const { trajectoriesHeader } = useApp();
+  const {
+    trajectoriesHeader: [{ dataId }],
+  } = useTrajectory();
 
-  return redirect(`/trajectories/${trajectoriesHeader[0].dataId}`);
+  return redirect(`/trajectories/${dataId}`);
 }

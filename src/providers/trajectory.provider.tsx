@@ -5,21 +5,21 @@ import { createContext, useContext, useMemo, useState } from 'react';
 
 import type { TrajectoryHeader } from '@/types/main';
 
-export interface AppState {
+export interface TrajectoryState {
   trajectoriesHeader: TrajectoryHeader[];
 }
 
-type AppProviderProps = {
+type TrajectoryProviderProps = {
   children: ReactNode;
   trajectoriesHeaderDB: TrajectoryHeader[];
 };
 
-const AppContext = createContext<AppState>({} as AppState);
+const TrajectoryContext = createContext<TrajectoryState>({} as TrajectoryState);
 
-export const AppProvider = ({
+export const TrajectoryProvider = ({
   children,
   trajectoriesHeaderDB,
-}: AppProviderProps) => {
+}: TrajectoryProviderProps) => {
   const [trajectoriesHeader] = useState(trajectoriesHeaderDB);
 
   const contextValue = useMemo(
@@ -30,8 +30,11 @@ export const AppProvider = ({
   );
 
   return (
-    <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>
+    <TrajectoryContext.Provider value={contextValue}>
+      {children}
+    </TrajectoryContext.Provider>
   );
 };
 
-export const useApp = (): AppState => useContext(AppContext);
+export const useTrajectory = (): TrajectoryState =>
+  useContext(TrajectoryContext);

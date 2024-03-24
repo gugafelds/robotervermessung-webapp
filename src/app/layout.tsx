@@ -5,10 +5,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import type { ReactNode } from 'react';
 
-import { getTrajectoriesHeader } from '@/src/actions/trajectory.service';
 import { Navbar } from '@/src/app/components/Navbar';
-import { json } from '@/src/lib/functions';
-import { AppProvider } from '@/src/providers/app.provider';
 
 const inter = Inter({ subsets: ['latin'], display: 'swap' });
 
@@ -36,17 +33,13 @@ export default async function RootLayout({
 }: {
   children: ReactNode;
 }) {
-  const trajectoriesHeader = await getTrajectoriesHeader();
-
   return (
     <html lang="en">
       <head />
       <body className={inter.className}>
-        <AppProvider trajectoriesHeaderDB={json(trajectoriesHeader)}>
-          <Navbar />
-          {children}
-          <SpeedInsights />
-        </AppProvider>
+        <Navbar />
+        {children}
+        <SpeedInsights />
       </body>
     </html>
   );

@@ -8,26 +8,23 @@ import { useState } from 'react';
 
 import SearchFilter from '@/src/components/SearchFilter';
 import { Typography } from '@/src/components/Typography';
-import { formatDate } from '@/src/lib/functions';
-import { useApp } from '@/src/providers/app.provider';
+import { filterBy, formatDate } from '@/src/lib/functions';
+import { useTrajectory } from '@/src/providers/trajectory.provider';
 
 export const Sidebar = () => {
-  const { trajectoriesHeader } = useApp();
+  const { trajectoriesHeader } = useTrajectory();
   const pathname = usePathname();
+
   const [filteredTrajectories, setFilteredTrajectories] =
     useState(trajectoriesHeader);
 
   const handleFilterChange = (filter: string) => {
-    const filtered = trajectoriesHeader.filter(
-      (trajectory) =>
-        trajectory.trajectoryType
-          .toLowerCase()
-          .includes(filter.toLowerCase()) ||
-        trajectory.robotName.toLowerCase().includes(filter.toLowerCase()) ||
-        formatDate(trajectory.recordingDate.toLowerCase()).includes(
-          filter.toLowerCase(),
-        ),
-      // to-do: add parameter robotType (Victor muss es noch ergänzen)
+    const filtered = trajectoriesHeader.filter((trajectory) =>
+      filterBy(filter, [
+        trajectory.trajectoryType,
+        trajectory.robotName,
+        formatDate(trajectory.recordingDate),
+      ]),
     );
     setFilteredTrajectories(filtered);
   };
@@ -44,7 +41,9 @@ export const Sidebar = () => {
           </div>
         </div>
       </div>
+
       <SearchFilter onFilterChange={handleFilterChange} />
+
       <div className="mt-4">
         {filteredTrajectories.map((trajectory) => (
           <Link

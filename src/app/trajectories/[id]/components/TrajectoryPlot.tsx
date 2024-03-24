@@ -6,19 +6,18 @@ import type { PlotData } from 'plotly.js';
 
 import { Typography } from '@/src/components/Typography';
 import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
-import type { TrajectoryData, TrajectoryHeader } from '@/types/main';
+import { useTrajectory } from '@/src/providers/trajectory.provider';
+import type { TrajectoryData } from '@/types/main';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 type TrajectoryPlotProps = {
-  trajectoriesHeader: TrajectoryHeader[];
   currentTrajectory: TrajectoryData;
 };
 
-export const TrajectoryPlot = ({
-  trajectoriesHeader,
-  currentTrajectory,
-}: TrajectoryPlotProps) => {
+export const TrajectoryPlot = ({ currentTrajectory }: TrajectoryPlotProps) => {
+  const { trajectoriesHeader } = useTrajectory();
+
   const realTrajectory: Partial<PlotData> = {
     ...dataPlotConfig('ist'),
     x: currentTrajectory.xIst,
