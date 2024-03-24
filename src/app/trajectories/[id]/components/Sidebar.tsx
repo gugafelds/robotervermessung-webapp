@@ -3,7 +3,7 @@
 import LogoIcon from '@heroicons/react/20/solid/ListBulletIcon';
 import classNames from 'classnames';
 import Link from 'next/link';
-import { redirect, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 import SearchFilter from '@/src/components/SearchFilter';
@@ -16,10 +16,6 @@ export const Sidebar = () => {
   const pathname = usePathname();
   const [filteredTrajectories, setFilteredTrajectories] =
     useState(trajectoriesHeader);
-
-  if (pathname === '/trajectories') {
-    redirect(`/trajectories/${trajectoriesHeader[0].dataId}`);
-  }
 
   const handleFilterChange = (filter: string) => {
     const filtered = trajectoriesHeader.filter(
