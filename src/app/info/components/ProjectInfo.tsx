@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { Typography } from '@/src/components/Typography';
 
 export const ProjectInfo = () => {
@@ -11,6 +13,20 @@ export const ProjectInfo = () => {
         Autonome Messung und effiziente Speicherung von
         Industrieroboterbewegungsdaten
       </Typography>
+      <div className="my-2 flex w-fit flex-row rounded-lg bg-gray-50 p-4">
+        Deutsche Forschungsgemeinschaft - DFG-47-1
+        <span className="mx-10 inline-flex">
+          Projektnummer:
+          <span className="mx-2 inline-flex">
+            <Link
+              href="https://gepris.dfg.de/gepris/projekt/515675259"
+              className="font-extrabold"
+            >
+              515675259
+            </Link>
+          </span>
+        </span>
+      </div>
       <Typography as="h3">
         In diesem Projekt soll die Grundlage für eine
         Robotervermessungsdatenbank geschaffen werden, in der aufgezeichnete

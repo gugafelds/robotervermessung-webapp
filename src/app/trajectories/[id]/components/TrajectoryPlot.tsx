@@ -39,7 +39,7 @@ export const TrajectoryPlot = ({ currentTrajectory }: TrajectoryPlotProps) => {
 
   if (currentTrajectoryID === -1) {
     return (
-      <div className="m-10 w-fit place-items-baseline rounded-2xl bg-gray-300 p-10 shadow-xl">
+      <div className="m-10 size-fit place-items-baseline rounded-2xl bg-gray-300 p-10 shadow-xl">
         <div>
           <ExclamationTriangleIcon className="mx-auto w-16" color="#003560" />
         </div>

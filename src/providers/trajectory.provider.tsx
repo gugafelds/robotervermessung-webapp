@@ -5,6 +5,8 @@ import { createContext, useContext, useMemo, useState } from 'react';
 
 import type { TrajectoryHeader } from '@/types/main';
 
+import { json } from '../lib/functions';
+
 export interface TrajectoryState {
   trajectoriesHeader: TrajectoryHeader[];
 }
@@ -30,7 +32,7 @@ export const TrajectoryProvider = ({
   );
 
   return (
-    <TrajectoryContext.Provider value={contextValue}>
+    <TrajectoryContext.Provider value={json(contextValue)}>
       {children}
     </TrajectoryContext.Provider>
   );
