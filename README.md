@@ -1,23 +1,22 @@
-# Progressive Web App Example
+# robotervermessung-webapp
 
-This example uses [`next-pwa`](https://github.com/shadowwalker/next-pwa) to create a progressive web app (PWA) powered by [Workbox](https://developers.google.com/web/tools/workbox/).
+This repository is a web application for visualization and analysis of recorded motion data from industrial robots.
 
-## Deploy your own
+### project info
 
-Deploy the example using [Vercel](https://vercel.com?utm_source=github&utm_medium=readme&utm_campaign=next-example):
+**Autonome Messung und effiziente Speicherung von Industrieroboterbewegungsdaten**
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/git/external?repository-url=https://github.com/vercel/next.js/tree/canary/examples/progressive-web-app&project-name=progressive-web-app&repository-name=progressive-web-app)
+*Automatic measurement and efficient storage of industrial robot movement data*
 
-## How to use
+The objective of this project is to establish the foundation for a robot measurement database capable of storing recorded motion data from industrial robots. By creating a comprehensive database that can continuously grow with new measurement data, various applications and scenarios can be supported, eliminating the need for time-consuming and expensive individual measurements.
 
-Execute [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) with [npm](https://docs.npmjs.com/cli/init), [Yarn](https://yarnpkg.com/lang/en/docs/cli/create/), or [pnpm](https://pnpm.io) to bootstrap the example:
+The project commenced in September 2023 and is structured around four key milestones:
+- Development of a method for comparing robot trajectories, considering position, orientation, velocity, and acceleration deviations across different robot arm configurations and sampling rates.
+- Establishment of a database for storing and providing transaction data, emphasizing fast data retrieval and partial sequence search capabilities.
+- Creation of a method for sequential test planning for robot path measurement, including the automatic generation of robot programs for autonomous measurement.
+- Successful generation of data for the developed methods and algorithms for autonomous measurement, as well as the storage and provision of measurement data.
 
-```bash
-npx create-next-app --example progressive-web-app progressive-web-app
-# or
-yarn create next-app --example progressive-web-app progressive-web-app
-# or
-pnpm create next-app --example progressive-web-app progressive-web-app
-```
 
-Deploy it to the cloud with [Vercel](https://vercel.com/new?utm_source=github&utm_medium=readme&utm_campaign=next-example) ([Documentation](https://nextjs.org/docs/deployment)).
+
+
+> This research work is funded by the **German Research Foundation (DFG)** within the research project *Autonome Messung und effiziente Speicherung von Industrieroboterbewegungsdaten* (project number [515675259](https://gepris.dfg.de/gepris/projekt/515675259)).
