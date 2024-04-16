@@ -6,6 +6,7 @@ import InfoIcon from '@heroicons/react/24/outline/InformationCircleIcon';
 import React from 'react';
 import { CSVLink } from 'react-csv';
 
+import { applyEuclideanDistance } from '@/src/actions/methods.service';
 import { Typography } from '@/src/components/Typography';
 import { getCSVData } from '@/src/lib/csv-utils';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
@@ -86,6 +87,15 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
       >
         save to <span className="italic">.csv</span>
       </CSVLink>
+      <button
+        type="button"
+        className="mx-2 mt-2 w-fit rounded-xl px-6 py-4 text-xl font-normal
+        text-primary shadow-md transition-colors duration-200
+        ease-in betterhover:hover:bg-gray-200"
+        onClick={() => applyEuclideanDistance(currentTrajectory)}
+      >
+        apply euclidean distance
+      </button>
     </div>
   );
 };
