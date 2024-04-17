@@ -39,11 +39,9 @@ export const TrajectoryPlot = ({ currentTrajectory }: TrajectoryPlotProps) => {
   };
 
   const intersectionsPlot: Partial<PlotData>[] = intersections.map(
-    (inter: any, index: any) => ({
-      ...dataPlotConfig(`inter_${index}`),
-      x: inter.x,
-      y: inter.y,
-      z: inter.z,
+    (inter: any, index: number) => ({
+      ...dataPlotConfig(`intersection`, 'black', index === 0),
+      ...inter,
     }),
   );
 

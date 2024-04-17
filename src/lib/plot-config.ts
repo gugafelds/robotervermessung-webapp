@@ -1,11 +1,13 @@
 import type { Layout, PlotData } from 'plotly.js';
 
-export const dataPlotConfig = (name: string) =>
+export const dataPlotConfig = (name: string, color = '', showlegend = true) =>
   ({
     name,
     mode: 'lines',
     type: 'scatter3d',
+    showlegend,
     line: {
+      color,
       width: 6,
     },
   }) as Partial<PlotData>;
