@@ -5,10 +5,10 @@ import { createContext, useContext, useMemo, useState } from 'react';
 
 import type { TrajectoryHeader } from '@/types/main';
 
-import { json } from '../lib/functions';
-
 export interface TrajectoryState {
   trajectoriesHeader: TrajectoryHeader[];
+  intersections: any;
+  setIntersections: any;
 }
 
 type TrajectoryProviderProps = {
@@ -23,16 +23,19 @@ export const TrajectoryProvider = ({
   trajectoriesHeaderDB,
 }: TrajectoryProviderProps) => {
   const [trajectoriesHeader] = useState(trajectoriesHeaderDB);
+  const [intersections, setIntersections] = useState([]);
 
   const contextValue = useMemo(
     () => ({
       trajectoriesHeader,
+      intersections,
+      setIntersections,
     }),
-    [trajectoriesHeader],
+    [intersections, setIntersections, trajectoriesHeader],
   );
 
   return (
-    <TrajectoryContext.Provider value={json(contextValue)}>
+    <TrajectoryContext.Provider value={contextValue}>
       {children}
     </TrajectoryContext.Provider>
   );

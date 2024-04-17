@@ -16,15 +16,6 @@ export const Navbar = () => {
             <Typography as="h1">robotervermessung</Typography>
           </div>
         </Link>
-        <Link href="/info">
-          <div
-            className={`items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300 ${
-              pathname === `/info` ? 'bg-gray-300' : ''
-            }`}
-          >
-            <Typography as="h2">info</Typography>
-          </div>
-        </Link>
         <Link href="/trajectories">
           <div
             className={`my-0 items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300 ${

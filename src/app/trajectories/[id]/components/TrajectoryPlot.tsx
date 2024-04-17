@@ -3,6 +3,7 @@
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import dynamic from 'next/dynamic';
 import type { PlotData } from 'plotly.js';
+import { useEffect } from 'react';
 
 import { Typography } from '@/src/components/Typography';
 import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
@@ -16,7 +17,12 @@ type TrajectoryPlotProps = {
 };
 
 export const TrajectoryPlot = ({ currentTrajectory }: TrajectoryPlotProps) => {
-  const { trajectoriesHeader } = useTrajectory();
+  const { trajectoriesHeader, intersections, setIntersections } =
+    useTrajectory();
+
+  useEffect(() => {
+    setIntersections([]);
+  }, []);
 
   const realTrajectory: Partial<PlotData> = {
     ...dataPlotConfig('ist'),
@@ -31,6 +37,15 @@ export const TrajectoryPlot = ({ currentTrajectory }: TrajectoryPlotProps) => {
     y: currentTrajectory.ySoll,
     z: currentTrajectory.zSoll,
   };
+
+  const intersectionsPlot: Partial<PlotData>[] = intersections.map(
+    (inter: any, index: any) => ({
+      ...dataPlotConfig(`inter_${index}`),
+      x: inter.x,
+      y: inter.y,
+      z: inter.z,
+    }),
+  );
 
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
   const currentTrajectoryID = trajectoriesHeader.findIndex(
@@ -51,7 +66,7 @@ export const TrajectoryPlot = ({ currentTrajectory }: TrajectoryPlotProps) => {
   return (
     <div className="flex">
       <Plot
-        data={[idealTrajectory, realTrajectory]}
+        data={[idealTrajectory, realTrajectory, ...intersectionsPlot]}
         layout={plotLayoutConfig}
         config={{
           displaylogo: false,

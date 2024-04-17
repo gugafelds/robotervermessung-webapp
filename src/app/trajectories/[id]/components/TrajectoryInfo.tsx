@@ -17,7 +17,7 @@ type TrajectoryCardProps = {
 };
 
 export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
-  const { trajectoriesHeader } = useTrajectory();
+  const { trajectoriesHeader, setIntersections } = useTrajectory();
 
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
   const currentTrajectoryID = trajectoriesHeader.findIndex(
@@ -34,7 +34,7 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
       </span>
     );
   }
-  const currentTrajectoryData = trajectoriesHeader[currentTrajectoryID];
+  const currentTrajectoryHeader = trajectoriesHeader[currentTrajectoryID];
 
   const csvData = getCSVData(currentTrajectory);
 
@@ -49,7 +49,7 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
     filename: `trajectory_${currentTrajectory.trajectoryHeaderId.toString()}.csv`,
   };
 
-  const headersHeader = Object.keys(currentTrajectoryData).filter(
+  const headersHeader = Object.keys(currentTrajectoryHeader).filter(
     (key) => !key.includes('_'),
   );
 
@@ -67,7 +67,7 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
             {`${header}:`}{' '}
             <span className="text-lg font-light text-primary">
               {' '}
-              {`${currentTrajectoryData[header as keyof TrajectoryHeader]}`}
+              {`${currentTrajectoryHeader[header as keyof TrajectoryHeader]}`}
             </span>
           </li>
         </ul>
@@ -92,7 +92,10 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
         className="mx-2 mt-2 w-fit rounded-xl px-6 py-4 text-xl font-normal
         text-primary shadow-md transition-colors duration-200
         ease-in betterhover:hover:bg-gray-200"
-        onClick={() => applyEuclideanDistance(currentTrajectory)}
+        onClick={async () => {
+          const euclides = await applyEuclideanDistance(currentTrajectory);
+          setIntersections(euclides.intersection);
+        }}
       >
         apply euclidean distance
       </button>
