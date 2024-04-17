@@ -2,10 +2,8 @@ import axios from 'axios';
 
 import type { TrajectoryData } from '@/types/main';
 
-// const CLOUD_FUNCTIONS_URI =
-//   'https://europe-west3-dotted-forest-420514.cloudfunctions.net/euclidean_distance';
-
-const CLOUD_FUNCTIONS_URI = 'http://localhost:8080';
+const CLOUD_FUNCTIONS_URI =
+  'https://europe-west3-dotted-forest-420514.cloudfunctions.net/euclidean_distance';
 
 export const applyEuclideanDistance = async ({
   xIst: x_ist,
