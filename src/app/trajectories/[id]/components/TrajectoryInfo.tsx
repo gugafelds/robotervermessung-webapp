@@ -17,7 +17,8 @@ type TrajectoryCardProps = {
 };
 
 export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
-  const { trajectoriesHeader, setIntersections } = useTrajectory();
+  const { trajectoriesHeader, intersections, setIntersections } =
+    useTrajectory();
 
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
   const currentTrajectoryID = trajectoriesHeader.findIndex(
@@ -93,6 +94,10 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
         text-primary shadow-md transition-colors duration-200
         ease-in betterhover:hover:bg-gray-200"
         onClick={async () => {
+          if (intersections?.length > 0) {
+            setIntersections([]);
+            return;
+          }
           const euclides = await applyEuclideanDistance(currentTrajectory);
           setIntersections(euclides.intersection);
         }}

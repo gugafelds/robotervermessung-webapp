@@ -14,15 +14,11 @@ export const dataPlotConfig = (name: string, color = '', showlegend = true) =>
 
 export const plotLayoutConfig: Partial<Layout> = {
   title: {
-    text: '3D position plot',
     yref: 'paper',
     font: {
       size: 30,
       family: 'Arial, sans-serif',
       color: '#003560',
-    },
-    pad: {
-      r: 90,
     },
   },
   modebar: {
