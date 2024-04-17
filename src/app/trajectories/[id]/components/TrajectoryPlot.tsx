@@ -17,30 +17,36 @@ type TrajectoryPlotProps = {
 };
 
 export const TrajectoryPlot = ({ currentTrajectory }: TrajectoryPlotProps) => {
-  const { trajectoriesHeader, intersections, setIntersections } =
+  const { trajectoriesHeader, euclideanDistances, setEuclidean } =
     useTrajectory();
 
   useEffect(() => {
-    setIntersections([]);
+    setEuclidean([]);
   }, []);
 
   const realTrajectory: Partial<PlotData> = {
-    ...dataPlotConfig('ist'),
+    ...dataPlotConfig('lines', 'ist', 6),
     x: currentTrajectory.xIst,
     y: currentTrajectory.yIst,
     z: currentTrajectory.zIst,
   };
 
   const idealTrajectory: Partial<PlotData> = {
-    ...dataPlotConfig('soll'),
+    ...dataPlotConfig('lines', 'soll', 6),
     x: currentTrajectory.xSoll,
     y: currentTrajectory.ySoll,
     z: currentTrajectory.zSoll,
   };
 
-  const intersectionsPlot: Partial<PlotData>[] = intersections.map(
+  const euclideanDistancePlot: Partial<PlotData>[] = euclideanDistances.map(
     (inter: any, index: number) => ({
-      ...dataPlotConfig(`intersection`, 'black', index === 0),
+      ...dataPlotConfig(
+        'lines+markers',
+        'distance',
+        3,
+        'rgba(100, 100, 100, 0.9)',
+        index === 0,
+      ),
       ...inter,
     }),
   );
@@ -64,7 +70,7 @@ export const TrajectoryPlot = ({ currentTrajectory }: TrajectoryPlotProps) => {
   return (
     <div className="flex">
       <Plot
-        data={[idealTrajectory, realTrajectory, ...intersectionsPlot]}
+        data={[idealTrajectory, realTrajectory, ...euclideanDistancePlot]}
         layout={plotLayoutConfig}
         config={{
           displaylogo: false,

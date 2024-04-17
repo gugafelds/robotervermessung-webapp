@@ -7,8 +7,8 @@ import type { TrajectoryHeader } from '@/types/main';
 
 export interface TrajectoryState {
   trajectoriesHeader: TrajectoryHeader[];
-  intersections: any;
-  setIntersections: any;
+  euclideanDistances: any;
+  setEuclidean: any;
 }
 
 type TrajectoryProviderProps = {
@@ -23,15 +23,15 @@ export const TrajectoryProvider = ({
   trajectoriesHeaderDB,
 }: TrajectoryProviderProps) => {
   const [trajectoriesHeader] = useState(trajectoriesHeaderDB);
-  const [intersections, setIntersections] = useState([]);
+  const [euclideanDistances, setEuclidean] = useState([]);
 
   const contextValue = useMemo(
     () => ({
       trajectoriesHeader,
-      intersections,
-      setIntersections,
+      euclideanDistances,
+      setEuclidean,
     }),
-    [intersections, setIntersections, trajectoriesHeader],
+    [euclideanDistances, setEuclidean, trajectoriesHeader],
   );
 
   return (
