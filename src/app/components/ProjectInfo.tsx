@@ -7,10 +7,10 @@ import { Typography } from '@/src/components/Typography';
 
 export const ProjectInfo = () => {
   return (
-    <section className="mx-auto mt-8 max-w-xl text-balance px-8 md:max-w-2xl xl:max-w-4xl">
+    <section className="mx-auto mt-8 max-w-xl px-8 md:max-w-2xl xl:max-w-4xl">
       <div className="mb-2 flex flex-col gap-3">
         <Typography as="h1">projektinfo</Typography>
-        <Typography as="h2" className="break-words">
+        <Typography as="h2" className="break-all">
           Autonome Messung und effiziente Speicherung von
           Industrieroboterbewegungsdaten
         </Typography>

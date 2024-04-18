@@ -7,8 +7,8 @@ import { Typography } from '@/src/components/Typography';
 
 export const ContactCard = () => {
   return (
-    <section className="mx-auto my-8 h-fit max-w-lg flex-row items-start text-balance rounded-lg bg-gray-100 p-4 text-justify shadow-md">
-      <div>
+    <section className="mx-auto my-8 h-fit max-w-lg flex-row items-start text-balance rounded-lg bg-gray-100 text-justify shadow-md">
+      <div className="p-4">
         <Typography as="h1">kontakt</Typography>
 
         <div className="mt-2 text-xl font-extrabold">
