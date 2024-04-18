@@ -10,10 +10,7 @@ export async function getMongoClient(): Promise<MongoClient> {
    * https://github.com/vercel/next.js/pull/17666
    */
   if (!(global as any).mongoClientPromise) {
-    const client = new MongoClient(
-      process.env.MONGODB_URI ||
-        'mongodb+srv://umbertobarros:8Cmgpiv53SaYEp7k@cluster0.su3gj7l.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0',
-    );
+    const client = new MongoClient(process.env.MONGODB_URI || '');
     // client.connect() returns an instance of MongoClient when resolved
     (global as any).mongoClientPromise = client.connect();
     // eslint-disable-next-line @typescript-eslint/no-shadow
