@@ -6,6 +6,7 @@ const CLOUD_FUNCTIONS_URI =
   'https://europe-west3-dotted-forest-420514.cloudfunctions.net/euclidean_distance';
 
 export const applyEuclideanDistance = async ({
+  trajectoryHeaderId: trajectory_header_id,
   xIst: x_ist,
   yIst: y_ist,
   zIst: z_ist,
@@ -14,6 +15,7 @@ export const applyEuclideanDistance = async ({
   zSoll: z_soll,
 }: TrajectoryData) => {
   const response = await axios.post(CLOUD_FUNCTIONS_URI, {
+    trajectory_header_id,
     x_ist,
     y_ist,
     z_ist,
