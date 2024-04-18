@@ -7,18 +7,21 @@ import { Typography } from '@/src/components/Typography';
 
 export const ContactCard = () => {
   return (
-    <div className="m-36 flex h-full w-7/12 flex-col items-start text-balance rounded-lg bg-gray-100 p-4 text-justify shadow-md sm:text-left">
-      <Typography as="h1">kontakt</Typography>
-      <div className="mt-5 text-xl font-extrabold">
-        Gustavo Barros, M. Sc. <br />
-      </div>
+    <section className="my-8 flex h-full flex-row flex-wrap items-start text-balance rounded-lg bg-gray-100 p-4 text-justify shadow-md">
+      <div>
+        <Typography as="h3">kontakt</Typography>
 
-      <Typography as="h5">
-        Lehrstuhl für Produktionssysteme <br />
-        Ruhr-Universität Bochum <br />
-        Industriestraße 38C Raum 02/38 <br />
-      </Typography>
-      <div className="flex flex-row">
+        <div className="mt-2 text-xl font-extrabold">
+          Gustavo Barros, M. Sc. <br />
+        </div>
+
+        <Typography as="h5">
+          Lehrstuhl für Produktionssysteme <br />
+          Ruhr-Universität Bochum <br />
+          Industriestraße 38C Raum 02/38 <br />
+        </Typography>
+      </div>
+      <div className="ml-0 flex flex-row flex-wrap sm:ml-auto sm:flex-col">
         <Link
           className="items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300"
           href="https://www.lps.ruhr-uni-bochum.de/lps/profil/team/gustavobarros.html.de"
@@ -44,6 +47,6 @@ export const ContactCard = () => {
           />
         </Link>
       </div>
-    </div>
+    </section>
   );
 };

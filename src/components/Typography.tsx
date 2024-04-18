@@ -29,7 +29,7 @@ const TypographyComponent = (
         {
           ...rest,
           ref,
-          className: 'text-3xl font-bold text-primary',
+          className: `${className} text-3xl font-bold text-primary`,
         },
         children,
       );
@@ -40,7 +40,7 @@ const TypographyComponent = (
         {
           ...rest,
           ref,
-          className: 'text-2xl font-semibold text-primary',
+          className: `${className} text-2xl font-semibold text-primary`,
         },
         children,
       );
@@ -51,7 +51,7 @@ const TypographyComponent = (
         {
           ...rest,
           ref,
-          className: 'text-xl font-normal text-primary mt-6',
+          className: `${className} text-2xl font-normal text-primary`,
         },
         children,
       );
@@ -62,7 +62,7 @@ const TypographyComponent = (
         {
           ...rest,
           ref,
-          className: 'text-3xl font-semibold text-primary mt-8',
+          className: `${className} text-xl font-semibold text-primary`,
         },
         children,
       );
@@ -73,7 +73,7 @@ const TypographyComponent = (
         {
           ...rest,
           ref,
-          className: 'text-lg font-light text-primary',
+          className: `${className} text-lg font-light text-primary`,
         },
         children,
       );
@@ -85,6 +85,17 @@ const TypographyComponent = (
           ...rest,
           ref,
           className,
+        },
+        children,
+      );
+      break;
+    case 'p':
+      template = React.createElement(
+        as,
+        {
+          ...rest,
+          ref,
+          className: `${className} font-light text-primary`,
         },
         children,
       );
