@@ -7,9 +7,9 @@ import { Typography } from '@/src/components/Typography';
 
 export const ContactCard = () => {
   return (
-    <section className="my-8 flex h-full flex-row flex-wrap items-start text-balance rounded-lg bg-gray-100 p-4 text-justify shadow-md">
+    <section className="mx-auto my-8 h-fit max-w-lg flex-row items-start text-balance rounded-lg bg-gray-100 p-4 text-justify shadow-md">
       <div>
-        <Typography as="h3">kontakt</Typography>
+        <Typography as="h1">kontakt</Typography>
 
         <div className="mt-2 text-xl font-extrabold">
           Gustavo Barros, M. Sc. <br />
@@ -21,7 +21,7 @@ export const ContactCard = () => {
           Industriestraße 38C Raum 02/38 <br />
         </Typography>
       </div>
-      <div className="ml-0 flex flex-row flex-wrap sm:ml-auto sm:flex-col">
+      <div className="flex flex-row sm:ml-auto">
         <Link
           className="items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300"
           href="https://www.lps.ruhr-uni-bochum.de/lps/profil/team/gustavobarros.html.de"
@@ -35,7 +35,7 @@ export const ContactCard = () => {
           />
         </Link>
         <Link
-          className="items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300"
+          className="items-center rounded-md p-1 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300"
           href="https://github.com/gugafelds"
         >
           <Image

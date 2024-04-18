@@ -2,13 +2,12 @@
 
 import Link from 'next/link';
 
-import { ContactCard } from '@/src/app/components/ContactCard';
 // import { ContactCard } from '@/src/app/components/ContactCard';
 import { Typography } from '@/src/components/Typography';
 
 export const ProjectInfo = () => {
   return (
-    <section className="mx-auto mt-8 max-w-xl text-balance px-8 md:max-w-2xl xl:max-w-3xl">
+    <section className="mx-auto mt-8 max-w-2xl text-balance px-8 md:max-w-2xl xl:max-w-4xl">
       <div className="mb-2 flex flex-col gap-3">
         <Typography as="h1">projektinfo</Typography>
         <Typography as="h2" className="break-words">
@@ -16,7 +15,7 @@ export const ProjectInfo = () => {
           Industrieroboterbewegungsdaten
         </Typography>
       </div>
-      <div className="flex flex-col flex-wrap rounded-lg bg-gray-50 p-4">
+      <div className="flex flex-col rounded-lg bg-gray-50 p-4 xl:flex-row xl:space-x-52">
         <Typography as="h6" className="block">
           Deutsche Forschungsgemeinschaft - DFG-47-1
         </Typography>
@@ -40,12 +39,11 @@ export const ProjectInfo = () => {
           unterstützt werden, in denen dann zeit- und kostenintensive
           individuelle Vermessungen vermieden werden.
         </Typography>
-        <Typography as="p" className="mt-4 text-justify">
+        <Typography as="p" className="mt-4">
           Diese Website dient als Remote-Anwendung mit direkter Visualisierung
           der Daten, die in der MongoDB-Atlas-Datenbank gespeichert sind.
         </Typography>
       </div>
-      <ContactCard />
     </section>
   );
 };
