@@ -1,6 +1,8 @@
 import type {
   TrajectoryData,
   TrajectoryDataRaw,
+  TrajectoryEuclideanMetrics,
+  TrajectoryEuclideanMetricsRaw,
   TrajectoryHeader,
   TrajectoryHeaderRaw,
 } from '@/types/main';
@@ -80,6 +82,21 @@ export const transformTrajectoriesHeadersResult = (
       numberPointsSoll: trajectory.number_of_points_soll,
       SampleFrequencyIst: trajectory.sample_frequency_ist,
       SampleFrequencySoll: trajectory.sample_frequency_soll,
+    }),
+  );
+};
+
+export const transformTrajectoriesEuclideanMetricsResult = (
+  trajectoriesEuclideanMetricsRaw: TrajectoryEuclideanMetricsRaw[],
+): TrajectoryEuclideanMetrics[] => {
+  return trajectoriesEuclideanMetricsRaw.map(
+    (trajectory): TrajectoryEuclideanMetrics => ({
+      ...trajectory,
+      _id: trajectory._id,
+      trajectoryHeaderId: trajectory.trajectory_header_id,
+      euclideanMaxDistance: trajectory.euclidean_max_distance,
+      euclideanAverageDistance: trajectory.euclidean_average_distance,
+      metricType: trajectory.metric_type,
     }),
   );
 };

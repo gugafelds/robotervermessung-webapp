@@ -3,10 +3,11 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useMemo, useState } from 'react';
 
-import type { TrajectoryHeader } from '@/types/main';
+import type { TrajectoryEuclideanMetrics, TrajectoryHeader } from '@/types/main';
 
 export interface TrajectoryState {
   trajectoriesHeader: TrajectoryHeader[];
+  trajectoriesEuclideanMetrics: TrajectoryEuclideanMetrics[];
   euclideanDistances: any;
   setEuclidean: any;
 }
@@ -14,6 +15,7 @@ export interface TrajectoryState {
 type TrajectoryProviderProps = {
   children: ReactNode;
   trajectoriesHeaderDB: TrajectoryHeader[];
+  trajectoriesEuclideanMetricsDB: TrajectoryEuclideanMetrics[];
 };
 
 const TrajectoryContext = createContext<TrajectoryState>({} as TrajectoryState);
@@ -21,17 +23,27 @@ const TrajectoryContext = createContext<TrajectoryState>({} as TrajectoryState);
 export const TrajectoryProvider = ({
   children,
   trajectoriesHeaderDB,
+  trajectoriesEuclideanMetricsDB,
 }: TrajectoryProviderProps) => {
   const [trajectoriesHeader] = useState(trajectoriesHeaderDB);
+  const [trajectoriesEuclideanMetrics] = useState(
+    trajectoriesEuclideanMetricsDB,
+  );
   const [euclideanDistances, setEuclidean] = useState([]);
 
   const contextValue = useMemo(
     () => ({
       trajectoriesHeader,
+      trajectoriesEuclideanMetrics,
       euclideanDistances,
       setEuclidean,
     }),
-    [euclideanDistances, setEuclidean, trajectoriesHeader],
+    [
+      euclideanDistances,
+      trajectoriesEuclideanMetrics,
+      setEuclidean,
+      trajectoriesHeader,
+    ],
   );
 
   return (

@@ -77,3 +77,19 @@ export interface TrajectoryHeader {
   SampleFrequencyIst: number;
   SampleFrequencySoll: number;
 }
+
+export interface TrajectoryEuclideanMetricsRaw {
+  _id: ObjectId | string;
+  trajectory_header_id: string;
+  euclidean_max_distance: number;
+  euclidean_average_distance: number;
+  metric_type: string;
+}
+
+export interface TrajectoryEuclideanMetrics {
+  _id: ObjectId | string;
+  trajectoryHeaderId: string;
+  euclideanMaxDistance: number;
+  euclideanAverageDistance: number;
+  metricType: string;
+}

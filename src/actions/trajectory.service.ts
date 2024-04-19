@@ -3,12 +3,14 @@
 import { getMongoDb } from '@/src/lib/mongodb';
 import {
   transformTrajectoriesDataResult,
+  transformTrajectoriesEuclideanMetricsResult,
   transformTrajectoriesHeadersResult,
   transformTrajectoryResult,
 } from '@/src/lib/transformer';
 import type {
   TrajectoryData,
   TrajectoryDataRaw,
+  TrajectoryEuclideanMetricsRaw,
   TrajectoryHeaderRaw,
 } from '@/types/main';
 
@@ -38,6 +40,20 @@ export const getTrajectoriesData = async () => {
   }
 
   return transformTrajectoriesDataResult(trajectoriesDataResult);
+};
+
+export const getTrajectoriesEuclideanMetrics = async () => {
+  const mongo = await getMongoDb();
+
+  const trajectoriesEuclideanMetricsResult = await mongo
+    .collection('metrics')
+    .find<TrajectoryEuclideanMetricsRaw>({})
+    .sort({ recording_date: -1 })
+    .toArray();
+
+  return transformTrajectoriesEuclideanMetricsResult(
+    trajectoriesEuclideanMetricsResult,
+  );
 };
 
 export const getTrajectoryById = async (id: string) => {
