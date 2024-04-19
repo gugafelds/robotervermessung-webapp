@@ -14,7 +14,7 @@ export default async function TrajectoriesLayout({
 
   return (
     <TrajectoryProvider trajectoriesHeaderDB={json(trajectoriesHeader)}>
-      <main className="flex sm:flex-col lg:flex-row">
+      <main className="flex flex-col lg:flex-row">
         <Sidebar />
         {children}
       </main>

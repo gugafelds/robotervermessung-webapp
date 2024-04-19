@@ -38,8 +38,10 @@ export const plotLayoutConfig: Partial<Layout> = {
   hovermode: 'closest',
   margin: {
     l: 1,
+    r: 1,
     b: 1,
-    r: 5,
+    t: 1,
+    pad: 1,
   },
   legend: {
     x: 1,
@@ -53,8 +55,8 @@ export const plotLayoutConfig: Partial<Layout> = {
     bordercolor: '#FFFFFF',
     borderwidth: 2,
   },
-  width: 600,
-  height: 600,
+  width: 500,
+  height: 500,
   scene: {
     xaxis: { title: 'x [m]' },
     yaxis: { title: 'y [m]' },

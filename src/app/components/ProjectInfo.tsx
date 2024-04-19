@@ -23,7 +23,7 @@ export const ProjectInfo = () => {
           Projektnummer:{' '}
           <Link
             href="https://gepris.dfg.de/gepris/projekt/515675259"
-            className="font-extrabold"
+            className="border-b-2 border-dotted border-b-black font-extrabold"
           >
             515675259
           </Link>

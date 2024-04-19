@@ -27,7 +27,7 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
 
   if (currentTrajectoryID === -1) {
     return (
-      <span className="inline-flex flex-row justify-center p-10">
+      <span className="flex flex-row justify-center p-10">
         <Typography as="h2">no trajectory found</Typography>
         <span>
           <ErrorIcon className="mx-2 my-0.5 w-7 " />
@@ -55,7 +55,7 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
   );
 
   return (
-    <div className="flex h-screen flex-col overflow-scroll bg-gray-50 p-4">
+    <div className="flex h-screen flex-col bg-gray-50 p-4">
       <span className="inline-flex">
         <InfoIcon className="w-8" />
         <span className="mx-2 my-4 flex text-2xl font-semibold text-primary">

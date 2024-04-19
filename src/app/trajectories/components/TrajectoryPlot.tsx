@@ -68,14 +68,15 @@ export const TrajectoryPlot = ({ currentTrajectory }: TrajectoryPlotProps) => {
   }
 
   return (
-    <div className="flex">
+    <div className="mx-auto">
       <Plot
         data={[idealTrajectory, realTrajectory, ...euclideanDistancePlot]}
+        useResizeHandler
         layout={plotLayoutConfig}
         config={{
           displaylogo: false,
           modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-          fillFrame: true,
+          responsive: true,
         }}
       />
     </div>
