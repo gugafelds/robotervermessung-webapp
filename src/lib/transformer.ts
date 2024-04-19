@@ -10,7 +10,6 @@ import type {
 export const transformTrajectoryResult = (
   trajectoryRaw: TrajectoryDataRaw,
 ): TrajectoryData => ({
-  ...trajectoryRaw,
   _id: trajectoryRaw._id,
   trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
   timestampIst: trajectoryRaw.timestamp_ist,
@@ -38,7 +37,6 @@ export const transformTrajectoriesDataResult = (
 ): TrajectoryData[] => {
   return trajectoriesDataRaw.map(
     (trajectoryRaw): TrajectoryData => ({
-      ...trajectoryRaw,
       _id: trajectoryRaw._id,
       trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
       timestampIst: trajectoryRaw.timestamp_ist,
@@ -68,7 +66,6 @@ export const transformTrajectoriesHeadersResult = (
 ): TrajectoryHeader[] => {
   return trajectoriesRaw.map(
     (trajectory): TrajectoryHeader => ({
-      ...trajectory,
       _id: trajectory._id,
       dataId: trajectory.data_id,
       robotName: trajectory.robot_name,
@@ -91,7 +88,6 @@ export const transformTrajectoriesEuclideanMetricsResult = (
 ): TrajectoryEuclideanMetrics[] => {
   return trajectoriesEuclideanMetricsRaw.map(
     (trajectory): TrajectoryEuclideanMetrics => ({
-      ...trajectory,
       _id: trajectory._id,
       trajectoryHeaderId: trajectory.trajectory_header_id,
       euclideanMaxDistance: trajectory.euclidean_max_distance,

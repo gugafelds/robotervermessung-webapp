@@ -44,8 +44,9 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
     );
   }
   const currentTrajectoryHeader = trajectoriesHeader[currentTrajectoryID];
-  const currentTrajectoryEuclideanMetrics =
-    trajectoriesEuclideanMetrics[currentTrajectoryID];
+  const currentTrajectoryEuclideanMetrics = trajectoriesEuclideanMetrics.find(
+    (tem) => tem.trajectoryHeaderId === searchedIndex,
+  );
 
   const csvData = getCSVData(currentTrajectory);
 
@@ -60,10 +61,6 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
     filename: `trajectory_${currentTrajectory.trajectoryHeaderId.toString()}.csv`,
   };
 
-  const headersHeader = Object.keys(currentTrajectoryHeader).filter(
-    (key) => !key.includes('_'),
-  );
-  
   return (
     <div className="flex h-screen flex-col bg-gray-50 p-4">
       <span className="inline-flex">
@@ -72,7 +69,7 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
           trajectory info
         </span>
       </span>
-      {headersHeader.map((header) => (
+      {Object.keys(currentTrajectoryHeader).map((header) => (
         <ul key={header}>
           <li className="px-6 text-lg font-bold text-primary">
             {`${header}:`}{' '}
@@ -83,9 +80,10 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
           </li>
         </ul>
       ))}
-      {Object.keys(currentTrajectoryEuclideanMetrics || {}).length > 0 ? (
+      {currentTrajectoryEuclideanMetrics &&
+      Object.keys(currentTrajectoryEuclideanMetrics).length !== 0 ? (
         Object.keys(currentTrajectoryEuclideanMetrics)
-          .filter((header) => !header.includes('_')) // 
+          .filter((header) => !header.includes('_'))
           .map((header) => (
             <ul key={header}>
               <li className="px-6 text-lg font-bold text-primary">
