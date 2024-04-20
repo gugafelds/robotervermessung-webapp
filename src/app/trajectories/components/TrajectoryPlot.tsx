@@ -48,7 +48,7 @@ export const TrajectoryPlot = ({
           (inter: any, index: number) => ({
             ...dataPlotConfig(
               'lines+markers',
-              'distance',
+              'euc',
               3,
               'rgba(100, 100, 100, 0.9)',
               index === 0,

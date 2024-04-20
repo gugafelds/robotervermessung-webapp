@@ -133,16 +133,16 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
         <button
           type="button"
           className={`
-    mx-1 mt-1 w-32 rounded-xl px-4 text-xl  shadow-md transition-colors duration-200 ease-in betterhover:hover:bg-gray-200 
+    mx-1 mt-1 w-32 rounded-xl px-4 text-xl  shadow-md
     ${
       visibleEuclidean
-        ? 'bg-gray-200 text-gray-500'
-        : 'font-normal text-primary'
+        ? 'bg-gray-200 font-bold text-primary'
+        : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
     }
     ${
       !currentTrajectoryEuclideanMetrics
-        ? 'cursor-not-allowed bg-gray-300 font-light text-gray-600 betterhover:hover:bg-gray-300 '
-        : 'font-bold text-primary shadow-md'
+        ? 'bg-gray-200 font-light text-neutral-400'
+        : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
     }
   `}
           onClick={() => {
