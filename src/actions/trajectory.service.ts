@@ -6,10 +6,12 @@ import {
   transformTrajectoriesEuclideanMetricsResult,
   transformTrajectoriesHeadersResult,
   transformTrajectoryResult,
+  transformMetricResult,
 } from '@/src/lib/transformer';
 import type {
   TrajectoryData,
   TrajectoryDataRaw,
+  TrajectoryEuclideanMetrics,
   TrajectoryEuclideanMetricsRaw,
   TrajectoryHeaderRaw,
 } from '@/types/main';
@@ -69,4 +71,19 @@ export const getTrajectoryById = async (id: string) => {
   }
 
   return transformTrajectoryResult(trajectoryResult);
+};
+
+export const getMetricsById = async (id: string) => {
+  const mongo = await getMongoDb();
+
+  const metricsResult = await mongo
+    .collection('metrics')
+    .find<TrajectoryEuclideanMetricsRaw>({ trajectory_header_id: id })
+    .next();
+
+  if (!metricsResult) {
+    return {} as TrajectoryEuclideanMetrics;
+  }
+
+  return transformMetricResult(metricsResult);
 };

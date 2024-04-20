@@ -3,25 +3,29 @@
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import dynamic from 'next/dynamic';
 import type { PlotData } from 'plotly.js';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Typography } from '@/src/components/Typography';
 import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
-import type { TrajectoryData } from '@/types/main';
+import type { TrajectoryData, TrajectoryEuclideanMetrics } from '@/types/main';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 type TrajectoryPlotProps = {
   currentTrajectory: TrajectoryData;
+  currentMetrics: TrajectoryEuclideanMetrics;
 };
 
-export const TrajectoryPlot = ({ currentTrajectory }: TrajectoryPlotProps) => {
-  const { trajectoriesHeader, euclideanDistances, setEuclidean } =
-    useTrajectory();
+export const TrajectoryPlot = ({ currentTrajectory, currentMetrics }: TrajectoryPlotProps) => {
+  const {
+    trajectoriesHeader,
+    setEuclidean,
+    visibleEuclidean,
+  } = useTrajectory();
 
   useEffect(() => {
-    setEuclidean([]);
+    setEuclidean();
   }, []);
 
   const realTrajectory: Partial<PlotData> = {
@@ -38,7 +42,7 @@ export const TrajectoryPlot = ({ currentTrajectory }: TrajectoryPlotProps) => {
     z: currentTrajectory.zSoll,
   };
 
-  const euclideanDistancePlot: Partial<PlotData>[] = euclideanDistances.map(
+  const euclideanDistancePlot: Partial<PlotData>[] = currentMetrics.euclideanIntersections.map(
     (inter: any, index: number) => ({
       ...dataPlotConfig(
         'lines+markers',
@@ -50,6 +54,8 @@ export const TrajectoryPlot = ({ currentTrajectory }: TrajectoryPlotProps) => {
       ...inter,
     }),
   );
+
+  console.log(visibleEuclidean)
 
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
   const currentTrajectoryID = trajectoriesHeader.findIndex(
@@ -69,16 +75,30 @@ export const TrajectoryPlot = ({ currentTrajectory }: TrajectoryPlotProps) => {
 
   return (
     <div className="mx-auto">
-      <Plot
-        data={[idealTrajectory, realTrajectory, ...euclideanDistancePlot]}
-        useResizeHandler
-        layout={plotLayoutConfig}
-        config={{
-          displaylogo: false,
-          modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-          responsive: true,
-        }}
-      />
+      {visibleEuclidean && (
+        <Plot
+          data={[idealTrajectory, realTrajectory, ...euclideanDistancePlot]}
+          useResizeHandler
+          layout={plotLayoutConfig}
+          config={{
+            displaylogo: false,
+            modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+            responsive: true,
+          }}
+        />
+      )}
+      {!visibleEuclidean && (
+        <Plot
+          data={[idealTrajectory, realTrajectory]}
+          useResizeHandler
+          layout={plotLayoutConfig}
+          config={{
+            displaylogo: false,
+            modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+            responsive: true,
+          }}
+        />
+      )}
     </div>
   );
 };

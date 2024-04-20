@@ -10,6 +10,8 @@ export interface TrajectoryState {
   trajectoriesEuclideanMetrics: TrajectoryEuclideanMetrics[];
   euclideanDistances: any;
   setEuclidean: any;
+  visibleEuclidean: boolean;
+  showEuclideanPlot: any;
 }
 
 type TrajectoryProviderProps = {
@@ -26,10 +28,9 @@ export const TrajectoryProvider = ({
   trajectoriesEuclideanMetricsDB,
 }: TrajectoryProviderProps) => {
   const [trajectoriesHeader] = useState(trajectoriesHeaderDB);
-  const [trajectoriesEuclideanMetrics] = useState(
-    trajectoriesEuclideanMetricsDB,
-  );
+  const [trajectoriesEuclideanMetrics] = useState(trajectoriesEuclideanMetricsDB);
   const [euclideanDistances, setEuclidean] = useState([]);
+  const [visibleEuclidean, showEuclideanPlot] = useState(false);
 
   const contextValue = useMemo(
     () => ({
@@ -37,12 +38,16 @@ export const TrajectoryProvider = ({
       trajectoriesEuclideanMetrics,
       euclideanDistances,
       setEuclidean,
+      visibleEuclidean,
+      showEuclideanPlot,
     }),
     [
+      trajectoriesHeader,
       euclideanDistances,
       trajectoriesEuclideanMetrics,
       setEuclidean,
-      trajectoriesHeader,
+      visibleEuclidean,
+      showEuclideanPlot,
     ],
   );
 

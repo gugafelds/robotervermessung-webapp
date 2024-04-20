@@ -26,6 +26,8 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
     trajectoriesEuclideanMetrics,
     euclideanDistances,
     setEuclidean,
+    visibleEuclidean,
+    showEuclideanPlot,
   } = useTrajectory();
 
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
@@ -47,6 +49,8 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
   const currentTrajectoryEuclideanMetrics = trajectoriesEuclideanMetrics.find(
     (tem) => tem.trajectoryHeaderId === searchedIndex,
   );
+
+  console.log(visibleEuclidean)
 
   const csvData = getCSVData(currentTrajectory);
 
@@ -83,7 +87,9 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
       {currentTrajectoryEuclideanMetrics &&
       Object.keys(currentTrajectoryEuclideanMetrics).length !== 0 ? (
         Object.keys(currentTrajectoryEuclideanMetrics)
-          .filter((header) => !header.includes('_'))
+          .filter((header) => !header.includes('_id'))
+          .filter((header) => !header.includes('euclideanIntersections'))
+          .filter((header) => !header.includes('metricType'))
           .map((header) => (
             <ul key={header}>
               <li className="px-6 text-lg font-bold text-primary">
@@ -115,22 +121,39 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
       >
         save to <span className="italic">.csv</span>
       </CSVLink>
-      <button
-        type="button"
-        className="mx-2 mt-2 w-fit rounded-xl px-6 py-4 text-xl font-normal
-        text-primary shadow-md transition-colors duration-200
-        ease-in betterhover:hover:bg-gray-200"
-        onClick={async () => {
-          if (euclideanDistances?.length > 0) {
-            setEuclidean([]);
-            return;
-          }
-          const euclides = await applyEuclideanDistance(currentTrajectory);
-          setEuclidean(euclides.intersection);
-        }}
-      >
-        apply euclidean distance
-      </button>
+      <div className="inline-flex">
+        <span className="mx-5 mt-2 w-fit py-4 text-xl font-bold text-primary">
+        euclidean distance:
+        </span>
+        <button
+          type="button"
+          className="mx-2 mt-2 w-fit rounded-xl px-6 py-4 text-xl font-normal
+          text-primary shadow-md transition-colors duration-200
+          ease-in betterhover:hover:bg-gray-200"
+          onClick={async () => {
+            if (euclideanDistances?.length > 0) {
+              setEuclidean([]);
+              return;
+            }
+            const euclides = await applyEuclideanDistance(currentTrajectory);
+            setEuclidean(euclides.intersection);
+          }}
+        >
+          calculate
+        </button>
+        <button
+          type="button"
+          className="mx-2 mt-2 w-fit rounded-xl px-6 py-4 text-xl font-normal
+          text-primary shadow-md transition-colors duration-200
+          ease-in betterhover:hover:bg-gray-200"
+          onClick={async () => {
+            showEuclideanPlot(true);
+          }}
+        >
+          show 3D
+        </button>
+        
+      </div>
     </div>
   );
 };

@@ -83,6 +83,8 @@ export interface TrajectoryEuclideanMetricsRaw {
   trajectory_header_id: string;
   euclidean_max_distance: number;
   euclidean_average_distance: number;
+  euclidean_standard_deviation: number;
+  euclidean_intersections: number[];
   metric_type: string;
 }
 
@@ -91,5 +93,7 @@ export interface TrajectoryEuclideanMetrics {
   trajectoryHeaderId: string;
   euclideanMaxDistance: number;
   euclideanAverageDistance: number;
+  euclideanStandardDeviation: number;
+  euclideanIntersections: number[];
   metricType: string;
 }

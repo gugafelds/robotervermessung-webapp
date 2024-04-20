@@ -32,6 +32,18 @@ export const transformTrajectoryResult = (
   jointStateSoll: trajectoryRaw.joint_state_soll,
 });
 
+export const transformMetricResult = (
+  trajectoryRaw: TrajectoryEuclideanMetricsRaw,
+): TrajectoryEuclideanMetrics => ({
+  _id: trajectoryRaw._id,
+  trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
+  euclideanMaxDistance: trajectoryRaw.euclidean_max_distance,
+  euclideanAverageDistance: trajectoryRaw.euclidean_average_distance,
+  euclideanStandardDeviation: trajectoryRaw.euclidean_standard_deviation,
+  euclideanIntersections: trajectoryRaw.euclidean_intersections,
+  metricType: trajectoryRaw.metric_type,
+});
+
 export const transformTrajectoriesDataResult = (
   trajectoriesDataRaw: TrajectoryDataRaw[],
 ): TrajectoryData[] => {
@@ -92,6 +104,8 @@ export const transformTrajectoriesEuclideanMetricsResult = (
       trajectoryHeaderId: trajectory.trajectory_header_id,
       euclideanMaxDistance: trajectory.euclidean_max_distance,
       euclideanAverageDistance: trajectory.euclidean_average_distance,
+      euclideanStandardDeviation: trajectory.euclidean_standard_deviation,
+      euclideanIntersections: trajectory.euclidean_intersections,
       metricType: trajectory.metric_type,
     }),
   );
