@@ -50,8 +50,6 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
     (tem) => tem.trajectoryHeaderId === searchedIndex,
   );
 
-  console.log(visibleEuclidean)
-
   const csvData = getCSVData(currentTrajectory);
 
   const headersData = Object.keys(csvData || {}).map((key: string) => ({
@@ -112,22 +110,13 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
           options
         </span>
       </span>
-      <CSVLink
-        {...csvTrajectory}
-        separator=","
-        className="mx-2 w-fit rounded-xl px-6 py-4 text-xl font-normal
-        text-primary shadow-md transition-colors duration-200
-        ease-in betterhover:hover:bg-gray-200"
-      >
-        save to <span className="italic">.csv</span>
-      </CSVLink>
       <div className="inline-flex">
-        <span className="mx-5 mt-2 w-fit py-4 text-xl font-bold text-primary">
-        euclidean distance:
+        <span className="mx-5 mt-2 w-fit py-3 text-xl font-bold text-primary">
+          euclidean distance:
         </span>
         <button
           type="button"
-          className="mx-2 mt-2 w-fit rounded-xl px-6 py-4 text-xl font-normal
+          className="mx-2 mt-2 w-fit rounded-xl px-6 text-xl font-normal
           text-primary shadow-md transition-colors duration-200
           ease-in betterhover:hover:bg-gray-200"
           onClick={async () => {
@@ -143,17 +132,39 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
         </button>
         <button
           type="button"
-          className="mx-2 mt-2 w-fit rounded-xl px-6 py-4 text-xl font-normal
-          text-primary shadow-md transition-colors duration-200
-          ease-in betterhover:hover:bg-gray-200"
-          onClick={async () => {
-            showEuclideanPlot(true);
+          className={`
+    mx-1 mt-1 w-32 rounded-xl px-4 text-xl  shadow-md transition-colors duration-200 ease-in betterhover:hover:bg-gray-200 
+    ${
+      visibleEuclidean
+        ? 'bg-gray-200 text-gray-500'
+        : 'font-normal text-primary'
+    }
+    ${
+      !currentTrajectoryEuclideanMetrics
+        ? 'cursor-not-allowed bg-gray-300 font-light text-gray-600 betterhover:hover:bg-gray-300 '
+        : 'font-bold text-primary shadow-md'
+    }
+  `}
+          onClick={() => {
+            showEuclideanPlot(!visibleEuclidean);
           }}
+          disabled={
+            !currentTrajectoryEuclideanMetrics ||
+            !currentTrajectoryEuclideanMetrics.euclideanIntersections
+          }
         >
-          show 3D
+          view 3D
         </button>
-        
       </div>
+      <CSVLink
+        {...csvTrajectory}
+        separator=","
+        className="mx-2 w-fit rounded-xl px-6 py-4 text-xl font-normal
+        text-primary shadow-md transition-colors duration-200
+        ease-in betterhover:hover:bg-gray-200"
+      >
+        save to <span className="italic">.csv</span>
+      </CSVLink>
     </div>
   );
 };

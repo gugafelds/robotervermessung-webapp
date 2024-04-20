@@ -3,7 +3,7 @@
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import dynamic from 'next/dynamic';
 import type { PlotData } from 'plotly.js';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 import { Typography } from '@/src/components/Typography';
 import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
@@ -17,12 +17,12 @@ type TrajectoryPlotProps = {
   currentMetrics: TrajectoryEuclideanMetrics;
 };
 
-export const TrajectoryPlot = ({ currentTrajectory, currentMetrics }: TrajectoryPlotProps) => {
-  const {
-    trajectoriesHeader,
-    setEuclidean,
-    visibleEuclidean,
-  } = useTrajectory();
+export const TrajectoryPlot = ({
+  currentTrajectory,
+  currentMetrics,
+}: TrajectoryPlotProps) => {
+  const { trajectoriesHeader, setEuclidean, visibleEuclidean } =
+    useTrajectory();
 
   useEffect(() => {
     setEuclidean();
@@ -42,20 +42,21 @@ export const TrajectoryPlot = ({ currentTrajectory, currentMetrics }: Trajectory
     z: currentTrajectory.zSoll,
   };
 
-  const euclideanDistancePlot: Partial<PlotData>[] = currentMetrics.euclideanIntersections.map(
-    (inter: any, index: number) => ({
-      ...dataPlotConfig(
-        'lines+markers',
-        'distance',
-        3,
-        'rgba(100, 100, 100, 0.9)',
-        index === 0,
-      ),
-      ...inter,
-    }),
-  );
-
-  console.log(visibleEuclidean)
+  const euclideanDistancePlot: Partial<PlotData>[] =
+    currentMetrics.euclideanIntersections
+      ? currentMetrics.euclideanIntersections.map(
+          (inter: any, index: number) => ({
+            ...dataPlotConfig(
+              'lines+markers',
+              'distance',
+              3,
+              'rgba(100, 100, 100, 0.9)',
+              index === 0,
+            ),
+            ...inter,
+          }),
+        )
+      : [];
 
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
   const currentTrajectoryID = trajectoriesHeader.findIndex(

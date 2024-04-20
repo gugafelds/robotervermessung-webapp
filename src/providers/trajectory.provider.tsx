@@ -3,7 +3,10 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useMemo, useState } from 'react';
 
-import type { TrajectoryEuclideanMetrics, TrajectoryHeader } from '@/types/main';
+import type {
+  TrajectoryEuclideanMetrics,
+  TrajectoryHeader,
+} from '@/types/main';
 
 export interface TrajectoryState {
   trajectoriesHeader: TrajectoryHeader[];
@@ -28,7 +31,9 @@ export const TrajectoryProvider = ({
   trajectoriesEuclideanMetricsDB,
 }: TrajectoryProviderProps) => {
   const [trajectoriesHeader] = useState(trajectoriesHeaderDB);
-  const [trajectoriesEuclideanMetrics] = useState(trajectoriesEuclideanMetricsDB);
+  const [trajectoriesEuclideanMetrics] = useState(
+    trajectoriesEuclideanMetricsDB,
+  );
   const [euclideanDistances, setEuclidean] = useState([]);
   const [visibleEuclidean, showEuclideanPlot] = useState(false);
 

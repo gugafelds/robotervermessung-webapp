@@ -1,6 +1,9 @@
 import React from 'react';
 
-import { getTrajectoryById, getMetricsById } from '@/src/actions/trajectory.service';
+import {
+  getMetricsById,
+  getTrajectoryById,
+} from '@/src/actions/trajectory.service';
 import { TrajectoryInfo } from '@/src/app/trajectories/components/TrajectoryInfo';
 import { TrajectoryPlot } from '@/src/app/trajectories/components/TrajectoryPlot';
 import { json } from '@/src/lib/functions';
@@ -17,7 +20,10 @@ export default async function TrajectoryPage({ params }: TrajectoryPageProps) {
     <>
       <TrajectoryInfo currentTrajectory={json(currentTrajectory)} />
 
-      <TrajectoryPlot currentTrajectory={json(currentTrajectory)} currentMetrics={json(currentMetrics)}/>
+      <TrajectoryPlot
+        currentTrajectory={json(currentTrajectory)}
+        currentMetrics={json(currentMetrics)}
+      />
     </>
   );
 }

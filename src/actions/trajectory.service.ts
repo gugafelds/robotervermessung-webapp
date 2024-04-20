@@ -2,11 +2,11 @@
 
 import { getMongoDb } from '@/src/lib/mongodb';
 import {
+  transformMetricResult,
   transformTrajectoriesDataResult,
   transformTrajectoriesEuclideanMetricsResult,
   transformTrajectoriesHeadersResult,
   transformTrajectoryResult,
-  transformMetricResult,
 } from '@/src/lib/transformer';
 import type {
   TrajectoryData,
