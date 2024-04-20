@@ -141,7 +141,7 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
     }
     ${
       !currentTrajectoryEuclideanMetrics
-        ? 'bg-gray-200 font-light text-neutral-400'
+        ? 'bg-gray-200 font-extralight text-gray-400'
         : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
     }
   `}
