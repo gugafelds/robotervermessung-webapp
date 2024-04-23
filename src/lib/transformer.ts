@@ -1,10 +1,10 @@
 import type {
   TrajectoryData,
   TrajectoryDataRaw,
-  TrajectoryEuclideanMetrics,
-  TrajectoryEuclideanMetricsRaw,
   TrajectoryDTWJohnenMetrics,
   TrajectoryDTWJohnenMetricsRaw,
+  TrajectoryEuclideanMetrics,
+  TrajectoryEuclideanMetricsRaw,
   TrajectoryHeader,
   TrajectoryHeaderRaw,
 } from '@/types/main';
@@ -57,7 +57,7 @@ export const transformDTWJohnenMetricResult = (
   dtwJohnenY: trajectoryRaw.dtw_Y,
   dtwAccDist: trajectoryRaw.dtw_accdist,
   dtwPath: trajectoryRaw.dtw_path,
-  metricType: trajectoryRaw.metric_type
+  metricType: trajectoryRaw.metric_type,
 });
 
 export const transformTrajectoriesDataResult = (
@@ -140,8 +140,7 @@ export const transformTrajectoriesDTWJohnenMetricsResult = (
       dtwJohnenY: trajectory.dtw_Y,
       dtwAccDist: trajectory.dtw_accdist,
       dtwPath: trajectory.dtw_path,
-      metricType: trajectory.metric_type
+      metricType: trajectory.metric_type,
     }),
   );
 };
-

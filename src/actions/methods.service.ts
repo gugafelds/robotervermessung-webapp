@@ -55,4 +55,3 @@ export const applyDTWJohnen = async ({
 
   return responseDTW.data;
 };
-
