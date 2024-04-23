@@ -6,14 +6,17 @@ import InfoIcon from '@heroicons/react/24/outline/InformationCircleIcon';
 import React from 'react';
 import { CSVLink } from 'react-csv';
 
-import { applyDTWJohnen, applyEuclideanDistance } from '@/src/actions/methods.service';
+import {
+  applyDTWJohnen,
+  applyEuclideanDistance,
+} from '@/src/actions/methods.service';
 import { Typography } from '@/src/components/Typography';
 import { getCSVData } from '@/src/lib/csv-utils';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 import type {
   TrajectoryData,
-  TrajectoryEuclideanMetrics,
   TrajectoryDTWJohnenMetrics,
+  TrajectoryEuclideanMetrics,
   TrajectoryHeader,
 } from '@/types/main';
 
@@ -23,11 +26,13 @@ type TrajectoryCardProps = {
   currentEuclideanMetrics: TrajectoryEuclideanMetrics;
 };
 
-export const TrajectoryInfo = ({ currentTrajectory, currentDTWJohnenMetrics, currentEuclideanMetrics }: TrajectoryCardProps) => {
+export const TrajectoryInfo = ({
+  currentTrajectory,
+  currentEuclideanMetrics,
+  currentDTWJohnenMetrics,
+}: TrajectoryCardProps) => {
   const {
     trajectoriesHeader,
-    trajectoriesEuclideanMetrics,
-    trajectoriesDTWJohnenMetrics,
     euclideanDistances,
     setEuclidean,
     visibleEuclidean,
@@ -52,14 +57,7 @@ export const TrajectoryInfo = ({ currentTrajectory, currentDTWJohnenMetrics, cur
     );
   }
   const currentTrajectoryHeader = trajectoriesHeader[currentTrajectoryID];
-  const currentTrajectoryEuclideanMetrics = trajectoriesEuclideanMetrics.find(
-    (tem) => tem.trajectoryHeaderId === searchedIndex,
-  );
-  
-  const currentTrajectoryDTWJohnenMetrics = trajectoriesDTWJohnenMetrics.find(
-    (tem) => tem.trajectoryHeaderId === searchedIndex,
-  );
-  
+
   const csvData = getCSVData(currentTrajectory);
 
   const headersData = Object.keys(csvData || {}).map((key: string) => ({
@@ -73,12 +71,8 @@ export const TrajectoryInfo = ({ currentTrajectory, currentDTWJohnenMetrics, cur
     filename: `trajectory_${currentTrajectory.trajectoryHeaderId.toString()}.csv`,
   };
 
-  console.log(trajectoriesEuclideanMetrics)
-  console.log(currentDTWJohnenMetrics.dtwJohnenAverageDistance)
-  console.log(currentEuclideanMetrics.euclideanAverageDistance)
-
   return (
-    <div className="flex h-screen flex-col bg-gray-50 p-4">
+    <div className="flex h-auto flex-col bg-gray-50 p-4">
       <span className="inline-flex">
         <InfoIcon className="w-8" />
         <span className="mx-2 my-4 flex text-2xl font-semibold text-primary">
@@ -96,9 +90,9 @@ export const TrajectoryInfo = ({ currentTrajectory, currentDTWJohnenMetrics, cur
           </li>
         </ul>
       ))}
-      {currentTrajectoryEuclideanMetrics &&
-      Object.keys(currentTrajectoryEuclideanMetrics).length !== 0 ? (
-        Object.keys(currentTrajectoryEuclideanMetrics)
+      {currentEuclideanMetrics &&
+      Object.keys(currentEuclideanMetrics).length !== 0 ? (
+        Object.keys(currentEuclideanMetrics)
           .filter((header) => !header.includes('_id'))
           .filter((header) => !header.includes('euclideanIntersections'))
           .filter((header) => !header.includes('metricType'))
@@ -108,7 +102,7 @@ export const TrajectoryInfo = ({ currentTrajectory, currentDTWJohnenMetrics, cur
                 {`${header}:`}{' '}
                 <span className="text-lg font-light text-primary">
                   {' '}
-                  {`${currentTrajectoryEuclideanMetrics[header as keyof TrajectoryEuclideanMetrics]}`}
+                  {`${currentEuclideanMetrics[header as keyof TrajectoryEuclideanMetrics]}`}
                 </span>
               </li>
             </ul>
@@ -118,18 +112,22 @@ export const TrajectoryInfo = ({ currentTrajectory, currentDTWJohnenMetrics, cur
           No euclidean metrics for this trajectory.
         </ul>
       )}
-      {currentTrajectoryDTWJohnenMetrics &&
-      Object.keys(currentTrajectoryDTWJohnenMetrics).length !== 0 ? (
-        Object.keys(currentTrajectoryDTWJohnenMetrics)
+      {currentDTWJohnenMetrics &&
+      Object.keys(currentDTWJohnenMetrics).length !== 0 ? (
+        Object.keys(currentDTWJohnenMetrics)
           .filter((header) => !header.includes('_id'))
           .filter((header) => !header.includes('metricType'))
+          .filter((header) => !header.includes('dtwJohnenX'))
+          .filter((header) => !header.includes('dtwJohnenY'))
+          .filter((header) => !header.includes('dtwAccDist'))
+          .filter((header) => !header.includes('dtwPath'))
           .map((header) => (
             <ul key={header}>
               <li className="px-6 text-lg font-bold text-primary">
                 {`${header}:`}{' '}
                 <span className="text-lg font-light text-primary">
                   {' '}
-                  {`${currentTrajectoryDTWJohnenMetrics[header as keyof TrajectoryDTWJohnenMetrics]}`}
+                  {`${currentDTWJohnenMetrics[header as keyof TrajectoryDTWJohnenMetrics]}`}
                 </span>
               </li>
             </ul>
@@ -175,7 +173,7 @@ export const TrajectoryInfo = ({ currentTrajectory, currentDTWJohnenMetrics, cur
         : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
     }
     ${
-      !currentTrajectoryEuclideanMetrics
+      !currentEuclideanMetrics
         ? 'bg-gray-200 font-extralight text-gray-400'
         : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
     }
@@ -184,8 +182,8 @@ export const TrajectoryInfo = ({ currentTrajectory, currentDTWJohnenMetrics, cur
             showEuclideanPlot(!visibleEuclidean);
           }}
           disabled={
-            !currentTrajectoryEuclideanMetrics ||
-            !currentTrajectoryEuclideanMetrics.euclideanIntersections
+            !currentEuclideanMetrics ||
+            !currentEuclideanMetrics.euclideanIntersections
           }
         >
           view 3D
@@ -221,7 +219,7 @@ export const TrajectoryInfo = ({ currentTrajectory, currentDTWJohnenMetrics, cur
         : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
     }
     ${
-      !currentTrajectoryDTWJohnenMetrics
+      !currentDTWJohnenMetrics
         ? 'bg-gray-200 font-extralight text-gray-400'
         : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
     }
@@ -230,8 +228,7 @@ export const TrajectoryInfo = ({ currentTrajectory, currentDTWJohnenMetrics, cur
             showDTWJohnenPlot(!visibleDTWJohnen);
           }}
           disabled={
-            !currentTrajectoryDTWJohnenMetrics ||
-            !currentTrajectoryDTWJohnenMetrics.dtwPath
+            !currentDTWJohnenMetrics || !currentDTWJohnenMetrics.dtwPath
           }
         >
           view 3D

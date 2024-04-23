@@ -8,7 +8,11 @@ import { useEffect } from 'react';
 import { Typography } from '@/src/components/Typography';
 import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
-import type { TrajectoryDTWJohnenMetrics, TrajectoryData, TrajectoryEuclideanMetrics } from '@/types/main';
+import type {
+  TrajectoryData,
+  TrajectoryDTWJohnenMetrics,
+  TrajectoryEuclideanMetrics,
+} from '@/types/main';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
@@ -45,7 +49,7 @@ export const TrajectoryPlot = ({
   };
 
   const euclideanDistancePlot: Partial<PlotData>[] =
-    currentEuclideanMetrics.euclideanIntersections
+    visibleEuclidean && currentEuclideanMetrics.euclideanIntersections
       ? currentEuclideanMetrics.euclideanIntersections.map(
           (inter: any, index: number) => ({
             ...dataPlotConfig(
@@ -65,8 +69,6 @@ export const TrajectoryPlot = ({
     (item) => item.dataId === searchedIndex,
   );
 
-  console.log(currentDTWJohnenMetrics.dtwJohnenAverageDistance)
-
   if (currentTrajectoryID === -1) {
     return (
       <div className="m-10 size-fit place-items-baseline rounded-2xl bg-gray-300 p-10 shadow-xl">
@@ -80,30 +82,16 @@ export const TrajectoryPlot = ({
 
   return (
     <div className="mx-auto">
-      {visibleEuclidean && (
-        <Plot
-          data={[idealTrajectory, realTrajectory, ...euclideanDistancePlot]}
-          useResizeHandler
-          layout={plotLayoutConfig}
-          config={{
-            displaylogo: false,
-            modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-            responsive: true,
-          }}
-        />
-      )}
-      {!visibleEuclidean && (
-        <Plot
-          data={[idealTrajectory, realTrajectory]}
-          useResizeHandler
-          layout={plotLayoutConfig}
-          config={{
-            displaylogo: false,
-            modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-            responsive: true,
-          }}
-        />
-      )}
+      <Plot
+        data={[idealTrajectory, realTrajectory, ...euclideanDistancePlot]}
+        useResizeHandler
+        layout={plotLayoutConfig}
+        config={{
+          displaylogo: false,
+          modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+          responsive: true,
+        }}
+      />
     </div>
   );
 };

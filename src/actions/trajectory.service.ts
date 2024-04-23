@@ -2,21 +2,21 @@
 
 import { getMongoDb } from '@/src/lib/mongodb';
 import {
+  transformDTWJohnenMetricResult,
   transformMetricResult,
   transformTrajectoriesDataResult,
-  transformTrajectoriesEuclideanMetricsResult,
   transformTrajectoriesDTWJohnenMetricsResult,
+  transformTrajectoriesEuclideanMetricsResult,
   transformTrajectoriesHeadersResult,
   transformTrajectoryResult,
-  transformDTWJohnenMetricResult,
 } from '@/src/lib/transformer';
 import type {
   TrajectoryData,
   TrajectoryDataRaw,
-  TrajectoryEuclideanMetrics,
-  TrajectoryEuclideanMetricsRaw,
   TrajectoryDTWJohnenMetrics,
   TrajectoryDTWJohnenMetricsRaw,
+  TrajectoryEuclideanMetrics,
+  TrajectoryEuclideanMetricsRaw,
   TrajectoryHeaderRaw,
 } from '@/types/main';
 
@@ -53,7 +53,7 @@ export const getTrajectoriesEuclideanMetrics = async () => {
 
   const trajectoriesEuclideanMetricsResult = await mongo
     .collection('metrics')
-    .find<TrajectoryEuclideanMetricsRaw>({ metric_type: "euclidean"})
+    .find<TrajectoryEuclideanMetricsRaw>({ metric_type: 'euclidean' })
     .sort({ recording_date: -1 })
     .toArray();
 
@@ -62,14 +62,12 @@ export const getTrajectoriesEuclideanMetrics = async () => {
   );
 };
 
-
-
 export const getTrajectoriesDTWJohnenMetrics = async () => {
   const mongo = await getMongoDb();
 
   const trajectoriesDTWJohnenMetricsResult = await mongo
     .collection('metrics')
-    .find<TrajectoryDTWJohnenMetricsRaw>({})
+    .find<TrajectoryDTWJohnenMetricsRaw>({ metric_type: 'dtw_johnen' })
     .sort({ recording_date: -1 })
     .toArray();
 
@@ -77,7 +75,6 @@ export const getTrajectoriesDTWJohnenMetrics = async () => {
     trajectoriesDTWJohnenMetricsResult,
   );
 };
-
 
 export const getTrajectoryById = async (id: string) => {
   const mongo = await getMongoDb();
@@ -99,7 +96,10 @@ export const getEuclideanMetricsById = async (id: string) => {
 
   const euclideanMetricsResult = await mongo
     .collection('metrics')
-    .find<TrajectoryEuclideanMetricsRaw>({ trajectory_header_id: id })
+    .find<TrajectoryEuclideanMetricsRaw>({
+      trajectory_header_id: id,
+      metric_type: 'euclidean',
+    })
     .next();
 
   if (!euclideanMetricsResult) {
@@ -114,7 +114,10 @@ export const getDTWJohnenMetricsById = async (id: string) => {
 
   const dtwJohnenMetricsResult = await mongo
     .collection('metrics')
-    .find<TrajectoryDTWJohnenMetricsRaw>({ trajectory_header_id: id })
+    .find<TrajectoryDTWJohnenMetricsRaw>({
+      trajectory_header_id: id,
+      metric_type: 'dtw_johnen',
+    })
     .next();
 
   if (!dtwJohnenMetricsResult) {
