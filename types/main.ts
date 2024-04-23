@@ -115,8 +115,8 @@ export interface TrajectoryDTWJohnenMetrics {
   trajectoryHeaderId: string;
   dtwJohnenMaxDistance: number;
   dtwJohnenAverageDistance: number;
-  dtwJohnenX: number[];
-  dtwJohnenY: number[];
+  dtwJohnenX: number[][];
+  dtwJohnenY: number[][];
   dtwAccDist: number[];
   dtwPath: number[];
   metricType: string;

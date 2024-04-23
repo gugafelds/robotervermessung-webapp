@@ -143,7 +143,7 @@ export const TrajectoryInfo = ({
           options
         </span>
       </span>
-      <div className="inline-flex">
+      <div className="mb-5 inline-flex">
         <span className="mx-5 mt-2 w-fit py-3 text-xl font-bold text-primary">
           euclidean distance:
         </span>
@@ -173,7 +173,7 @@ export const TrajectoryInfo = ({
         : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
     }
     ${
-      !currentEuclideanMetrics
+      !currentEuclideanMetrics.trajectoryHeaderId
         ? 'bg-gray-200 font-extralight text-gray-400'
         : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
     }
@@ -219,7 +219,7 @@ export const TrajectoryInfo = ({
         : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
     }
     ${
-      !currentDTWJohnenMetrics
+      !currentDTWJohnenMetrics.trajectoryHeaderId
         ? 'bg-gray-200 font-extralight text-gray-400'
         : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
     }

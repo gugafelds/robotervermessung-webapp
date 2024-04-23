@@ -27,8 +27,12 @@ export const TrajectoryPlot = ({
   currentEuclideanMetrics,
   currentDTWJohnenMetrics,
 }: TrajectoryPlotProps) => {
-  const { trajectoriesHeader, setEuclidean, visibleEuclidean } =
-    useTrajectory();
+  const {
+    trajectoriesHeader,
+    setEuclidean,
+    visibleEuclidean,
+    visibleDTWJohnen,
+  } = useTrajectory();
 
   useEffect(() => {
     setEuclidean();
@@ -64,6 +68,24 @@ export const TrajectoryPlot = ({
         )
       : [];
 
+  const dtwDistancePlot: Partial<PlotData>[] =
+    visibleDTWJohnen &&
+    currentDTWJohnenMetrics.dtwJohnenX &&
+    currentDTWJohnenMetrics.dtwJohnenY
+      ? currentDTWJohnenMetrics.dtwJohnenX.map((inter: any, index: number) => ({
+          ...dataPlotConfig(
+            'lines+markers',
+            'dtw',
+            3,
+            'rgb(237,0,255)',
+            index === 0,
+          ),
+          x: [inter[0], currentDTWJohnenMetrics.dtwJohnenY[index][0]],
+          y: [inter[1], currentDTWJohnenMetrics.dtwJohnenY[index][1]],
+          z: [inter[2], currentDTWJohnenMetrics.dtwJohnenY[index][2]],
+        }))
+      : [];
+
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
   const currentTrajectoryID = trajectoriesHeader.findIndex(
     (item) => item.dataId === searchedIndex,
@@ -83,7 +105,12 @@ export const TrajectoryPlot = ({
   return (
     <div className="mx-auto">
       <Plot
-        data={[idealTrajectory, realTrajectory, ...euclideanDistancePlot]}
+        data={[
+          idealTrajectory,
+          realTrajectory,
+          ...euclideanDistancePlot,
+          ...dtwDistancePlot,
+        ]}
         useResizeHandler
         layout={plotLayoutConfig}
         config={{
