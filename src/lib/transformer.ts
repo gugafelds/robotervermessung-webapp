@@ -3,6 +3,8 @@ import type {
   TrajectoryDataRaw,
   TrajectoryEuclideanMetrics,
   TrajectoryEuclideanMetricsRaw,
+  TrajectoryDTWJohnenMetrics,
+  TrajectoryDTWJohnenMetricsRaw,
   TrajectoryHeader,
   TrajectoryHeaderRaw,
 } from '@/types/main';
@@ -42,6 +44,20 @@ export const transformMetricResult = (
   euclideanStandardDeviation: trajectoryRaw.euclidean_standard_deviation,
   euclideanIntersections: trajectoryRaw.euclidean_intersections,
   metricType: trajectoryRaw.metric_type,
+});
+
+export const transformDTWJohnenMetricResult = (
+  trajectoryRaw: TrajectoryDTWJohnenMetricsRaw,
+): TrajectoryDTWJohnenMetrics => ({
+  _id: trajectoryRaw._id,
+  trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
+  dtwJohnenMaxDistance: trajectoryRaw.dtw_max_distance,
+  dtwJohnenAverageDistance: trajectoryRaw.dtw_average_distance,
+  dtwJohnenX: trajectoryRaw.dtw_X,
+  dtwJohnenY: trajectoryRaw.dtw_Y,
+  dtwAccDist: trajectoryRaw.dtw_accdist,
+  dtwPath: trajectoryRaw.dtw_path,
+  metricType: trajectoryRaw.metric_type
 });
 
 export const transformTrajectoriesDataResult = (
@@ -110,3 +126,22 @@ export const transformTrajectoriesEuclideanMetricsResult = (
     }),
   );
 };
+
+export const transformTrajectoriesDTWJohnenMetricsResult = (
+  trajectoriesDTWJohnenMetricsRaw: TrajectoryDTWJohnenMetricsRaw[],
+): TrajectoryDTWJohnenMetrics[] => {
+  return trajectoriesDTWJohnenMetricsRaw.map(
+    (trajectory): TrajectoryDTWJohnenMetrics => ({
+      _id: trajectory._id,
+      trajectoryHeaderId: trajectory.trajectory_header_id,
+      dtwJohnenMaxDistance: trajectory.dtw_max_distance,
+      dtwJohnenAverageDistance: trajectory.dtw_average_distance,
+      dtwJohnenX: trajectory.dtw_X,
+      dtwJohnenY: trajectory.dtw_Y,
+      dtwAccDist: trajectory.dtw_accdist,
+      dtwPath: trajectory.dtw_path,
+      metricType: trajectory.metric_type
+    }),
+  );
+};
+

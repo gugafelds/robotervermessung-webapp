@@ -8,18 +8,20 @@ import { useEffect } from 'react';
 import { Typography } from '@/src/components/Typography';
 import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
-import type { TrajectoryData, TrajectoryEuclideanMetrics } from '@/types/main';
+import type { TrajectoryDTWJohnenMetrics, TrajectoryData, TrajectoryEuclideanMetrics } from '@/types/main';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 type TrajectoryPlotProps = {
   currentTrajectory: TrajectoryData;
-  currentMetrics: TrajectoryEuclideanMetrics;
+  currentEuclideanMetrics: TrajectoryEuclideanMetrics;
+  currentDTWJohnenMetrics: TrajectoryDTWJohnenMetrics;
 };
 
 export const TrajectoryPlot = ({
   currentTrajectory,
-  currentMetrics,
+  currentEuclideanMetrics,
+  currentDTWJohnenMetrics,
 }: TrajectoryPlotProps) => {
   const { trajectoriesHeader, setEuclidean, visibleEuclidean } =
     useTrajectory();
@@ -43,8 +45,8 @@ export const TrajectoryPlot = ({
   };
 
   const euclideanDistancePlot: Partial<PlotData>[] =
-    currentMetrics.euclideanIntersections
-      ? currentMetrics.euclideanIntersections.map(
+    currentEuclideanMetrics.euclideanIntersections
+      ? currentEuclideanMetrics.euclideanIntersections.map(
           (inter: any, index: number) => ({
             ...dataPlotConfig(
               'lines+markers',
@@ -62,6 +64,8 @@ export const TrajectoryPlot = ({
   const currentTrajectoryID = trajectoriesHeader.findIndex(
     (item) => item.dataId === searchedIndex,
   );
+
+  console.log(currentDTWJohnenMetrics.dtwJohnenAverageDistance)
 
   if (currentTrajectoryID === -1) {
     return (

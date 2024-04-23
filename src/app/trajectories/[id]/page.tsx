@@ -1,7 +1,8 @@
 import React from 'react';
 
 import {
-  getMetricsById,
+  getEuclideanMetricsById,
+  getDTWJohnenMetricsById,
   getTrajectoryById,
 } from '@/src/actions/trajectory.service';
 import { TrajectoryInfo } from '@/src/app/trajectories/components/TrajectoryInfo';
@@ -14,15 +15,21 @@ type TrajectoryPageProps = {
 
 export default async function TrajectoryPage({ params }: TrajectoryPageProps) {
   const currentTrajectory = await getTrajectoryById(params.id);
-  const currentMetrics = await getMetricsById(params.id);
+  const currentEuclideanMetrics = await getEuclideanMetricsById(params.id);
+  const currentDTWJohnenMetrics = await getDTWJohnenMetricsById(params.id);
 
   return (
     <>
-      <TrajectoryInfo currentTrajectory={json(currentTrajectory)} />
+      <TrajectoryInfo 
+        currentTrajectory={json(currentTrajectory)} 
+        currentDTWJohnenMetrics={json(currentDTWJohnenMetrics)} 
+        currentEuclideanMetrics={json(currentEuclideanMetrics)}
+        />
 
       <TrajectoryPlot
         currentTrajectory={json(currentTrajectory)}
-        currentMetrics={json(currentMetrics)}
+        currentEuclideanMetrics={json(currentEuclideanMetrics)}
+        currentDTWJohnenMetrics={json(currentDTWJohnenMetrics)}
       />
     </>
   );

@@ -6,28 +6,34 @@ import InfoIcon from '@heroicons/react/24/outline/InformationCircleIcon';
 import React from 'react';
 import { CSVLink } from 'react-csv';
 
-import { applyEuclideanDistance } from '@/src/actions/methods.service';
+import { applyDTWJohnen, applyEuclideanDistance } from '@/src/actions/methods.service';
 import { Typography } from '@/src/components/Typography';
 import { getCSVData } from '@/src/lib/csv-utils';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 import type {
   TrajectoryData,
   TrajectoryEuclideanMetrics,
+  TrajectoryDTWJohnenMetrics,
   TrajectoryHeader,
 } from '@/types/main';
 
 type TrajectoryCardProps = {
   currentTrajectory: TrajectoryData;
+  currentDTWJohnenMetrics: TrajectoryDTWJohnenMetrics;
+  currentEuclideanMetrics: TrajectoryEuclideanMetrics;
 };
 
-export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
+export const TrajectoryInfo = ({ currentTrajectory, currentDTWJohnenMetrics, currentEuclideanMetrics }: TrajectoryCardProps) => {
   const {
     trajectoriesHeader,
     trajectoriesEuclideanMetrics,
+    trajectoriesDTWJohnenMetrics,
     euclideanDistances,
     setEuclidean,
     visibleEuclidean,
     showEuclideanPlot,
+    visibleDTWJohnen,
+    showDTWJohnenPlot,
   } = useTrajectory();
 
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
@@ -49,7 +55,11 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
   const currentTrajectoryEuclideanMetrics = trajectoriesEuclideanMetrics.find(
     (tem) => tem.trajectoryHeaderId === searchedIndex,
   );
-
+  
+  const currentTrajectoryDTWJohnenMetrics = trajectoriesDTWJohnenMetrics.find(
+    (tem) => tem.trajectoryHeaderId === searchedIndex,
+  );
+  
   const csvData = getCSVData(currentTrajectory);
 
   const headersData = Object.keys(csvData || {}).map((key: string) => ({
@@ -62,6 +72,10 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
     header: headersData,
     filename: `trajectory_${currentTrajectory.trajectoryHeaderId.toString()}.csv`,
   };
+
+  console.log(trajectoriesEuclideanMetrics)
+  console.log(currentDTWJohnenMetrics.dtwJohnenAverageDistance)
+  console.log(currentEuclideanMetrics.euclideanAverageDistance)
 
   return (
     <div className="flex h-screen flex-col bg-gray-50 p-4">
@@ -102,6 +116,27 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
       ) : (
         <ul className="px-6 text-lg font-light text-primary">
           No euclidean metrics for this trajectory.
+        </ul>
+      )}
+      {currentTrajectoryDTWJohnenMetrics &&
+      Object.keys(currentTrajectoryDTWJohnenMetrics).length !== 0 ? (
+        Object.keys(currentTrajectoryDTWJohnenMetrics)
+          .filter((header) => !header.includes('_id'))
+          .filter((header) => !header.includes('metricType'))
+          .map((header) => (
+            <ul key={header}>
+              <li className="px-6 text-lg font-bold text-primary">
+                {`${header}:`}{' '}
+                <span className="text-lg font-light text-primary">
+                  {' '}
+                  {`${currentTrajectoryDTWJohnenMetrics[header as keyof TrajectoryDTWJohnenMetrics]}`}
+                </span>
+              </li>
+            </ul>
+          ))
+      ) : (
+        <ul className="px-6 text-lg font-light text-primary">
+          No DTW Johnen metrics for this trajectory.
         </ul>
       )}
       <span className="inline-flex">
@@ -151,6 +186,52 @@ export const TrajectoryInfo = ({ currentTrajectory }: TrajectoryCardProps) => {
           disabled={
             !currentTrajectoryEuclideanMetrics ||
             !currentTrajectoryEuclideanMetrics.euclideanIntersections
+          }
+        >
+          view 3D
+        </button>
+      </div>
+      <div className="inline-flex">
+        <span className="mx-5 mt-2 w-fit py-3 text-xl font-bold text-primary">
+          dtw johnen:
+        </span>
+        <button
+          type="button"
+          className="mx-2 mt-2 w-fit rounded-xl px-6 text-xl font-normal
+          text-primary shadow-md transition-colors duration-200
+          ease-in betterhover:hover:bg-gray-200"
+          onClick={async () => {
+            if (euclideanDistances?.length > 0) {
+              setEuclidean([]);
+              return;
+            }
+            const dtwJohnen = await applyDTWJohnen(currentTrajectory);
+            setEuclidean(dtwJohnen.intersection);
+          }}
+        >
+          calculate
+        </button>
+        <button
+          type="button"
+          className={`
+    mx-1 mt-1 w-32 rounded-xl px-4 text-xl  shadow-md
+    ${
+      visibleDTWJohnen
+        ? 'bg-gray-200 font-bold text-primary'
+        : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
+    }
+    ${
+      !currentTrajectoryDTWJohnenMetrics
+        ? 'bg-gray-200 font-extralight text-gray-400'
+        : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
+    }
+  `}
+          onClick={() => {
+            showDTWJohnenPlot(!visibleDTWJohnen);
+          }}
+          disabled={
+            !currentTrajectoryDTWJohnenMetrics ||
+            !currentTrajectoryDTWJohnenMetrics.dtwPath
           }
         >
           view 3D

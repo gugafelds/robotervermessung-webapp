@@ -97,3 +97,27 @@ export interface TrajectoryEuclideanMetrics {
   euclideanIntersections: number[];
   metricType: string;
 }
+
+export interface TrajectoryDTWJohnenMetricsRaw {
+  _id: ObjectId | string;
+  trajectory_header_id: string;
+  dtw_max_distance: number;
+  dtw_average_distance: number;
+  dtw_X: number[];
+  dtw_Y: number[];
+  dtw_accdist: number[];
+  dtw_path: number[];
+  metric_type: string;
+}
+
+export interface TrajectoryDTWJohnenMetrics {
+  _id: ObjectId | string;
+  trajectoryHeaderId: string;
+  dtwJohnenMaxDistance: number;
+  dtwJohnenAverageDistance: number;
+  dtwJohnenX: number[];
+  dtwJohnenY: number[];
+  dtwAccDist: number[];
+  dtwPath: number[];
+  metricType: string;
+}
