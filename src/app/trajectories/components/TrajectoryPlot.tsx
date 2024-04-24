@@ -86,6 +86,34 @@ export const TrajectoryPlot = ({
         }))
       : [];
 
+  const dtwPathPlot: Partial<PlotData> =
+    visibleDTWJohnen && currentDTWJohnenMetrics.dtwPath
+      ? {
+          type: 'scatter',
+          mode: 'lines',
+          x: Array.isArray(currentDTWJohnenMetrics.dtwPath[1])
+            ? currentDTWJohnenMetrics.dtwPath[1]
+            : [currentDTWJohnenMetrics.dtwPath[1]],
+          y: Array.isArray(currentDTWJohnenMetrics.dtwPath[0])
+            ? currentDTWJohnenMetrics.dtwPath[0]
+            : [currentDTWJohnenMetrics.dtwPath[0]],
+          line: {
+            color: 'rgb(255, 0, 0)',
+            width: 4,
+          },
+        }
+      : {};
+
+  const dtwAccdistHeatmap: Partial<PlotData> =
+    visibleDTWJohnen && currentDTWJohnenMetrics.dtwAccDist
+      ? {
+          type: 'heatmap',
+          z: currentDTWJohnenMetrics.dtwAccDist,
+          colorscale: 'Plasma',
+          showscale: true,
+        }
+      : {};
+
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
   const currentTrajectoryID = trajectoriesHeader.findIndex(
     (item) => item.dataId === searchedIndex,
@@ -119,6 +147,18 @@ export const TrajectoryPlot = ({
           responsive: true,
         }}
       />
+      {visibleDTWJohnen && currentDTWJohnenMetrics.dtwAccDist && (
+        <Plot
+          data={[dtwAccdistHeatmap, dtwPathPlot]}
+          useResizeHandler
+          layout={plotLayoutConfig}
+          config={{
+            displaylogo: false,
+            modeBarButtonsToRemove: ['toImage', 'orbitRotation', 'pan2d'],
+            responsive: true,
+          }}
+        />
+      )}
     </div>
   );
 };
