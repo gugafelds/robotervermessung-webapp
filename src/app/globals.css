@@ -21,3 +21,11 @@ a {
 ::-webkit-scrollbar {
   display: none;
 }
+
+.h-fullscreen {
+  height: calc(100vh - 84px); /* Adjust the height as per your requirement */
+}
+
+.h-custom-height {
+  height: 84px;
+}
