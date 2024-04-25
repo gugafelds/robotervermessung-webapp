@@ -174,12 +174,12 @@ export const TrajectoryInfo = ({
         className="mt-2 grid grid-rows-[50px_50px_50px] gap-3 rounded-3xl bg-stone-200 p-5
 "
       >
-        <div className="mt-3 text-2xl font-bold text-primary">
+        <div className="mt-3 text-lg font-bold text-primary">
           euclidean distance
         </div>
         <button
           type="button"
-          className={`rounded-xl text-xl
+          className={`rounded-xl text-lg
     shadow-md
     ${
       currentEuclideanMetrics.trajectoryHeaderId
@@ -202,7 +202,7 @@ export const TrajectoryInfo = ({
         <button
           type="button"
           className={`
-       rounded-xl  text-xl  shadow-md
+       rounded-xl  text-lg  shadow-md
       ${visibleEuclidean ? 'bg-stone-300 font-bold' : ''}
       ${
         !currentEuclideanMetrics.trajectoryHeaderId
@@ -221,11 +221,11 @@ export const TrajectoryInfo = ({
           view 3D
         </button>
 
-        <div className="mt-3 text-2xl font-bold text-primary">dtw johnen</div>
+        <div className="mt-3 text-lg font-bold text-primary">dtw johnen</div>
 
         <button
           type="button"
-          className={`rounded-xl px-2 text-xl 
+          className={`rounded-xl px-2 text-lg 
     shadow-md
     ${
       currentDTWJohnenMetrics.trajectoryHeaderId
@@ -247,7 +247,7 @@ export const TrajectoryInfo = ({
         <button
           type="button"
           className={`
-     rounded-xl text-xl  shadow-md  
+     rounded-xl text-lg  shadow-md  
      ${visibleDTWJohnen ? 'bg-stone-300 font-bold' : ''}
      ${
        !currentDTWJohnenMetrics.trajectoryHeaderId
