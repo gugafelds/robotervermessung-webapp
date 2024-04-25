@@ -248,18 +248,13 @@ export const TrajectoryInfo = ({
           type="button"
           className={`
      rounded-xl text-xl  shadow-md  
-      ${visibleDTWJohnen ? 'bg-stone-300 font-bold' : ''}
-      ${
-        !currentDTWJohnenMetrics.trajectoryHeaderId
-          ? 'bg-gray-300 font-extralight text-gray-400 '
-          : 'text-primary  '
-      }
-      ${
-        !currentDTWJohnenMetrics.trajectoryHeaderId
-          ? 'bg-gray-200 font-extralight text-gray-400'
-          : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
-      }
-    `}
+     ${visibleDTWJohnen ? 'bg-stone-300 font-bold' : ''}
+     ${
+       !currentDTWJohnenMetrics.trajectoryHeaderId
+         ? 'bg-gray-300 font-extralight text-gray-400 '
+         : 'text-primary  '
+     }
+   `}
           onClick={() => {
             showDTWJohnenPlot(!visibleDTWJohnen);
           }}
@@ -269,15 +264,14 @@ export const TrajectoryInfo = ({
         >
           view 3D
         </button>
-
-        <div
+        <CSVLink
+          {...csvTrajectory}
+          separator=","
           className="col-start-3 content-center rounded-xl px-2 text-center text-lg font-normal      text-primary shadow-md transition-colors duration-200
         ease-in betterhover:hover:bg-gray-200"
         >
-          <CSVLink {...csvTrajectory} separator=",">
-            save to <span className="italic">.csv</span>
-          </CSVLink>
-        </div>
+          save to <span className="italic">.csv</span>
+        </CSVLink>
       </div>
     </div>
   );
