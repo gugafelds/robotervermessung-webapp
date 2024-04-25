@@ -12,7 +12,8 @@ import { filterBy, formatDate } from '@/src/lib/functions';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 
 export const Sidebar = () => {
-  const { trajectoriesHeader } = useTrajectory();
+  const { trajectoriesHeader, showEuclideanPlot, showDTWJohnenPlot } =
+    useTrajectory();
   const pathname = usePathname();
 
   const [filteredTrajectories, setFilteredTrajectories] =
@@ -48,6 +49,10 @@ export const Sidebar = () => {
           <Link
             key={trajectory.dataId.toString()}
             href={`/trajectories/${trajectory.dataId.toString()}`}
+            onClick={() => {
+              showEuclideanPlot(false);
+              showDTWJohnenPlot(false);
+            }}
           >
             <div
               className={` mt-1 rounded-xl p-3 transition-colors duration-200 ease-in betterhover:hover:bg-gray-200 ${

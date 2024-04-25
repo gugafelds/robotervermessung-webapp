@@ -72,41 +72,57 @@ export const TrajectoryInfo = ({
   };
 
   return (
-    <div className="flex h-auto flex-col bg-gray-50 p-4">
+    <div className="flex h-auto w-fit flex-col bg-gray-50 p-4">
       <span className="inline-flex">
         <InfoIcon className="w-8" />
         <span className="mx-2 my-4 flex text-2xl font-semibold text-primary">
           trajectory info
         </span>
       </span>
-      {Object.keys(currentTrajectoryHeader).map((header) => (
-        <ul key={header}>
-          <li className="px-6 text-lg font-bold text-primary">
-            {`${header}:`}{' '}
-            <span className="text-lg font-light text-primary">
-              {' '}
-              {`${currentTrajectoryHeader[header as keyof TrajectoryHeader]}`}
-            </span>
-          </li>
-        </ul>
-      ))}
+      {Object.keys(currentTrajectoryHeader).map((header) => {
+        let value = currentTrajectoryHeader[header as keyof TrajectoryHeader];
+        // Verifica se o valor é numérico
+        if (typeof value === 'number') {
+          value = value.toFixed(2); // Formata o valor numérico para 4 casas decimais
+        }
+        return (
+          <ul key={header}>
+            <li className="px-6 text-lg font-bold text-primary">
+              {`${header}:`}{' '}
+              <span className="text-lg font-light text-primary">
+                {`${value}`}
+              </span>
+            </li>
+          </ul>
+        );
+      })}
       {currentEuclideanMetrics &&
       Object.keys(currentEuclideanMetrics).length !== 0 ? (
         Object.keys(currentEuclideanMetrics)
           .filter((header) => !header.includes('_id'))
           .filter((header) => !header.includes('euclideanIntersections'))
           .filter((header) => !header.includes('metricType'))
-          .map((header) => (
-            <ul key={header}>
-              <li className="px-6 text-lg font-bold text-primary">
-                {`${header}:`}{' '}
-                <span className="text-lg font-light text-primary">
-                  {' '}
-                  {`${currentEuclideanMetrics[header as keyof TrajectoryEuclideanMetrics]}`}
-                </span>
-              </li>
-            </ul>
-          ))
+          .map((header) => {
+            let value =
+              currentEuclideanMetrics[
+                header as keyof TrajectoryEuclideanMetrics
+              ];
+            let unit = '';
+            if (typeof value === 'number') {
+              value = value.toFixed(5);
+              unit = 'm';
+            }
+            return (
+              <ul key={header}>
+                <li className="px-6 text-lg font-bold text-primary">
+                  {`${header}:`}{' '}
+                  <span className="text-lg font-light text-primary">
+                    {`${value} ${unit}`}
+                  </span>
+                </li>
+              </ul>
+            );
+          })
       ) : (
         <ul className="px-6 text-lg font-light text-primary">
           No euclidean metrics for this trajectory.
@@ -121,37 +137,55 @@ export const TrajectoryInfo = ({
           .filter((header) => !header.includes('dtwJohnenY'))
           .filter((header) => !header.includes('dtwAccDist'))
           .filter((header) => !header.includes('dtwPath'))
-          .map((header) => (
-            <ul key={header}>
-              <li className="px-6 text-lg font-bold text-primary">
-                {`${header}:`}{' '}
-                <span className="text-lg font-light text-primary">
-                  {' '}
-                  {`${currentDTWJohnenMetrics[header as keyof TrajectoryDTWJohnenMetrics]}`}
-                </span>
-              </li>
-            </ul>
-          ))
+          .map((header) => {
+            let value =
+              currentDTWJohnenMetrics[
+                header as keyof TrajectoryDTWJohnenMetrics
+              ];
+            let unit = '';
+            if (typeof value === 'number') {
+              value = value.toFixed(5);
+              unit = 'm';
+            }
+            return (
+              <ul key={header}>
+                <li className="px-6 text-lg font-bold text-primary">
+                  {`${header}:`}{' '}
+                  <span className="text-lg font-light text-primary">
+                    {`${value} ${unit}`}
+                  </span>
+                </li>
+              </ul>
+            );
+          })
       ) : (
         <ul className="px-6 text-lg font-light text-primary">
-          No DTW Johnen metrics for this trajectory.
+          No DTW metrics for this trajectory.
         </ul>
       )}
-      <span className="inline-flex">
+      <span className="mt-4 inline-flex">
         <OptionsIcon className="w-9" color="#003560" />
-        <span className="mx-2 my-4 flex text-2xl font-semibold text-primary">
+        <span className="mx-2  flex text-2xl font-semibold text-primary">
           options
         </span>
       </span>
-      <div className="mb-5 inline-flex">
-        <span className="mx-5 mt-2 w-fit py-3 text-xl font-bold text-primary">
-          euclidean distance:
-        </span>
+
+      <div
+        className="mt-2 grid grid-rows-[50px_50px_50px] gap-3 rounded-3xl bg-stone-200 p-5
+"
+      >
+        <div className="mt-3 text-2xl font-bold text-primary">
+          euclidean distance
+        </div>
         <button
           type="button"
-          className="mx-2 mt-2 w-fit rounded-xl px-6 text-xl font-normal
-          text-primary shadow-md transition-colors duration-200
-          ease-in betterhover:hover:bg-gray-200"
+          className={`rounded-xl text-xl
+    shadow-md
+    ${
+      currentEuclideanMetrics.trajectoryHeaderId
+        ? 'bg-gray-300 font-extralight text-gray-400'
+        : 'font-normal text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
+    }`}
           onClick={async () => {
             if (euclideanDistances?.length > 0) {
               setEuclidean([]);
@@ -160,24 +194,22 @@ export const TrajectoryInfo = ({
             const euclides = await applyEuclideanDistance(currentTrajectory);
             setEuclidean(euclides.intersection);
           }}
+          disabled={currentEuclideanMetrics.euclideanIntersections?.length > 0}
         >
-          calculate
+          generate
         </button>
+
         <button
           type="button"
           className={`
-    mx-1 mt-1 w-32 rounded-xl px-4 text-xl  shadow-md
-    ${
-      visibleEuclidean
-        ? 'bg-gray-200 font-bold text-primary'
-        : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
-    }
-    ${
-      !currentEuclideanMetrics.trajectoryHeaderId
-        ? 'bg-gray-200 font-extralight text-gray-400'
-        : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
-    }
-  `}
+       rounded-xl  text-xl  shadow-md
+      ${visibleEuclidean ? 'bg-stone-300 font-bold' : ''}
+      ${
+        !currentEuclideanMetrics.trajectoryHeaderId
+          ? 'bg-gray-300 font-extralight text-gray-400 '
+          : 'text-primary  '
+      }
+    `}
           onClick={() => {
             showEuclideanPlot(!visibleEuclidean);
           }}
@@ -188,16 +220,18 @@ export const TrajectoryInfo = ({
         >
           view 3D
         </button>
-      </div>
-      <div className="inline-flex">
-        <span className="mx-5 mt-2 w-fit py-3 text-xl font-bold text-primary">
-          dtw johnen:
-        </span>
+
+        <div className="mt-3 text-2xl font-bold text-primary">dtw johnen</div>
+
         <button
           type="button"
-          className="mx-2 mt-2 w-fit rounded-xl px-6 text-xl font-normal
-          text-primary shadow-md transition-colors duration-200
-          ease-in betterhover:hover:bg-gray-200"
+          className={`rounded-xl px-2 text-xl 
+    shadow-md
+    ${
+      currentDTWJohnenMetrics.trajectoryHeaderId
+        ? 'bg-gray-300 font-extralight text-gray-400'
+        : 'font-normal text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
+    }`}
           onClick={async () => {
             if (euclideanDistances?.length > 0) {
               setEuclidean([]);
@@ -207,23 +241,25 @@ export const TrajectoryInfo = ({
             setEuclidean(dtwJohnen.intersection);
           }}
         >
-          calculate
+          generate
         </button>
+
         <button
           type="button"
           className={`
-    mx-1 mt-1 w-32 rounded-xl px-4 text-xl  shadow-md
-    ${
-      visibleDTWJohnen
-        ? 'bg-gray-200 font-bold text-primary'
-        : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
-    }
-    ${
-      !currentDTWJohnenMetrics.trajectoryHeaderId
-        ? 'bg-gray-200 font-extralight text-gray-400'
-        : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
-    }
-  `}
+     rounded-xl text-xl  shadow-md  
+      ${visibleDTWJohnen ? 'bg-stone-300 font-bold' : ''}
+      ${
+        !currentDTWJohnenMetrics.trajectoryHeaderId
+          ? 'bg-gray-300 font-extralight text-gray-400 '
+          : 'text-primary  '
+      }
+      ${
+        !currentDTWJohnenMetrics.trajectoryHeaderId
+          ? 'bg-gray-200 font-extralight text-gray-400'
+          : 'text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
+      }
+    `}
           onClick={() => {
             showDTWJohnenPlot(!visibleDTWJohnen);
           }}
@@ -233,16 +269,16 @@ export const TrajectoryInfo = ({
         >
           view 3D
         </button>
-      </div>
-      <CSVLink
-        {...csvTrajectory}
-        separator=","
-        className="mx-2 w-fit rounded-xl px-6 py-4 text-xl font-normal
-        text-primary shadow-md transition-colors duration-200
+
+        <div
+          className="col-start-3 content-center rounded-xl px-2 text-center text-lg font-normal      text-primary shadow-md transition-colors duration-200
         ease-in betterhover:hover:bg-gray-200"
-      >
-        save to <span className="italic">.csv</span>
-      </CSVLink>
+        >
+          <CSVLink {...csvTrajectory} separator=",">
+            save to <span className="italic">.csv</span>
+          </CSVLink>
+        </div>
+      </div>
     </div>
   );
 };
