@@ -1,17 +1,11 @@
 'use client';
 
-import OptionsIcon from '@heroicons/react/24/outline/CogIcon';
 import ErrorIcon from '@heroicons/react/24/outline/FaceFrownIcon';
 import InfoIcon from '@heroicons/react/24/outline/InformationCircleIcon';
 import React from 'react';
-import { CSVLink } from 'react-csv';
 
-import {
-  applyDTWJohnen,
-  applyEuclideanDistance,
-} from '@/src/actions/methods.service';
+import { TrajectoryOptions } from '@/src/app/trajectories/components/TrajectoryOptions/TrajectoryOptions';
 import { Typography } from '@/src/components/Typography';
-import { getCSVData } from '@/src/lib/csv-utils';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 import type {
   TrajectoryData,
@@ -31,15 +25,7 @@ export const TrajectoryInfo = ({
   currentEuclideanMetrics,
   currentDTWJohnenMetrics,
 }: TrajectoryCardProps) => {
-  const {
-    trajectoriesHeader,
-    euclideanDistances,
-    setEuclidean,
-    visibleEuclidean,
-    showEuclideanPlot,
-    visibleDTWJohnen,
-    showDTWJohnenPlot,
-  } = useTrajectory();
+  const { trajectoriesHeader } = useTrajectory();
 
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
   const currentTrajectoryID = trajectoriesHeader.findIndex(
@@ -57,19 +43,6 @@ export const TrajectoryInfo = ({
     );
   }
   const currentTrajectoryHeader = trajectoriesHeader[currentTrajectoryID];
-
-  const csvData = getCSVData(currentTrajectory);
-
-  const headersData = Object.keys(csvData || {}).map((key: string) => ({
-    label: key,
-    key,
-  }));
-
-  const csvTrajectory = {
-    data: csvData,
-    header: headersData,
-    filename: `trajectory_${currentTrajectory.trajectoryHeaderId.toString()}.csv`,
-  };
 
   return (
     <div className="flex h-full w-auto flex-col bg-gray-50 p-4 lg:h-fullscreen lg:overflow-scroll">
@@ -164,117 +137,11 @@ export const TrajectoryInfo = ({
           No DTW metrics for this trajectory.
         </ul>
       )}
-      <span className="mt-4 inline-flex">
-        <OptionsIcon className="w-9" color="#003560" />
-        <span className="mx-2  flex text-2xl font-semibold text-primary">
-          options
-        </span>
-      </span>
-
-      <div
-        className="mt-2 grid grid-rows-[50px_50px_50px] gap-3 rounded-3xl bg-stone-200 p-5
-"
-      >
-        <div className="mt-3 text-lg font-bold text-primary">
-          euclidean distance
-        </div>
-        <button
-          type="button"
-          className={`rounded-xl text-lg
-    shadow-md
-    ${
-      currentEuclideanMetrics.trajectoryHeaderId
-        ? 'bg-gray-300 font-extralight text-gray-400'
-        : 'font-normal text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
-    }`}
-          onClick={async () => {
-            if (euclideanDistances?.length > 0) {
-              setEuclidean([]);
-              return;
-            }
-            const euclides = await applyEuclideanDistance(currentTrajectory);
-            setEuclidean(euclides.intersection);
-          }}
-          disabled={currentEuclideanMetrics.euclideanIntersections?.length > 0}
-        >
-          generate
-        </button>
-
-        <button
-          type="button"
-          className={`
-       rounded-xl  text-lg  shadow-md
-      ${visibleEuclidean ? 'bg-stone-300 font-bold' : ''}
-      ${
-        !currentEuclideanMetrics.trajectoryHeaderId
-          ? 'bg-gray-300 font-extralight text-gray-400 '
-          : 'text-primary  '
-      }
-    `}
-          onClick={() => {
-            showEuclideanPlot(!visibleEuclidean);
-          }}
-          disabled={
-            !currentEuclideanMetrics ||
-            !currentEuclideanMetrics.euclideanIntersections
-          }
-        >
-          view 3D
-        </button>
-
-        <div className="mt-3 text-lg font-bold text-primary">dtw johnen</div>
-
-        <button
-          type="button"
-          className={`rounded-xl px-2 text-lg 
-    shadow-md
-    ${
-      currentDTWJohnenMetrics.trajectoryHeaderId
-        ? 'bg-gray-300 font-extralight text-gray-400'
-        : 'font-normal text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
-    }`}
-          onClick={async () => {
-            if (Object.keys(currentDTWJohnenMetrics)?.length > 0) {
-              setEuclidean([]);
-              return;
-            }
-            const dtwJohnen = await applyDTWJohnen(currentTrajectory);
-            setEuclidean(dtwJohnen.intersection);
-          }}
-          disabled={Object.keys(currentDTWJohnenMetrics)?.length > 0}
-        >
-          generate
-        </button>
-
-        <button
-          type="button"
-          className={`
-     rounded-xl text-lg  shadow-md  
-     ${visibleDTWJohnen ? 'bg-stone-300 font-bold' : ''}
-     ${
-       !currentDTWJohnenMetrics.trajectoryHeaderId
-         ? 'bg-gray-300 font-extralight text-gray-400 '
-         : 'text-primary  '
-     }
-   `}
-          onClick={() => {
-            showDTWJohnenPlot(!visibleDTWJohnen);
-          }}
-          disabled={
-            !currentDTWJohnenMetrics || !currentDTWJohnenMetrics.dtwPath
-          }
-        >
-          view 3D
-        </button>
-        <CSVLink
-          {...csvTrajectory}
-          separator=","
-          className="col-start-3 content-center rounded-xl px-2 text-center text-lg font-normal      text-primary shadow-md transition-colors duration-200
-        ease-in betterhover:hover:bg-gray-200"
-        >
-          save to <span className="italic">.csv</span>
-        </CSVLink>
-      </div>
+      <TrajectoryOptions
+        currentTrajectory={currentTrajectory}
+        currentEuclideanMetrics={currentEuclideanMetrics}
+        currentDTWJohnenMetrics={currentDTWJohnenMetrics}
+      />
     </div>
   );
 };
