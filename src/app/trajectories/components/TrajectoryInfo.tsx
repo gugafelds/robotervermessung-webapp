@@ -81,9 +81,8 @@ export const TrajectoryInfo = ({
       </span>
       {Object.keys(currentTrajectoryHeader).map((header) => {
         let value = currentTrajectoryHeader[header as keyof TrajectoryHeader];
-        // Verifica se o valor é numérico
         if (typeof value === 'number') {
-          value = value.toFixed(2); // Formata o valor numérico para 4 casas decimais
+          value = value.toFixed(2);
         }
         return (
           <ul key={header}>
@@ -99,6 +98,7 @@ export const TrajectoryInfo = ({
       {currentEuclideanMetrics &&
       Object.keys(currentEuclideanMetrics).length !== 0 ? (
         Object.keys(currentEuclideanMetrics)
+          .filter((header) => !header.includes('trajectoryHeaderId'))
           .filter((header) => !header.includes('_id'))
           .filter((header) => !header.includes('euclideanIntersections'))
           .filter((header) => !header.includes('metricType'))
@@ -132,6 +132,7 @@ export const TrajectoryInfo = ({
       Object.keys(currentDTWJohnenMetrics).length !== 0 ? (
         Object.keys(currentDTWJohnenMetrics)
           .filter((header) => !header.includes('_id'))
+          .filter((header) => !header.includes('trajectoryHeaderId'))
           .filter((header) => !header.includes('metricType'))
           .filter((header) => !header.includes('dtwJohnenX'))
           .filter((header) => !header.includes('dtwJohnenY'))
@@ -233,13 +234,14 @@ export const TrajectoryInfo = ({
         : 'font-normal text-primary transition-colors duration-200 ease-in betterhover:hover:bg-gray-200'
     }`}
           onClick={async () => {
-            if (euclideanDistances?.length > 0) {
+            if (Object.keys(currentDTWJohnenMetrics)?.length > 0) {
               setEuclidean([]);
               return;
             }
             const dtwJohnen = await applyDTWJohnen(currentTrajectory);
             setEuclidean(dtwJohnen.intersection);
           }}
+          disabled={Object.keys(currentDTWJohnenMetrics)?.length > 0}
         >
           generate
         </button>
