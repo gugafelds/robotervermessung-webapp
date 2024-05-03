@@ -39,7 +39,7 @@ export const TrajectoryPlot = ({
   }, []);
 
   const realTrajectory: Partial<PlotData> = {
-    ...dataPlotConfig('lines', 'ist', 6),
+    ...dataPlotConfig('lines', 'ist', 6, 'rgb(217,26,96)'),
     x: currentTrajectory.xIst,
     y: currentTrajectory.yIst,
     z: currentTrajectory.zIst,
@@ -77,7 +77,7 @@ export const TrajectoryPlot = ({
             'lines+markers',
             'dtw',
             3,
-            'rgb(237,0,255)',
+            'rgba(210, 105, 30, 0.9)',
             index === 0,
           ),
           x: [inter[0], currentDTWJohnenMetrics.dtwJohnenY[index][0]],
