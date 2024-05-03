@@ -26,7 +26,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <head />
-      <body className={inter.className}>
+      <body className={`${inter.className} h-full`}>
         <Navbar />
         {children}
         <SpeedInsights />

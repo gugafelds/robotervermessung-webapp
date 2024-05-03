@@ -72,7 +72,7 @@ export const TrajectoryInfo = ({
   };
 
   return (
-    <div className="flex h-auto w-fit flex-col bg-gray-50 p-4">
+    <div className="flex h-full w-auto flex-col bg-gray-50 p-4 lg:h-fullscreen lg:overflow-scroll">
       <span className="inline-flex">
         <InfoIcon className="w-8" />
         <span className="mx-2 my-4 flex text-2xl font-semibold text-primary">

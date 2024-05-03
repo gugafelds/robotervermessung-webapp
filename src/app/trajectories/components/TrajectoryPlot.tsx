@@ -131,33 +131,37 @@ export const TrajectoryPlot = ({
   }
 
   return (
-    <div className="mx-auto">
-      <Plot
-        data={[
-          idealTrajectory,
-          realTrajectory,
-          ...euclideanDistancePlot,
-          ...dtwDistancePlot,
-        ]}
-        useResizeHandler
-        layout={plotLayoutConfig}
-        config={{
-          displaylogo: false,
-          modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-          responsive: true,
-        }}
-      />
-      {visibleDTWJohnen && currentDTWJohnenMetrics.dtwAccDist && (
+    <div className="flex h-fullscreen flex-1 flex-col gap-x-2 overflow-scroll">
+      <div className="self-center">
         <Plot
-          data={[dtwAccdistHeatmap, dtwPathPlot]}
+          data={[
+            idealTrajectory,
+            realTrajectory,
+            ...euclideanDistancePlot,
+            ...dtwDistancePlot,
+          ]}
           useResizeHandler
           layout={plotLayoutConfig}
           config={{
             displaylogo: false,
-            modeBarButtonsToRemove: ['toImage', 'orbitRotation', 'pan2d'],
+            modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
             responsive: true,
           }}
         />
+      </div>
+      {visibleDTWJohnen && currentDTWJohnenMetrics.dtwAccDist && (
+        <div className="self-center">
+          <Plot
+            data={[dtwAccdistHeatmap, dtwPathPlot]}
+            useResizeHandler
+            layout={plotLayoutConfig}
+            config={{
+              displaylogo: false,
+              modeBarButtonsToRemove: ['toImage', 'orbitRotation', 'pan2d'],
+              responsive: true,
+            }}
+          />
+        </div>
       )}
     </div>
   );

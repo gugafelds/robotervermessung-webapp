@@ -9,7 +9,7 @@ import { Typography } from '@/src/components/Typography';
 export const Navbar = () => {
   const pathname = usePathname();
   return (
-    <header className="bg-gray-200">
+    <header className="h-mobilenavbarheight bg-gray-200 md:h-navbarheight lg:h-navbarheight">
       <div className="flex flex-row flex-wrap items-center px-6 py-4 sm:space-x-2 md:space-x-8 lg:space-x-16">
         <Link href="/">
           <div className="items-center rounded-md p-2">

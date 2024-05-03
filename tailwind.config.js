@@ -47,6 +47,11 @@ module.exports = {
       'detail-hover': '36px',
     },
     extend: {
+      height: {
+        navbarheight: '83.98px',
+        mobilenavbarheight: '132px',
+        fullscreen: `calc(100vh - 83.98px)`,
+      },
       fontFamily: {
         sans: ['Inter var', ...defaultTheme.fontFamily.sans],
       },
