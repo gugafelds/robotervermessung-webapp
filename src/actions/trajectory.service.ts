@@ -3,7 +3,7 @@
 import { getMongoDb } from '@/src/lib/mongodb';
 import {
   transformDTWJohnenMetricResult,
-  transformMetricResult,
+  transformEuclideanMetricResult,
   transformTrajectoriesDataResult,
   transformTrajectoriesDTWJohnenMetricsResult,
   transformTrajectoriesEuclideanMetricsResult,
@@ -106,7 +106,7 @@ export const getEuclideanMetricsById = async (id: string) => {
     return {} as TrajectoryEuclideanMetrics;
   }
 
-  return transformMetricResult(euclideanMetricsResult);
+  return transformEuclideanMetricResult(euclideanMetricsResult);
 };
 
 export const getDTWJohnenMetricsById = async (id: string) => {

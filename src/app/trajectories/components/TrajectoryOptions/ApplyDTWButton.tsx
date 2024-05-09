@@ -4,44 +4,36 @@ import React, { useState } from 'react';
 
 import { applyDTWJohnen } from '@/src/actions/methods.service';
 import { Spinner } from '@/src/components/Spinner';
+import { useTrajectory } from '@/src/providers/trajectory.provider';
 
-type Props = {
-  currentDTWJohnenMetrics: any;
-  euclideanDistances: any;
-  setEuclidean: any;
-  currentTrajectory: any;
-  visibleDTWJohnen: any;
-  showDTWJohnenPlot: any;
-};
-
-export const ApplyDTWButton = ({
-  currentTrajectory,
-  showDTWJohnenPlot,
-  visibleDTWJohnen,
-  currentDTWJohnenMetrics,
-  euclideanDistances,
-  setEuclidean,
-}: Props) => {
+export const ApplyDTWButton = () => {
+  const {
+    currentTrajectory,
+    showDTWJohnenPlot,
+    visibleDTWJohnen,
+    currentDtw,
+    setCurrentDtw,
+  } = useTrajectory();
   const [loading, setLoading] = useState(false);
 
   return (
     <div className="mb-5 flex flex-wrap gap-3 rounded-3xl bg-stone-200">
       <div className="mt-3 text-lg font-bold text-primary">dtw johnen</div>
 
-      {!currentDTWJohnenMetrics.dtwPath && (
+      {!currentDtw.dtwPath && (
         <button
           type="button"
           className="flex items-center gap-2 rounded-xl p-2 text-lg font-normal text-primary shadow-md transition-colors duration-200 ease-in betterhover:hover:bg-gray-200"
           onClick={async () => {
-            if (euclideanDistances?.length > 0) {
-              setEuclidean([]);
+            if (currentDtw?.length > 0) {
+              setCurrentDtw([]);
               return;
             }
             try {
               setLoading(true);
               const dtwJohnen = await applyDTWJohnen(currentTrajectory);
               setLoading(false);
-              setEuclidean(dtwJohnen.intersection);
+              setCurrentDtw(dtwJohnen);
             } catch {
               setLoading(false);
             }
@@ -51,7 +43,7 @@ export const ApplyDTWButton = ({
         </button>
       )}
 
-      {currentDTWJohnenMetrics.dtwPath && (
+      {currentDtw.dtwPath && (
         <button
           type="button"
           className={`

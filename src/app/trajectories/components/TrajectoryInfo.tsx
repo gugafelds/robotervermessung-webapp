@@ -8,24 +8,18 @@ import { TrajectoryOptions } from '@/src/app/trajectories/components/TrajectoryO
 import { Typography } from '@/src/components/Typography';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 import type {
-  TrajectoryData,
   TrajectoryDTWJohnenMetrics,
   TrajectoryEuclideanMetrics,
   TrajectoryHeader,
 } from '@/types/main';
 
-type TrajectoryCardProps = {
-  currentTrajectory: TrajectoryData;
-  currentDTWJohnenMetrics: TrajectoryDTWJohnenMetrics;
-  currentEuclideanMetrics: TrajectoryEuclideanMetrics;
-};
-
-export const TrajectoryInfo = ({
-  currentTrajectory,
-  currentEuclideanMetrics,
-  currentDTWJohnenMetrics,
-}: TrajectoryCardProps) => {
-  const { trajectoriesHeader } = useTrajectory();
+export const TrajectoryInfo = () => {
+  const {
+    trajectoriesHeader,
+    currentTrajectory,
+    currentDtw,
+    currentEuclidean,
+  } = useTrajectory();
 
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
   const currentTrajectoryID = trajectoriesHeader.findIndex(
@@ -68,18 +62,15 @@ export const TrajectoryInfo = ({
           </ul>
         );
       })}
-      {currentEuclideanMetrics &&
-      Object.keys(currentEuclideanMetrics).length !== 0 ? (
-        Object.keys(currentEuclideanMetrics)
+      {currentEuclidean && Object.keys(currentEuclidean).length !== 0 ? (
+        Object.keys(currentEuclidean)
           .filter((header) => !header.includes('trajectoryHeaderId'))
           .filter((header) => !header.includes('_id'))
           .filter((header) => !header.includes('euclideanIntersections'))
           .filter((header) => !header.includes('metricType'))
           .map((header) => {
             let value =
-              currentEuclideanMetrics[
-                header as keyof TrajectoryEuclideanMetrics
-              ];
+              currentEuclidean[header as keyof TrajectoryEuclideanMetrics];
             let unit = '';
             if (typeof value === 'number') {
               value = value.toFixed(5);
@@ -101,9 +92,8 @@ export const TrajectoryInfo = ({
           No euclidean metrics for this trajectory.
         </ul>
       )}
-      {currentDTWJohnenMetrics &&
-      Object.keys(currentDTWJohnenMetrics).length !== 0 ? (
-        Object.keys(currentDTWJohnenMetrics)
+      {currentDtw && Object.keys(currentDtw).length !== 0 ? (
+        Object.keys(currentDtw)
           .filter((header) => !header.includes('_id'))
           .filter((header) => !header.includes('trajectoryHeaderId'))
           .filter((header) => !header.includes('metricType'))
@@ -112,10 +102,7 @@ export const TrajectoryInfo = ({
           .filter((header) => !header.includes('dtwAccDist'))
           .filter((header) => !header.includes('dtwPath'))
           .map((header) => {
-            let value =
-              currentDTWJohnenMetrics[
-                header as keyof TrajectoryDTWJohnenMetrics
-              ];
+            let value = currentDtw[header as keyof TrajectoryDTWJohnenMetrics];
             let unit = '';
             if (typeof value === 'number') {
               value = value.toFixed(5);
@@ -137,11 +124,7 @@ export const TrajectoryInfo = ({
           No DTW metrics for this trajectory.
         </ul>
       )}
-      <TrajectoryOptions
-        currentTrajectory={currentTrajectory}
-        currentEuclideanMetrics={currentEuclideanMetrics}
-        currentDTWJohnenMetrics={currentDTWJohnenMetrics}
-      />
+      <TrajectoryOptions />
     </div>
   );
 };

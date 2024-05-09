@@ -1,5 +1,9 @@
 import axios from 'axios';
 
+import {
+  transformDTWJohnenMetricResult,
+  transformEuclideanMetricResult,
+} from '@/src/lib/transformer';
 import type { TrajectoryData } from '@/types/main';
 
 const CLOUD_FUNCTIONS_URI =
@@ -17,17 +21,21 @@ export const applyEuclideanDistance = async ({
   ySoll: y_soll,
   zSoll: z_soll,
 }: TrajectoryData) => {
-  const response = await axios.post(CLOUD_FUNCTIONS_URI, {
-    trajectory_header_id,
-    x_ist,
-    y_ist,
-    z_ist,
-    x_soll,
-    y_soll,
-    z_soll,
-  });
+  const response = await axios.post(
+    CLOUD_FUNCTIONS_URI,
+    {
+      trajectory_header_id,
+      x_ist,
+      y_ist,
+      z_ist,
+      x_soll,
+      y_soll,
+      z_soll,
+    },
+    { responseType: 'json' },
+  );
 
-  return response.data;
+  return transformEuclideanMetricResult(JSON.parse(response.data));
 };
 
 export const applyDTWJohnen = async ({
@@ -69,5 +77,5 @@ export const applyDTWJohnen = async ({
     q4_soll,
   });
 
-  return responseDTW.data;
+  return transformDTWJohnenMetricResult(JSON.parse(responseDTW.data));
 };

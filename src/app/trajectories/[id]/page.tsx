@@ -5,8 +5,7 @@ import {
   getEuclideanMetricsById,
   getTrajectoryById,
 } from '@/src/actions/trajectory.service';
-import { TrajectoryInfo } from '@/src/app/trajectories/components/TrajectoryInfo';
-import { TrajectoryPlot } from '@/src/app/trajectories/components/TrajectoryPlot';
+import { TrajectoryWrapper } from '@/src/app/trajectories/components/TrajectoryWrapper';
 import { json } from '@/src/lib/functions';
 
 type TrajectoryPageProps = {
@@ -19,18 +18,10 @@ export default async function TrajectoryPage({ params }: TrajectoryPageProps) {
   const currentDTWJohnenMetrics = await getDTWJohnenMetricsById(params.id);
 
   return (
-    <>
-      <TrajectoryInfo
-        currentTrajectory={json(currentTrajectory)}
-        currentDTWJohnenMetrics={json(currentDTWJohnenMetrics)}
-        currentEuclideanMetrics={json(currentEuclideanMetrics)}
-      />
-
-      <TrajectoryPlot
-        currentTrajectory={json(currentTrajectory)}
-        currentEuclideanMetrics={json(currentEuclideanMetrics)}
-        currentDTWJohnenMetrics={json(currentDTWJohnenMetrics)}
-      />
-    </>
+    <TrajectoryWrapper
+      currentTrajectory={json(currentTrajectory)}
+      currentEuclideanMetrics={json(currentEuclideanMetrics)}
+      currentDTWJohnenMetrics={json(currentDTWJohnenMetrics)}
+    />
   );
 }

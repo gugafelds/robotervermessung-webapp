@@ -7,17 +7,6 @@ import { ApplyDTWButton } from '@/src/app/trajectories/components/TrajectoryOpti
 import { ApplyEuclideanButton } from '@/src/app/trajectories/components/TrajectoryOptions/ApplyEuclideanButton';
 import { getCSVData } from '@/src/lib/csv-utils';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
-import type {
-  TrajectoryData,
-  TrajectoryDTWJohnenMetrics,
-  TrajectoryEuclideanMetrics,
-} from '@/types/main';
-
-type TrajectoryCardProps = {
-  currentTrajectory: TrajectoryData;
-  currentDTWJohnenMetrics: TrajectoryDTWJohnenMetrics;
-  currentEuclideanMetrics: TrajectoryEuclideanMetrics;
-};
 
 export const Spinner = () => {
   return (
@@ -42,19 +31,8 @@ export const Spinner = () => {
   );
 };
 
-export const TrajectoryOptions = ({
-  currentTrajectory,
-  currentEuclideanMetrics,
-  currentDTWJohnenMetrics,
-}: TrajectoryCardProps) => {
-  const {
-    euclideanDistances,
-    setEuclidean,
-    visibleEuclidean,
-    showEuclideanPlot,
-    visibleDTWJohnen,
-    showDTWJohnenPlot,
-  } = useTrajectory();
+export const TrajectoryOptions = () => {
+  const { currentTrajectory } = useTrajectory();
 
   const csvData = getCSVData(currentTrajectory);
 
@@ -79,23 +57,9 @@ export const TrajectoryOptions = ({
       </span>
 
       <div className="mt-2 rounded-3xl bg-stone-200 p-5">
-        <ApplyEuclideanButton
-          currentTrajectory={currentTrajectory}
-          currentEuclideanMetrics={currentEuclideanMetrics}
-          setEuclidean={setEuclidean}
-          visibleEuclidean={visibleEuclidean}
-          euclideanDistances={euclideanDistances}
-          showEuclideanPlot={showEuclideanPlot}
-        />
+        <ApplyEuclideanButton />
 
-        <ApplyDTWButton
-          currentDTWJohnenMetrics={currentDTWJohnenMetrics}
-          euclideanDistances={euclideanDistances}
-          setEuclidean={setEuclidean}
-          currentTrajectory={currentTrajectory}
-          visibleDTWJohnen={visibleDTWJohnen}
-          showDTWJohnenPlot={showDTWJohnenPlot}
-        />
+        <ApplyDTWButton />
 
         <CSVLink
           {...csvTrajectory}

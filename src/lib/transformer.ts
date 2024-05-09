@@ -34,7 +34,7 @@ export const transformTrajectoryResult = (
   jointStateSoll: trajectoryRaw.joint_state_soll,
 });
 
-export const transformMetricResult = (
+export const transformEuclideanMetricResult = (
   trajectoryRaw: TrajectoryEuclideanMetricsRaw,
 ): TrajectoryEuclideanMetrics => ({
   _id: trajectoryRaw._id,

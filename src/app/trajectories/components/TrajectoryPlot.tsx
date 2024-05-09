@@ -3,40 +3,22 @@
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import dynamic from 'next/dynamic';
 import type { PlotData } from 'plotly.js';
-import { useEffect } from 'react';
 
 import { Typography } from '@/src/components/Typography';
 import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
-import type {
-  TrajectoryData,
-  TrajectoryDTWJohnenMetrics,
-  TrajectoryEuclideanMetrics,
-} from '@/types/main';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
-type TrajectoryPlotProps = {
-  currentTrajectory: TrajectoryData;
-  currentEuclideanMetrics: TrajectoryEuclideanMetrics;
-  currentDTWJohnenMetrics: TrajectoryDTWJohnenMetrics;
-};
-
-export const TrajectoryPlot = ({
-  currentTrajectory,
-  currentEuclideanMetrics,
-  currentDTWJohnenMetrics,
-}: TrajectoryPlotProps) => {
+export const TrajectoryPlot = () => {
   const {
     trajectoriesHeader,
-    setEuclidean,
+    currentTrajectory,
+    currentEuclidean,
+    currentDtw,
     visibleEuclidean,
     visibleDTWJohnen,
   } = useTrajectory();
-
-  useEffect(() => {
-    setEuclidean();
-  }, []);
 
   const realTrajectory: Partial<PlotData> = {
     ...dataPlotConfig('lines', 'ist', 6, 'rgb(217,26,96)'),
@@ -53,8 +35,8 @@ export const TrajectoryPlot = ({
   };
 
   const euclideanDistancePlot: Partial<PlotData>[] =
-    visibleEuclidean && currentEuclideanMetrics.euclideanIntersections
-      ? currentEuclideanMetrics.euclideanIntersections.map(
+    visibleEuclidean && currentEuclidean.euclideanIntersections
+      ? currentEuclidean.euclideanIntersections.map(
           (inter: any, index: number) => ({
             ...dataPlotConfig(
               'lines+markers',
@@ -69,10 +51,8 @@ export const TrajectoryPlot = ({
       : [];
 
   const dtwDistancePlot: Partial<PlotData>[] =
-    visibleDTWJohnen &&
-    currentDTWJohnenMetrics.dtwJohnenX &&
-    currentDTWJohnenMetrics.dtwJohnenY
-      ? currentDTWJohnenMetrics.dtwJohnenX.map((inter: any, index: number) => ({
+    visibleDTWJohnen && currentDtw.dtwJohnenX && currentDtw.dtwJohnenY
+      ? currentDtw.dtwJohnenX.map((inter: any, index: number) => ({
           ...dataPlotConfig(
             'lines+markers',
             'dtw',
@@ -80,23 +60,23 @@ export const TrajectoryPlot = ({
             'rgba(210, 105, 30, 0.9)',
             index === 0,
           ),
-          x: [inter[0], currentDTWJohnenMetrics.dtwJohnenY[index][0]],
-          y: [inter[1], currentDTWJohnenMetrics.dtwJohnenY[index][1]],
-          z: [inter[2], currentDTWJohnenMetrics.dtwJohnenY[index][2]],
+          x: [inter[0], currentDtw.dtwJohnenY[index][0]],
+          y: [inter[1], currentDtw.dtwJohnenY[index][1]],
+          z: [inter[2], currentDtw.dtwJohnenY[index][2]],
         }))
       : [];
 
   const dtwPathPlot: Partial<PlotData> =
-    visibleDTWJohnen && currentDTWJohnenMetrics.dtwPath
+    visibleDTWJohnen && currentDtw.dtwPath
       ? {
           type: 'scatter',
           mode: 'lines',
-          x: Array.isArray(currentDTWJohnenMetrics.dtwPath[1])
-            ? currentDTWJohnenMetrics.dtwPath[1]
-            : [currentDTWJohnenMetrics.dtwPath[1]],
-          y: Array.isArray(currentDTWJohnenMetrics.dtwPath[0])
-            ? currentDTWJohnenMetrics.dtwPath[0]
-            : [currentDTWJohnenMetrics.dtwPath[0]],
+          x: Array.isArray(currentDtw.dtwPath[1])
+            ? currentDtw.dtwPath[1]
+            : [currentDtw.dtwPath[1]],
+          y: Array.isArray(currentDtw.dtwPath[0])
+            ? currentDtw.dtwPath[0]
+            : [currentDtw.dtwPath[0]],
           line: {
             color: 'rgb(255, 0, 0)',
             width: 4,
@@ -105,10 +85,10 @@ export const TrajectoryPlot = ({
       : {};
 
   const dtwAccdistHeatmap: Partial<PlotData> =
-    visibleDTWJohnen && currentDTWJohnenMetrics.dtwAccDist
+    visibleDTWJohnen && currentDtw.dtwAccDist
       ? {
           type: 'heatmap',
-          z: currentDTWJohnenMetrics.dtwAccDist,
+          z: currentDtw.dtwAccDist,
           colorscale: 'Plasma',
           showscale: true,
         }
@@ -149,7 +129,7 @@ export const TrajectoryPlot = ({
           }}
         />
       </div>
-      {visibleDTWJohnen && currentDTWJohnenMetrics.dtwAccDist && (
+      {visibleDTWJohnen && currentDtw.dtwAccDist && (
         <div className="self-center">
           <Plot
             data={[dtwAccdistHeatmap, dtwPathPlot]}
