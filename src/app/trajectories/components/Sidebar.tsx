@@ -23,7 +23,8 @@ export const Sidebar = () => {
     const filtered = trajectoriesHeader.filter((trajectory) =>
       filterBy(filter, [
         trajectory.trajectoryType,
-        trajectory.robotName,
+        trajectory.robotModel,
+        trajectory.realRobot.toString(),
         formatDate(trajectory.recordingDate),
       ]),
     );

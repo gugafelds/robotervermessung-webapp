@@ -57,11 +57,8 @@ export const TrajectoryInfo = () => {
       {currentTrajectoryHeader &&
         Object.keys(currentTrajectoryHeader).length !== 0 &&
         getDataToBeDisplayed(currentTrajectoryHeader, [
-          'dataId',
-          'robotName',
           'robotModel',
           'trajectoryType',
-          'pathSolver',
           'recordingDate',
           'realRobot',
           'numberPointsIst',
@@ -92,7 +89,6 @@ export const TrajectoryInfo = () => {
         getDataToBeDisplayed(currentEuclidean, [
           'euclideanMaxDistance',
           'euclideanAverageDistance',
-          'euclideanStandardDeviation',
         ]).map((header) => {
           let value =
             currentEuclidean[header as keyof TrajectoryEuclideanMetrics];

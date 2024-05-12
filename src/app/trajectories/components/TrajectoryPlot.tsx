@@ -27,6 +27,34 @@ export const TrajectoryPlot = () => {
     z: currentTrajectory.zIst,
   };
 
+  /* const xIstTrajectory: Partial<PlotData> = currentTrajectory.timestampIst
+    ? {
+        type: 'scatter',
+        mode: 'lines',
+        x: currentTrajectory.timestampIst.lenght,
+        y: currentTrajectory.xIst,
+        line: {
+          color: 'rgb(255, 0, 0)',
+          width: 4,
+        },
+      }
+    : {};
+
+  const xSollTrajectory: Partial<PlotData> = currentTrajectory.timestampSoll
+    ? {
+        type: 'scatter',
+        mode: 'lines',
+        x: currentTrajectory.timestampSoll.lenght,
+        y: currentTrajectory.xSoll,
+        line: {
+          color: 'rgb(255, 0, 0)',
+          width: 4,
+        },
+      }
+    : {};
+  
+    */
+
   const idealTrajectory: Partial<PlotData> = {
     ...dataPlotConfig('lines', 'soll', 6),
     x: currentTrajectory.xSoll,
