@@ -12,6 +12,27 @@ export const formatDate = (dateString: string) => {
     .padStart(2, '0')}`;
 };
 
+export const camelToWords = (str: string) =>
+  str
+    .replace(/([A-Z])/g, ' $1')
+    .trim()
+    .replace(/^\w/, (c) => c.toUpperCase());
+
+export const getDataToBeDisplayed = (object: object, dataIncluded: string[]) =>
+  Object.keys(object).filter((data) => dataIncluded.includes(data));
+
+export const isDateString = (value: unknown) => {
+  const regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}$/;
+  return regex.test(value as string);
+};
+
+export const formatNumber = (num: number) => {
+  if (Number.isInteger(num)) {
+    return num;
+  }
+  return num.toFixed(2);
+};
+
 export const json = (data: unknown) => JSON.parse(JSON.stringify(data));
 
 export const filterBy = (filter: string, properties: string[]) => {
