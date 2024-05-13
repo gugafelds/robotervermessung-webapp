@@ -48,6 +48,14 @@ export const applyDTWJohnen = async ({
   zSoll: z_soll,
   timestampIst: timestamp_ist,
   timestampSoll: timestamp_soll,
+  q1Ist: q1_ist,
+  q2Ist: q2_ist,
+  q3Ist: q3_ist,
+  q4Ist: q4_ist,
+  q1Soll: q1_soll,
+  q2Soll: q2_soll,
+  q3Soll: q3_soll,
+  q4Soll: q4_soll,
 }: TrajectoryData) => {
   const responseDTW = await axios.post(CLOUD_FUNCTIONS_URI_DTW, {
     trajectory_header_id,
@@ -55,10 +63,18 @@ export const applyDTWJohnen = async ({
     x_ist,
     y_ist,
     z_ist,
+    q1_ist,
+    q2_ist,
+    q3_ist,
+    q4_ist,
     timestamp_soll,
     x_soll,
     y_soll,
     z_soll,
+    q1_soll,
+    q2_soll,
+    q3_soll,
+    q4_soll,
   });
 
   return transformDTWJohnenMetricResult(JSON.parse(responseDTW.data));

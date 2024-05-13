@@ -94,8 +94,8 @@ export const TrajectoryInfo = () => {
             currentEuclidean[header as keyof TrajectoryEuclideanMetrics];
           let unit = '';
           if (typeof value === 'number') {
-            value = value.toFixed(5);
-            unit = 'm';
+            value = (value * 1000).toFixed(5);
+            unit = 'mm';
           }
           return (
             <ul key={header}>
@@ -122,8 +122,8 @@ export const TrajectoryInfo = () => {
           let value = currentDtw[header as keyof TrajectoryDTWJohnenMetrics];
           let unit = '';
           if (typeof value === 'number') {
-            value = value.toFixed(5);
-            unit = 'm';
+            value = (value * 1000).toFixed(5);
+            unit = 'mm';
           }
           return (
             <ul key={header}>
@@ -142,8 +142,8 @@ export const TrajectoryInfo = () => {
         </ul>
       )}
       <ul className="px-6 text-lg font-light text-primary">
-          No Fréchet metrics for this trajectory.
-        </ul>
+        No Fréchet metrics for this trajectory.
+      </ul>
 
       <TrajectoryOptions />
     </div>
