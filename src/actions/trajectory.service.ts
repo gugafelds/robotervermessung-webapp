@@ -5,8 +5,6 @@ import {
   transformDTWJohnenMetricResult,
   transformEuclideanMetricResult,
   transformTrajectoriesDataResult,
-  transformTrajectoriesDTWJohnenMetricsResult,
-  transformTrajectoriesEuclideanMetricsResult,
   transformTrajectoriesHeadersResult,
   transformTrajectoryResult,
 } from '@/src/lib/transformer';
@@ -46,34 +44,6 @@ export const getTrajectoriesData = async () => {
   }
 
   return transformTrajectoriesDataResult(trajectoriesDataResult);
-};
-
-export const getTrajectoriesEuclideanMetrics = async () => {
-  const mongo = await getMongoDb();
-
-  const trajectoriesEuclideanMetricsResult = await mongo
-    .collection('metrics')
-    .find<TrajectoryEuclideanMetricsRaw>({ metric_type: 'euclidean' })
-    .sort({ recording_date: -1 })
-    .toArray();
-
-  return transformTrajectoriesEuclideanMetricsResult(
-    trajectoriesEuclideanMetricsResult,
-  );
-};
-
-export const getTrajectoriesDTWJohnenMetrics = async () => {
-  const mongo = await getMongoDb();
-
-  const trajectoriesDTWJohnenMetricsResult = await mongo
-    .collection('metrics')
-    .find<TrajectoryDTWJohnenMetricsRaw>({ metric_type: 'dtw_johnen' })
-    .sort({ recording_date: -1 })
-    .toArray();
-
-  return transformTrajectoriesDTWJohnenMetricsResult(
-    trajectoriesDTWJohnenMetricsResult,
-  );
 };
 
 export const getTrajectoryById = async (id: string) => {
