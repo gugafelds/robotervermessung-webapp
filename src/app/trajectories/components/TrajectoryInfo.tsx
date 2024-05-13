@@ -141,6 +141,9 @@ export const TrajectoryInfo = () => {
           No DTW metrics for this trajectory.
         </ul>
       )}
+      <ul className="px-6 text-lg font-light text-primary">
+          No Fréchet metrics for this trajectory.
+        </ul>
 
       <TrajectoryOptions />
     </div>

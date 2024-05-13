@@ -5,6 +5,7 @@ import { CSVLink } from 'react-csv';
 
 import { ApplyDTWButton } from '@/src/app/trajectories/components/TrajectoryOptions/ApplyDTWButton';
 import { ApplyEuclideanButton } from '@/src/app/trajectories/components/TrajectoryOptions/ApplyEuclideanButton';
+import { ApplyFréchetButton } from '@/src/app/trajectories/components/TrajectoryOptions/ApplyFréchetButton';
 import { getCSVData } from '@/src/lib/csv-utils';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 
@@ -60,6 +61,8 @@ export const TrajectoryOptions = () => {
         <ApplyEuclideanButton />
 
         <ApplyDTWButton />
+
+        <ApplyFréchetButton />
 
         <CSVLink
           {...csvTrajectory}
