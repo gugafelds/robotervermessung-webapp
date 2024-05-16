@@ -1,5 +1,7 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
+
 import { getMongoDb } from '@/src/lib/mongodb';
 import {
   transformDTWJohnenMetricResult,
@@ -27,6 +29,7 @@ export const getTrajectoriesHeader = async () => {
     .sort({ recording_date: -1 })
     .toArray();
 
+  revalidatePath('/trajectories');
   return transformTrajectoriesHeadersResult(trajectoriesHeaderResult);
 };
 
@@ -43,6 +46,7 @@ export const getTrajectoriesData = async () => {
     return {} as TrajectoryData[];
   }
 
+  revalidatePath('/trajectories');
   return transformTrajectoriesDataResult(trajectoriesDataResult);
 };
 
@@ -58,6 +62,7 @@ export const getTrajectoryById = async (id: string) => {
     return {} as TrajectoryData;
   }
 
+  revalidatePath('/trajectories');
   return transformTrajectoryResult(trajectoryResult);
 };
 
@@ -76,6 +81,7 @@ export const getEuclideanMetricsById = async (id: string) => {
     return {} as TrajectoryEuclideanMetrics;
   }
 
+  revalidatePath('/trajectories');
   return transformEuclideanMetricResult(euclideanMetricsResult);
 };
 
@@ -94,5 +100,6 @@ export const getDTWJohnenMetricsById = async (id: string) => {
     return {} as TrajectoryDTWJohnenMetrics;
   }
 
+  revalidatePath('/trajectories');
   return transformDTWJohnenMetricResult(dtwJohnenMetricsResult);
 };
