@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import type { PlotData } from 'plotly.js';
 
 import { Typography } from '@/src/components/Typography';
-import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
+import { dataPlotConfig, plotLayout2DConfig, plotLayoutConfig, heatMapLayoutConfig } from '@/src/lib/plot-config';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -112,6 +112,20 @@ export const TrajectoryPlot = () => {
         }
       : {};
 
+  const tcpVelocityPlot: Partial<PlotData> = {
+
+          type: 'scatter',
+          mode: 'lines',
+          x: currentTrajectory.timestampIst,
+
+          y:currentTrajectory.tcpVelocityIst,
+          xaxis: "autorange", 
+          line: {
+            color: 'rgba(100, 100, 100, 0.9)',
+            width: 3,
+          }};
+      
+
   const dtwAccdistHeatmap: Partial<PlotData> =
     visibleDTWJohnen && currentDtw.dtwAccDist
       ? {
@@ -141,6 +155,19 @@ export const TrajectoryPlot = () => {
   return (
     <div className="flex h-fullscreen flex-1 flex-col gap-x-2 overflow-scroll">
       <div className="self-center">
+      <Plot
+          data={[
+            tcpVelocityPlot,
+          ]}
+          useResizeHandler
+          layout={plotLayout2DConfig}
+          config={{
+            displaylogo: false,
+            modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+            responsive: true,
+          }}
+        />
+        
         <Plot
           data={[
             idealTrajectory,
@@ -158,11 +185,11 @@ export const TrajectoryPlot = () => {
         />
       </div>
       {visibleDTWJohnen && currentDtw.dtwAccDist && (
-        <div className="self-center">
+        <div className="self-center ">
           <Plot
             data={[dtwAccdistHeatmap, dtwPathPlot]}
             useResizeHandler
-            layout={plotLayoutConfig}
+            layout={heatMapLayoutConfig}
             config={{
               displaylogo: false,
               modeBarButtonsToRemove: ['toImage', 'orbitRotation', 'pan2d'],

@@ -61,6 +61,7 @@ export const TrajectoryInfo = () => {
           'trajectoryType',
           'recordingDate',
           'realRobot',
+          'pathSolver',
           'numberPointsIst',
           'numberPointsSoll',
           'SampleFrequencyIst',

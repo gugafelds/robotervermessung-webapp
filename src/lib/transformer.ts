@@ -22,6 +22,9 @@ export const transformTrajectoryResult = (
   q2Ist: trajectoryRaw.q2_ist,
   q3Ist: trajectoryRaw.q3_ist,
   q4Ist: trajectoryRaw.q4_ist,
+  tcpVelocityIst: trajectoryRaw.tcp_velocity_ist,
+  tcpAcceleration: trajectoryRaw.tcp_acceleration,
+  jointStateIst: trajectoryRaw.joint_state_ist,
   timestampSoll: trajectoryRaw.timestamp_soll,
   xSoll: trajectoryRaw.x_soll,
   ySoll: trajectoryRaw.y_soll,
@@ -30,7 +33,7 @@ export const transformTrajectoryResult = (
   q2Soll: trajectoryRaw.q2_soll,
   q3Soll: trajectoryRaw.q3_soll,
   q4Soll: trajectoryRaw.q4_soll,
-  jointStateIst: trajectoryRaw.joint_state_ist,
+  tcpVelocitySoll: trajectoryRaw.tcp_velocity_soll,
   jointStateSoll: trajectoryRaw.joint_state_soll,
 });
 
@@ -75,6 +78,9 @@ export const transformTrajectoriesDataResult = (
       q2Ist: trajectoryRaw.q2_ist,
       q3Ist: trajectoryRaw.q3_ist,
       q4Ist: trajectoryRaw.q4_ist,
+      tcpVelocityIst: trajectoryRaw.tcp_velocity_ist,
+      tcpAcceleration: trajectoryRaw.tcp_acceleration,
+      jointStateIst: trajectoryRaw.joint_state_ist,
       timestampSoll: trajectoryRaw.timestamp_soll,
       xSoll: trajectoryRaw.x_soll,
       ySoll: trajectoryRaw.y_soll,
@@ -83,7 +89,7 @@ export const transformTrajectoriesDataResult = (
       q2Soll: trajectoryRaw.q2_soll,
       q3Soll: trajectoryRaw.q3_soll,
       q4Soll: trajectoryRaw.q4_soll,
-      jointStateIst: trajectoryRaw.joint_state_ist,
+      tcpVelocitySoll: trajectoryRaw.tcp_velocity_soll,
       jointStateSoll: trajectoryRaw.joint_state_soll,
     }),
   );

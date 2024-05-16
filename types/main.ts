@@ -11,6 +11,9 @@ export interface TrajectoryDataRaw {
   q2_ist: number[];
   q3_ist: number[];
   q4_ist: number[];
+  tcp_velocity_ist: number[];
+  tcp_acceleration: number[];
+  joint_state_ist: number[];
   timestamp_soll: number[];
   x_soll: number[];
   y_soll: number[];
@@ -19,8 +22,9 @@ export interface TrajectoryDataRaw {
   q2_soll: number[];
   q3_soll: number[];
   q4_soll: number[];
-  joint_state_ist: number[];
+  tcp_velocity_soll: number[];
   joint_state_soll: number[];
+  cpu_temperature: number[];
 }
 
 export interface TrajectoryData {
@@ -34,6 +38,9 @@ export interface TrajectoryData {
   q2Ist: number[];
   q3Ist: number[];
   q4Ist: number[];
+  tcpVelocityIst: number[];
+  tcpAcceleration: number[];
+  jointStateIst: number[];
   timestampSoll: number[];
   xSoll: number[];
   ySoll: number[];
@@ -42,7 +49,7 @@ export interface TrajectoryData {
   q2Soll: number[];
   q3Soll: number[];
   q4Soll: number[];
-  jointStateIst: number[];
+  tcpVelocitySoll: number[];
   jointStateSoll: number[];
 }
 
