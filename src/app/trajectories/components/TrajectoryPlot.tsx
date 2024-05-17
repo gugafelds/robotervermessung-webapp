@@ -2,10 +2,16 @@
 
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import dynamic from 'next/dynamic';
-import type { PlotData } from 'plotly.js';
+import type { Layout, PlotData } from 'plotly.js';
 
 import { Typography } from '@/src/components/Typography';
-import { dataPlotConfig, plotLayout2DConfig, plotLayoutConfig, heatMapLayoutConfig } from '@/src/lib/plot-config';
+import {
+  dataPlotConfig,
+  heatMapLayoutConfig,
+  plotLayout2DConfigAcceleration,
+  plotLayout2DConfigVelocity,
+  plotLayoutConfig,
+} from '@/src/lib/plot-config';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -112,19 +118,97 @@ export const TrajectoryPlot = () => {
         }
       : {};
 
-  const tcpVelocityPlot: Partial<PlotData> = {
+  const tcpVelocityPlot: Partial<PlotData> = currentTrajectory.tcpVelocityIst
+    ? {
+        type: 'scatter',
+        mode: 'lines',
+        x: currentTrajectory.timestampIst,
+        y: currentTrajectory.tcpVelocityIst,
+        line: {
+          color: 'rgba(217,26,96, 0.8)',
+          width: 3,
+        },
+      }
+    : {};
 
+  const combinedLayoutVelocity: Partial<Layout> = {
+    ...plotLayout2DConfigVelocity,
+    shapes:
+      currentTrajectory.tcpVelocityIst && currentTrajectory.tcpVelocitySoll
+        ? [
+            {
+              type: 'line',
+              x0: currentTrajectory.timestampIst
+                ? currentTrajectory.timestampIst[0]
+                : 0,
+              x1: currentTrajectory.timestampIst
+                ? currentTrajectory.timestampIst[
+                    currentTrajectory.timestampIst.length - 1
+                  ]
+                : 1,
+              y0: currentTrajectory.tcpVelocitySoll,
+              y1: currentTrajectory.tcpVelocitySoll,
+              line: {
+                color: 'rgba(31,119,180, 0.7)',
+                width: 2,
+                dash: 'dash',
+              },
+            },
+          ]
+        : [],
+    annotations: !currentTrajectory.tcpVelocityIst
+      ? [
+          {
+            xref: 'paper',
+            yref: 'paper',
+            x: 0.5,
+            y: 0.5,
+            text: 'keine Daten :(',
+            showarrow: false,
+            font: {
+              size: 15,
+              color: 'black',
+            },
+            align: 'center',
+          },
+        ]
+      : [],
+  };
+
+  const tcpAccelerationPlot: Partial<PlotData> =
+    currentTrajectory.tcpAcceleration
+      ? {
           type: 'scatter',
           mode: 'lines',
           x: currentTrajectory.timestampIst,
-
-          y:currentTrajectory.tcpVelocityIst,
-          xaxis: "autorange", 
+          y: currentTrajectory.tcpAcceleration,
           line: {
-            color: 'rgba(100, 100, 100, 0.9)',
+            color: 'rgba(217,26,96, 0.8)',
             width: 3,
-          }};
-      
+          },
+        }
+      : {};
+
+  const combinedLayoutAcceleration: Partial<Layout> = {
+    ...plotLayout2DConfigAcceleration,
+    annotations: !currentTrajectory.tcpAcceleration
+      ? [
+          {
+            xref: 'paper',
+            yref: 'paper',
+            x: 0.5,
+            y: 0.5,
+            text: 'keine Daten :(',
+            showarrow: false,
+            font: {
+              size: 15,
+              color: 'black',
+            },
+            align: 'center',
+          },
+        ]
+      : [],
+  };
 
   const dtwAccdistHeatmap: Partial<PlotData> =
     visibleDTWJohnen && currentDtw.dtwAccDist
@@ -153,21 +237,33 @@ export const TrajectoryPlot = () => {
   }
 
   return (
-    <div className="flex h-fullscreen flex-1 flex-col gap-x-2 overflow-scroll">
-      <div className="self-center">
-      <Plot
-          data={[
-            tcpVelocityPlot,
-          ]}
+    <div className="flex-row overflow-scroll">
+      <div className="m-4 flex-row">
+        <Plot
+          className=""
+          data={[tcpVelocityPlot]}
           useResizeHandler
-          layout={plotLayout2DConfig}
+          layout={combinedLayoutVelocity}
           config={{
             displaylogo: false,
             modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
             responsive: true,
           }}
         />
-        
+
+        <Plot
+          data={[tcpAccelerationPlot]}
+          useResizeHandler
+          layout={combinedLayoutAcceleration}
+          config={{
+            displaylogo: false,
+            modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+            responsive: true,
+          }}
+        />
+      </div>
+
+      <div className="m-4 flex-row">
         <Plot
           data={[
             idealTrajectory,
@@ -183,9 +279,8 @@ export const TrajectoryPlot = () => {
             responsive: true,
           }}
         />
-      </div>
-      {visibleDTWJohnen && currentDtw.dtwAccDist && (
-        <div className="self-center ">
+
+        {visibleDTWJohnen && currentDtw.dtwAccDist && (
           <Plot
             data={[dtwAccdistHeatmap, dtwPathPlot]}
             useResizeHandler
@@ -196,8 +291,8 @@ export const TrajectoryPlot = () => {
               responsive: true,
             }}
           />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
