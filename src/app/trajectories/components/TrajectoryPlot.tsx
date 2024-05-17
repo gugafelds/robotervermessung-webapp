@@ -339,7 +339,7 @@ export const TrajectoryPlot = () => {
   }
 
   return (
-    <div className="flex-row overflow-scroll">
+    <div className="h-fullscreen flex-row overflow-scroll">
       <div className="m-4 flex-row">
         <Plot
           className=""
