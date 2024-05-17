@@ -112,6 +112,7 @@ export interface TrajectoryDTWJohnenMetricsRaw {
   trajectory_header_id: string;
   dtw_max_distance: number;
   dtw_average_distance: number;
+  dtw_distances: number[];
   dtw_X: number[][];
   dtw_Y: number[][];
   dtw_accdist: number[];
@@ -124,6 +125,7 @@ export interface TrajectoryDTWJohnenMetrics {
   trajectoryHeaderId: string;
   dtwJohnenMaxDistance: number;
   dtwJohnenAverageDistance: number;
+  dtwJohnenDistances: number[];
   dtwJohnenX: number[][];
   dtwJohnenY: number[][];
   dtwAccDist: number[];

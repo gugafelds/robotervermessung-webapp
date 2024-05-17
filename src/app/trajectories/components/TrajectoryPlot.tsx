@@ -9,6 +9,7 @@ import {
   dataPlotConfig,
   heatMapLayoutConfig,
   plotLayout2DConfigAcceleration,
+  plotLayout2DConfigDTWJohnenError,
   plotLayout2DConfigEuclideanError,
   plotLayout2DConfigVelocity,
   plotLayoutConfig,
@@ -272,6 +273,55 @@ export const TrajectoryPlot = () => {
       : [],
   };
 
+  const dtwJohnenErrorPlot: Partial<PlotData> = currentDtw.dtwJohnenDistances
+    ? {
+        type: 'scatter',
+        mode: 'lines',
+        y: currentDtw.dtwJohnenDistances,
+        line: {
+          color: 'rgba(217,26,96, 0.8)',
+          width: 1,
+        },
+      }
+    : {};
+
+  const dtwJohnenMaxErrorPlot: Partial<PlotData> = currentDtw.dtwJohnenDistances
+    ? {
+        type: 'scatter',
+        mode: 'markers',
+        x: [
+          currentDtw.dtwJohnenDistances.indexOf(
+            currentDtw.dtwJohnenMaxDistance,
+          ),
+        ],
+        y: [currentDtw.dtwJohnenMaxDistance],
+        marker: {
+          color: 'red',
+          size: 6,
+        },
+      }
+    : {};
+
+  const combinedLayoutDTWJohnenError: Partial<Layout> = {
+    ...plotLayout2DConfigDTWJohnenError,
+    shapes: currentDtw.dtwJohnenDistances
+      ? [
+          {
+            type: 'line',
+            x0: 0,
+            x1: currentDtw.dtwJohnenDistances.length,
+            y0: currentDtw.dtwJohnenAverageDistance,
+            y1: currentDtw.dtwJohnenAverageDistance,
+            line: {
+              color: 'rgba(31,119,180, 0.8)',
+              width: 2,
+              dash: 'dash',
+            },
+          },
+        ]
+      : [],
+  };
+
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
   const currentTrajectoryID = trajectoriesHeader.findIndex(
     (item) => item.dataId === searchedIndex,
@@ -332,20 +382,6 @@ export const TrajectoryPlot = () => {
           }}
         />
 
-        {currentEuclidean.euclideanDistances && (
-          <Plot
-            className=""
-            data={[euclideanErrorPlot, euclideanMaxErrorPlot]}
-            useResizeHandler
-            layout={combinedLayoutEuclideanError}
-            config={{
-              displaylogo: false,
-              modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-              responsive: true,
-            }}
-          />
-        )}
-
         {visibleDTWJohnen && currentDtw.dtwAccDist && (
           <Plot
             data={[dtwAccdistHeatmap, dtwPathPlot]}
@@ -358,6 +394,36 @@ export const TrajectoryPlot = () => {
             }}
           />
         )}
+
+        <div className="m-4 flex-row">
+          {currentEuclidean.euclideanDistances && (
+            <Plot
+              className=""
+              data={[euclideanErrorPlot, euclideanMaxErrorPlot]}
+              useResizeHandler
+              layout={combinedLayoutEuclideanError}
+              config={{
+                displaylogo: false,
+                modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+                responsive: true,
+              }}
+            />
+          )}
+
+          {currentDtw.dtwJohnenDistances && (
+            <Plot
+              className=""
+              data={[dtwJohnenErrorPlot, dtwJohnenMaxErrorPlot]}
+              useResizeHandler
+              layout={combinedLayoutDTWJohnenError}
+              config={{
+                displaylogo: false,
+                modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+                responsive: true,
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
