@@ -9,6 +9,7 @@ import {
   dataPlotConfig,
   heatMapLayoutConfig,
   plotLayout2DConfigAcceleration,
+  plotLayout2DConfigEuclideanError,
   plotLayout2DConfigVelocity,
   plotLayoutConfig,
 } from '@/src/lib/plot-config';
@@ -220,6 +221,57 @@ export const TrajectoryPlot = () => {
         }
       : {};
 
+  const euclideanErrorPlot: Partial<PlotData> =
+    currentEuclidean.euclideanDistances
+      ? {
+          type: 'scatter',
+          mode: 'lines',
+          y: currentEuclidean.euclideanDistances,
+          line: {
+            color: 'rgba(217,26,96, 0.8)',
+            width: 1,
+          },
+        }
+      : {};
+
+  const euclideanMaxErrorPlot: Partial<PlotData> =
+    currentEuclidean.euclideanDistances
+      ? {
+          type: 'scatter',
+          mode: 'markers',
+          x: [
+            currentEuclidean.euclideanDistances.indexOf(
+              currentEuclidean.euclideanMaxDistance,
+            ),
+          ],
+          y: [currentEuclidean.euclideanMaxDistance],
+          marker: {
+            color: 'red',
+            size: 6,
+          },
+        }
+      : {};
+
+  const combinedLayoutEuclideanError: Partial<Layout> = {
+    ...plotLayout2DConfigEuclideanError,
+    shapes: currentEuclidean.euclideanDistances
+      ? [
+          {
+            type: 'line',
+            x0: 0,
+            x1: currentEuclidean.euclideanDistances.length,
+            y0: currentEuclidean.euclideanAverageDistance,
+            y1: currentEuclidean.euclideanAverageDistance,
+            line: {
+              color: 'rgba(31,119,180, 0.8)',
+              width: 2,
+              dash: 'dash',
+            },
+          },
+        ]
+      : [],
+  };
+
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
   const currentTrajectoryID = trajectoriesHeader.findIndex(
     (item) => item.dataId === searchedIndex,
@@ -279,6 +331,20 @@ export const TrajectoryPlot = () => {
             responsive: true,
           }}
         />
+
+        {currentEuclidean.euclideanDistances && (
+          <Plot
+            className=""
+            data={[euclideanErrorPlot, euclideanMaxErrorPlot]}
+            useResizeHandler
+            layout={combinedLayoutEuclideanError}
+            config={{
+              displaylogo: false,
+              modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+              responsive: true,
+            }}
+          />
+        )}
 
         {visibleDTWJohnen && currentDtw.dtwAccDist && (
           <Plot

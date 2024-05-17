@@ -42,6 +42,7 @@ export const transformEuclideanMetricResult = (
 ): TrajectoryEuclideanMetrics => ({
   _id: trajectoryRaw._id,
   trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
+  euclideanDistances: trajectoryRaw.euclidean_distances,
   euclideanMaxDistance: trajectoryRaw.euclidean_max_distance,
   euclideanAverageDistance: trajectoryRaw.euclidean_average_distance,
   euclideanStandardDeviation: trajectoryRaw.euclidean_standard_deviation,
@@ -124,6 +125,7 @@ export const transformTrajectoriesEuclideanMetricsResult = (
     (trajectory): TrajectoryEuclideanMetrics => ({
       _id: trajectory._id,
       trajectoryHeaderId: trajectory.trajectory_header_id,
+      euclideanDistances: trajectory.euclidean_distances,
       euclideanMaxDistance: trajectory.euclidean_max_distance,
       euclideanAverageDistance: trajectory.euclidean_average_distance,
       euclideanStandardDeviation: trajectory.euclidean_standard_deviation,

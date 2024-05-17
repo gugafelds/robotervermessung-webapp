@@ -164,6 +164,45 @@ export const plotLayout2DConfigAcceleration: Partial<Layout> = {
   },
 };
 
+export const plotLayout2DConfigEuclideanError: Partial<Layout> = {
+  title: {
+    text: 'Error [Euclidean]',
+    font: {
+      size: 15,
+      family: 'Arial, sans-serif',
+      color: 'black',
+    },
+  },
+  modebar: {
+    orientation: 'v',
+    color: '#E2E2E2',
+  },
+  margin: {
+    l: 30,
+    r: 30,
+    b: 20,
+    t: 50,
+    pad: 1,
+  },
+  showlegend: false,
+  width: 400,
+  height: 200,
+  xaxis: {
+    title: 'Punkte',
+    automargin: true,
+    autorange: true,
+    showgrid: true,
+    dtick: 30,
+  },
+  yaxis: {
+    title: 'e [m]',
+    automargin: true,
+    showgrid: true,
+    autorange: true,
+    ticksuffix: '  ',
+  },
+};
+
 export const heatMapLayoutConfig: Partial<Layout> = {
   title: {
     text: 'DTW-Kostenmatrix',
