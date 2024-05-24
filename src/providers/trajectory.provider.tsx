@@ -43,9 +43,9 @@ export const TrajectoryProvider = ({
   const [currentDFD, setCurrentDFD] = useState([]);
 
   const [visibleEuclidean, showEuclideanPlot] = useState(false);
-  const [visibleDTW, showDTWPlot] = useState(false);
+  // const [visibleDTW, showDTWPlot] = useState(false);
   const [visibleDTWJohnen, showDTWJohnenPlot] = useState(false);
-  const [visibleDFD, showDFDPlot] = useState(false);
+  // const [visibleDFD, showDFDPlot] = useState(false);
 
   const contextValue = useMemo(
     () => ({
@@ -73,9 +73,9 @@ export const TrajectoryProvider = ({
       currentDTWJohnen,
       currentDFD,
       visibleEuclidean,
-      visibleDTW,
+      // visibleDTW,
       visibleDTWJohnen,
-      visibleDFD,
+      // visibleDFD,
     ],
   );
 
