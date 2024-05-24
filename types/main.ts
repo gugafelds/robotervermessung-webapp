@@ -132,3 +132,51 @@ export interface TrajectoryDTWJohnenMetrics {
   dtwPath: number[];
   metricType: string;
 }
+
+export interface TrajectoryDTWMetricsRaw {
+  _id: ObjectId | string;
+  trajectory_header_id: string;
+  dtw_max_distance: number;
+  dtw_average_distance: number;
+  dtw_distances: number[];
+  dtw_X: number[][];
+  dtw_Y: number[][];
+  dtw_accdist: number[];
+  dtw_path: number[];
+  metric_type: string;
+}
+
+export interface TrajectoryDTWMetrics {
+  _id: ObjectId | string;
+  trajectoryHeaderId: string;
+  dtwMaxDistance: number;
+  dtwAverageDistance: number;
+  dtwDistances: number[];
+  dtwX: number[][];
+  dtwY: number[][];
+  dtwAccDist: number[];
+  dtwPath: number[];
+  metricType: string;
+}
+
+export interface TrajectoryDFDMetricsRaw {
+  _id: ObjectId | string;
+  trajectory_header_id: string;
+  frechet_max_distance: number;
+  frechet_average_distance: number;
+  frechet_distances: number[];
+  frechet_accdist: number[];
+  frechet_path: number[];
+  metric_type: string;
+}
+
+export interface TrajectoryDFDMetrics {
+  _id: ObjectId | string;
+  trajectoryHeaderId: string;
+  dfdMaxDistance: number;
+  dfdAverageDistance: number;
+  dfdDistances: number[];
+  dfdAccDist: number[];
+  dfdPath: number[];
+  metricType: string;
+}

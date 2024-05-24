@@ -195,7 +195,46 @@ export const plotLayout2DConfigEuclideanError: Partial<Layout> = {
     dtick: 30,
   },
   yaxis: {
-    title: 'e [m]',
+    title: 'e [mm]',
+    automargin: true,
+    showgrid: true,
+    autorange: true,
+    ticksuffix: '  ',
+  },
+};
+
+export const plotLayout2DConfigDTWError: Partial<Layout> = {
+  title: {
+    text: 'Error [DTW Standard]',
+    font: {
+      size: 15,
+      family: 'Arial, sans-serif',
+      color: 'black',
+    },
+  },
+  modebar: {
+    orientation: 'v',
+    color: '#E2E2E2',
+  },
+  margin: {
+    l: 30,
+    r: 30,
+    b: 20,
+    t: 50,
+    pad: 1,
+  },
+  showlegend: false,
+  width: 400,
+  height: 200,
+  xaxis: {
+    title: 'Punkte',
+    automargin: true,
+    autorange: true,
+    showgrid: true,
+    dtick: 30,
+  },
+  yaxis: {
+    title: 'e [mm]',
     automargin: true,
     showgrid: true,
     autorange: true,
@@ -234,7 +273,46 @@ export const plotLayout2DConfigDTWJohnenError: Partial<Layout> = {
     dtick: 30,
   },
   yaxis: {
-    title: 'e [m]',
+    title: 'e [mm]',
+    automargin: true,
+    showgrid: true,
+    autorange: true,
+    ticksuffix: '  ',
+  },
+};
+
+export const plotLayout2DConfigDFDError: Partial<Layout> = {
+  title: {
+    text: 'Error [DFD]',
+    font: {
+      size: 15,
+      family: 'Arial, sans-serif',
+      color: 'black',
+    },
+  },
+  modebar: {
+    orientation: 'v',
+    color: '#E2E2E2',
+  },
+  margin: {
+    l: 30,
+    r: 30,
+    b: 20,
+    t: 50,
+    pad: 1,
+  },
+  showlegend: false,
+  width: 400,
+  height: 200,
+  xaxis: {
+    title: 'Punkte',
+    automargin: true,
+    autorange: true,
+    showgrid: true,
+    dtick: 30,
+  },
+  yaxis: {
+    title: 'e [mm]',
     automargin: true,
     showgrid: true,
     autorange: true,

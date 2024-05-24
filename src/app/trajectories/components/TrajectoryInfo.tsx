@@ -15,7 +15,9 @@ import {
 } from '@/src/lib/functions';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 import type {
+  TrajectoryDFDMetrics,
   TrajectoryDTWJohnenMetrics,
+  TrajectoryDTWMetrics,
   TrajectoryEuclideanMetrics,
   TrajectoryHeader,
 } from '@/types/main';
@@ -24,8 +26,10 @@ export const TrajectoryInfo = () => {
   const {
     trajectoriesHeader,
     currentTrajectory,
-    currentDtw,
+    currentDTW,
+    currentDTWJohnen,
     currentEuclidean,
+    currentDFD,
   } = useTrajectory();
 
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
@@ -115,12 +119,41 @@ export const TrajectoryInfo = () => {
         </ul>
       )}
 
-      {currentDtw && Object.keys(currentDtw).length !== 0 ? (
-        getDataToBeDisplayed(currentDtw, [
+      {currentDTW && Object.keys(currentDTW).length !== 0 ? (
+        getDataToBeDisplayed(currentDTW, [
+          'dtwMaxDistance',
+          'dtwAverageDistance',
+        ]).map((header) => {
+          let value = currentDTW[header as keyof TrajectoryDTWMetrics];
+          let unit = '';
+          if (typeof value === 'number') {
+            value = (value * 1000).toFixed(5);
+            unit = 'mm';
+          }
+          return (
+            <ul key={header}>
+              <li className="px-6 text-lg font-bold text-primary">
+                {`${camelToWords(header)}:`}{' '}
+                <span className="text-lg font-light text-primary">
+                  {`${value} ${unit}`}
+                </span>
+              </li>
+            </ul>
+          );
+        })
+      ) : (
+        <ul className="px-6 text-lg font-light text-primary">
+          No DTW Standard metrics for this trajectory.
+        </ul>
+      )}
+
+      {currentDTWJohnen && Object.keys(currentDTWJohnen).length !== 0 ? (
+        getDataToBeDisplayed(currentDTWJohnen, [
           'dtwJohnenMaxDistance',
           'dtwJohnenAverageDistance',
         ]).map((header) => {
-          let value = currentDtw[header as keyof TrajectoryDTWJohnenMetrics];
+          let value =
+            currentDTWJohnen[header as keyof TrajectoryDTWJohnenMetrics];
           let unit = '';
           if (typeof value === 'number') {
             value = (value * 1000).toFixed(5);
@@ -142,9 +175,34 @@ export const TrajectoryInfo = () => {
           No DTW metrics for this trajectory.
         </ul>
       )}
-      <ul className="px-6 text-lg font-light text-primary">
-        No Fréchet metrics for this trajectory.
-      </ul>
+
+      {currentDFD && Object.keys(currentDFD).length !== 0 ? (
+        getDataToBeDisplayed(currentDFD, [
+          'dfdMaxDistance',
+          'dfdAverageDistance',
+        ]).map((header) => {
+          let value = currentDFD[header as keyof TrajectoryDFDMetrics];
+          let unit = '';
+          if (typeof value === 'number') {
+            value = (value * 1000).toFixed(5);
+            unit = 'mm';
+          }
+          return (
+            <ul key={header}>
+              <li className="px-6 text-lg font-bold text-primary">
+                {`${camelToWords(header)}:`}{' '}
+                <span className="text-lg font-light text-primary">
+                  {`${value} ${unit}`}
+                </span>
+              </li>
+            </ul>
+          );
+        })
+      ) : (
+        <ul className="px-6 text-lg font-light text-primary">
+          No DFD metrics for this trajectory.
+        </ul>
+      )}
 
       <TrajectoryOptions />
     </div>

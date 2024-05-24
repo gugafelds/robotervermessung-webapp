@@ -1,8 +1,12 @@
 import type {
   TrajectoryData,
   TrajectoryDataRaw,
+  TrajectoryDFDMetrics,
+  TrajectoryDFDMetricsRaw,
   TrajectoryDTWJohnenMetrics,
   TrajectoryDTWJohnenMetricsRaw,
+  TrajectoryDTWMetrics,
+  TrajectoryDTWMetricsRaw,
   TrajectoryEuclideanMetrics,
   TrajectoryEuclideanMetricsRaw,
   TrajectoryHeader,
@@ -50,6 +54,21 @@ export const transformEuclideanMetricResult = (
   metricType: trajectoryRaw.metric_type,
 });
 
+export const transformDTWMetricResult = (
+  trajectoryRaw: TrajectoryDTWMetricsRaw,
+): TrajectoryDTWMetrics => ({
+  _id: trajectoryRaw._id,
+  trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
+  dtwMaxDistance: trajectoryRaw.dtw_max_distance,
+  dtwAverageDistance: trajectoryRaw.dtw_average_distance,
+  dtwDistances: trajectoryRaw.dtw_distances,
+  dtwX: trajectoryRaw.dtw_X,
+  dtwY: trajectoryRaw.dtw_Y,
+  dtwAccDist: trajectoryRaw.dtw_accdist,
+  dtwPath: trajectoryRaw.dtw_path,
+  metricType: trajectoryRaw.metric_type,
+});
+
 export const transformDTWJohnenMetricResult = (
   trajectoryRaw: TrajectoryDTWJohnenMetricsRaw,
 ): TrajectoryDTWJohnenMetrics => ({
@@ -62,6 +81,19 @@ export const transformDTWJohnenMetricResult = (
   dtwJohnenY: trajectoryRaw.dtw_Y,
   dtwAccDist: trajectoryRaw.dtw_accdist,
   dtwPath: trajectoryRaw.dtw_path,
+  metricType: trajectoryRaw.metric_type,
+});
+
+export const transformDFDMetricResult = (
+  trajectoryRaw: TrajectoryDFDMetricsRaw,
+): TrajectoryDFDMetrics => ({
+  _id: trajectoryRaw._id,
+  trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
+  dfdMaxDistance: trajectoryRaw.frechet_max_distance,
+  dfdAverageDistance: trajectoryRaw.frechet_average_distance,
+  dfdDistances: trajectoryRaw.frechet_distances,
+  dfdAccDist: trajectoryRaw.frechet_accdist,
+  dfdPath: trajectoryRaw.frechet_path,
   metricType: trajectoryRaw.metric_type,
 });
 
@@ -136,6 +168,25 @@ export const transformTrajectoriesEuclideanMetricsResult = (
   );
 };
 
+export const transformTrajectoriesDTWMetricsResult = (
+  trajectoriesDTWMetricsRaw: TrajectoryDTWMetricsRaw[],
+): TrajectoryDTWMetrics[] => {
+  return trajectoriesDTWMetricsRaw.map(
+    (trajectory): TrajectoryDTWMetrics => ({
+      _id: trajectory._id,
+      trajectoryHeaderId: trajectory.trajectory_header_id,
+      dtwMaxDistance: trajectory.dtw_max_distance,
+      dtwAverageDistance: trajectory.dtw_average_distance,
+      dtwDistances: trajectory.dtw_distances,
+      dtwX: trajectory.dtw_X,
+      dtwY: trajectory.dtw_Y,
+      dtwAccDist: trajectory.dtw_accdist,
+      dtwPath: trajectory.dtw_path,
+      metricType: trajectory.metric_type,
+    }),
+  );
+};
+
 export const transformTrajectoriesDTWJohnenMetricsResult = (
   trajectoriesDTWJohnenMetricsRaw: TrajectoryDTWJohnenMetricsRaw[],
 ): TrajectoryDTWJohnenMetrics[] => {
@@ -150,6 +201,23 @@ export const transformTrajectoriesDTWJohnenMetricsResult = (
       dtwJohnenY: trajectory.dtw_Y,
       dtwAccDist: trajectory.dtw_accdist,
       dtwPath: trajectory.dtw_path,
+      metricType: trajectory.metric_type,
+    }),
+  );
+};
+
+export const transformTrajectoriesDFDMetricsResult = (
+  trajectoriesDFDMetricsRaw: TrajectoryDFDMetricsRaw[],
+): TrajectoryDFDMetrics[] => {
+  return trajectoriesDFDMetricsRaw.map(
+    (trajectory): TrajectoryDFDMetrics => ({
+      _id: trajectory._id,
+      trajectoryHeaderId: trajectory.trajectory_header_id,
+      dfdMaxDistance: trajectory.frechet_max_distance,
+      dfdAverageDistance: trajectory.frechet_average_distance,
+      dfdDistances: trajectory.frechet_distances,
+      dfdAccDist: trajectory.frechet_accdist,
+      dfdPath: trajectory.frechet_path,
       metricType: trajectory.metric_type,
     }),
   );

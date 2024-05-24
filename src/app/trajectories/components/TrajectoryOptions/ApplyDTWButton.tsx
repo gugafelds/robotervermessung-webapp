@@ -11,8 +11,8 @@ export const ApplyDTWButton = () => {
     currentTrajectory,
     showDTWJohnenPlot,
     visibleDTWJohnen,
-    currentDtw,
-    setCurrentDtw,
+    currentDTWJohnen,
+    setCurrentDTWJohnen,
   } = useTrajectory();
   const [loading, setLoading] = useState(false);
 
@@ -20,20 +20,20 @@ export const ApplyDTWButton = () => {
     <div className="mb-5 flex flex-wrap gap-3 rounded-3xl bg-stone-200">
       <div className="mt-3 text-lg font-bold text-primary">dtw johnen</div>
 
-      {!currentDtw.dtwPath && (
+      {!currentDTWJohnen.dtwPath && (
         <button
           type="button"
           className="flex items-center gap-2 rounded-xl p-2 text-lg font-normal text-primary shadow-md transition-colors duration-200 ease-in betterhover:hover:bg-gray-200"
           onClick={async () => {
-            if (currentDtw?.length > 0) {
-              setCurrentDtw([]);
+            if (currentDTWJohnen?.length > 0) {
+              setCurrentDTWJohnen([]);
               return;
             }
             try {
               setLoading(true);
               const dtwJohnen = await applyDTWJohnen(currentTrajectory);
               setLoading(false);
-              setCurrentDtw(dtwJohnen);
+              setCurrentDTWJohnen(dtwJohnen);
             } catch {
               setLoading(false);
             }
@@ -43,7 +43,7 @@ export const ApplyDTWButton = () => {
         </button>
       )}
 
-      {currentDtw.dtwPath && (
+      {currentDTWJohnen.dtwPath && (
         <button
           type="button"
           className={`

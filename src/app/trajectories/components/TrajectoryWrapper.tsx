@@ -7,28 +7,41 @@ import { TrajectoryPlot } from '@/src/app/trajectories/components/TrajectoryPlot
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 import type {
   TrajectoryData,
+  TrajectoryDFDMetrics,
   TrajectoryDTWJohnenMetrics,
+  TrajectoryDTWMetrics,
   TrajectoryEuclideanMetrics,
 } from '@/types/main';
 
 type TrajectoryPageProps = {
   currentTrajectory: TrajectoryData;
+  currentDTWMetrics: TrajectoryDTWMetrics;
   currentEuclideanMetrics: TrajectoryEuclideanMetrics;
   currentDTWJohnenMetrics: TrajectoryDTWJohnenMetrics;
+  currentDFDMetrics: TrajectoryDFDMetrics;
 };
 
 export function TrajectoryWrapper({
   currentTrajectory,
   currentEuclideanMetrics,
+  currentDTWMetrics,
   currentDTWJohnenMetrics,
+  currentDFDMetrics,
 }: TrajectoryPageProps) {
-  const { setCurrentTrajectory, setCurrentEuclidean, setCurrentDtw } =
-    useTrajectory();
+  const {
+    setCurrentTrajectory,
+    setCurrentEuclidean,
+    setCurrentDTWJohnen,
+    setCurrentDTW,
+    setCurrentDFD,
+  } = useTrajectory();
 
   useEffect(() => {
+    setCurrentDTW(currentDTWMetrics);
     setCurrentTrajectory(currentTrajectory);
     setCurrentEuclidean(currentEuclideanMetrics);
-    setCurrentDtw(currentDTWJohnenMetrics);
+    setCurrentDTWJohnen(currentDTWJohnenMetrics);
+    setCurrentDFD(currentDFDMetrics);
   }, []);
 
   return (

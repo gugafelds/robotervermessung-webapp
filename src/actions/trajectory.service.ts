@@ -4,7 +4,9 @@ import { revalidatePath } from 'next/cache';
 
 import { getMongoDb } from '@/src/lib/mongodb';
 import {
+  transformDFDMetricResult,
   transformDTWJohnenMetricResult,
+  transformDTWMetricResult,
   transformEuclideanMetricResult,
   transformTrajectoriesDataResult,
   transformTrajectoriesHeadersResult,
@@ -13,8 +15,12 @@ import {
 import type {
   TrajectoryData,
   TrajectoryDataRaw,
+  TrajectoryDFDMetrics,
+  TrajectoryDFDMetricsRaw,
   TrajectoryDTWJohnenMetrics,
   TrajectoryDTWJohnenMetricsRaw,
+  TrajectoryDTWMetrics,
+  TrajectoryDTWMetricsRaw,
   TrajectoryEuclideanMetrics,
   TrajectoryEuclideanMetricsRaw,
   TrajectoryHeaderRaw,
@@ -102,4 +108,42 @@ export const getDTWJohnenMetricsById = async (id: string) => {
 
   revalidatePath('/trajectories');
   return transformDTWJohnenMetricResult(dtwJohnenMetricsResult);
+};
+
+export const getDTWMetricsById = async (id: string) => {
+  const mongo = await getMongoDb();
+
+  const dtwMetricsResult = await mongo
+    .collection('metrics')
+    .find<TrajectoryDTWMetricsRaw>({
+      trajectory_header_id: id,
+      metric_type: 'dtw_standard',
+    })
+    .next();
+
+  if (!dtwMetricsResult) {
+    return {} as TrajectoryDTWMetrics;
+  }
+
+  revalidatePath('/trajectories');
+  return transformDTWMetricResult(dtwMetricsResult);
+};
+
+export const getDFDMetricsById = async (id: string) => {
+  const mongo = await getMongoDb();
+
+  const dfdMetricsResult = await mongo
+    .collection('metrics')
+    .find<TrajectoryDFDMetricsRaw>({
+      trajectory_header_id: id,
+      metric_type: 'discrete_frechet',
+    })
+    .next();
+
+  if (!dfdMetricsResult) {
+    return {} as TrajectoryDFDMetrics;
+  }
+
+  revalidatePath('/trajectories');
+  return transformDFDMetricResult(dfdMetricsResult);
 };

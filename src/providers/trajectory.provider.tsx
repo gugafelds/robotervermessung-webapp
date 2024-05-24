@@ -11,8 +11,12 @@ export interface TrajectoryState {
   setCurrentTrajectory: any;
   currentEuclidean: any;
   setCurrentEuclidean: any;
-  currentDtw: any;
-  setCurrentDtw: any;
+  currentDTW: any;
+  setCurrentDTW: any;
+  currentDTWJohnen: any;
+  setCurrentDTWJohnen: any;
+  currentDFD: any;
+  setCurrentDFD: any;
   visibleEuclidean: boolean;
   showEuclideanPlot: any;
   visibleDTWJohnen: boolean;
@@ -34,10 +38,14 @@ export const TrajectoryProvider = ({
 
   const [currentTrajectory, setCurrentTrajectory] = useState([]);
   const [currentEuclidean, setCurrentEuclidean] = useState([]);
-  const [currentDtw, setCurrentDtw] = useState([]);
+  const [currentDTW, setCurrentDTW] = useState([]);
+  const [currentDTWJohnen, setCurrentDTWJohnen] = useState([]);
+  const [currentDFD, setCurrentDFD] = useState([]);
 
   const [visibleEuclidean, showEuclideanPlot] = useState(false);
+  const [visibleDTW, showDTWPlot] = useState(false);
   const [visibleDTWJohnen, showDTWJohnenPlot] = useState(false);
+  const [visibleDFD, showDFDPlot] = useState(false);
 
   const contextValue = useMemo(
     () => ({
@@ -46,8 +54,12 @@ export const TrajectoryProvider = ({
       setCurrentTrajectory,
       currentEuclidean,
       setCurrentEuclidean,
-      currentDtw,
-      setCurrentDtw,
+      currentDTW,
+      setCurrentDTW,
+      currentDTWJohnen,
+      setCurrentDTWJohnen,
+      currentDFD,
+      setCurrentDFD,
       visibleEuclidean,
       showEuclideanPlot,
       visibleDTWJohnen,
@@ -57,9 +69,13 @@ export const TrajectoryProvider = ({
       trajectoriesHeader,
       currentTrajectory,
       currentEuclidean,
-      currentDtw,
+      currentDTW,
+      currentDTWJohnen,
+      currentDFD,
       visibleEuclidean,
+      visibleDTW,
       visibleDTWJohnen,
+      visibleDFD,
     ],
   );
 

@@ -9,6 +9,8 @@ import {
   dataPlotConfig,
   heatMapLayoutConfig,
   plotLayout2DConfigAcceleration,
+  plotLayout2DConfigDFDError,
+  plotLayout2DConfigDTWError,
   plotLayout2DConfigDTWJohnenError,
   plotLayout2DConfigEuclideanError,
   plotLayout2DConfigVelocity,
@@ -23,7 +25,9 @@ export const TrajectoryPlot = () => {
     trajectoriesHeader,
     currentTrajectory,
     currentEuclidean,
-    currentDtw,
+    currentDTW,
+    currentDFD,
+    currentDTWJohnen,
     visibleEuclidean,
     visibleDTWJohnen,
   } = useTrajectory();
@@ -86,9 +90,11 @@ export const TrajectoryPlot = () => {
         )
       : [];
 
-  const dtwDistancePlot: Partial<PlotData>[] =
-    visibleDTWJohnen && currentDtw.dtwJohnenX && currentDtw.dtwJohnenY
-      ? currentDtw.dtwJohnenX.map((inter: any, index: number) => ({
+  const dtwJohnenDistancePlot: Partial<PlotData>[] =
+    visibleDTWJohnen &&
+    currentDTWJohnen.dtwJohnenX &&
+    currentDTWJohnen.dtwJohnenY
+      ? currentDTWJohnen.dtwJohnenX.map((inter: any, index: number) => ({
           ...dataPlotConfig(
             'lines+markers',
             'dtw',
@@ -96,23 +102,23 @@ export const TrajectoryPlot = () => {
             'rgba(210, 105, 30, 0.9)',
             index === 0,
           ),
-          x: [inter[0], currentDtw.dtwJohnenY[index][0]],
-          y: [inter[1], currentDtw.dtwJohnenY[index][1]],
-          z: [inter[2], currentDtw.dtwJohnenY[index][2]],
+          x: [inter[0], currentDTWJohnen.dtwJohnenY[index][0]],
+          y: [inter[1], currentDTWJohnen.dtwJohnenY[index][1]],
+          z: [inter[2], currentDTWJohnen.dtwJohnenY[index][2]],
         }))
       : [];
 
-  const dtwPathPlot: Partial<PlotData> =
-    visibleDTWJohnen && currentDtw.dtwPath
+  const dtwJohnenPathPlot: Partial<PlotData> =
+    visibleDTWJohnen && currentDTWJohnen.dtwPath
       ? {
           type: 'scatter',
           mode: 'lines',
-          x: Array.isArray(currentDtw.dtwPath[1])
-            ? currentDtw.dtwPath[1]
-            : [currentDtw.dtwPath[1]],
-          y: Array.isArray(currentDtw.dtwPath[0])
-            ? currentDtw.dtwPath[0]
-            : [currentDtw.dtwPath[0]],
+          x: Array.isArray(currentDTWJohnen.dtwPath[1])
+            ? currentDTWJohnen.dtwPath[1]
+            : [currentDTWJohnen.dtwPath[1]],
+          y: Array.isArray(currentDTWJohnen.dtwPath[0])
+            ? currentDTWJohnen.dtwPath[0]
+            : [currentDTWJohnen.dtwPath[0]],
           line: {
             color: 'rgb(255, 0, 0)',
             width: 4,
@@ -212,11 +218,11 @@ export const TrajectoryPlot = () => {
       : [],
   };
 
-  const dtwAccdistHeatmap: Partial<PlotData> =
-    visibleDTWJohnen && currentDtw.dtwAccDist
+  const dtwJohnenAccdistHeatmap: Partial<PlotData> =
+    visibleDTWJohnen && currentDTWJohnen.dtwAccDist
       ? {
           type: 'heatmap',
-          z: currentDtw.dtwAccDist,
+          z: currentDTWJohnen.dtwAccDist,
           colorscale: 'Plasma',
           showscale: true,
         }
@@ -227,7 +233,9 @@ export const TrajectoryPlot = () => {
       ? {
           type: 'scatter',
           mode: 'lines',
-          y: currentEuclidean.euclideanDistances,
+          y: currentEuclidean.euclideanDistances.map(
+            (value: number) => value * 1000,
+          ),
           line: {
             color: 'rgba(217,26,96, 0.8)',
             width: 1,
@@ -245,7 +253,7 @@ export const TrajectoryPlot = () => {
               currentEuclidean.euclideanMaxDistance,
             ),
           ],
-          y: [currentEuclidean.euclideanMaxDistance],
+          y: [currentEuclidean.euclideanMaxDistance * 1000],
           marker: {
             color: 'red',
             size: 6,
@@ -261,8 +269,8 @@ export const TrajectoryPlot = () => {
             type: 'line',
             x0: 0,
             x1: currentEuclidean.euclideanDistances.length,
-            y0: currentEuclidean.euclideanAverageDistance,
-            y1: currentEuclidean.euclideanAverageDistance,
+            y0: currentEuclidean.euclideanAverageDistance * 1000,
+            y1: currentEuclidean.euclideanAverageDistance * 1000,
             line: {
               color: 'rgba(31,119,180, 0.8)',
               width: 2,
@@ -273,11 +281,64 @@ export const TrajectoryPlot = () => {
       : [],
   };
 
-  const dtwJohnenErrorPlot: Partial<PlotData> = currentDtw.dtwJohnenDistances
+  const dtwJohnenErrorPlot: Partial<PlotData> =
+    currentDTWJohnen.dtwJohnenDistances
+      ? {
+          type: 'scatter',
+          mode: 'lines',
+          y: currentDTWJohnen.dtwJohnenDistances.map(
+            (value: number) => value * 1000,
+          ),
+          line: {
+            color: 'rgba(217,26,96, 0.8)',
+            width: 1,
+          },
+        }
+      : {};
+
+  const dtwJohnenMaxErrorPlot: Partial<PlotData> =
+    currentDTWJohnen.dtwJohnenDistances
+      ? {
+          type: 'scatter',
+          mode: 'markers',
+          x: [
+            currentDTWJohnen.dtwJohnenDistances.indexOf(
+              currentDTWJohnen.dtwJohnenMaxDistance,
+            ),
+          ],
+          y: [currentDTWJohnen.dtwJohnenMaxDistance * 1000],
+          marker: {
+            color: 'red',
+            size: 6,
+          },
+        }
+      : {};
+
+  const combinedLayoutDTWJohnenError: Partial<Layout> = {
+    ...plotLayout2DConfigDTWJohnenError,
+    shapes: currentDTWJohnen.dtwJohnenDistances
+      ? [
+          {
+            type: 'line',
+            x0: 0,
+            x1: currentDTWJohnen.dtwJohnenDistances.length,
+            y0: currentDTWJohnen.dtwJohnenAverageDistance * 1000,
+            y1: currentDTWJohnen.dtwJohnenAverageDistance * 1000,
+            line: {
+              color: 'rgba(31,119,180, 0.8)',
+              width: 2,
+              dash: 'dash',
+            },
+          },
+        ]
+      : [],
+  };
+
+  const dtwErrorPlot: Partial<PlotData> = currentDTW.dtwDistances
     ? {
         type: 'scatter',
         mode: 'lines',
-        y: currentDtw.dtwJohnenDistances,
+        y: currentDTW.dtwDistances.map((value: number) => value * 1000),
         line: {
           color: 'rgba(217,26,96, 0.8)',
           width: 1,
@@ -285,16 +346,12 @@ export const TrajectoryPlot = () => {
       }
     : {};
 
-  const dtwJohnenMaxErrorPlot: Partial<PlotData> = currentDtw.dtwJohnenDistances
+  const dtwMaxErrorPlot: Partial<PlotData> = currentDTW.dtwDistances
     ? {
         type: 'scatter',
         mode: 'markers',
-        x: [
-          currentDtw.dtwJohnenDistances.indexOf(
-            currentDtw.dtwJohnenMaxDistance,
-          ),
-        ],
-        y: [currentDtw.dtwJohnenMaxDistance],
+        x: [currentDTW.dtwDistances.indexOf(currentDTW.dtwMaxDistance)],
+        y: [currentDTW.dtwMaxDistance * 1000],
         marker: {
           color: 'red',
           size: 6,
@@ -302,16 +359,61 @@ export const TrajectoryPlot = () => {
       }
     : {};
 
-  const combinedLayoutDTWJohnenError: Partial<Layout> = {
-    ...plotLayout2DConfigDTWJohnenError,
-    shapes: currentDtw.dtwJohnenDistances
+  const combinedLayoutDTWError: Partial<Layout> = {
+    ...plotLayout2DConfigDTWError,
+    shapes: currentDTW.dtwDistances
       ? [
           {
             type: 'line',
             x0: 0,
-            x1: currentDtw.dtwJohnenDistances.length,
-            y0: currentDtw.dtwJohnenAverageDistance,
-            y1: currentDtw.dtwJohnenAverageDistance,
+            x1: currentDTW.dtwDistances.length,
+            y0: currentDTW.dtwAverageDistance * 1000,
+            y1: currentDTW.dtwAverageDistance * 1000,
+            line: {
+              color: 'rgba(31,119,180, 0.8)',
+              width: 2,
+              dash: 'dash',
+            },
+          },
+        ]
+      : [],
+  };
+
+  const dfdErrorPlot: Partial<PlotData> = currentDFD.dfdDistances
+    ? {
+        type: 'scatter',
+        mode: 'lines',
+        y: currentDFD.dfdDistances.map((value: number) => value * 1000),
+        line: {
+          color: 'rgba(217,26,96, 0.8)',
+          width: 1,
+        },
+      }
+    : {};
+
+  const dfdMaxErrorPlot: Partial<PlotData> = currentDFD.dfdDistances
+    ? {
+        type: 'scatter',
+        mode: 'markers',
+        x: [currentDFD.dfdDistances.indexOf(currentDFD.dfdMaxDistance)],
+        y: [currentDFD.dfdMaxDistance * 1000],
+        marker: {
+          color: 'red',
+          size: 6,
+        },
+      }
+    : {};
+
+  const combinedLayoutDFDError: Partial<Layout> = {
+    ...plotLayout2DConfigDFDError,
+    shapes: currentDFD.dfdDistances
+      ? [
+          {
+            type: 'line',
+            x0: 0,
+            x1: currentDFD.dfdDistances.length,
+            y0: currentDFD.dfdAverageDistance * 1000,
+            y1: currentDFD.dfdAverageDistance * 1000,
             line: {
               color: 'rgba(31,119,180, 0.8)',
               width: 2,
@@ -342,36 +444,11 @@ export const TrajectoryPlot = () => {
     <div className="h-fullscreen flex-row overflow-scroll">
       <div className="m-4 flex-row">
         <Plot
-          className=""
-          data={[tcpVelocityPlot]}
-          useResizeHandler
-          layout={combinedLayoutVelocity}
-          config={{
-            displaylogo: false,
-            modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-            responsive: true,
-          }}
-        />
-
-        <Plot
-          data={[tcpAccelerationPlot]}
-          useResizeHandler
-          layout={combinedLayoutAcceleration}
-          config={{
-            displaylogo: false,
-            modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-            responsive: true,
-          }}
-        />
-      </div>
-
-      <div className="m-4 flex-row">
-        <Plot
           data={[
             idealTrajectory,
             realTrajectory,
             ...euclideanDistancePlot,
-            ...dtwDistancePlot,
+            ...dtwJohnenDistancePlot,
           ]}
           useResizeHandler
           layout={plotLayoutConfig}
@@ -382,9 +459,9 @@ export const TrajectoryPlot = () => {
           }}
         />
 
-        {visibleDTWJohnen && currentDtw.dtwAccDist && (
+        {visibleDTWJohnen && currentDTWJohnen.dtwAccDist && (
           <Plot
-            data={[dtwAccdistHeatmap, dtwPathPlot]}
+            data={[dtwJohnenAccdistHeatmap, dtwJohnenPathPlot]}
             useResizeHandler
             layout={heatMapLayoutConfig}
             config={{
@@ -394,6 +471,31 @@ export const TrajectoryPlot = () => {
             }}
           />
         )}
+
+        <div className="m-4 flex-row">
+          <Plot
+            className=""
+            data={[tcpVelocityPlot]}
+            useResizeHandler
+            layout={combinedLayoutVelocity}
+            config={{
+              displaylogo: false,
+              modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+              responsive: true,
+            }}
+          />
+
+          <Plot
+            data={[tcpAccelerationPlot]}
+            useResizeHandler
+            layout={combinedLayoutAcceleration}
+            config={{
+              displaylogo: false,
+              modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+              responsive: true,
+            }}
+          />
+        </div>
 
         <div className="m-4 flex-row">
           {currentEuclidean.euclideanDistances && (
@@ -410,12 +512,40 @@ export const TrajectoryPlot = () => {
             />
           )}
 
-          {currentDtw.dtwJohnenDistances && (
+          {currentDTW.dtwDistances && (
+            <Plot
+              className=""
+              data={[dtwErrorPlot, dtwMaxErrorPlot]}
+              useResizeHandler
+              layout={combinedLayoutDTWError}
+              config={{
+                displaylogo: false,
+                modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+                responsive: true,
+              }}
+            />
+          )}
+
+          {currentDTWJohnen.dtwJohnenDistances && (
             <Plot
               className=""
               data={[dtwJohnenErrorPlot, dtwJohnenMaxErrorPlot]}
               useResizeHandler
               layout={combinedLayoutDTWJohnenError}
+              config={{
+                displaylogo: false,
+                modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+                responsive: true,
+              }}
+            />
+          )}
+
+          {currentDFD.dfdDistances && (
+            <Plot
+              className=""
+              data={[dfdErrorPlot, dfdMaxErrorPlot]}
+              useResizeHandler
+              layout={combinedLayoutDFDError}
               config={{
                 displaylogo: false,
                 modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
