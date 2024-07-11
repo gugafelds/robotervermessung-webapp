@@ -16,16 +16,25 @@ export const ProjectInfo = () => {
       </div>
       <div className="mt-2">
         <Typography as="p" className="mt-4">
-          Ziel dieses Projektes ist es, die Grundlagen für eine
-          Robotermessdatenbank zu schaffen, in der Bewegungsdaten von
-          Industrierobotern gespeichert werden können. Durch den Aufbau einer
+          Das Ziel dieses Forschungsprojektes ist die Schaffung der Grundlagen
+          für eine Robotermessdatenbank, in der Bewegungsdaten von
+          Industrierobotern gespeichert werden können. Der Aufbau einer
           umfassenden Datenbank, die kontinuierlich mit neuen Messdaten
-          angereichert werden kann, können verschiedene Anwendungen und
-          Szenarien unterstützt werden. Dadurch entfällt die Notwendigkeit von
-          zeitaufwändigen und teuren Einzelmessungen.
+          angereichert werden kann, ermöglicht die Unterstützung verschiedener
+          Anwendungen und Szenarien.
         </Typography>
         <Typography as="p" className="mt-4">
-          Das Projekt startet im September 2023 und umfasst vier Meilensteine:
+          Dadurch entfällt die Notwendigkeit von zeitaufwändigen und
+          kostenintensiven Einzelmessungen. Des Weiteren soll ein quantitativer
+          Vergleich verschiedener Robotersysteme für ein spezifisches
+          Anwendungsszenario möglich sein. Das Datenbanksystem soll
+          beispielsweise den Roboter mit der höchsten Genauigkeit für den
+          Prozess oder aber auch den Roboter mit der geringsten Zykluszeit
+          liefern.
+        </Typography>
+        <Typography as="p" className="mt-4">
+          Das Projekt hat im September 2023 gestartet und umfasst vier
+          Meilensteine:
           <li className="mt-4">
             Entwicklung einer Methode für den Vergleich von Robotertrajektorien
             unter Berücksichtigung von Abweichungen in der Position, der

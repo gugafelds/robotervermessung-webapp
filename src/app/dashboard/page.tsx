@@ -6,7 +6,7 @@ export default async function Dashboard() {
 
   return (
     <section className="flex flex-col p-5 lg:flex-row">
-      <DataCard title="Total Trajectories" value={trajectoriesCount} />
+      <DataCard title="Trajektorien insgesamt" value={trajectoriesCount} />
     </section>
   );
 }

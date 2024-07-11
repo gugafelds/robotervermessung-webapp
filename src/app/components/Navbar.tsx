@@ -35,7 +35,7 @@ export const Navbar = () => {
               pathname.includes('trajectories') ? 'bg-gray-300' : ''
             }`}
           >
-            trajectories
+            trajektorien
           </Typography>
         </Link>
         <Link
