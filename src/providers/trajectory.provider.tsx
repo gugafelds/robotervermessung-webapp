@@ -15,6 +15,8 @@ export interface TrajectoryState {
   setCurrentDTW: any;
   currentDTWJohnen: any;
   setCurrentDTWJohnen: any;
+  currentLCSS: any;
+  setCurrentLCSS: any;
   currentDFD: any;
   setCurrentDFD: any;
   visibleEuclidean: boolean;
@@ -41,6 +43,7 @@ export const TrajectoryProvider = ({
   const [currentDTW, setCurrentDTW] = useState([]);
   const [currentDTWJohnen, setCurrentDTWJohnen] = useState([]);
   const [currentDFD, setCurrentDFD] = useState([]);
+  const [currentLCSS, setCurrentLCSS] = useState([]);
 
   const [visibleEuclidean, showEuclideanPlot] = useState(false);
   // const [visibleDTW, showDTWPlot] = useState(false);
@@ -60,6 +63,8 @@ export const TrajectoryProvider = ({
       setCurrentDTWJohnen,
       currentDFD,
       setCurrentDFD,
+      currentLCSS,
+      setCurrentLCSS,
       visibleEuclidean,
       showEuclideanPlot,
       visibleDTWJohnen,
@@ -72,6 +77,7 @@ export const TrajectoryProvider = ({
       currentDTW,
       currentDTWJohnen,
       currentDFD,
+      currentLCSS,
       visibleEuclidean,
       // visibleDTW,
       visibleDTWJohnen,

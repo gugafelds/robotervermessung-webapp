@@ -13,6 +13,7 @@ import {
   plotLayout2DConfigDTWError,
   plotLayout2DConfigDTWJohnenError,
   plotLayout2DConfigEuclideanError,
+  plotLayout2DConfigLCSSError,
   plotLayout2DConfigVelocity,
   plotLayoutConfig,
 } from '@/src/lib/plot-config';
@@ -28,6 +29,7 @@ export const TrajectoryPlot = () => {
     currentDTW,
     currentDFD,
     currentDTWJohnen,
+    currentLCSS,
     visibleEuclidean,
     visibleDTWJohnen,
   } = useTrajectory();
@@ -391,18 +393,43 @@ export const TrajectoryPlot = () => {
       }
     : {};
 
-  const dfdMaxErrorPlot: Partial<PlotData> = currentDFD.dfdDistances
-    ? {
-        type: 'scatter',
-        mode: 'markers',
-        x: [currentDFD.dfdDistances.indexOf(currentDFD.dfdMaxDistance)],
-        y: [currentDFD.dfdMaxDistance * 1000],
-        marker: {
-          color: 'red',
-          size: 6,
-        },
-      }
-    : {};
+  const indexOfMaxDistance =
+    currentDFD.dfdDistances && Array.isArray(currentDFD.dfdDistances)
+      ? currentDFD.dfdDistances.reduce(
+          (
+            closestIndex: number,
+            currentValue: number,
+            currentIndex: number,
+            array: any,
+          ) => {
+            const currentDifference = Math.abs(
+              currentValue - currentDFD.dfdMaxDistance,
+            );
+            const closestDifference = Math.abs(
+              array[closestIndex] - currentDFD.dfdMaxDistance,
+            );
+
+            return currentDifference < closestDifference
+              ? currentIndex
+              : closestIndex;
+          },
+          0,
+        )
+      : -1;
+
+  const dfdMaxErrorPlot: Partial<PlotData> =
+    currentDFD.dfdDistances && indexOfMaxDistance !== -1
+      ? {
+          type: 'scatter',
+          mode: 'markers',
+          x: [indexOfMaxDistance],
+          y: [currentDFD.dfdMaxDistance * 1000],
+          marker: {
+            color: 'red',
+            size: 6,
+          },
+        }
+      : {};
 
   const combinedLayoutDFDError: Partial<Layout> = {
     ...plotLayout2DConfigDFDError,
@@ -414,6 +441,51 @@ export const TrajectoryPlot = () => {
             x1: currentDFD.dfdDistances.length,
             y0: currentDFD.dfdAverageDistance * 1000,
             y1: currentDFD.dfdAverageDistance * 1000,
+            line: {
+              color: 'rgba(31,119,180, 0.8)',
+              width: 2,
+              dash: 'dash',
+            },
+          },
+        ]
+      : [],
+  };
+
+  const lcssErrorPlot: Partial<PlotData> = currentLCSS.lcssDistances
+    ? {
+        type: 'scatter',
+        mode: 'lines',
+        y: currentLCSS.lcssDistances.map((value: number) => value * 1000),
+        line: {
+          color: 'rgba(217,26,96, 0.8)',
+          width: 1,
+        },
+      }
+    : {};
+
+  const lcssMaxErrorPlot: Partial<PlotData> = currentLCSS.lcssDistances
+    ? {
+        type: 'scatter',
+        mode: 'markers',
+        x: [currentLCSS.lcssDistances.indexOf(currentLCSS.lcssMaxDistance)],
+        y: [currentLCSS.lcssMaxDistance * 1000],
+        marker: {
+          color: 'red',
+          size: 6,
+        },
+      }
+    : {};
+
+  const combinedLayoutLCSSError: Partial<Layout> = {
+    ...plotLayout2DConfigLCSSError,
+    shapes: currentLCSS.lcssDistances
+      ? [
+          {
+            type: 'line',
+            x0: 0,
+            x1: currentLCSS.lcssDistances.length,
+            y0: currentLCSS.lcssAverageDistance * 1000,
+            y1: currentLCSS.lcssAverageDistance * 1000,
             line: {
               color: 'rgba(31,119,180, 0.8)',
               width: 2,
@@ -546,6 +618,20 @@ export const TrajectoryPlot = () => {
               data={[dfdErrorPlot, dfdMaxErrorPlot]}
               useResizeHandler
               layout={combinedLayoutDFDError}
+              config={{
+                displaylogo: false,
+                modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+                responsive: true,
+              }}
+            />
+          )}
+
+          {currentDFD.dfdDistances && (
+            <Plot
+              className=""
+              data={[lcssErrorPlot, lcssMaxErrorPlot]}
+              useResizeHandler
+              layout={combinedLayoutLCSSError}
               config={{
                 displaylogo: false,
                 modeBarButtonsToRemove: ['toImage', 'orbitRotation'],

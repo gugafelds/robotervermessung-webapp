@@ -5,6 +5,7 @@ import {
   getDTWJohnenMetricsById,
   getDTWMetricsById,
   getEuclideanMetricsById,
+  getLCSSMetricsById,
   getTrajectoryById,
 } from '@/src/actions/trajectory.service';
 import { TrajectoryWrapper } from '@/src/app/trajectories/components/TrajectoryWrapper';
@@ -20,6 +21,7 @@ export default async function TrajectoryPage({ params }: TrajectoryPageProps) {
   const currentDTWMetrics = await getDTWMetricsById(params.id);
   const currentDTWJohnenMetrics = await getDTWJohnenMetricsById(params.id);
   const currentDFDMetrics = await getDFDMetricsById(params.id);
+  const currentLCSSMetrics = await getLCSSMetricsById(params.id);
 
   return (
     <TrajectoryWrapper
@@ -28,6 +30,7 @@ export default async function TrajectoryPage({ params }: TrajectoryPageProps) {
       currentEuclideanMetrics={json(currentEuclideanMetrics)}
       currentDTWJohnenMetrics={json(currentDTWJohnenMetrics)}
       currentDFDMetrics={json(currentDFDMetrics)}
+      currentLCSSMetrics={json(currentLCSSMetrics)}
     />
   );
 }

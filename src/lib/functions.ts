@@ -26,7 +26,20 @@ export const isDateString = (value: unknown) => {
   return regex.test(value as string);
 };
 
-export const formatNumber = (num: number) => {
+export const formatNumber = (
+  num: number | null | undefined | unknown,
+): string | number => {
+  if (
+    num === undefined ||
+    num === null ||
+    Array.isArray(num) ||
+    Number.isNaN(num as number)
+  ) {
+    return '-'; // or return an empty string '' if you prefer
+  }
+  if (typeof num !== 'number') {
+    return '-';
+  }
   if (Number.isInteger(num)) {
     return num;
   }

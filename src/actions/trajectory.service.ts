@@ -8,6 +8,7 @@ import {
   transformDTWJohnenMetricResult,
   transformDTWMetricResult,
   transformEuclideanMetricResult,
+  transformLCSSMetricResult,
   transformTrajectoriesDataResult,
   transformTrajectoriesHeadersResult,
   transformTrajectoryResult,
@@ -24,6 +25,8 @@ import type {
   TrajectoryEuclideanMetrics,
   TrajectoryEuclideanMetricsRaw,
   TrajectoryHeaderRaw,
+  TrajectoryLCSSMetrics,
+  TrajectoryLCSSMetricsRaw,
 } from '@/types/main';
 
 export const getTrajectoriesHeader = async () => {
@@ -146,4 +149,23 @@ export const getDFDMetricsById = async (id: string) => {
 
   revalidatePath('/trajectories');
   return transformDFDMetricResult(dfdMetricsResult);
+};
+
+export const getLCSSMetricsById = async (id: string) => {
+  const mongo = await getMongoDb();
+
+  const lcssMetricsResult = await mongo
+    .collection('metrics')
+    .find<TrajectoryLCSSMetricsRaw>({
+      trajectory_header_id: id,
+      metric_type: 'lcss',
+    })
+    .next();
+
+  if (!lcssMetricsResult) {
+    return {} as TrajectoryLCSSMetrics;
+  }
+
+  revalidatePath('/trajectories');
+  return transformLCSSMetricResult(lcssMetricsResult);
 };

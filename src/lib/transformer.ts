@@ -11,6 +11,8 @@ import type {
   TrajectoryEuclideanMetricsRaw,
   TrajectoryHeader,
   TrajectoryHeaderRaw,
+  TrajectoryLCSSMetrics,
+  TrajectoryLCSSMetricsRaw,
 } from '@/types/main';
 
 export const transformTrajectoryResult = (
@@ -97,6 +99,23 @@ export const transformDFDMetricResult = (
   metricType: trajectoryRaw.metric_type,
 });
 
+export const transformLCSSMetricResult = (
+  trajectoryRaw: TrajectoryLCSSMetricsRaw,
+): TrajectoryLCSSMetrics => ({
+  _id: trajectoryRaw._id,
+  trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
+  lcssMaxDistance: trajectoryRaw.lcss_max_distance,
+  lcssAverageDistance: trajectoryRaw.lcss_average_distance,
+  lcssDistances: trajectoryRaw.lcss_distances,
+  lcssAccDist: trajectoryRaw.lcss_accdist,
+  lcssPath: trajectoryRaw.lcss_path,
+  lcssX: trajectoryRaw.lcss_X,
+  lcssY: trajectoryRaw.lcss_Y,
+  lcssScore: trajectoryRaw.lcss_score,
+  lcssThreshold: trajectoryRaw.lcss_threshold,
+  metricType: trajectoryRaw.metric_type,
+});
+
 export const transformTrajectoriesDataResult = (
   trajectoriesDataRaw: TrajectoryDataRaw[],
 ): TrajectoryData[] => {
@@ -147,6 +166,8 @@ export const transformTrajectoriesHeadersResult = (
       numberPointsSoll: trajectory.number_of_points_soll,
       SampleFrequencyIst: trajectory.sample_frequency_ist,
       SampleFrequencySoll: trajectory.sample_frequency_soll,
+      SourceDataIst: trajectory.source_data_ist,
+      SourceDataSoll: trajectory.source_data_soll,
     }),
   );
 };
@@ -218,6 +239,27 @@ export const transformTrajectoriesDFDMetricsResult = (
       dfdDistances: trajectory.frechet_distances,
       dfdAccDist: trajectory.frechet_accdist,
       dfdPath: trajectory.frechet_path,
+      metricType: trajectory.metric_type,
+    }),
+  );
+};
+
+export const transformTrajectoriesLCSSMetricsResult = (
+  trajectoriesLCSSMetricsRaw: TrajectoryLCSSMetricsRaw[],
+): TrajectoryLCSSMetrics[] => {
+  return trajectoriesLCSSMetricsRaw.map(
+    (trajectory): TrajectoryLCSSMetrics => ({
+      _id: trajectory._id,
+      trajectoryHeaderId: trajectory.trajectory_header_id,
+      lcssMaxDistance: trajectory.lcss_max_distance,
+      lcssAverageDistance: trajectory.lcss_average_distance,
+      lcssDistances: trajectory.lcss_distances,
+      lcssAccDist: trajectory.lcss_accdist,
+      lcssPath: trajectory.lcss_path,
+      lcssX: trajectory.lcss_X,
+      lcssY: trajectory.lcss_Y,
+      lcssScore: trajectory.lcss_score,
+      lcssThreshold: trajectory.lcss_threshold,
       metricType: trajectory.metric_type,
     }),
   );

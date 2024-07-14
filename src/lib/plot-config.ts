@@ -103,7 +103,7 @@ export const plotLayout2DConfigVelocity: Partial<Layout> = {
     automargin: true,
     autorange: true,
     showgrid: true,
-    dtick: 1,
+    dtick: 0.5,
   },
   yaxis: {
     title: 'v [mm/s]',
@@ -153,7 +153,7 @@ export const plotLayout2DConfigAcceleration: Partial<Layout> = {
     automargin: true,
     autorange: true,
     showgrid: true,
-    dtick: 1,
+    dtick: 0.5,
   },
   yaxis: {
     title: 'a [mm²/s]',
@@ -166,7 +166,7 @@ export const plotLayout2DConfigAcceleration: Partial<Layout> = {
 
 export const plotLayout2DConfigEuclideanError: Partial<Layout> = {
   title: {
-    text: 'Error [Euclidean]',
+    text: 'Abw. [Euclidean]',
     font: {
       size: 15,
       family: 'Arial, sans-serif',
@@ -192,7 +192,7 @@ export const plotLayout2DConfigEuclideanError: Partial<Layout> = {
     automargin: true,
     autorange: true,
     showgrid: true,
-    dtick: 30,
+    dtick: 100,
   },
   yaxis: {
     title: 'e [mm]',
@@ -205,7 +205,7 @@ export const plotLayout2DConfigEuclideanError: Partial<Layout> = {
 
 export const plotLayout2DConfigDTWError: Partial<Layout> = {
   title: {
-    text: 'Error [DTW Standard]',
+    text: 'Abw. [DTW Standard]',
     font: {
       size: 15,
       family: 'Arial, sans-serif',
@@ -231,7 +231,7 @@ export const plotLayout2DConfigDTWError: Partial<Layout> = {
     automargin: true,
     autorange: true,
     showgrid: true,
-    dtick: 30,
+    dtick: 100,
   },
   yaxis: {
     title: 'e [mm]',
@@ -244,7 +244,7 @@ export const plotLayout2DConfigDTWError: Partial<Layout> = {
 
 export const plotLayout2DConfigDTWJohnenError: Partial<Layout> = {
   title: {
-    text: 'Error [DTW Johnen]',
+    text: 'Abw. [DTW Johnen]',
     font: {
       size: 15,
       family: 'Arial, sans-serif',
@@ -270,7 +270,7 @@ export const plotLayout2DConfigDTWJohnenError: Partial<Layout> = {
     automargin: true,
     autorange: true,
     showgrid: true,
-    dtick: 30,
+    dtick: 100,
   },
   yaxis: {
     title: 'e [mm]',
@@ -283,7 +283,7 @@ export const plotLayout2DConfigDTWJohnenError: Partial<Layout> = {
 
 export const plotLayout2DConfigDFDError: Partial<Layout> = {
   title: {
-    text: 'Error [DFD]',
+    text: 'Abw. [DFD]',
     font: {
       size: 15,
       family: 'Arial, sans-serif',
@@ -309,7 +309,46 @@ export const plotLayout2DConfigDFDError: Partial<Layout> = {
     automargin: true,
     autorange: true,
     showgrid: true,
-    dtick: 30,
+    dtick: 100,
+  },
+  yaxis: {
+    title: 'e [mm]',
+    automargin: true,
+    showgrid: true,
+    autorange: true,
+    ticksuffix: '  ',
+  },
+};
+
+export const plotLayout2DConfigLCSSError: Partial<Layout> = {
+  title: {
+    text: 'Abw. [LCSS]',
+    font: {
+      size: 15,
+      family: 'Arial, sans-serif',
+      color: 'black',
+    },
+  },
+  modebar: {
+    orientation: 'v',
+    color: '#E2E2E2',
+  },
+  margin: {
+    l: 30,
+    r: 30,
+    b: 20,
+    t: 50,
+    pad: 1,
+  },
+  showlegend: false,
+  width: 400,
+  height: 200,
+  xaxis: {
+    title: 'Punkte',
+    automargin: true,
+    autorange: true,
+    showgrid: true,
+    dtick: 100,
   },
   yaxis: {
     title: 'e [mm]',

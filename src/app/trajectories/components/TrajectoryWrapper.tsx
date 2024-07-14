@@ -11,6 +11,7 @@ import type {
   TrajectoryDTWJohnenMetrics,
   TrajectoryDTWMetrics,
   TrajectoryEuclideanMetrics,
+  TrajectoryLCSSMetrics,
 } from '@/types/main';
 
 type TrajectoryPageProps = {
@@ -19,6 +20,7 @@ type TrajectoryPageProps = {
   currentEuclideanMetrics: TrajectoryEuclideanMetrics;
   currentDTWJohnenMetrics: TrajectoryDTWJohnenMetrics;
   currentDFDMetrics: TrajectoryDFDMetrics;
+  currentLCSSMetrics: TrajectoryLCSSMetrics;
 };
 
 export function TrajectoryWrapper({
@@ -27,11 +29,13 @@ export function TrajectoryWrapper({
   currentDTWMetrics,
   currentDTWJohnenMetrics,
   currentDFDMetrics,
+  currentLCSSMetrics,
 }: TrajectoryPageProps) {
   const {
     setCurrentTrajectory,
     setCurrentEuclidean,
     setCurrentDTWJohnen,
+    setCurrentLCSS,
     setCurrentDTW,
     setCurrentDFD,
   } = useTrajectory();
@@ -42,6 +46,7 @@ export function TrajectoryWrapper({
     setCurrentEuclidean(currentEuclideanMetrics);
     setCurrentDTWJohnen(currentDTWJohnenMetrics);
     setCurrentDFD(currentDFDMetrics);
+    setCurrentLCSS(currentLCSSMetrics);
   }, []);
 
   return (

@@ -67,6 +67,8 @@ export interface TrajectoryHeaderRaw {
   number_of_points_soll: number;
   sample_frequency_ist: number;
   sample_frequency_soll: number;
+  source_data_ist: string;
+  source_data_soll: string;
 }
 
 export interface TrajectoryHeader {
@@ -83,6 +85,8 @@ export interface TrajectoryHeader {
   numberPointsSoll: number;
   SampleFrequencyIst: number;
   SampleFrequencySoll: number;
+  SourceDataIst: string;
+  SourceDataSoll: string;
 }
 
 export interface TrajectoryEuclideanMetricsRaw {
@@ -178,5 +182,35 @@ export interface TrajectoryDFDMetrics {
   dfdDistances: number[];
   dfdAccDist: number[];
   dfdPath: number[];
+  metricType: string;
+}
+
+export interface TrajectoryLCSSMetricsRaw {
+  _id: ObjectId | string;
+  trajectory_header_id: string;
+  lcss_max_distance: number;
+  lcss_average_distance: number;
+  lcss_distances: number[];
+  lcss_X: number[];
+  lcss_Y: number[];
+  lcss_accdist: number[];
+  lcss_path: number[];
+  lcss_score: number;
+  lcss_threshold: number;
+  metric_type: string;
+}
+
+export interface TrajectoryLCSSMetrics {
+  _id: ObjectId | string;
+  trajectoryHeaderId: string;
+  lcssMaxDistance: number;
+  lcssAverageDistance: number;
+  lcssDistances: number[];
+  lcssX: number[];
+  lcssY: number[];
+  lcssAccDist: number[];
+  lcssPath: number[];
+  lcssScore: number;
+  lcssThreshold: number;
   metricType: string;
 }

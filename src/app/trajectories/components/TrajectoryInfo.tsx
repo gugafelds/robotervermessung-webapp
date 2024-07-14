@@ -17,6 +17,7 @@ export const TrajectoryInfo = () => {
     currentDTWJohnen,
     currentEuclidean,
     currentDFD,
+    currentLCSS,
   } = useTrajectory();
 
   const searchedIndex = currentTrajectory.trajectoryHeaderId;
@@ -36,6 +37,44 @@ export const TrajectoryInfo = () => {
   }
   const currentTrajectoryHeader = trajectoriesHeader[currentTrajectoryID];
 
+  const metricGroups = [
+    {
+      title: 'Euklidischer Abst.',
+      data: currentEuclidean,
+      max: 'euclideanMaxDistance',
+      avg: 'euclideanAverageDistance',
+      errorMsg: 'Keine euklidischen Metriken.',
+    },
+    {
+      title: 'DTW',
+      data: currentDTW,
+      max: 'dtwMaxDistance',
+      avg: 'dtwAverageDistance',
+      errorMsg: 'Keine DTW-Standardmetriken.',
+    },
+    {
+      title: 'DTW-SI',
+      data: currentDTWJohnen,
+      max: 'dtwJohnenMaxDistance',
+      avg: 'dtwJohnenAverageDistance',
+      errorMsg: 'Keine DTW-Johnen-Metriken.',
+    },
+    {
+      title: 'Diskr. Fréchet',
+      data: currentDFD,
+      max: 'dfdMaxDistance',
+      avg: 'dfdAverageDistance',
+      errorMsg: 'Keine DFD-Metriken.',
+    },
+    {
+      title: 'LCSS',
+      data: currentLCSS,
+      max: 'lcssMaxDistance',
+      avg: 'lcssAverageDistance',
+      errorMsg: 'Keine LCSS-Metriken.',
+    },
+  ];
+
   return (
     <div className="flex h-full w-auto flex-col bg-gray-50 p-2 lg:h-fullscreen lg:w-3/12 lg:overflow-scroll">
       <span className="inline-flex">
@@ -51,13 +90,13 @@ export const TrajectoryInfo = () => {
             <li className="px-4 text-lg font-bold text-primary">
               {`Roboter Modell:`}{' '}
               <span className="text-lg font-light text-primary">
-                {`${currentTrajectoryHeader.robotModel || 'Keine'}`}
+                {`${currentTrajectoryHeader.robotModel || 'n. a.'}`}
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">
               {`Trajektorie Typ:`}{' '}
               <span className="text-lg font-light text-primary">
-                {`${currentTrajectoryHeader.trajectoryType || 'Keine'}`}
+                {`${currentTrajectoryHeader.trajectoryType || 'n. a.'}`}
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">
@@ -65,149 +104,90 @@ export const TrajectoryInfo = () => {
               <span className="text-lg font-light text-primary">
                 {isDateString(currentTrajectoryHeader.recordingDate)
                   ? formatDate(currentTrajectoryHeader.recordingDate)
-                  : 'Keine'}
+                  : 'n. a.'}
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">
               {`Echter Roboter:`}{' '}
               <span className="text-lg font-light text-primary">
-                {`${currentTrajectoryHeader.realRobot || 'Keine'}`}
+                {`${currentTrajectoryHeader.realRobot || 'n. a.'}`}
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">
               {`Bahnplanung:`}{' '}
               <span className="text-lg font-light text-primary">
-                {`${currentTrajectoryHeader.pathSolver || 'Keine'}`}
+                {`${currentTrajectoryHeader.pathSolver || 'n. a.'}`}
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">
               {`Anzahl der Punkte (Ist):`}{' '}
               <span className="text-lg font-light text-primary">
-                {`${formatNumber(currentTrajectoryHeader.numberPointsIst) || 'Keine'}`}
+                {`${formatNumber(currentTrajectoryHeader.numberPointsIst) || 'n. a.'}`}
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">
               {`Anzahl der Punkte (Soll):`}{' '}
               <span className="text-lg font-light text-primary">
-                {`${formatNumber(currentTrajectoryHeader.numberPointsSoll) || 'Keine'}`}
+                {`${formatNumber(currentTrajectoryHeader.numberPointsSoll) || 'n. a.'}`}
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">
               {`Abtastrate (Ist):`}{' '}
               <span className="text-lg font-light text-primary">
-                {`${formatNumber(currentTrajectoryHeader.SampleFrequencyIst) || 'Keine'}`}
+                {`${formatNumber(currentTrajectoryHeader.SampleFrequencyIst) || 'n. a.'}`}
+              </span>
+            </li>
+            <li className="px-4 text-lg font-bold text-primary">
+              {`Abtastrate (Soll):`}{' '}
+              <span className="text-lg font-light text-primary">
+                {`${formatNumber(currentTrajectoryHeader.SampleFrequencySoll) || 'n. a.'}`}
+              </span>
+            </li>
+            <li className="px-4 text-lg font-bold text-primary">
+              {`Datenquelle (Ist):`}{' '}
+              <span className="text-lg font-light text-primary">
+                {`${currentTrajectoryHeader.SourceDataIst || 'n. a.'}`}
               </span>
             </li>
             <li className="mb-2 px-4 text-lg font-bold text-primary">
-              {`Abtastrate (Soll):`}{' '}
+              {`Datenquelle (Soll):`}{' '}
               <span className="text-lg font-light text-primary">
-                {`${formatNumber(currentTrajectoryHeader.SampleFrequencySoll) || 'Keine'}`}
+                {`${currentTrajectoryHeader.SourceDataSoll || 'n. a.'}`}
               </span>
             </li>
           </ul>
         )}
 
-      <hr className="m-2 border-t border-gray-300" />
-
-      {currentEuclidean && Object.keys(currentEuclidean).length !== 0 ? (
-        <ul className="mb-2">
-          <li className="px-6 text-lg font-bold text-primary">
-            Euklidischer Abstand
-          </li>
-          <li className="px-6 text-lg font-semibold text-primary">
-            {`Max.:`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${(currentEuclidean.euclideanMaxDistance * 1000).toFixed(5)} mm`}
-            </span>
-          </li>
-          <li className="px-6 text-lg font-semibold text-primary">
-            {`Ø:`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${(currentEuclidean.euclideanAverageDistance * 1000).toFixed(5)} mm`}
-            </span>
-          </li>
-        </ul>
-      ) : (
-        <ul className="mb-4 px-6 text-lg font-light text-primary">
-          Keine euklidischen Metriken für diese Trajektorie.
-        </ul>
-      )}
-
-      <hr className="m-2 border-t border-gray-300" />
-
-      {currentDTW && Object.keys(currentDTW).length !== 0 ? (
-        <ul className="mb-2">
-          <li className="px-6 text-lg font-bold text-primary">DTW</li>
-          <li className="px-6 text-lg font-semibold text-primary">
-            {`Max.:`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${(currentDTW.dtwMaxDistance * 1000).toFixed(5)} mm`}
-            </span>
-          </li>
-          <li className="px-6 text-lg font-semibold text-primary">
-            {`Ø:`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${(currentDTW.dtwAverageDistance * 1000).toFixed(5)} mm`}
-            </span>
-          </li>
-        </ul>
-      ) : (
-        <ul className="mb-4 px-6 text-lg font-light text-primary">
-          Keine DTW-Standardmetriken für diese Trajektorie.
-        </ul>
-      )}
-
-      <hr className="m-2 border-t border-gray-300" />
-
-      {currentDTWJohnen && Object.keys(currentDTWJohnen).length !== 0 ? (
-        <ul className="mb-2">
-          <li className="px-6 text-lg font-bold text-primary">DTW-Johnen</li>
-          <li className="px-6 text-lg font-semibold text-primary">
-            {`Max.:`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${(currentDTWJohnen.dtwJohnenMaxDistance * 1000).toFixed(5)} mm`}
-            </span>
-          </li>
-          <li className="px-6 text-lg font-semibold text-primary">
-            {`Ø:`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${(currentDTWJohnen.dtwJohnenAverageDistance * 1000).toFixed(5)} mm`}
-            </span>
-          </li>
-        </ul>
-      ) : (
-        <ul className="mb-4 px-6 text-lg font-light text-primary">
-          Keine DTW-Johnen-Metriken für diese Trajektorie.
-        </ul>
-      )}
-
-      <hr className="m-2 border-t border-gray-300" />
-
-      {currentDFD && Object.keys(currentDFD).length !== 0 ? (
-        <ul className="mb-2">
-          <li className="px-6 text-lg font-bold text-primary">
-            Diskrete Fréchet-Distanz
-          </li>
-          <li className="px-6 text-lg font-semibold text-primary">
-            {`Max.:`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${(currentDFD.dfdMaxDistance * 1000).toFixed(5)} mm`}
-            </span>
-          </li>
-          <li className="px-6 text-lg font-semibold text-primary">
-            {`Ø:`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${(currentDFD.dfdAverageDistance * 1000).toFixed(5)} mm`}
-            </span>
-          </li>
-        </ul>
-      ) : (
-        <ul className="mb-4 px-6 text-lg font-light text-primary">
-          Keine DFD-Metriken für diese Trajektorie.
-        </ul>
-      )}
-
-      <hr className="m-2 border-t border-gray-300" />
+      <div className="grid grid-cols-2 gap-2">
+        {metricGroups.map((metric) => (
+          <div key={metric.title}>
+            <hr className="m-2 border-t border-gray-300" />
+            {metric.data && Object.keys(metric.data).length !== 0 ? (
+              <ul className="mb-1">
+                <li className="px-6 text-base font-bold text-primary">
+                  {metric.title}
+                </li>
+                <li className="px-6 text-base font-semibold text-primary">
+                  {`Max.:`}{' '}
+                  <span className="text-base font-normal text-primary">
+                    {`${(metric.data[metric.max] * 1000).toFixed(3)} mm`}
+                  </span>
+                </li>
+                <li className="px-6 text-base font-semibold text-primary">
+                  {`Ø:`}{' '}
+                  <span className="text-base font-normal text-primary">
+                    {`${(metric.data[metric.avg] * 1000).toFixed(3)} mm`}
+                  </span>
+                </li>
+              </ul>
+            ) : (
+              <ul className="mb-4 px-6 text-base font-extralight text-primary">
+                {metric.errorMsg}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
 
       <TrajectoryOptions />
     </div>

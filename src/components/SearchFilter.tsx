@@ -18,7 +18,7 @@ const SearchFilter: React.FC<SearchFilterProps> = ({ onFilterChange }) => {
     <div>
       <input
         type="text"
-        placeholder="filter trajectories"
+        placeholder="trajektorien filtern"
         value={filter}
         onChange={handleChange}
         className="mt-3 h-10 w-full rounded-xl bg-gray-50 p-4 ps-4 text-lg font-extralight shadow-md"

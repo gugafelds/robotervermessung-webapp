@@ -38,7 +38,7 @@ export const Sidebar = () => {
           <div className={classNames('flex items-end gap-4 pl-1')}>
             <LogoIcon width={30} color="#003560" />
             <span className="mt-2 text-2xl font-semibold text-primary">
-              trajectories
+              trajektorien
             </span>
           </div>
         </div>
