@@ -23,11 +23,11 @@ export const ContactCard = () => {
       </div>
       <div className="flex flex-row sm:ml-auto">
         <Link
-          className="items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300"
+          className="items-center rounded-bl-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300"
           href="https://www.lps.ruhr-uni-bochum.de/lps/profil/team/gustavobarros.html.de"
         >
           <Image
-            className="m-2"
+            className="m-2 w-auto"
             src="/lps.png"
             width={60}
             height={60}
@@ -35,11 +35,11 @@ export const ContactCard = () => {
           />
         </Link>
         <Link
-          className="items-center rounded-md p-1 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300"
+          className="items-center p-1 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300"
           href="https://github.com/gugafelds"
         >
           <Image
-            className="m-2"
+            className="m-2 w-auto"
             src="/github.png"
             width={35}
             height={30}

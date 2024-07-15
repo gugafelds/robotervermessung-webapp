@@ -6,7 +6,7 @@ import { Typography } from '@/src/components/Typography';
 
 export const ProjectInfo = () => {
   return (
-    <section className="mx-auto mt-8 max-w-xl text-pretty px-8 md:max-w-2xl xl:max-w-4xl">
+    <section className="mx-auto mb-12 mt-8 max-w-xl text-pretty px-8 md:max-w-2xl xl:max-w-4xl">
       <div className="mb-2 flex flex-col gap-3">
         <Typography as="h1">projektinfo</Typography>
         <Typography as="h2">
@@ -35,6 +35,8 @@ export const ProjectInfo = () => {
         <Typography as="p" className="mt-4">
           Das Projekt hat im September 2023 gestartet und umfasst vier
           Meilensteine:
+        </Typography>
+        <ul>
           <li className="mt-4">
             Entwicklung einer Methode für den Vergleich von Robotertrajektorien
             unter Berücksichtigung von Abweichungen in der Position, der
@@ -57,7 +59,7 @@ export const ProjectInfo = () => {
             Algorithmen zur autonomen Messung sowie Speicherung und
             Bereitstellung der Messdaten
           </li>
-        </Typography>
+        </ul>
         <Typography as="p" className="mt-5">
           Diese Webseite dient als Remote-Anwendung mit direkter Visualisierung
           der Daten, die in der MongoDB-Datenbank gespeichert sind.
