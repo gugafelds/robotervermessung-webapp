@@ -36,30 +36,30 @@ export const ProjectInfo = () => {
           Das Projekt hat im September 2023 gestartet und umfasst vier
           Meilensteine:
         </Typography>
-        <ul>
-          <li className="mt-4">
+        <div className="mx-6 font-light text-primary">
+          <li>
             Entwicklung einer Methode für den Vergleich von Robotertrajektorien
             unter Berücksichtigung von Abweichungen in der Position, der
             Orientierung, der Geschwindigkeit und der Beschleunigung bei
             verschiedenen Konfigurationen von Roboterarmen und unterschiedlichen
             Abtastraten.
           </li>
-          <li className="mt-2">
+          <li>
             Aufbau einer Datenbank zur Speicherung und Bereitstellung von
             Transaktionsdaten mit Schwerpunkt auf schnellem Datenzugriff und der
             Möglichkeit, nach Teilsequenzen zu suchen.
           </li>
-          <li className="mt-2">
+          <li>
             Entwicklung einer Methode zur sequentiellen Versuchsplanung für
             Roboterbahnmessungen, einschließlich der automatischen Generierung
             von Roboterprogrammen für autonome Messungen.
           </li>
-          <li className="mt-2">
+          <li>
             Erfolgreiche Datengenerierung für die entwickelten Methoden und
             Algorithmen zur autonomen Messung sowie Speicherung und
             Bereitstellung der Messdaten
           </li>
-        </ul>
+        </div>
         <Typography as="p" className="mt-5">
           Diese Webseite dient als Remote-Anwendung mit direkter Visualisierung
           der Daten, die in der MongoDB-Datenbank gespeichert sind.
