@@ -94,12 +94,6 @@ export const TrajectoryInfo = () => {
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">
-              {`Trajektorie Typ:`}{' '}
-              <span className="text-lg font-light text-primary">
-                {`${currentTrajectoryHeader.trajectoryType || 'n. a.'}`}
-              </span>
-            </li>
-            <li className="px-4 text-lg font-bold text-primary">
               {`Aufnahmedatum:`}{' '}
               <span className="text-lg font-light text-primary">
                 {isDateString(currentTrajectoryHeader.recordingDate)

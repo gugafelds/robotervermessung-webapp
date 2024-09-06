@@ -12,6 +12,8 @@
     "@headlessui/react": "^1.7.10",
     "@hello-pangea/dnd": "^16.5.0",
     "@heroicons/react": "^2.0.15",
+    "@react-three/drei": "^9.112.0",
+    "@react-three/fiber": "^8.17.6",
     "@serwist/next": "^8.4.4",
     "@serwist/precaching": "^8.4.4",
     "@serwist/sw": "^8.4.4",
@@ -21,6 +23,7 @@
     "axios": "^1.6.8",
     "buffer": "^6.0.3",
     "classnames": "^2.5.1",
+    "dotenv": "^16.4.5",
     "export-to-csv": "^1.2.4",
     "global-require": "^0.0.1",
     "graceful-fs": "^4.2.11",
@@ -35,7 +38,10 @@
     "react-native": "^0.73.6",
     "react-plotly.js": "^2.6.0",
     "react-table": "^7.8.0",
+    "ros3d": "^0.17.0",
+    "roslib": "^1.4.1",
     "stream-browserify": "^3.0.0",
+    "three": "^0.168.0",
     "url": "^0.11.3"
   },
   "devDependencies": {
