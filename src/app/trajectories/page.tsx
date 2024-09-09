@@ -8,6 +8,7 @@ export default function TrajectoriesPage() {
   const {
     trajectoriesHeader: [{ dataId }],
   } = useTrajectory();
+  
 
   return redirect(`/trajectories/${dataId}`);
 }

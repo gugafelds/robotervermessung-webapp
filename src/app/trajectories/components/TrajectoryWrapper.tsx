@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 
 import { TrajectoryInfo } from '@/src/app/trajectories/components/TrajectoryInfo';
+import { SegmentInfo } from '@/src/app/trajectories/components/SegmentInfo';
 import { TrajectoryPlot } from '@/src/app/trajectories/components/TrajectoryPlot';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 import type {
@@ -49,9 +50,11 @@ export function TrajectoryWrapper({
     setCurrentLCSS(currentLCSSMetrics);
   }, []);
 
+  const isSegment = currentTrajectory.segmentId && currentTrajectory.segmentId.includes('_');
+  
   return (
     <>
-      <TrajectoryInfo />
+      {isSegment ? <SegmentInfo /> : <TrajectoryInfo />}
       <TrajectoryPlot />
     </>
   );

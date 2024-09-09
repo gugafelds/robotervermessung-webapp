@@ -12,6 +12,7 @@ import {
   transformTrajectoriesDataResult,
   transformTrajectoriesHeadersResult,
   transformTrajectoryResult,
+  transformSegmentsHeadersResult,
 } from '@/src/lib/transformer';
 import type {
   TrajectoryData,
@@ -27,9 +28,11 @@ import type {
   TrajectoryHeaderRaw,
   TrajectoryLCSSMetrics,
   TrajectoryLCSSMetricsRaw,
+  SegmentHeaderRaw,
 } from '@/types/main';
 
 export const getTrajectoriesHeader = async () => {
+<<<<<<< HEAD
   const mongo = await getMongoDb();
 
   const trajectoriesHeaderResult = await mongo
@@ -37,9 +40,23 @@ export const getTrajectoriesHeader = async () => {
     .find<TrajectoryHeaderRaw>({})
     .sort({ recording_date: -1 })
     .toArray();
+=======
+  const trajectoriesHeaderResult = await queryPostgres<TrajectoryHeaderRaw>(
+    'SELECT * FROM trajectories.trajectories_header ORDER BY start_time DESC',
+  );
+>>>>>>> 99b4cb8 (segments included)
 
   revalidatePath('/trajectories');
   return transformTrajectoriesHeadersResult(trajectoriesHeaderResult);
+};
+
+export const getSegmentsHeader = async () => {
+  const segmentsHeaderResult = await queryPostgres<SegmentHeaderRaw>(
+    'SELECT * FROM trajectories.trajectories_header_segments ORDER BY end_time DESC',
+  );
+
+  revalidatePath('/trajectories');
+  return transformSegmentsHeadersResult(segmentsHeaderResult);
 };
 
 export const getTrajectoriesData = async () => {
@@ -60,12 +77,21 @@ export const getTrajectoriesData = async () => {
 };
 
 export const getTrajectoryById = async (id: string) => {
+<<<<<<< HEAD
   const mongo = await getMongoDb();
 
   const trajectoryResult = await mongo
     .collection('data')
     .find<TrajectoryDataRaw>({ trajectory_header_id: id })
     .next();
+=======
+  const isSegment = id.includes('_');
+  const query = isSegment
+    ? 'SELECT * FROM trajectories.trajectories_data WHERE segment_id = $1'
+    : 'SELECT * FROM trajectories.trajectories_data WHERE trajectory_header_id = $1';
+
+  const [trajectoryResult] = await queryPostgres<TrajectoryDataRaw>(query, [id]);
+>>>>>>> 99b4cb8 (segments included)
 
   if (!trajectoryResult) {
     return {} as TrajectoryData;
@@ -76,6 +102,7 @@ export const getTrajectoryById = async (id: string) => {
 };
 
 export const getEuclideanMetricsById = async (id: string) => {
+<<<<<<< HEAD
   const mongo = await getMongoDb();
 
   const euclideanMetricsResult = await mongo
@@ -85,6 +112,17 @@ export const getEuclideanMetricsById = async (id: string) => {
       metric_type: 'euclidean',
     })
     .next();
+=======
+  const isSegment = id.includes('_');
+  const query = isSegment
+    ? 'SELECT * FROM trajectories.trajectories_metrics_euclidean WHERE segment_id = $1'
+    : 'SELECT * FROM trajectories.trajectories_metrics_euclidean WHERE trajectory_header_id = $1';
+  
+  const [euclideanMetricsResult] =
+    await queryPostgres<TrajectoryEuclideanMetricsRaw>(
+      query
+      ,[id]);
+>>>>>>> 99b4cb8 (segments included)
 
   if (!euclideanMetricsResult) {
     return {} as TrajectoryEuclideanMetrics;
@@ -95,6 +133,7 @@ export const getEuclideanMetricsById = async (id: string) => {
 };
 
 export const getDTWJohnenMetricsById = async (id: string) => {
+<<<<<<< HEAD
   const mongo = await getMongoDb();
 
   const dtwJohnenMetricsResult = await mongo
@@ -104,6 +143,17 @@ export const getDTWJohnenMetricsById = async (id: string) => {
       metric_type: 'dtw_johnen',
     })
     .next();
+=======
+  const isSegment = id.includes('_');
+  const query = isSegment
+    ? 'SELECT * FROM trajectories.trajectories_metrics_dtw_johnen WHERE segment_id = $1'
+    : 'SELECT * FROM trajectories.trajectories_metrics_dtw_johnen WHERE trajectory_header_id = $1';
+  
+  const [dtwJohnenMetricsResult] = await queryPostgres<TrajectoryDTWJohnenMetricsRaw>(
+    query,
+    [id],
+  );
+>>>>>>> 99b4cb8 (segments included)
 
   if (!dtwJohnenMetricsResult) {
     return {} as TrajectoryDTWJohnenMetrics;
@@ -114,6 +164,7 @@ export const getDTWJohnenMetricsById = async (id: string) => {
 };
 
 export const getDTWMetricsById = async (id: string) => {
+<<<<<<< HEAD
   const mongo = await getMongoDb();
 
   const dtwMetricsResult = await mongo
@@ -123,6 +174,17 @@ export const getDTWMetricsById = async (id: string) => {
       metric_type: 'dtw_standard',
     })
     .next();
+=======
+  const isSegment = id.includes('_');
+  const query = isSegment
+    ? 'SELECT * FROM trajectories.trajectories_metrics_dtw_standard WHERE segment_id = $1'
+    : 'SELECT * FROM trajectories.trajectories_metrics_dtw_standard WHERE trajectory_header_id = $1';
+  
+  const [dtwMetricsResult] = await queryPostgres<TrajectoryDTWMetricsRaw>(
+    query,
+    [id],
+  );
+>>>>>>> 99b4cb8 (segments included)
 
   if (!dtwMetricsResult) {
     return {} as TrajectoryDTWMetrics;
@@ -133,6 +195,7 @@ export const getDTWMetricsById = async (id: string) => {
 };
 
 export const getDFDMetricsById = async (id: string) => {
+<<<<<<< HEAD
   const mongo = await getMongoDb();
 
   const dfdMetricsResult = await mongo
@@ -142,6 +205,17 @@ export const getDFDMetricsById = async (id: string) => {
       metric_type: 'discrete_frechet',
     })
     .next();
+=======
+  const isSegment = id.includes('_');
+  const query = isSegment
+    ? 'SELECT * FROM trajectories.trajectories_metrics_discrete_frechet WHERE segment_id = $1'
+    : 'SELECT * FROM trajectories.trajectories_metrics_discrete_frechet WHERE trajectory_header_id = $1';
+  
+  const [dfdMetricsResult] = await queryPostgres<TrajectoryDFDMetricsRaw>(
+    query,
+    [id],
+  );
+>>>>>>> 99b4cb8 (segments included)
 
   if (!dfdMetricsResult) {
     return {} as TrajectoryDFDMetrics;
@@ -152,6 +226,7 @@ export const getDFDMetricsById = async (id: string) => {
 };
 
 export const getLCSSMetricsById = async (id: string) => {
+<<<<<<< HEAD
   const mongo = await getMongoDb();
 
   const lcssMetricsResult = await mongo
@@ -161,6 +236,17 @@ export const getLCSSMetricsById = async (id: string) => {
       metric_type: 'lcss',
     })
     .next();
+=======
+  const isSegment = id.includes('_');
+  const query = isSegment
+    ? 'SELECT * FROM trajectories.trajectories_metrics_lcss WHERE segment_id = $1'
+    : 'SELECT * FROM trajectories.trajectories_metrics_lcss WHERE trajectory_header_id = $1';
+  
+  const [lcssMetricsResult] = await queryPostgres<TrajectoryLCSSMetricsRaw>(
+    query,
+    [id],
+  );
+>>>>>>> 99b4cb8 (segments included)
 
   if (!lcssMetricsResult) {
     return {} as TrajectoryLCSSMetrics;

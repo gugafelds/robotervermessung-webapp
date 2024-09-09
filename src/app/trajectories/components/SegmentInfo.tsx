@@ -6,12 +6,11 @@ import React from 'react';
 
 import { TrajectoryOptions } from '@/src/app/trajectories/components/TrajectoryOptions/TrajectoryOptions';
 import { Typography } from '@/src/components/Typography';
-import { formatDate, formatNumber, isDateString } from '@/src/lib/functions';
+import { formatDate, formatNumber } from '@/src/lib/functions';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 
-export const TrajectoryInfo = () => {
+export const SegmentInfo = () => {
   const {
-    trajectoriesHeader,
     segmentsHeader,
     currentTrajectory,
     currentDTW,
@@ -21,9 +20,9 @@ export const TrajectoryInfo = () => {
     currentLCSS,
   } = useTrajectory();
 
-  const searchedIndex = currentTrajectory.trajectoryHeaderId;
-  const currentTrajectoryID = trajectoriesHeader.findIndex(
-    (item) => item.dataId === searchedIndex,
+  const searchedIndex = currentTrajectory.segmentId;
+  const currentTrajectoryID = segmentsHeader.findIndex(
+    (item) => item.segmentId === searchedIndex,
   );
 
   if (currentTrajectoryID === -1) {
@@ -37,10 +36,7 @@ export const TrajectoryInfo = () => {
     );
   }
 
-  const isSegment = searchedIndex.includes('_');
-  const headerToUse = isSegment ? segmentsHeader : trajectoriesHeader;
-
-  const currentTrajectoryHeader = trajectoriesHeader[currentTrajectoryID];
+  const currentTrajectoryHeader = segmentsHeader[currentTrajectoryID];
 
   const metricGroups = [
     {
@@ -93,21 +89,9 @@ export const TrajectoryInfo = () => {
         Object.keys(currentTrajectoryHeader).length !== 0 && (
           <ul>
             <li className="px-4 text-lg font-bold text-primary">
-              {`Roboter Modell:`}{' '}
-              <span className="text-lg font-light text-primary">
-                {`${currentTrajectoryHeader.robotModel || 'n. a.'}`}
-              </span>
-            </li>
-            <li className="px-4 text-lg font-bold text-primary">
               {`Startzeitpunkt:`}{' '}
               <span className="text-lg font-light text-primary">
-<<<<<<< HEAD
-                {isDateString(currentTrajectoryHeader.recordingDate)
-                  ? formatDate(currentTrajectoryHeader.recordingDate)
-                  : 'n. a.'}
-=======
                 {`${currentTrajectoryHeader.startTime ? formatDate(currentTrajectoryHeader.startTime) : 'n. a.'}`}
->>>>>>> 99b4cb8 (segments included)
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">
@@ -138,18 +122,6 @@ export const TrajectoryInfo = () => {
               {`Abtastrate (Soll):`}{' '}
               <span className="text-lg font-light text-primary">
                 {`${formatNumber(currentTrajectoryHeader.SampleFrequencySoll) || 'n. a.'}`}
-              </span>
-            </li>
-            <li className="px-4 text-lg font-bold text-primary">
-              {`Datenquelle (Ist):`}{' '}
-              <span className="text-lg font-light text-primary">
-                {`${currentTrajectoryHeader.SourceDataIst || 'n. a.'}`}
-              </span>
-            </li>
-            <li className="mb-2 px-4 text-lg font-bold text-primary">
-              {`Datenquelle (Soll):`}{' '}
-              <span className="text-lg font-light text-primary">
-                {`${currentTrajectoryHeader.SourceDataSoll || 'n. a.'}`}
               </span>
             </li>
           </ul>

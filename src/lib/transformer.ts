@@ -1,4 +1,6 @@
 import type {
+  SegmentHeader,
+  SegmentHeaderRaw,
   TrajectoryData,
   TrajectoryDataRaw,
   TrajectoryDFDMetrics,
@@ -41,6 +43,7 @@ export const transformTrajectoryResult = (
   q4Soll: trajectoryRaw.q4_soll,
   tcpVelocitySoll: trajectoryRaw.tcp_velocity_soll,
   jointStateSoll: trajectoryRaw.joint_state_soll,
+  segmentId: trajectoryRaw.segment_id,
 });
 
 export const transformEuclideanMetricResult = (
@@ -144,6 +147,7 @@ export const transformTrajectoriesDataResult = (
       q4Soll: trajectoryRaw.q4_soll,
       tcpVelocitySoll: trajectoryRaw.tcp_velocity_soll,
       jointStateSoll: trajectoryRaw.joint_state_soll,
+      segmentId: trajectoryRaw.segment_id,
     }),
   );
 };
@@ -168,6 +172,26 @@ export const transformTrajectoriesHeadersResult = (
       SampleFrequencySoll: trajectory.sample_frequency_soll,
       SourceDataIst: trajectory.source_data_ist,
       SourceDataSoll: trajectory.source_data_soll,
+      startTime: trajectory.start_time,
+      endTime: trajectory.end_time,
+    }),
+  );
+};
+
+export const transformSegmentsHeadersResult = (
+  trajectoriesRaw: SegmentHeaderRaw[],
+): SegmentHeader[] => {
+  return trajectoriesRaw.map(
+    (trajectory): SegmentHeader => ({
+      _id: trajectory._id,
+      trajectoryHeaderId: trajectory.trajectory_header_id,
+      segmentId: trajectory.segment_id,
+      startTime: trajectory.start_time,
+      endTime: trajectory.end_time,
+      numberPointsIst: trajectory.number_of_points_ist,
+      numberPointsSoll: trajectory.number_of_points_soll,
+      SampleFrequencyIst: trajectory.sample_frequency_ist,
+      SampleFrequencySoll: trajectory.sample_frequency_soll,
     }),
   );
 };

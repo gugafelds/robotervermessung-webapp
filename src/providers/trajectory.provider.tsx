@@ -3,12 +3,15 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useMemo, useState } from 'react';
 
-import type { TrajectoryHeader } from '@/types/main';
+import type { TrajectoryHeader, SegmentHeader } from '@/types/main';
 
 export interface TrajectoryState {
   trajectoriesHeader: TrajectoryHeader[];
+  segmentsHeader: SegmentHeader[];
   currentTrajectory: any;
   setCurrentTrajectory: any;
+  currentSegment: any;
+  setCurrentSegment: any;
   currentEuclidean: any;
   setCurrentEuclidean: any;
   currentDTW: any;
@@ -28,6 +31,7 @@ export interface TrajectoryState {
 type TrajectoryProviderProps = {
   children: ReactNode;
   trajectoriesHeaderDB: TrajectoryHeader[];
+  segmentsHeaderDB: SegmentHeader[];
 };
 
 const TrajectoryContext = createContext<TrajectoryState>({} as TrajectoryState);
@@ -35,10 +39,13 @@ const TrajectoryContext = createContext<TrajectoryState>({} as TrajectoryState);
 export const TrajectoryProvider = ({
   children,
   trajectoriesHeaderDB,
+  segmentsHeaderDB,
 }: TrajectoryProviderProps) => {
   const [trajectoriesHeader] = useState(trajectoriesHeaderDB);
+  const [segmentsHeader] = useState(segmentsHeaderDB);
 
   const [currentTrajectory, setCurrentTrajectory] = useState([]);
+  const [currentSegment, setCurrentSegment] = useState([]);
   const [currentEuclidean, setCurrentEuclidean] = useState([]);
   const [currentDTW, setCurrentDTW] = useState([]);
   const [currentDTWJohnen, setCurrentDTWJohnen] = useState([]);
@@ -53,8 +60,11 @@ export const TrajectoryProvider = ({
   const contextValue = useMemo(
     () => ({
       trajectoriesHeader,
+      segmentsHeader,
       currentTrajectory,
       setCurrentTrajectory,
+      currentSegment,
+      setCurrentSegment,
       currentEuclidean,
       setCurrentEuclidean,
       currentDTW,
@@ -72,7 +82,9 @@ export const TrajectoryProvider = ({
     }),
     [
       trajectoriesHeader,
+      segmentsHeader,
       currentTrajectory,
+      currentSegment,
       currentEuclidean,
       currentDTW,
       currentDTWJohnen,

@@ -1,4 +1,4 @@
-import type { ObjectId } from 'mongodb';
+import type { ObjectId, Timestamp } from 'mongodb';
 
 export interface TrajectoryDataRaw {
   _id: ObjectId | string;
@@ -25,6 +25,7 @@ export interface TrajectoryDataRaw {
   tcp_velocity_soll: number[];
   joint_state_soll: number[];
   cpu_temperature: number[];
+  segment_id: string;
 }
 
 export interface TrajectoryData {
@@ -51,6 +52,7 @@ export interface TrajectoryData {
   q4Soll: number[];
   tcpVelocitySoll: number[];
   jointStateSoll: number[];
+  segmentId: string;
 }
 
 export interface TrajectoryHeaderRaw {
@@ -69,6 +71,8 @@ export interface TrajectoryHeaderRaw {
   sample_frequency_soll: number;
   source_data_ist: string;
   source_data_soll: string;
+  start_time: string;
+  end_time: string;
 }
 
 export interface TrajectoryHeader {
@@ -87,6 +91,32 @@ export interface TrajectoryHeader {
   SampleFrequencySoll: number;
   SourceDataIst: string;
   SourceDataSoll: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface SegmentHeaderRaw {
+  _id: ObjectId | string;
+  trajectory_header_id: string;
+  segment_id: string;
+  start_time: string;
+  end_time: string;
+  number_of_points_ist: number;
+  number_of_points_soll: number;
+  sample_frequency_ist: number;
+  sample_frequency_soll: number;
+}
+
+export interface SegmentHeader {
+  _id: ObjectId | string;
+  trajectoryHeaderId: string;
+  segmentId: string;
+  startTime: string;
+  endTime: string;
+  numberPointsIst: number;
+  numberPointsSoll: number;
+  SampleFrequencyIst: number;
+  SampleFrequencySoll: number;
 }
 
 export interface TrajectoryEuclideanMetricsRaw {
@@ -96,7 +126,7 @@ export interface TrajectoryEuclideanMetricsRaw {
   euclidean_max_distance: number;
   euclidean_average_distance: number;
   euclidean_standard_deviation: number;
-  euclidean_intersections: number[];
+  euclidean_intersections: Array<number>;
   metric_type: string;
 }
 
@@ -107,7 +137,7 @@ export interface TrajectoryEuclideanMetrics {
   euclideanMaxDistance: number;
   euclideanAverageDistance: number;
   euclideanStandardDeviation: number;
-  euclideanIntersections: number[];
+  euclideanIntersections: Array<number>;
   metricType: string;
 }
 
@@ -116,11 +146,17 @@ export interface TrajectoryDTWJohnenMetricsRaw {
   trajectory_header_id: string;
   dtw_max_distance: number;
   dtw_average_distance: number;
+<<<<<<< HEAD
   dtw_distances: number[];
   dtw_X: number[][];
   dtw_Y: number[][];
+=======
+  dtw_distances: Array<number>;
+  dtw_x: Array<number>;
+  dtw_y: Array<number>;
+>>>>>>> 99b4cb8 (segments included)
   dtw_accdist: number[];
-  dtw_path: number[];
+  dtw_path: Array<number>;
   metric_type: string;
 }
 
@@ -129,11 +165,11 @@ export interface TrajectoryDTWJohnenMetrics {
   trajectoryHeaderId: string;
   dtwJohnenMaxDistance: number;
   dtwJohnenAverageDistance: number;
-  dtwJohnenDistances: number[];
-  dtwJohnenX: number[][];
-  dtwJohnenY: number[][];
+  dtwJohnenDistances: Array<number>;
+  dtwJohnenX: Array<number>;
+  dtwJohnenY: Array<number>;
   dtwAccDist: number[];
-  dtwPath: number[];
+  dtwPath: Array<number>;
   metricType: string;
 }
 

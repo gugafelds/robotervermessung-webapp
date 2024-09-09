@@ -5,11 +5,10 @@ export const formatDate = (dateString: string) => {
   const year = date.getFullYear();
   const hours = date.getHours();
   const minutes = date.getMinutes();
+  const seconds = date.getSeconds();
   return `${day.toString().padStart(2, '0')}.${month
     .toString()
-    .padStart(2, '0')}.${year} ${hours.toString().padStart(2, '0')}:${minutes
-    .toString()
-    .padStart(2, '0')}`;
+    .padStart(2, '0')}.${year} ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
 export const camelToWords = (str: string) =>

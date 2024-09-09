@@ -115,10 +115,10 @@ export const TrajectoryPlot = () => {
       ? {
           type: 'scatter',
           mode: 'lines',
-          x: Array.isArray(currentDTWJohnen.dtwPath[1])
+          x: currentDTWJohnen.dtwPath[1]
             ? currentDTWJohnen.dtwPath[1]
             : [currentDTWJohnen.dtwPath[1]],
-          y: Array.isArray(currentDTWJohnen.dtwPath[0])
+          y: currentDTWJohnen.dtwPath[0]
             ? currentDTWJohnen.dtwPath[0]
             : [currentDTWJohnen.dtwPath[0]],
           line: {
