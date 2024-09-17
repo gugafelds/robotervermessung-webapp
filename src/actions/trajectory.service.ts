@@ -17,6 +17,7 @@ import {
 import {
   transformBahnAccelIstResult,
   transformBahnInfoResult,
+  transformBahnOrientationSollResult,
   transformBahnPoseIstResult,
   transformBahnPositionSollResult,
   transformBahnTwistIstResult,
@@ -46,22 +47,15 @@ import type {
   BahnAccelIst,
   BahnPositionSollRaw,
   BahnPositionSoll,
+  BahnOrientationSoll,
+  BahnOrientationSollRaw,
 } from '@/types/main';
+import { queryPostgres } from '../lib/postgresql';
 
 export const getTrajectoriesHeader = async () => {
-<<<<<<< HEAD
-  const mongo = await getMongoDb();
-
-  const trajectoriesHeaderResult = await mongo
-    .collection('header')
-    .find<TrajectoryHeaderRaw>({})
-    .sort({ recording_date: -1 })
-    .toArray();
-=======
   const trajectoriesHeaderResult = await queryPostgres<TrajectoryHeaderRaw>(
     'SELECT * FROM trajectories.trajectories_header ORDER BY start_time DESC',
   );
->>>>>>> 99b4cb8 (segments included)
 
   revalidatePath('/trajectories');
   return transformTrajectoriesHeadersResult(trajectoriesHeaderResult);
@@ -94,21 +88,12 @@ export const getTrajectoriesData = async () => {
 };
 
 export const getTrajectoryById = async (id: string) => {
-<<<<<<< HEAD
-  const mongo = await getMongoDb();
-
-  const trajectoryResult = await mongo
-    .collection('data')
-    .find<TrajectoryDataRaw>({ trajectory_header_id: id })
-    .next();
-=======
   const isSegment = id.includes('_');
   const query = isSegment
     ? 'SELECT * FROM trajectories.trajectories_data WHERE segment_id = $1'
     : 'SELECT * FROM trajectories.trajectories_data WHERE trajectory_header_id = $1';
 
   const [trajectoryResult] = await queryPostgres<TrajectoryDataRaw>(query, [id]);
->>>>>>> 99b4cb8 (segments included)
 
   if (!trajectoryResult) {
     return {} as TrajectoryData;
@@ -119,17 +104,6 @@ export const getTrajectoryById = async (id: string) => {
 };
 
 export const getEuclideanMetricsById = async (id: string) => {
-<<<<<<< HEAD
-  const mongo = await getMongoDb();
-
-  const euclideanMetricsResult = await mongo
-    .collection('metrics')
-    .find<TrajectoryEuclideanMetricsRaw>({
-      trajectory_header_id: id,
-      metric_type: 'euclidean',
-    })
-    .next();
-=======
   const isSegment = id.includes('_');
   const query = isSegment
     ? 'SELECT * FROM trajectories.trajectories_metrics_euclidean WHERE segment_id = $1'
@@ -139,7 +113,6 @@ export const getEuclideanMetricsById = async (id: string) => {
     await queryPostgres<TrajectoryEuclideanMetricsRaw>(
       query
       ,[id]);
->>>>>>> 99b4cb8 (segments included)
 
   if (!euclideanMetricsResult) {
     return {} as TrajectoryEuclideanMetrics;
@@ -150,17 +123,6 @@ export const getEuclideanMetricsById = async (id: string) => {
 };
 
 export const getDTWJohnenMetricsById = async (id: string) => {
-<<<<<<< HEAD
-  const mongo = await getMongoDb();
-
-  const dtwJohnenMetricsResult = await mongo
-    .collection('metrics')
-    .find<TrajectoryDTWJohnenMetricsRaw>({
-      trajectory_header_id: id,
-      metric_type: 'dtw_johnen',
-    })
-    .next();
-=======
   const isSegment = id.includes('_');
   const query = isSegment
     ? 'SELECT * FROM trajectories.trajectories_metrics_dtw_johnen WHERE segment_id = $1'
@@ -170,7 +132,6 @@ export const getDTWJohnenMetricsById = async (id: string) => {
     query,
     [id],
   );
->>>>>>> 99b4cb8 (segments included)
 
   if (!dtwJohnenMetricsResult) {
     return {} as TrajectoryDTWJohnenMetrics;
@@ -181,17 +142,6 @@ export const getDTWJohnenMetricsById = async (id: string) => {
 };
 
 export const getDTWMetricsById = async (id: string) => {
-<<<<<<< HEAD
-  const mongo = await getMongoDb();
-
-  const dtwMetricsResult = await mongo
-    .collection('metrics')
-    .find<TrajectoryDTWMetricsRaw>({
-      trajectory_header_id: id,
-      metric_type: 'dtw_standard',
-    })
-    .next();
-=======
   const isSegment = id.includes('_');
   const query = isSegment
     ? 'SELECT * FROM trajectories.trajectories_metrics_dtw_standard WHERE segment_id = $1'
@@ -201,7 +151,6 @@ export const getDTWMetricsById = async (id: string) => {
     query,
     [id],
   );
->>>>>>> 99b4cb8 (segments included)
 
   if (!dtwMetricsResult) {
     return {} as TrajectoryDTWMetrics;
@@ -212,17 +161,6 @@ export const getDTWMetricsById = async (id: string) => {
 };
 
 export const getDFDMetricsById = async (id: string) => {
-<<<<<<< HEAD
-  const mongo = await getMongoDb();
-
-  const dfdMetricsResult = await mongo
-    .collection('metrics')
-    .find<TrajectoryDFDMetricsRaw>({
-      trajectory_header_id: id,
-      metric_type: 'discrete_frechet',
-    })
-    .next();
-=======
   const isSegment = id.includes('_');
   const query = isSegment
     ? 'SELECT * FROM trajectories.trajectories_metrics_discrete_frechet WHERE segment_id = $1'
@@ -232,7 +170,6 @@ export const getDFDMetricsById = async (id: string) => {
     query,
     [id],
   );
->>>>>>> 99b4cb8 (segments included)
 
   if (!dfdMetricsResult) {
     return {} as TrajectoryDFDMetrics;
@@ -243,17 +180,6 @@ export const getDFDMetricsById = async (id: string) => {
 };
 
 export const getLCSSMetricsById = async (id: string) => {
-<<<<<<< HEAD
-  const mongo = await getMongoDb();
-
-  const lcssMetricsResult = await mongo
-    .collection('metrics')
-    .find<TrajectoryLCSSMetricsRaw>({
-      trajectory_header_id: id,
-      metric_type: 'lcss',
-    })
-    .next();
-=======
   const isSegment = id.includes('_');
   const query = isSegment
     ? 'SELECT * FROM trajectories.trajectories_metrics_lcss WHERE segment_id = $1'
@@ -263,7 +189,6 @@ export const getLCSSMetricsById = async (id: string) => {
     query,
     [id],
   );
->>>>>>> 99b4cb8 (segments included)
 
   if (!lcssMetricsResult) {
     return {} as TrajectoryLCSSMetrics;
@@ -391,4 +316,31 @@ export const getBahnPositionSollById = async (id: string): Promise<BahnPositionS
 
   revalidatePath('/trajectories');
   return transformBahnPositionSollResult(bahnPositionSollResult);
+};
+
+export const getBahnOrientationSollById = async (id: string): Promise<BahnOrientationSoll[]> => {
+  const query = `
+    SELECT * FROM bewegungsdaten.bahn_orientation_soll
+    WHERE bahn_id = $1
+    ORDER BY timestamp ASC
+  `;
+
+  const result = await queryPostgres(query, [id]);
+
+  // Explicit type checking and conversion
+  let bahnOrientationSollResult: BahnOrientationSollRaw[];
+  if (Array.isArray(result) && result.length > 0 && Array.isArray(result[0])) {
+    bahnOrientationSollResult = result[0] as BahnOrientationSollRaw[];
+  } else if (Array.isArray(result)) {
+    bahnOrientationSollResult = result as BahnOrientationSollRaw[];
+  } else {
+    bahnOrientationSollResult = [];
+  }
+
+  if (bahnOrientationSollResult.length === 0) {
+    return [];
+  }
+
+  revalidatePath('/trajectories');
+  return transformBahnOrientationSollResult(bahnOrientationSollResult);
 };

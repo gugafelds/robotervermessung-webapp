@@ -17,6 +17,7 @@ import type {
   TrajectoryEuclideanMetrics,
   TrajectoryLCSSMetrics,
   BahnPositionSoll,
+  BahnOrientationSoll,
 } from '@/types/main';
 
 type TrajectoryPageProps = {
@@ -25,6 +26,7 @@ type TrajectoryPageProps = {
   currentBahnTwistIst: BahnTwistIst;
   currentBahnAccelIst: BahnAccelIst;
   currentBahnPositionSoll: BahnPositionSoll;
+  currentBahnOrientationSoll: BahnOrientationSoll;
   currentDTWMetrics: TrajectoryDTWMetrics;
   currentEuclideanMetrics: TrajectoryEuclideanMetrics;
   currentDTWJohnenMetrics: TrajectoryDTWJohnenMetrics;
@@ -38,6 +40,7 @@ export function TrajectoryWrapper({
   currentBahnTwistIst,
   currentBahnAccelIst,
   currentBahnPositionSoll,
+  currentBahnOrientationSoll,
   currentEuclideanMetrics,
   currentDTWMetrics,
   currentDTWJohnenMetrics,
@@ -50,6 +53,7 @@ export function TrajectoryWrapper({
     setCurrentBahnTwistIst,
     setCurrentBahnAccelIst,
     setCurrentBahnPositionSoll,
+    setCurrentBahnOrientationSoll,
     setCurrentEuclidean,
     setCurrentDTWJohnen,
     setCurrentLCSS,
@@ -68,6 +72,7 @@ export function TrajectoryWrapper({
     setCurrentBahnTwistIst(currentBahnTwistIst);
     setCurrentBahnAccelIst(currentBahnAccelIst);
     setCurrentBahnPositionSoll(currentBahnPositionSoll);
+    setCurrentBahnOrientationSoll(currentBahnOrientationSoll);
   }, []);
 
   const isSegment = currentTrajectory.segmentId && currentTrajectory.segmentId.includes('_');

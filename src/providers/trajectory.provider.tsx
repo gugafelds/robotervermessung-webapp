@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useMemo, useState } from 'react';
 
-import type { TrajectoryHeader, SegmentHeader, BahnInfo, BahnPoseIst, BahnTwistIst, BahnAccelIst, BahnPositionSoll } from '@/types/main';
+import type { TrajectoryHeader, SegmentHeader, BahnInfo, BahnPoseIst, BahnTwistIst, BahnAccelIst, BahnPositionSoll, BahnOrientationSoll } from '@/types/main';
 
 export interface TrajectoryState {
   trajectoriesHeader: TrajectoryHeader[];
@@ -16,6 +16,8 @@ export interface TrajectoryState {
   setCurrentBahnAccelIst: any;
   currentBahnPositionSoll: BahnPositionSoll[];
   setCurrentBahnPositionSoll: any;
+  currentBahnOrientationSoll: BahnOrientationSoll[];
+  setCurrentBahnOrientationSoll: any;
   segmentsHeader: SegmentHeader[];
   currentTrajectory: any;
   setCurrentTrajectory: any;
@@ -61,6 +63,7 @@ export const TrajectoryProvider = ({
   const [currentBahnTwistIst, setCurrentBahnTwistIst] = useState([]);
   const [currentBahnAccelIst, setCurrentBahnAccelIst] = useState([]);
   const [currentBahnPositionSoll, setCurrentBahnPositionSoll] = useState([]);
+  const [currentBahnOrientationSoll, setCurrentBahnOrientationSoll] = useState([]);
   const [currentSegment, setCurrentSegment] = useState([]);
   const [currentEuclidean, setCurrentEuclidean] = useState([]);
   const [currentDTW, setCurrentDTW] = useState([]);
@@ -86,6 +89,8 @@ export const TrajectoryProvider = ({
       setCurrentBahnAccelIst,
       currentBahnPositionSoll,
       setCurrentBahnPositionSoll,
+      currentBahnOrientationSoll,
+      setCurrentBahnOrientationSoll,
       currentTrajectory,
       setCurrentTrajectory,
       currentSegment,
@@ -113,6 +118,7 @@ export const TrajectoryProvider = ({
       currentBahnTwistIst,
       currentBahnAccelIst,
       currentBahnPositionSoll,
+      currentBahnOrientationSoll,
       currentTrajectory,
       currentSegment,
       currentEuclidean,

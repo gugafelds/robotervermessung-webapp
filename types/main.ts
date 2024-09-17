@@ -146,15 +146,9 @@ export interface TrajectoryDTWJohnenMetricsRaw {
   trajectory_header_id: string;
   dtw_max_distance: number;
   dtw_average_distance: number;
-<<<<<<< HEAD
-  dtw_distances: number[];
-  dtw_X: number[][];
-  dtw_Y: number[][];
-=======
   dtw_distances: Array<number>;
   dtw_x: Array<number>;
   dtw_y: Array<number>;
->>>>>>> 99b4cb8 (segments included)
   dtw_accdist: number[];
   dtw_path: Array<number>;
   metric_type: string;

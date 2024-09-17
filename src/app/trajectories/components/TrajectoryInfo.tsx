@@ -110,13 +110,7 @@ export const TrajectoryInfo = () => {
             <li className="px-4 text-lg font-bold text-primary">
               {`Startzeitpunkt:`}{' '}
               <span className="text-lg font-light text-primary">
-<<<<<<< HEAD
-                {isDateString(currentTrajectoryHeader.recordingDate)
-                  ? formatDate(currentTrajectoryHeader.recordingDate)
-                  : 'n. a.'}
-=======
                 {`${currentTrajectoryHeader.startTime ? formatDate(currentTrajectoryHeader.startTime) : 'n. a.'}`}
->>>>>>> 99b4cb8 (segments included)
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">

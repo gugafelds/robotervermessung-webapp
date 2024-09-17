@@ -3,6 +3,8 @@ import type {
   BahnAccelIstRaw,
   BahnInfo,
   BahnInfoRaw,
+  BahnOrientationSoll,
+  BahnOrientationSollRaw,
   BahnPoseIst,
   BahnPoseIstRaw,
   BahnPositionSoll,
@@ -108,6 +110,22 @@ export const transformBahnPositionSollResult = (bahnenPositionSollRaw: BahnPosit
       xSoll: bahn.x_soll,
       ySoll: bahn.y_soll,
       zSoll: bahn.z_soll,
+      sourceDataSoll: bahn.source_data_soll,
+    })
+  );
+};
+
+export const transformBahnOrientationSollResult = (bahnenOrientationSollRaw: BahnOrientationSollRaw[]): BahnOrientationSoll[] => {
+  return bahnenOrientationSollRaw.map(
+    (bahn): BahnOrientationSoll => ({
+      id: bahn.id,
+      bahnId: bahn.bahn_id,
+      segmentId: bahn.segment_id,
+      timestamp: bahn.timestamp,
+      qxSoll: bahn.qx_soll,
+      qySoll: bahn.qy_soll,
+      qzSoll: bahn.qz_soll,
+      qwSoll: bahn.qw_soll,
       sourceDataSoll: bahn.source_data_soll,
     })
   );
