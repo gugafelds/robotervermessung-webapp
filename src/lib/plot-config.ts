@@ -58,10 +58,19 @@ export const plotLayoutConfig: Partial<Layout> = {
   width: 500,
   height: 500,
   scene: {
-    xaxis: { title: 'x [m]' },
-    yaxis: { title: 'y [m]' },
-    zaxis: { title: 'z [m]' },
+    xaxis: { title: 'x [mm]' },
+    yaxis: { title: 'y [mm]' },
+    zaxis: { title: 'z [mm]' },
   },
+};
+
+export const plotLayout2DConfigQuaternion: Partial<Layout> = {
+  // Add any specific configuration you want for the quaternion plot
+  // For example:
+  autosize: true,
+  height: 400,
+  width: 600,
+  margin: { l: 50, r: 50, b: 50, t: 50, pad: 4 },
 };
 
 export const plotLayout2DConfigVelocity: Partial<Layout> = {
@@ -103,7 +112,7 @@ export const plotLayout2DConfigVelocity: Partial<Layout> = {
     automargin: true,
     autorange: true,
     showgrid: true,
-    dtick: 0.5,
+    dtick: 5.0,
   },
   yaxis: {
     title: 'v [mm/s]',
@@ -153,7 +162,7 @@ export const plotLayout2DConfigAcceleration: Partial<Layout> = {
     automargin: true,
     autorange: true,
     showgrid: true,
-    dtick: 0.5,
+    dtick: 5.0,
   },
   yaxis: {
     title: 'a [mm²/s]',

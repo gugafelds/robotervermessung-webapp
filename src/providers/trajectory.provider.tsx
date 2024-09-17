@@ -3,10 +3,19 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useMemo, useState } from 'react';
 
-import type { TrajectoryHeader, SegmentHeader } from '@/types/main';
+import type { TrajectoryHeader, SegmentHeader, BahnInfo, BahnPoseIst, BahnTwistIst, BahnAccelIst, BahnPositionSoll } from '@/types/main';
 
 export interface TrajectoryState {
   trajectoriesHeader: TrajectoryHeader[];
+  bahnInfo: BahnInfo[];
+  currentBahnPoseIst: BahnPoseIst[];
+  setCurrentBahnPoseIst: any;
+  currentBahnTwistIst: BahnTwistIst[];
+  setCurrentBahnTwistIst: any;
+  currentBahnAccelIst: BahnAccelIst[];
+  setCurrentBahnAccelIst: any;
+  currentBahnPositionSoll: BahnPositionSoll[];
+  setCurrentBahnPositionSoll: any;
   segmentsHeader: SegmentHeader[];
   currentTrajectory: any;
   setCurrentTrajectory: any;
@@ -32,6 +41,7 @@ type TrajectoryProviderProps = {
   children: ReactNode;
   trajectoriesHeaderDB: TrajectoryHeader[];
   segmentsHeaderDB: SegmentHeader[];
+  bahnInfoDB: BahnInfo[];
 };
 
 const TrajectoryContext = createContext<TrajectoryState>({} as TrajectoryState);
@@ -40,11 +50,17 @@ export const TrajectoryProvider = ({
   children,
   trajectoriesHeaderDB,
   segmentsHeaderDB,
+  bahnInfoDB,
 }: TrajectoryProviderProps) => {
   const [trajectoriesHeader] = useState(trajectoriesHeaderDB);
   const [segmentsHeader] = useState(segmentsHeaderDB);
+  const [bahnInfo] = useState(bahnInfoDB);
 
   const [currentTrajectory, setCurrentTrajectory] = useState([]);
+  const [currentBahnPoseIst, setCurrentBahnPoseIst] = useState([]);
+  const [currentBahnTwistIst, setCurrentBahnTwistIst] = useState([]);
+  const [currentBahnAccelIst, setCurrentBahnAccelIst] = useState([]);
+  const [currentBahnPositionSoll, setCurrentBahnPositionSoll] = useState([]);
   const [currentSegment, setCurrentSegment] = useState([]);
   const [currentEuclidean, setCurrentEuclidean] = useState([]);
   const [currentDTW, setCurrentDTW] = useState([]);
@@ -61,6 +77,15 @@ export const TrajectoryProvider = ({
     () => ({
       trajectoriesHeader,
       segmentsHeader,
+      bahnInfo,
+      currentBahnPoseIst,
+      setCurrentBahnPoseIst,
+      currentBahnTwistIst,
+      setCurrentBahnTwistIst,
+      currentBahnAccelIst,
+      setCurrentBahnAccelIst,
+      currentBahnPositionSoll,
+      setCurrentBahnPositionSoll,
       currentTrajectory,
       setCurrentTrajectory,
       currentSegment,
@@ -83,6 +108,11 @@ export const TrajectoryProvider = ({
     [
       trajectoriesHeader,
       segmentsHeader,
+      bahnInfo,
+      currentBahnPoseIst,
+      currentBahnTwistIst,
+      currentBahnAccelIst,
+      currentBahnPositionSoll,
       currentTrajectory,
       currentSegment,
       currentEuclidean,

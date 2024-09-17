@@ -13,6 +13,8 @@ export const TrajectoryInfo = () => {
   const {
     trajectoriesHeader,
     segmentsHeader,
+    bahnInfo,
+    bahnInfo: [{ bahnID }],
     currentTrajectory,
     currentDTW,
     currentDTWJohnen,
@@ -21,9 +23,10 @@ export const TrajectoryInfo = () => {
     currentLCSS,
   } = useTrajectory();
 
-  const searchedIndex = currentTrajectory.trajectoryHeaderId;
-  const currentTrajectoryID = trajectoriesHeader.findIndex(
-    (item) => item.dataId === searchedIndex,
+  const searchedIndex = bahnID;
+  console.log(searchedIndex)
+  const currentTrajectoryID = bahnInfo.findIndex(
+    (item) => item.bahnID === searchedIndex,
   );
 
   if (currentTrajectoryID === -1) {
@@ -38,9 +41,9 @@ export const TrajectoryInfo = () => {
   }
 
   const isSegment = searchedIndex.includes('_');
-  const headerToUse = isSegment ? segmentsHeader : trajectoriesHeader;
+  const headerToUse = isSegment ? segmentsHeader : bahnInfo;
 
-  const currentTrajectoryHeader = trajectoriesHeader[currentTrajectoryID];
+  const currentTrajectoryHeader = bahnInfo[currentTrajectoryID];
 
   const metricGroups = [
     {
@@ -93,7 +96,13 @@ export const TrajectoryInfo = () => {
         Object.keys(currentTrajectoryHeader).length !== 0 && (
           <ul>
             <li className="px-4 text-lg font-bold text-primary">
-              {`Roboter Modell:`}{' '}
+              {`Aufnahmedatei:`}{' '}
+              <span className="text-lg font-light text-primary">
+                {`${currentTrajectoryHeader.recordFilename || 'n. a.'}`}
+              </span>
+            </li>
+            <li className="px-4 text-lg font-bold text-primary">
+              {`Roboter:`}{' '}
               <span className="text-lg font-light text-primary">
                 {`${currentTrajectoryHeader.robotModel || 'n. a.'}`}
               </span>
@@ -117,39 +126,63 @@ export const TrajectoryInfo = () => {
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">
-              {`Anzahl der Punkte (Ist):`}{' '}
+              {`Anzahl der Ereignisse:`}{' '}
               <span className="text-lg font-light text-primary">
-                {`${formatNumber(currentTrajectoryHeader.numberPointsIst) || 'n. a.'}`}
+                {`${formatNumber(currentTrajectoryHeader.numberPoints) || 'n. a.'}`}
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">
-              {`Anzahl der Punkte (Soll):`}{' '}
+              {`Abtastrate (Pose Ist):`}{' '}
               <span className="text-lg font-light text-primary">
-                {`${formatNumber(currentTrajectoryHeader.numberPointsSoll) || 'n. a.'}`}
+                {`${formatNumber(currentTrajectoryHeader.frequencyPoseIst) || 'n. a.'} Hz`}
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">
-              {`Abtastrate (Ist):`}{' '}
+              {`Abtastrate (Twist Ist):`}{' '}
               <span className="text-lg font-light text-primary">
-                {`${formatNumber(currentTrajectoryHeader.SampleFrequencyIst) || 'n. a.'}`}
+                {`${formatNumber(currentTrajectoryHeader.frequencyTwistIst) || 'n. a.'} Hz`}
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">
-              {`Abtastrate (Soll):`}{' '}
+              {`Abtastrate (Accel Ist):`}{' '}
               <span className="text-lg font-light text-primary">
-                {`${formatNumber(currentTrajectoryHeader.SampleFrequencySoll) || 'n. a.'}`}
+                {`${formatNumber(currentTrajectoryHeader.frequencyAccelIst) || 'n. a.'} Hz`}
+              </span>
+            </li>
+            <li className="px-4 text-lg font-bold text-primary">
+              {`Abtastrate (Position Soll):`}{' '}
+              <span className="text-lg font-light text-primary">
+                {`${formatNumber(currentTrajectoryHeader.frequencyPositionSoll) || 'n. a.'} Hz`}
+              </span>
+            </li>
+            <li className="px-4 text-lg font-bold text-primary">
+              {`Abtastrate (Rotation Soll):`}{' '}
+              <span className="text-lg font-light text-primary">
+                {`${formatNumber(currentTrajectoryHeader.frequencyOrientationSoll) || 'n. a.'} Hz`}
+              </span>
+            </li>
+            <li className="px-4 text-lg font-bold text-primary">
+              {`Abtastrate (Twist Soll):`}{' '}
+              <span className="text-lg font-light text-primary">
+                {`${formatNumber(currentTrajectoryHeader.frequencyTwistSoll) || 'n. a.'} Hz`}
+              </span>
+            </li>
+            <li className="px-4 text-lg font-bold text-primary">
+              {`Abtastrate (Joint States):`}{' '}
+              <span className="text-lg font-light text-primary">
+                {`${formatNumber(currentTrajectoryHeader.frequencyJointStates) || 'n. a.'} Hz`}
               </span>
             </li>
             <li className="px-4 text-lg font-bold text-primary">
               {`Datenquelle (Ist):`}{' '}
               <span className="text-lg font-light text-primary">
-                {`${currentTrajectoryHeader.SourceDataIst || 'n. a.'}`}
+                {`${currentTrajectoryHeader.sourceDataIst || 'n. a.'}`}
               </span>
             </li>
             <li className="mb-2 px-4 text-lg font-bold text-primary">
               {`Datenquelle (Soll):`}{' '}
               <span className="text-lg font-light text-primary">
-                {`${currentTrajectoryHeader.SourceDataSoll || 'n. a.'}`}
+                {`${currentTrajectoryHeader.sourceDataSoll || 'n. a.'}`}
               </span>
             </li>
           </ul>
@@ -186,7 +219,7 @@ export const TrajectoryInfo = () => {
         ))}
       </div>
 
-      <TrajectoryOptions />
+    
     </div>
   );
 };

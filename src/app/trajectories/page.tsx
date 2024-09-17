@@ -6,9 +6,9 @@ import { useTrajectory } from '@/src/providers/trajectory.provider';
 
 export default function TrajectoriesPage() {
   const {
-    trajectoriesHeader: [{ dataId }],
+    bahnInfo: [{ bahnID }],
   } = useTrajectory();
   
 
-  return redirect(`/trajectories/${dataId}`);
+  return redirect(`/trajectories/${bahnID}`);
 }

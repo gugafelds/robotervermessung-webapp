@@ -45,7 +45,7 @@ export const TrajectoryOptions = () => {
   const csvTrajectory = {
     data: csvData,
     header: headersData,
-    filename: `trajectory_${currentTrajectory.trajectoryHeaderId.toString()}.csv`,
+    filename: `record_${currentTrajectory.bahnID.toString()}.csv`,
   };
 
   return (

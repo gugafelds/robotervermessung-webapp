@@ -250,3 +250,190 @@ export interface TrajectoryLCSSMetrics {
   lcssThreshold: number;
   metricType: string;
 }
+
+/* NEW VERSION */
+
+export interface BahnInfo {
+  _id: number;
+  bahnID: string;
+  robotModel: string;
+  bahnplanung: string;
+  recordingDate: string;
+  startTime: string;
+  endTime: string;
+  sourceDataIst: string;
+  sourceDataSoll: string;
+  recordFilename: string;
+  numberPoints: number;
+  frequencyPoseIst: number;
+  frequencyPositionSoll: number;
+  frequencyOrientationSoll: number;
+  frequencyTwistIst: number;
+  frequencyTwistSoll: number;
+  frequencyAccelIst: number;
+  frequencyJointStates: number;
+  calibrationRun: boolean;
+}
+
+export interface BahnInfoRaw {
+  id: number;
+  bahn_id: string;
+  robot_model: string;
+  bahnplanung: string;
+  recording_date: string;
+  start_time: string;
+  end_time: string;
+  source_data_ist: string;
+  source_data_soll: string;
+  record_filename: string;
+  number_of_points: number;
+  frequency_pose_ist: number;
+  frequency_position_soll: number;
+  frequency_orientation_soll: number;
+  frequency_twist_ist: number;
+  frequency_twist_soll: number;
+  frequency_accel_ist: number;
+  frequency_joint_states: number;
+  calibration_run: boolean;
+}
+
+export interface BahnPoseIst {
+  _id: number;
+  bahnID: string;
+  segmentID: string;
+  timestamp: string;
+  xIst: string;
+  yIst: string;
+  zIst: string;
+  qxIst: number;
+  qyIst: number;
+  qzIst: number;
+  qwIst: number;
+  sourceDataIst: string;
+}
+
+export interface BahnPoseIstRaw {
+  id: number;
+  bahn_id: string;
+  segment_id: string;
+  timestamp: string;
+  x_ist: string;
+  y_ist: string;
+  z_ist: string;
+  qx_ist: number;
+  qy_ist: number;
+  qz_ist: number;
+  qw_ist: number;
+  source_data_ist: string;
+}
+
+export interface BahnTwistIst {
+  id: number;
+  bahnId: string;
+  segmentId: string;
+  timestamp: string;
+  tcpSpeedX: number;
+  tcpSpeedY: number;
+  tcpSpeedZ: number;
+  tcpSpeedIst: number;
+  tcpAngularX: number;
+  tcpAngularY: number;
+  tcpAngularZ: number;
+  tcpAngularIst: number;
+  sourceDataIst: string;
+}
+
+export interface BahnTwistIstRaw {
+  id: number;
+  bahn_id: string;
+  segment_id: string;
+  timestamp: string;
+  tcp_speed_x: number;
+  tcp_speed_y: number;
+  tcp_speed_z: number;
+  tcp_speed_ist: number;
+  tcp_angular_x: number;
+  tcp_angular_y: number;
+  tcp_angular_z: number;
+  tcp_angular_ist: number;
+  source_data_ist: string;
+}
+
+export interface BahnAccelIst {
+  id: number;
+  bahnId: string;
+  segmentId: string;
+  timestamp: string;
+  tcpAccelX: number;
+  tcpAccelY: number;
+  tcpAccelZ: number;
+  tcpAccelIst: number;
+  tcpAngularAccelX: number;
+  tcpAngularAccelY: number;
+  tcpAngularAccelZ: number;
+  tcpAngularAccelIst: number;
+  sourceDataIst: string;
+}
+
+export interface BahnAccelIstRaw {
+  id: number;
+  bahn_id: string;
+  segment_id: string;
+  timestamp: string;
+  tcp_accel_x: number;
+  tcp_accel_y: number;
+  tcp_accel_z: number;
+  tcp_accel_ist: number;
+  tcp_angular_accel_x: number;
+  tcp_angular_accel_y: number;
+  tcp_angular_accel_z: number;
+  tcp_angular_accel_ist: number;
+  source_data_ist: string;
+}
+
+export interface BahnPositionSoll {
+  id: number;
+  bahnId: string;
+  segmentId: string;
+  timestamp: string;
+  xSoll: number;
+  ySoll: number;
+  zSoll: number;
+  sourceDataSoll: string;
+}
+
+export interface BahnPositionSollRaw {
+  id: number;
+  bahn_id: string;
+  segment_id: string;
+  timestamp: string;
+  x_soll: number;
+  y_soll: number;
+  z_soll: number;
+  source_data_soll: string;
+}
+
+// Interfaces
+export interface BahnOrientationSoll {
+  id: number;
+  bahnId: string;
+  segmentId: string;
+  timestamp: string;
+  qxSoll: number;
+  qySoll: number;
+  qzSoll: number;
+  qwSoll: number;
+  sourceDataSoll: string;
+}
+
+export interface BahnOrientationSollRaw {
+  id: number;
+  bahn_id: string;
+  segment_id: string;
+  timestamp: string;
+  qx_soll: number;
+  qy_soll: number;
+  qz_soll: number;
+  qw_soll: number;
+  source_data_soll: string;
+}

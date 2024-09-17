@@ -12,27 +12,26 @@ import { filterBy, formatDate } from '@/src/lib/functions';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 
 export const Sidebar = () => {
-  const { trajectoriesHeader, showEuclideanPlot, showDTWJohnenPlot, segmentsHeader } =
+  const { trajectoriesHeader, showEuclideanPlot, showDTWJohnenPlot, segmentsHeader, bahnInfo } =
     useTrajectory();
   const pathname = usePathname();
 
   const [filteredTrajectories, setFilteredTrajectories] =
-    useState(trajectoriesHeader);
+    useState(bahnInfo);
 
   const [expandedTrajectory, setExpandedTrajectory] = useState<string | null>(null);
 
-  const toggleExpand = (dataId: string, e: React.MouseEvent) => {
+  const toggleExpand = (bahnID: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setExpandedTrajectory(expandedTrajectory === dataId ? null : dataId);
+    setExpandedTrajectory(expandedTrajectory === bahnID ? null : bahnID);
   };
 
   const handleFilterChange = (filter: string) => {
-    const filtered = trajectoriesHeader.filter((trajectory) =>
+    const filtered = bahnInfo.filter((trajectory) =>
       filterBy(filter, [
         trajectory.robotModel,
-        trajectory.dataId,
-        trajectory.realRobot.toString(),
-        formatDate(trajectory.startTime),
+        trajectory.bahnID,
+        formatDate(trajectory.recordingDate),
       ]),
     );
     setFilteredTrajectories(filtered);
@@ -54,15 +53,15 @@ export const Sidebar = () => {
 
       <div className="mt-4 overflow-scroll">
         {filteredTrajectories.map((trajectory) => (
-          <div key={trajectory.dataId.toString()} className="mt-1 rounded-xl p-3 transition-colors duration-200 ease-in betterhover:hover:bg-gray-200">
+          <div key={trajectory.bahnID.toString()} className="mt-1 rounded-xl p-3 transition-colors duration-200 ease-in betterhover:hover:bg-gray-200">
             <div className="flex justify-between items-center">
-              {segmentsHeader.some(segment => segment.trajectoryHeaderId === trajectory.dataId) && (
-                <span onClick={(e) => toggleExpand(trajectory.dataId.toString(), e)} className="cursor-pointer text-primary">
-                  {expandedTrajectory === trajectory.dataId.toString() ? '▾' : '▸'}
+              {segmentsHeader.some(segment => segment.trajectoryHeaderId === trajectory.bahnID) && (
+                <span onClick={(e) => toggleExpand(trajectory.bahnID.toString(), e)} className="cursor-pointer text-primary">
+                  {expandedTrajectory === trajectory.bahnID.toString() ? '▾' : '▸'}
                 </span>
               )}
               <Link
-                href={`/trajectories/${trajectory.dataId.toString()}`}
+                href={`/trajectories/${trajectory.bahnID.toString()}`}
                 onClick={() => {
                   showEuclideanPlot(false);
                   showDTWJohnenPlot(false);
@@ -71,23 +70,23 @@ export const Sidebar = () => {
               >
                 <div>
                   <Typography as="h6" className="font-extrabold text-primary">
-                    {trajectory.robotModel}
+                    {trajectory.recordFilename}
                   </Typography>
                   <Typography as="h6" className="font-semibold text-primary">
-                    {`ID: ${trajectory.dataId}`}
+                    {`ID: ${trajectory.bahnID}`}
                   </Typography>
                   <Typography as="h6" className="text-primary">
-                    {trajectory.startTime ? formatDate(trajectory.startTime) : 'n. a.'}
+                    {trajectory.startTime ? formatDate(trajectory.recordingDate) : 'n. a.'}
                   </Typography>
                 </div>
               </Link>
             </div>
 
-            {expandedTrajectory === trajectory.dataId.toString() && (
+            {expandedTrajectory === trajectory.bahnID.toString() && (
               <div className="ml-6 mt-2">
                 {Array.from(new Set(segmentsHeader
                   .filter(
-                    (segment) => segment.trajectoryHeaderId === trajectory.dataId
+                    (segment) => segment.trajectoryHeaderId === trajectory.bahnID
                   )
                   .map((segment) => segment.segmentId)
                 )).map((segmentId) => (

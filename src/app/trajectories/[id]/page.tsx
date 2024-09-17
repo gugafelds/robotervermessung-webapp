@@ -7,6 +7,10 @@ import {
   getEuclideanMetricsById,
   getLCSSMetricsById,
   getTrajectoryById,
+  getBahnPoseIstById,
+  getBahnTwistIstById,
+  getBahnAccelIstById,
+  getBahnPositionSollById,
 } from '@/src/actions/trajectory.service';
 import { TrajectoryWrapper } from '@/src/app/trajectories/components/TrajectoryWrapper';
 import { json } from '@/src/lib/functions';
@@ -17,6 +21,10 @@ type TrajectoryPageProps = {
 
 export default async function TrajectoryPage({ params }: TrajectoryPageProps) {
   const currentTrajectory = await getTrajectoryById(params.id);
+  const currentBahnPoseIst = await getBahnPoseIstById(params.id);
+  const currentBahnTwistIst = await getBahnTwistIstById(params.id);
+  const currentBahnAccelIst = await getBahnAccelIstById(params.id);
+  const currentBahnPositionSoll = await getBahnPositionSollById(params.id);
   const currentEuclideanMetrics = await getEuclideanMetricsById(params.id);
   const currentDTWMetrics = await getDTWMetricsById(params.id);
   const currentDTWJohnenMetrics = await getDTWJohnenMetricsById(params.id);
@@ -26,6 +34,10 @@ export default async function TrajectoryPage({ params }: TrajectoryPageProps) {
   return (
     <TrajectoryWrapper
       currentTrajectory={json(currentTrajectory)}
+      currentBahnPoseIst={json(currentBahnPoseIst)}
+      currentBahnTwistIst={json(currentBahnTwistIst)}
+      currentBahnAccelIst={json(currentBahnAccelIst)}
+      currentBahnPositionSoll={json(currentBahnPositionSoll)}
       currentDTWMetrics={json(currentDTWMetrics)}
       currentEuclideanMetrics={json(currentEuclideanMetrics)}
       currentDTWJohnenMetrics={json(currentDTWJohnenMetrics)}
