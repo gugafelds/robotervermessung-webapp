@@ -8,7 +8,10 @@ export const formatDate = (dateString: string) => {
   const seconds = date.getSeconds();
   return `${day.toString().padStart(2, '0')}.${month
     .toString()
-    .padStart(2, '0')}.${year} ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    .padStart(
+      2,
+      '0',
+    )}.${year} ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
 export const camelToWords = (str: string) =>
@@ -49,4 +52,33 @@ export const json = (data: unknown) => JSON.parse(JSON.stringify(data));
 
 export const filterBy = (filter: string, properties: string[]) => {
   return properties.some((property) => property.toLowerCase().includes(filter));
+};
+
+export const quaternionToEuler = (
+  x: number,
+  y: number,
+  z: number,
+  w: number,
+): [number, number, number] => {
+  // Roll (x-axis rotation)
+  const sinrCosp = 2 * (w * x + y * z);
+  const cosrCosp = 1 - 2 * (x * x + y * y);
+  const roll = Math.atan2(sinrCosp, cosrCosp);
+
+  // Pitch (y-axis rotation)
+  const sinp = 2 * (w * y - z * x);
+  const pitch =
+    Math.abs(sinp) >= 1 ? (Math.sign(sinp) * Math.PI) / 2 : Math.asin(sinp);
+
+  // Yaw (z-axis rotation)
+  const sinyCosp = 2 * (w * z + x * y);
+  const cosyCosp = 1 - 2 * (y * y + z * z);
+  const yaw = Math.atan2(sinyCosp, cosyCosp);
+
+  // Convert to degrees
+  return [
+    (roll * 180) / Math.PI,
+    (pitch * 180) / Math.PI,
+    (yaw * 180) / Math.PI,
+  ];
 };

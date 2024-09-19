@@ -3,46 +3,50 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useMemo, useState } from 'react';
 
-import type { TrajectoryHeader, SegmentHeader, BahnInfo, BahnPoseIst, BahnTwistIst, BahnAccelIst, BahnPositionSoll, BahnOrientationSoll } from '@/types/main';
+import type {
+  BahnAccelIst,
+  BahnEvents,
+  BahnInfo,
+  BahnJointStates,
+  BahnOrientationSoll,
+  BahnPoseIst,
+  BahnPositionSoll,
+  BahnTwistIst,
+  BahnTwistSoll,
+} from '@/types/main';
 
 export interface TrajectoryState {
-  trajectoriesHeader: TrajectoryHeader[];
   bahnInfo: BahnInfo[];
+  currentBahnInfo: BahnInfo | null;
+  setCurrentBahnInfo: React.Dispatch<React.SetStateAction<BahnInfo | null>>;
   currentBahnPoseIst: BahnPoseIst[];
-  setCurrentBahnPoseIst: any;
+  setCurrentBahnPoseIst: React.Dispatch<React.SetStateAction<BahnPoseIst[]>>;
   currentBahnTwistIst: BahnTwistIst[];
-  setCurrentBahnTwistIst: any;
+  setCurrentBahnTwistIst: React.Dispatch<React.SetStateAction<BahnTwistIst[]>>;
   currentBahnAccelIst: BahnAccelIst[];
-  setCurrentBahnAccelIst: any;
+  setCurrentBahnAccelIst: React.Dispatch<React.SetStateAction<BahnAccelIst[]>>;
   currentBahnPositionSoll: BahnPositionSoll[];
-  setCurrentBahnPositionSoll: any;
+  setCurrentBahnPositionSoll: React.Dispatch<
+    React.SetStateAction<BahnPositionSoll[]>
+  >;
   currentBahnOrientationSoll: BahnOrientationSoll[];
-  setCurrentBahnOrientationSoll: any;
-  segmentsHeader: SegmentHeader[];
-  currentTrajectory: any;
-  setCurrentTrajectory: any;
-  currentSegment: any;
-  setCurrentSegment: any;
-  currentEuclidean: any;
-  setCurrentEuclidean: any;
-  currentDTW: any;
-  setCurrentDTW: any;
-  currentDTWJohnen: any;
-  setCurrentDTWJohnen: any;
-  currentLCSS: any;
-  setCurrentLCSS: any;
-  currentDFD: any;
-  setCurrentDFD: any;
-  visibleEuclidean: boolean;
-  showEuclideanPlot: any;
-  visibleDTWJohnen: boolean;
-  showDTWJohnenPlot: any;
+  setCurrentBahnOrientationSoll: React.Dispatch<
+    React.SetStateAction<BahnOrientationSoll[]>
+  >;
+  currentBahnTwistSoll: BahnTwistSoll[];
+  setCurrentBahnTwistSoll: React.Dispatch<
+    React.SetStateAction<BahnTwistSoll[]>
+  >;
+  currentBahnJointStates: BahnJointStates[];
+  setCurrentBahnJointStates: React.Dispatch<
+    React.SetStateAction<BahnJointStates[]>
+  >;
+  currentBahnEvents: BahnEvents[];
+  setCurrentBahnEvents: React.Dispatch<React.SetStateAction<BahnEvents[]>>;
 }
 
 type TrajectoryProviderProps = {
   children: ReactNode;
-  trajectoriesHeaderDB: TrajectoryHeader[];
-  segmentsHeaderDB: SegmentHeader[];
   bahnInfoDB: BahnInfo[];
 };
 
@@ -50,37 +54,38 @@ const TrajectoryContext = createContext<TrajectoryState>({} as TrajectoryState);
 
 export const TrajectoryProvider = ({
   children,
-  trajectoriesHeaderDB,
-  segmentsHeaderDB,
   bahnInfoDB,
 }: TrajectoryProviderProps) => {
-  const [trajectoriesHeader] = useState(trajectoriesHeaderDB);
-  const [segmentsHeader] = useState(segmentsHeaderDB);
-  const [bahnInfo] = useState(bahnInfoDB);
-
-  const [currentTrajectory, setCurrentTrajectory] = useState([]);
-  const [currentBahnPoseIst, setCurrentBahnPoseIst] = useState([]);
-  const [currentBahnTwistIst, setCurrentBahnTwistIst] = useState([]);
-  const [currentBahnAccelIst, setCurrentBahnAccelIst] = useState([]);
-  const [currentBahnPositionSoll, setCurrentBahnPositionSoll] = useState([]);
-  const [currentBahnOrientationSoll, setCurrentBahnOrientationSoll] = useState([]);
-  const [currentSegment, setCurrentSegment] = useState([]);
-  const [currentEuclidean, setCurrentEuclidean] = useState([]);
-  const [currentDTW, setCurrentDTW] = useState([]);
-  const [currentDTWJohnen, setCurrentDTWJohnen] = useState([]);
-  const [currentDFD, setCurrentDFD] = useState([]);
-  const [currentLCSS, setCurrentLCSS] = useState([]);
-
-  const [visibleEuclidean, showEuclideanPlot] = useState(false);
-  // const [visibleDTW, showDTWPlot] = useState(false);
-  const [visibleDTWJohnen, showDTWJohnenPlot] = useState(false);
-  // const [visibleDFD, showDFDPlot] = useState(false);
+  const [bahnInfo] = useState<BahnInfo[]>(bahnInfoDB);
+  const [currentBahnInfo, setCurrentBahnInfo] = useState<BahnInfo | null>(null);
+  const [currentBahnPoseIst, setCurrentBahnPoseIst] = useState<BahnPoseIst[]>(
+    [],
+  );
+  const [currentBahnTwistIst, setCurrentBahnTwistIst] = useState<
+    BahnTwistIst[]
+  >([]);
+  const [currentBahnAccelIst, setCurrentBahnAccelIst] = useState<
+    BahnAccelIst[]
+  >([]);
+  const [currentBahnPositionSoll, setCurrentBahnPositionSoll] = useState<
+    BahnPositionSoll[]
+  >([]);
+  const [currentBahnOrientationSoll, setCurrentBahnOrientationSoll] = useState<
+    BahnOrientationSoll[]
+  >([]);
+  const [currentBahnTwistSoll, setCurrentBahnTwistSoll] = useState<
+    BahnTwistSoll[]
+  >([]);
+  const [currentBahnJointStates, setCurrentBahnJointStates] = useState<
+    BahnJointStates[]
+  >([]);
+  const [currentBahnEvents, setCurrentBahnEvents] = useState<BahnEvents[]>([]);
 
   const contextValue = useMemo(
     () => ({
-      trajectoriesHeader,
-      segmentsHeader,
       bahnInfo,
+      currentBahnInfo,
+      setCurrentBahnInfo,
       currentBahnPoseIst,
       setCurrentBahnPoseIst,
       currentBahnTwistIst,
@@ -91,45 +96,24 @@ export const TrajectoryProvider = ({
       setCurrentBahnPositionSoll,
       currentBahnOrientationSoll,
       setCurrentBahnOrientationSoll,
-      currentTrajectory,
-      setCurrentTrajectory,
-      currentSegment,
-      setCurrentSegment,
-      currentEuclidean,
-      setCurrentEuclidean,
-      currentDTW,
-      setCurrentDTW,
-      currentDTWJohnen,
-      setCurrentDTWJohnen,
-      currentDFD,
-      setCurrentDFD,
-      currentLCSS,
-      setCurrentLCSS,
-      visibleEuclidean,
-      showEuclideanPlot,
-      visibleDTWJohnen,
-      showDTWJohnenPlot,
+      currentBahnTwistSoll,
+      setCurrentBahnTwistSoll,
+      currentBahnJointStates,
+      setCurrentBahnJointStates,
+      currentBahnEvents,
+      setCurrentBahnEvents,
     }),
     [
-      trajectoriesHeader,
-      segmentsHeader,
       bahnInfo,
+      currentBahnInfo,
       currentBahnPoseIst,
       currentBahnTwistIst,
       currentBahnAccelIst,
       currentBahnPositionSoll,
       currentBahnOrientationSoll,
-      currentTrajectory,
-      currentSegment,
-      currentEuclidean,
-      currentDTW,
-      currentDTWJohnen,
-      currentDFD,
-      currentLCSS,
-      visibleEuclidean,
-      // visibleDTW,
-      visibleDTWJohnen,
-      // visibleDFD,
+      currentBahnTwistSoll,
+      currentBahnJointStates,
+      currentBahnEvents,
     ],
   );
 

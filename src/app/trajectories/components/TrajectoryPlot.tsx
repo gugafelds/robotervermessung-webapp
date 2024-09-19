@@ -1,27 +1,20 @@
+/* eslint-disable react/button-has-type */
+
 'use client';
 
+import { CubeIcon } from '@heroicons/react/20/solid';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import dynamic from 'next/dynamic';
-import type { Layout, PlotData } from 'plotly.js';
+import { useState } from 'react';
 
 import { Typography } from '@/src/components/Typography';
-import {
-  dataPlotConfig,
-  heatMapLayoutConfig,
-  plotLayout2DConfigAcceleration,
-  plotLayout2DConfigDFDError,
-  plotLayout2DConfigDTWError,
-  plotLayout2DConfigDTWJohnenError,
-  plotLayout2DConfigEuclideanError,
-  plotLayout2DConfigLCSSError,
-  plotLayout2DConfigVelocity,
-  plotLayout2DConfigQuaternion,
-  plotLayoutConfig,
-} from '@/src/lib/plot-config';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
-import { BahnAccelIst, BahnPoseIst, BahnTwistIst } from '@/types/main';
 
-const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
+import { JointStatesPlot } from './JointStatesPlot';
+import { OrientationPlot } from './OrientationPlot';
+import { Position2DPlot } from './Position2DPlot';
+import SlideOver from './SlideOver';
+import { TCPAccelPlot } from './TCPAccelPlot';
+import { TCPSpeedPlot } from './TCPSpeedPlot';
 
 export const TrajectoryPlot = () => {
   const {
@@ -31,29 +24,13 @@ export const TrajectoryPlot = () => {
     currentBahnTwistIst,
     currentBahnAccelIst,
     currentBahnPositionSoll,
-    currentEuclidean,
-    currentDTW,
-    currentDFD,
-    currentDTWJohnen,
-    currentLCSS,
-    visibleEuclidean,
-    visibleDTWJohnen,
+    currentBahnOrientationSoll,
+    currentBahnJointStates,
+    currentBahnTwistSoll,
+    currentBahnEvents,
   } = useTrajectory();
 
-  const realTrajectory: Partial<PlotData> = {
-    ...dataPlotConfig('lines', 'ist', 6, 'rgb(217,26,96)'),
-    x: currentBahnPoseIst.map(row => row.xIst),
-    y: currentBahnPoseIst.map(row => row.yIst),
-    z: currentBahnPoseIst.map(row => row.zIst),
-  };
-
-  const idealTrajectory: Partial<PlotData> = {
-    ...dataPlotConfig('lines', 'soll', 6),
-    x: currentBahnPositionSoll.map(row => row.xSoll),
-    y: currentBahnPositionSoll.map(row => row.ySoll),
-    z: currentBahnPositionSoll.map(row => row.zSoll),
-  };
-
+  /*
   const euclideanDistancePlot: Partial<PlotData>[] =
     visibleEuclidean && currentEuclidean.euclideanIntersections
       ? currentEuclidean.euclideanIntersections.map(
@@ -105,141 +82,6 @@ export const TrajectoryPlot = () => {
           },
         }
       : {};
-
-    const createTcpSpeedPlot = (currentBahnTwistIst: BahnTwistIst[]): Partial<PlotData> => {
-        // Convert timestamps to seconds elapsed
-        const startTime = Math.min(...currentBahnTwistIst.map(bahn => Number(bahn.timestamp)));
-        const timestamps = currentBahnTwistIst.map(bahn => {
-        const elapsedNanoseconds = Number(bahn.timestamp) - startTime;
-        return elapsedNanoseconds / 1e9; // Convert to seconds
-        });
-
-        if (currentBahnTwistIst.length === 0) {
-          return {};
-        }
-      
-        return {
-          type: 'scatter',
-          mode: 'lines',
-          x: timestamps,
-          y: currentBahnTwistIst.map(bahn => bahn.tcpSpeedIst),
-          line: {
-            color: 'rgba(217,26,96, 0.8)',
-            width: 3,
-          },
-        };
-      };
-      
-      const tcpSpeedPlot = createTcpSpeedPlot(currentBahnTwistIst);
-
-
-
-    const createTcpAccelPlot = (currentBahnAccelIst: BahnAccelIst[]): Partial<PlotData> => {
-        // Convert timestamps to seconds elapsed
-        const startTime = Math.min(...currentBahnAccelIst.map(bahn => Number(bahn.timestamp)));
-        const timestamps = currentBahnAccelIst.map(bahn => {
-        const elapsedNanoseconds = Number(bahn.timestamp) - startTime;
-        return elapsedNanoseconds / 1e9; // Convert to seconds
-        });
-
-        if (currentBahnAccelIst.length === 0) {
-          return {};
-        }
-      
-        return {
-          type: 'scatter',
-          mode: 'lines',
-          x: timestamps,
-          y: currentBahnAccelIst.map(bahn => bahn.tcpAccelIst),
-          line: {
-            color: 'rgba(217,26,96, 0.8)',
-            width: 3,
-          },
-        };
-      };
-    
-      const tcpAccelPlot = createTcpAccelPlot(currentBahnAccelIst);
-    
-    
-
-    const createQuaternionPlotData = (currentBahnPoseIst: BahnPoseIst[]): { plotData: Partial<PlotData>[]; maxTime: number } => {
-      // Convert timestamps to seconds elapsed
-      const startTime = Math.min(...currentBahnPoseIst.map(bahn => Number(bahn.timestamp)));
-      const timestamps = currentBahnPoseIst.map(bahn => {
-        const elapsedNanoseconds = Number(bahn.timestamp) - startTime;
-        return elapsedNanoseconds / 1e9; // Convert to seconds
-      });
-      
-      const maxTime = Math.max(...timestamps);
-    
-      const baseConfig = {
-        type: 'scatter' as const,
-        mode: 'lines' as const,
-        x: timestamps,
-      };
-    
-      const plotData = [
-        {
-          ...baseConfig,
-          y: currentBahnPoseIst.map(bahn => bahn.qxIst),
-          name: 'qx',
-          line: { color: 'red' },
-        },
-        {
-          ...baseConfig,
-          y: currentBahnPoseIst.map(bahn => bahn.qyIst),
-          name: 'qy',
-          line: { color: 'green' },
-        },
-        {
-          ...baseConfig,
-          y: currentBahnPoseIst.map(bahn => bahn.qzIst),
-          name: 'qz',
-          line: { color: 'blue' },
-        },
-        {
-          ...baseConfig,
-          y: currentBahnPoseIst.map(bahn => bahn.qwIst),
-          name: 'qw',
-          line: { color: 'purple' },
-        },
-      ];
-    
-      return { plotData, maxTime };
-    };
-
-  const { plotData: quaternionPlotData, maxTime } = createQuaternionPlotData(currentBahnPoseIst);
-
-  const combinedLayoutQuaternion: Partial<Layout> = {
-    ...plotLayout2DConfigQuaternion,
-    title: 'Quaternion-Ist',
-    xaxis: { 
-      title: 's',
-      tickformat: '.0f',  // Display 3 decimal places
-      range: [0, maxTime],
-    },
-  };
-
-  const combinedLayoutAcceleration: Partial<Layout> = {
-    ...plotLayout2DConfigAcceleration,
-    annotations: !currentBahnAccelIst
-      ? [
-          {
-            xref: 'paper',
-            yref: 'paper',
-            x: 0.5,
-            y: 0.5,
-            text: 'keine Daten :(',
-            showarrow: false,
-            font: {
-              size: 15,
-              color: 'black',
-            },
-            align: 'center',
-          },
-        ]
-      : [],
-  };
 
   const dtwJohnenAccdistHeatmap: Partial<PlotData> =
     visibleDTWJohnen && currentDTWJohnen.dtwAccDist
@@ -516,6 +358,7 @@ export const TrajectoryPlot = () => {
         ]
       : [],
   };
+  */
 
   const searchedIndex = bahnID;
   const currentTrajectoryID = bahnInfo.findIndex(
@@ -533,142 +376,52 @@ export const TrajectoryPlot = () => {
     );
   }
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const [isSlideOverOpen, setIsSlideOverOpen] = useState(false);
+
+  const openSlideOver = () => setIsSlideOverOpen(true);
+  const closeSlideOver = () => setIsSlideOverOpen(false);
+
   return (
-    <div className="h-fullscreen flex-row overflow-scroll">
-      <div className="m-4 flex-row">
-        <Plot
-          data={[realTrajectory, idealTrajectory]}
-          useResizeHandler
-          layout={plotLayoutConfig}
-          config={{
-            displaylogo: false,
-            modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-            responsive: true,
-          }}
-        />
+    <div className="flex h-fullscreen w-full flex-wrap overflow-scroll p-4">
+      <SlideOver
+        title="3D-Plot"
+        open={isSlideOverOpen}
+        onClose={closeSlideOver}
+        realTrajectory={currentBahnPoseIst}
+        idealTrajectory={currentBahnPositionSoll}
+      />
 
-<Plot
-          data={quaternionPlotData}
-          useResizeHandler
-          layout={combinedLayoutQuaternion}
-          config={{
-            displaylogo: false,
-            modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-            responsive: true,
-          }}
-        />
-  
+      <Position2DPlot
+        currentBahnEvents={currentBahnEvents}
+        idealTrajectory={currentBahnPositionSoll}
+        currentBahnPoseIst={currentBahnPoseIst}
+      />
 
-        {visibleDTWJohnen && currentDTWJohnen.dtwAccDist && (
-          <Plot
-            data={[dtwJohnenAccdistHeatmap, dtwJohnenPathPlot]}
-            useResizeHandler
-            layout={heatMapLayoutConfig}
-            config={{
-              displaylogo: false,
-              modeBarButtonsToRemove: ['toImage', 'orbitRotation', 'pan2d'],
-              responsive: true,
-            }}
-          />
-        )}
+      <OrientationPlot
+        currentBahnOrientationSoll={currentBahnOrientationSoll}
+        currentBahnPoseIst={currentBahnPoseIst}
+      />
 
-        <div className="m-4 flex-row">
-          <Plot
-            className=""
-            data={[tcpSpeedPlot]}
-            useResizeHandler
-            layout={plotLayout2DConfigVelocity}
-            config={{
-              displaylogo: false,
-              modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-              responsive: true,
-            }}
-          />
+      <TCPSpeedPlot
+        currentBahnTwistIst={currentBahnTwistIst}
+        currentBahnTwistSoll={currentBahnTwistSoll}
+      />
 
-          <Plot
-            data={[tcpAccelPlot]}
-            useResizeHandler
-            layout={combinedLayoutAcceleration}
-            config={{
-              displaylogo: false,
-              modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-              responsive: true,
-            }}
-          />
-        </div>
+      <TCPAccelPlot
+        currentBahnAccelIst={currentBahnAccelIst}
+        currentBahnTwistSoll={currentBahnTwistSoll}
+      />
 
-        <div className="m-4 flex-row">
-          {currentEuclidean.euclideanDistances && (
-            <Plot
-              className=""
-              data={[euclideanErrorPlot, euclideanMaxErrorPlot]}
-              useResizeHandler
-              layout={combinedLayoutEuclideanError}
-              config={{
-                displaylogo: false,
-                modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-                responsive: true,
-              }}
-            />
-          )}
+      <JointStatesPlot currentBahnJointStates={currentBahnJointStates} />
 
-          {currentDTW.dtwDistances && (
-            <Plot
-              className=""
-              data={[dtwErrorPlot, dtwMaxErrorPlot]}
-              useResizeHandler
-              layout={combinedLayoutDTWError}
-              config={{
-                displaylogo: false,
-                modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-                responsive: true,
-              }}
-            />
-          )}
-
-          {currentDTWJohnen.dtwJohnenDistances && (
-            <Plot
-              className=""
-              data={[dtwJohnenErrorPlot, dtwJohnenMaxErrorPlot]}
-              useResizeHandler
-              layout={combinedLayoutDTWJohnenError}
-              config={{
-                displaylogo: false,
-                modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-                responsive: true,
-              }}
-            />
-          )}
-
-          {currentDFD.dfdDistances && (
-            <Plot
-              className=""
-              data={[dfdErrorPlot, dfdMaxErrorPlot]}
-              useResizeHandler
-              layout={combinedLayoutDFDError}
-              config={{
-                displaylogo: false,
-                modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-                responsive: true,
-              }}
-            />
-          )}
-
-          {currentDFD.dfdDistances && (
-            <Plot
-              className=""
-              data={[lcssErrorPlot, lcssMaxErrorPlot]}
-              useResizeHandler
-              layout={combinedLayoutLCSSError}
-              config={{
-                displaylogo: false,
-                modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-                responsive: true,
-              }}
-            />
-          )}
-        </div>
-      </div>
+      <button
+        onClick={openSlideOver}
+        className="fixed right-4 top-28 flex -translate-y-1/2 items-center rounded-lg bg-primary px-4 py-2 font-bold text-white shadow-lg transition duration-300 ease-in-out hover:bg-gray-800"
+      >
+        <CubeIcon className="mr-2 size-5" />
+        3D-Plot
+      </button>
     </div>
   );
 };

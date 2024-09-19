@@ -1,15 +1,30 @@
+'use client';
+
 import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/20/solid';
 import { Fragment, type ReactNode } from 'react';
+
+import type { BahnPoseIst, BahnPositionSoll } from '@/types/main'; // Adjust import path as needed
+
+import { Position3DPlot } from './Position3DPlot'; // Adjust import path as needed
 
 type ModalProps = {
   title: string | ReactNode;
   open: boolean;
   onClose: () => void;
-  children: ReactNode;
+  children?: ReactNode;
+  realTrajectory: BahnPoseIst[];
+  idealTrajectory: BahnPositionSoll[];
 };
 
-const SlideOver = ({ title, open, onClose, children }: ModalProps) => {
+const SlideOver = ({
+  title,
+  open,
+  onClose,
+  children,
+  realTrajectory,
+  idealTrajectory,
+}: ModalProps) => {
   return (
     <Transition.Root show={open} as={Fragment}>
       <Dialog as="div" className="relative z-10" onClose={onClose}>
@@ -37,7 +52,9 @@ const SlideOver = ({ title, open, onClose, children }: ModalProps) => {
                 leaveFrom="translate-x-0"
                 leaveTo="translate-x-full"
               >
-                <Dialog.Panel className="pointer-events-auto relative w-screen max-w-md">
+                <Dialog.Panel className="pointer-events-auto relative my-auto max-h-[90vh] w-screen max-w-xl">
+                  {' '}
+                  {/* Adjusted here */}
                   <Transition.Child
                     as={Fragment}
                     enter="ease-in-out duration-500"
@@ -51,7 +68,7 @@ const SlideOver = ({ title, open, onClose, children }: ModalProps) => {
                       <button
                         type="button"
                         className="relative rounded-md text-gray-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-white"
-                        onClick={() => onClose()}
+                        onClick={onClose}
                       >
                         <span className="absolute -inset-2.5" />
                         <span className="sr-only">Close panel</span>
@@ -59,13 +76,23 @@ const SlideOver = ({ title, open, onClose, children }: ModalProps) => {
                       </button>
                     </div>
                   </Transition.Child>
-                  <div className="flex h-full flex-col  overflow-y-scroll bg-white py-6 shadow-xl">
+                  <div className="flex h-full flex-col overflow-y-scroll bg-white py-6 shadow-xl">
                     <div className="px-4 sm:px-6">
                       <Dialog.Title className="text-2xl font-bold leading-6 text-gray-900">
                         {title}
                       </Dialog.Title>
                     </div>
-                    <div className="relative mt-6 flex-1">{children}</div>
+                    <div className="relative flex-1 px-4 sm:px-6">
+                      <div className="h-[calc(100%-100px)] w-full p-4">
+                        {' '}
+                        {/* Adjusted height */}
+                        <Position3DPlot
+                          realTrajectory={realTrajectory}
+                          idealTrajectory={idealTrajectory}
+                        />
+                      </div>
+                      {children}
+                    </div>
                   </div>
                 </Dialog.Panel>
               </Transition.Child>

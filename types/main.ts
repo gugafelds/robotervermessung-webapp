@@ -1,4 +1,4 @@
-import type { ObjectId, Timestamp } from 'mongodb';
+import type { ObjectId } from 'mongodb';
 
 export interface TrajectoryDataRaw {
   _id: ObjectId | string;
@@ -429,5 +429,81 @@ export interface BahnOrientationSollRaw {
   qy_soll: number;
   qz_soll: number;
   qw_soll: number;
+  source_data_soll: string;
+}
+
+export interface BahnTwistSoll {
+  id: number;
+  bahnId: string;
+  segmentId: string;
+  timestamp: string;
+  tcpSpeedSoll: number;
+  sourceDataSoll: string;
+}
+
+export interface BahnTwistSollRaw {
+  id: number;
+  bahn_id: string;
+  segment_id: string;
+  timestamp: string;
+  tcp_speed_soll: number;
+  source_data_soll: string;
+}
+
+export interface BahnJointStates {
+  id: number;
+  bahnId: string;
+  segmentId: string;
+  timestamp: string;
+  joint1: number;
+  joint2: number;
+  joint3: number;
+  joint4: number;
+  joint5: number;
+  joint6: number;
+  sourceDataSoll: string;
+}
+
+export interface BahnJointStatesRaw {
+  id: number;
+  bahn_id: string;
+  segment_id: string;
+  timestamp: string;
+  joint_1: number;
+  joint_2: number;
+  joint_3: number;
+  joint_4: number;
+  joint_5: number;
+  joint_6: number;
+  source_data_soll: string;
+}
+
+export interface BahnEvents {
+  id: number;
+  bahnId: string;
+  segmentId: string;
+  timestamp: string;
+  xReached: number;
+  yReached: number;
+  zReached: number;
+  qxReached: number;
+  qyReached: number;
+  qzReached: number;
+  qwReached: number;
+  sourceDataSoll: string;
+}
+
+export interface BahnEventsRaw {
+  id: number;
+  bahn_id: string;
+  segment_id: string;
+  timestamp: string;
+  x_reached: number;
+  y_reached: number;
+  z_reached: number;
+  qx_reached: number;
+  qy_reached: number;
+  qz_reached: number;
+  qw_reached: number;
   source_data_soll: string;
 }

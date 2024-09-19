@@ -1,5 +1,6 @@
-import { Pool } from 'pg';
 import dotenv from 'dotenv';
+// eslint-disable-next-line import/no-extraneous-dependencies
+import { Pool } from 'pg';
 
 dotenv.config();
 

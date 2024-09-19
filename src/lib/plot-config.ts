@@ -27,7 +27,7 @@ export const plotLayoutConfig: Partial<Layout> = {
     yref: 'paper',
     font: {
       size: 30,
-      family: 'Arial, sans-serif',
+      family: 'Helvetica',
       color: '#003560',
     },
   },
@@ -48,7 +48,7 @@ export const plotLayoutConfig: Partial<Layout> = {
     y: 0,
     traceorder: 'grouped',
     font: {
-      family: 'Tahoma, sans-serif',
+      family: 'Arial, sans-serif',
       size: 15,
     },
     bgcolor: '#E2E2E2',
@@ -71,6 +71,11 @@ export const plotLayout2DConfigQuaternion: Partial<Layout> = {
   height: 400,
   width: 600,
   margin: { l: 50, r: 50, b: 50, t: 50, pad: 4 },
+  font: {
+    size: 12,
+    family: 'Arial, sans-serif',
+    color: 'black',
+  },
 };
 
 export const plotLayout2DConfigVelocity: Partial<Layout> = {

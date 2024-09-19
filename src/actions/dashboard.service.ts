@@ -1,10 +1,29 @@
+'use server';
+
 import { revalidatePath } from 'next/cache';
 
-import { getMongoDb } from '@/src/lib/mongodb';
+import { queryPostgres } from '../lib/postgresql';
 
-export const getTrajectoriesCount = async () => {
-  const mongo = await getMongoDb();
+interface CountResult {
+  count: number;
+}
 
-  revalidatePath('/dashboard');
-  return mongo.collection('header').countDocuments();
+export const getBahnCount = async (): Promise<number> => {
+  try {
+    const result = await queryPostgres<CountResult>(
+      'SELECT COUNT(*) as count FROM bewegungsdaten.bahn_info',
+    );
+
+    revalidatePath('/dashboard');
+
+    if (result.length === 0) {
+      throw new Error('No result returned from count query');
+    }
+
+    return result[0].count;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching bahn count:', error);
+    throw error; // or handle it as appropriate for your application
+  }
 };

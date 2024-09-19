@@ -3,83 +3,89 @@
 import React, { useEffect } from 'react';
 
 import { TrajectoryInfo } from '@/src/app/trajectories/components/TrajectoryInfo';
-import { SegmentInfo } from '@/src/app/trajectories/components/SegmentInfo';
 import { TrajectoryPlot } from '@/src/app/trajectories/components/TrajectoryPlot';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 import type {
-  BahnPoseIst,
-  BahnTwistIst,
   BahnAccelIst,
-  TrajectoryData,
-  TrajectoryDFDMetrics,
-  TrajectoryDTWJohnenMetrics,
-  TrajectoryDTWMetrics,
-  TrajectoryEuclideanMetrics,
-  TrajectoryLCSSMetrics,
-  BahnPositionSoll,
+  BahnEvents,
+  BahnInfo,
+  BahnJointStates,
   BahnOrientationSoll,
+  BahnPoseIst,
+  BahnPositionSoll,
+  BahnTwistIst,
+  BahnTwistSoll,
 } from '@/types/main';
 
 type TrajectoryPageProps = {
-  currentTrajectory: TrajectoryData;
-  currentBahnPoseIst: BahnPoseIst;
-  currentBahnTwistIst: BahnTwistIst;
-  currentBahnAccelIst: BahnAccelIst;
-  currentBahnPositionSoll: BahnPositionSoll;
-  currentBahnOrientationSoll: BahnOrientationSoll;
-  currentDTWMetrics: TrajectoryDTWMetrics;
-  currentEuclideanMetrics: TrajectoryEuclideanMetrics;
-  currentDTWJohnenMetrics: TrajectoryDTWJohnenMetrics;
-  currentDFDMetrics: TrajectoryDFDMetrics;
-  currentLCSSMetrics: TrajectoryLCSSMetrics;
+  currentBahnInfo: BahnInfo;
+  currentBahnPoseIst: BahnPoseIst[];
+  currentBahnTwistIst: BahnTwistIst[];
+  currentBahnAccelIst: BahnAccelIst[];
+  currentBahnPositionSoll: BahnPositionSoll[];
+  currentBahnOrientationSoll: BahnOrientationSoll[];
+  currentBahnTwistSoll: BahnTwistSoll[];
+  currentBahnJointStates: BahnJointStates[];
+  currentBahnEvents: BahnEvents[];
 };
 
 export function TrajectoryWrapper({
-  currentTrajectory,
+  currentBahnInfo,
   currentBahnPoseIst,
   currentBahnTwistIst,
   currentBahnAccelIst,
   currentBahnPositionSoll,
   currentBahnOrientationSoll,
-  currentEuclideanMetrics,
-  currentDTWMetrics,
-  currentDTWJohnenMetrics,
-  currentDFDMetrics,
-  currentLCSSMetrics,
+  currentBahnTwistSoll,
+  currentBahnJointStates,
+  currentBahnEvents,
 }: TrajectoryPageProps) {
   const {
-    setCurrentTrajectory,
+    setCurrentBahnInfo,
     setCurrentBahnPoseIst,
     setCurrentBahnTwistIst,
     setCurrentBahnAccelIst,
     setCurrentBahnPositionSoll,
     setCurrentBahnOrientationSoll,
-    setCurrentEuclidean,
-    setCurrentDTWJohnen,
-    setCurrentLCSS,
-    setCurrentDTW,
-    setCurrentDFD,
+    setCurrentBahnTwistSoll,
+    setCurrentBahnJointStates,
+    setCurrentBahnEvents,
   } = useTrajectory();
 
   useEffect(() => {
-    setCurrentDTW(currentDTWMetrics);
-    setCurrentTrajectory(currentTrajectory);
-    setCurrentEuclidean(currentEuclideanMetrics);
-    setCurrentDTWJohnen(currentDTWJohnenMetrics);
-    setCurrentDFD(currentDFDMetrics);
-    setCurrentLCSS(currentLCSSMetrics);
+    setCurrentBahnInfo(currentBahnInfo);
     setCurrentBahnPoseIst(currentBahnPoseIst);
     setCurrentBahnTwistIst(currentBahnTwistIst);
     setCurrentBahnAccelIst(currentBahnAccelIst);
     setCurrentBahnPositionSoll(currentBahnPositionSoll);
     setCurrentBahnOrientationSoll(currentBahnOrientationSoll);
-  }, []);
+    setCurrentBahnTwistSoll(currentBahnTwistSoll);
+    setCurrentBahnJointStates(currentBahnJointStates);
+    setCurrentBahnEvents(currentBahnEvents);
+  }, [
+    currentBahnInfo,
+    currentBahnAccelIst,
+    currentBahnOrientationSoll,
+    currentBahnPoseIst,
+    currentBahnPositionSoll,
+    currentBahnTwistIst,
+    currentBahnTwistSoll,
+    currentBahnJointStates,
+    currentBahnEvents,
+    setCurrentBahnInfo,
+    setCurrentBahnAccelIst,
+    setCurrentBahnOrientationSoll,
+    setCurrentBahnPoseIst,
+    setCurrentBahnPositionSoll,
+    setCurrentBahnTwistIst,
+    setCurrentBahnTwistSoll,
+    setCurrentBahnJointStates,
+    setCurrentBahnEvents,
+  ]);
 
-  const isSegment = currentTrajectory.segmentId && currentTrajectory.segmentId.includes('_');
-  
   return (
     <>
-      {isSegment ? <SegmentInfo /> : <TrajectoryInfo />}
+      <TrajectoryInfo />
       <TrajectoryPlot />
     </>
   );
