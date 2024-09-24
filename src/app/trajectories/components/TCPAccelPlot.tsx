@@ -16,7 +16,6 @@ interface TCPAccelerationPlotProps {
 const calculateDerivative = (times: number[], values: number[]) => {
   const derivative = [];
   const derivativeTimes = times.slice(1);
-  // eslint-disable-next-line no-plusplus
   for (let i = 1; i < times.length; i++) {
     const dt = times[i] - times[i - 1];
     const dv = values[i] - values[i - 1];
@@ -39,17 +38,21 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
   currentBahnTwistSoll,
 }) => {
   const createTcpAccelPlot = () => {
+    // Find the global start time
+    const globalStartTime = Math.min(
+      ...currentBahnAccelIst.map((bahn) => Number(bahn.timestamp)),
+      ...currentBahnTwistSoll.map((bahn) => Number(bahn.timestamp))
+    );
+
     // Process Ist data
     const timestampsIst = currentBahnAccelIst.map((bahn) =>
-      Number(bahn.timestamp),
+      (Number(bahn.timestamp) - globalStartTime) / 1e9
     );
-    const linearTimeIst = createLinearTimeVector(timestampsIst);
 
     // Process Soll data
     const timestampsSoll = currentBahnTwistSoll.map((bahn) =>
-      Number(bahn.timestamp),
+      (Number(bahn.timestamp) - globalStartTime) / 1e9
     );
-    const linearTimeSoll = createLinearTimeVector(timestampsSoll);
 
     // Extract and smooth Soll speeds (use magnitude)
     const sollSpeeds = currentBahnTwistSoll.map((bahn) =>
@@ -58,7 +61,7 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
 
     // Calculate derived acceleration from Soll speed data
     const [derivativeTimes, derivativeValues] = calculateDerivative(
-      linearTimeSoll,
+      timestampsSoll,
       sollSpeeds,
     );
 
@@ -66,12 +69,12 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
     const derivativeMagnitudes = derivativeValues.map(Math.abs);
 
     // Calculate maxTime once, considering all relevant timestamps
-    const maxTimeAccel = Math.max(...linearTimeIst);
+    const maxTimeAccel = Math.max(...timestampsIst, ...timestampsSoll);
 
     const istPlot: Partial<PlotData> = {
       type: 'scatter',
       mode: 'lines',
-      x: linearTimeIst,
+      x: timestampsIst,
       y: currentBahnAccelIst.map((bahn) => Math.abs(bahn.tcpAccelIst)),
       line: {
         color: 'green',
@@ -108,7 +111,7 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
     },
     xaxis: {
       title: 's',
-      tickformat: '.0f',
+      tickformat: '.2f',
       range: [0, maxTimeAccel],
     },
     yaxis: { title: 'm/s²' },

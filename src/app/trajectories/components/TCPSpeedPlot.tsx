@@ -1,9 +1,6 @@
-'use client';
-
 import dynamic from 'next/dynamic';
 import type { Layout, PlotData } from 'plotly.js';
 import React from 'react';
-
 import type { BahnTwistIst, BahnTwistSoll } from '@/types/main';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -21,21 +18,21 @@ export const TCPSpeedPlot: React.FC<TCPSpeedPlotProps> = ({
     plotData: Partial<PlotData>[];
     maxTimeSpeed: number;
   } => {
-    // Process Ist data
-    const startTimeIst = Math.min(
+    // Find the global start time
+    const globalStartTime = Math.min(
       ...currentBahnTwistIst.map((bahn) => Number(bahn.timestamp)),
+      ...currentBahnTwistSoll.map((bahn) => Number(bahn.timestamp))
     );
+
+    // Process Ist data
     const timestampsIst = currentBahnTwistIst.map((bahn) => {
-      const elapsedNanoseconds = Number(bahn.timestamp) - startTimeIst;
+      const elapsedNanoseconds = Number(bahn.timestamp) - globalStartTime;
       return elapsedNanoseconds / 1e9; // Convert to seconds
     });
 
     // Process Soll data
-    const startTimeSoll = Math.min(
-      ...currentBahnTwistSoll.map((bahn) => Number(bahn.timestamp)),
-    );
     const timestampsSoll = currentBahnTwistSoll.map((bahn) => {
-      const elapsedNanoseconds = Number(bahn.timestamp) - startTimeSoll;
+      const elapsedNanoseconds = Number(bahn.timestamp) - globalStartTime;
       return elapsedNanoseconds / 1e9; // Convert to seconds
     });
 
@@ -80,7 +77,7 @@ export const TCPSpeedPlot: React.FC<TCPSpeedPlotProps> = ({
     },
     xaxis: {
       title: 's',
-      tickformat: '.0f',
+      tickformat: '.2f',
       range: [0, maxTimeSpeed],
     },
     yaxis: { title: 'mm/s' },

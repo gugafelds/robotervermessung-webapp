@@ -8,6 +8,7 @@ import { useState } from 'react';
 
 import { Typography } from '@/src/components/Typography';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
+import { ConsistencyCheck } from './ConsistencyCheck';
 
 import { JointStatesPlot } from './JointStatesPlot';
 import { OrientationPlot } from './OrientationPlot';
@@ -422,6 +423,19 @@ export const TrajectoryPlot = () => {
         <CubeIcon className="mr-2 size-5" />
         3D-Plot
       </button>
-    </div>
+
+
+      <ConsistencyCheck
+  currentBahnTwistIst={currentBahnTwistIst}
+  currentBahnTwistSoll={currentBahnTwistSoll}
+  currentBahnPoseIst={currentBahnPoseIst}
+  idealTrajectory={currentBahnPositionSoll}
+  currentBahnEvents={currentBahnEvents}
+  currentBahnOrientationSoll={currentBahnOrientationSoll}
+  currentBahnAccelIst={currentBahnAccelIst}
+  currentBahnJointStates={currentBahnJointStates}
+/>
+
+</div>
   );
 };

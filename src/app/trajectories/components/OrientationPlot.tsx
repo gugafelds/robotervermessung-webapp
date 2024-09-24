@@ -22,12 +22,15 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
     plotData: Partial<PlotData>[];
     maxTimeOrientation: number;
   } => {
-    // Process Ist data
-    const startTimeIst = Math.min(
+    // Find the global start time
+    const globalStartTime = Math.min(
       ...currentBahnPoseIst.map((bahn) => Number(bahn.timestamp)),
+      ...currentBahnOrientationSoll.map((bahn) => Number(bahn.timestamp))
     );
+
+    // Process Ist data
     const timestampsIst = currentBahnPoseIst.map((bahn) => {
-      const elapsedNanoseconds = Number(bahn.timestamp) - startTimeIst;
+      const elapsedNanoseconds = Number(bahn.timestamp) - globalStartTime;
       return elapsedNanoseconds / 1e9; // Convert to seconds
     });
     const eulerAnglesIst = currentBahnPoseIst.map((bahn) =>
@@ -35,11 +38,8 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
     );
 
     // Process Soll data
-    const startTimeSoll = Math.min(
-      ...currentBahnOrientationSoll.map((bahn) => Number(bahn.timestamp)),
-    );
     const timestampsSoll = currentBahnOrientationSoll.map((bahn) => {
-      const elapsedNanoseconds = Number(bahn.timestamp) - startTimeSoll;
+      const elapsedNanoseconds = Number(bahn.timestamp) - globalStartTime;
       return elapsedNanoseconds / 1e9; // Convert to seconds
     });
     const eulerAnglesSoll = currentBahnOrientationSoll.map((bahn) =>
@@ -114,7 +114,7 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
     },
     xaxis: {
       title: 's',
-      tickformat: '.0f',
+      tickformat: '.2f',
       range: [0, maxTimeOrientation],
     },
     yaxis: { title: '°' },

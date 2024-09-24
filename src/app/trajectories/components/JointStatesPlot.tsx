@@ -19,12 +19,14 @@ export const JointStatesPlot: React.FC<JointStatesPlotProps> = ({
     plotData: Partial<PlotData>[];
     maxTimeJoints: number;
   } => {
-    // Process data
-    const startTime = Math.min(
-      ...currentBahnJointStates.map((bahn) => Number(bahn.timestamp)),
+    // Find the global start time
+    const globalStartTime = Math.min(
+      ...currentBahnJointStates.map((bahn) => Number(bahn.timestamp))
     );
+
+    // Process data
     const timestamps = currentBahnJointStates.map((bahn) => {
-      const elapsedNanoseconds = Number(bahn.timestamp) - startTime;
+      const elapsedNanoseconds = Number(bahn.timestamp) - globalStartTime;
       return elapsedNanoseconds / 1e9; // Convert to seconds
     });
 
@@ -86,6 +88,7 @@ export const JointStatesPlot: React.FC<JointStatesPlotProps> = ({
       maxTimeJoints,
     };
   };
+
   const { plotData: jointStatesPlotData, maxTimeJoints } =
     createJointStatesPlot();
 
@@ -96,7 +99,7 @@ export const JointStatesPlot: React.FC<JointStatesPlotProps> = ({
     },
     xaxis: {
       title: 's',
-      tickformat: '.0f',
+      tickformat: '.2f',
       range: [0, maxTimeJoints],
     },
     yaxis: { title: '°' },
