@@ -206,7 +206,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
     font: {
       family: 'Helvetica',
     },
-    xaxis: { title: 's', range: [0, positionMaxTime] },
+    xaxis: { title: 's', range: [0, positionMaxTime], tickformat:'.2f' },
     yaxis: { title: 'mm' },
     legend: { orientation: 'h', y: -0.2 },
     hovermode: 'x unified',
