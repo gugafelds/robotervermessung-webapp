@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import dynamic from "next/dynamic";
-import type { Layout, PlotData } from "plotly.js";
-import React from "react";
+import dynamic from 'next/dynamic';
+import type { Layout, PlotData } from 'plotly.js';
+import React from 'react';
 
-import type { BahnAccelIst, BahnTwistSoll } from "@/types/main";
+import type { BahnAccelIst, BahnTwistSoll } from '@/types/main';
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 interface TCPAccelerationPlotProps {
   currentBahnAccelIst: BahnAccelIst[];
@@ -16,6 +16,7 @@ interface TCPAccelerationPlotProps {
 const calculateDerivative = (times: number[], values: number[]) => {
   const derivative = [];
   const derivativeTimes = times.slice(1);
+  // eslint-disable-next-line no-plusplus
   for (let i = 1; i < times.length; i++) {
     const dt = times[i] - times[i - 1];
     const dv = values[i] - values[i - 1];
@@ -63,27 +64,27 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
     const maxTimeAccel = Math.max(...timestampsIst, ...timestampsSoll);
 
     const istPlot: Partial<PlotData> = {
-      type: "scatter",
-      mode: "lines",
+      type: 'scatter',
+      mode: 'lines',
       x: timestampsIst,
       y: currentBahnAccelIst.map((bahn) => Math.abs(bahn.tcpAccelIst)),
       line: {
-        color: "green",
+        color: 'green',
         width: 3,
       },
-      name: "Beschleunigung-Ist",
+      name: 'Beschleunigung-Ist',
     };
 
     const sollPlot: Partial<PlotData> = {
-      type: "scatter",
-      mode: "lines",
+      type: 'scatter',
+      mode: 'lines',
       x: derivativeTimes,
       y: derivativeMagnitudes.map((value: number) => value / 1000),
       line: {
-        color: "lightgreen",
+        color: 'lightgreen',
         width: 3,
       },
-      name: "Abgeleitet-Soll",
+      name: 'Abgeleitet-Soll',
     };
 
     return {
@@ -96,18 +97,18 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
   const { plotData: tcpAccelPlotData, maxTimeAccel } = createTcpAccelPlot();
 
   const tcpAccelLayout: Partial<Layout> = {
-    title: "TCP-Beschleunigung",
+    title: 'TCP-Beschleunigung',
     font: {
-      family: "Helvetica",
+      family: 'Helvetica',
     },
     xaxis: {
-      title: "s",
-      tickformat: ".2f",
+      title: 's',
+      tickformat: '.2f',
       range: [0, maxTimeAccel],
     },
-    yaxis: { title: "m/s²" },
-    legend: { orientation: "h", y: -0.2 },
-    hovermode: "x unified",
+    yaxis: { title: 'm/s²' },
+    legend: { orientation: 'h', y: -0.2 },
+    hovermode: 'x unified',
   };
 
   return (
@@ -118,10 +119,10 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
         useResizeHandler
         config={{
           displaylogo: false,
-          modeBarButtonsToRemove: ["toImage", "orbitRotation"],
+          modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
           responsive: true,
         }}
-        style={{ width: "100%", height: "500px" }}
+        style={{ width: '100%', height: '500px' }}
       />
     </div>
   );

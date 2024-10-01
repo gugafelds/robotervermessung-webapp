@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react';
-import { useState } from 'react';
+import React, { useState } from 'react';
 
 type SearchFilterProps = {
   onFilterChange: (filter: string) => void;

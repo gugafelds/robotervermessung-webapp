@@ -118,40 +118,6 @@ export const transformLCSSMetricResult = (
   lcssThreshold: trajectoryRaw.lcss_threshold,
   metricType: trajectoryRaw.metric_type,
 });
-
-export const transformTrajectoriesDataResult = (
-  trajectoriesDataRaw: TrajectoryDataRaw[],
-): TrajectoryData[] => {
-  return trajectoriesDataRaw.map(
-    (trajectoryRaw): TrajectoryData => ({
-      _id: trajectoryRaw._id,
-      trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
-      timestampIst: trajectoryRaw.timestamp_ist,
-      xIst: trajectoryRaw.x_ist,
-      yIst: trajectoryRaw.y_ist,
-      zIst: trajectoryRaw.z_ist,
-      q1Ist: trajectoryRaw.q1_ist,
-      q2Ist: trajectoryRaw.q2_ist,
-      q3Ist: trajectoryRaw.q3_ist,
-      q4Ist: trajectoryRaw.q4_ist,
-      tcpVelocityIst: trajectoryRaw.tcp_velocity_ist,
-      tcpAcceleration: trajectoryRaw.tcp_acceleration,
-      jointStateIst: trajectoryRaw.joint_state_ist,
-      timestampSoll: trajectoryRaw.timestamp_soll,
-      xSoll: trajectoryRaw.x_soll,
-      ySoll: trajectoryRaw.y_soll,
-      zSoll: trajectoryRaw.z_soll,
-      q1Soll: trajectoryRaw.q1_soll,
-      q2Soll: trajectoryRaw.q2_soll,
-      q3Soll: trajectoryRaw.q3_soll,
-      q4Soll: trajectoryRaw.q4_soll,
-      tcpVelocitySoll: trajectoryRaw.tcp_velocity_soll,
-      jointStateSoll: trajectoryRaw.joint_state_soll,
-      segmentId: trajectoryRaw.segment_id,
-    }),
-  );
-};
-
 export const transformTrajectoriesHeadersResult = (
   trajectoriesRaw: TrajectoryHeaderRaw[],
 ): TrajectoryHeader[] => {

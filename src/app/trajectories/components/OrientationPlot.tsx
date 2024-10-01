@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import dynamic from "next/dynamic";
-import type { Layout, PlotData } from "plotly.js";
-import React from "react";
+import dynamic from 'next/dynamic';
+import type { Layout, PlotData } from 'plotly.js';
+import React from 'react';
 
-import { quaternionToEuler } from "@/src/lib/functions";
-import type { BahnOrientationSoll, BahnPoseIst } from "@/types/main";
+import { quaternionToEuler } from '@/src/lib/functions';
+import type { BahnOrientationSoll, BahnPoseIst } from '@/types/main';
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 interface OrientationPlotProps {
   currentBahnPoseIst: BahnPoseIst[];
@@ -51,53 +51,53 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
     const plotData: Partial<PlotData>[] = [
       // Ist data
       {
-        type: "scatter",
-        mode: "lines",
+        type: 'scatter',
+        mode: 'lines',
         x: timestampsIst,
         y: eulerAnglesIst.map((angles) => angles[0]),
-        name: "Roll (Ist)",
-        line: { color: "red" },
+        name: 'Roll (Ist)',
+        line: { color: 'red' },
       },
       {
-        type: "scatter",
-        mode: "lines",
+        type: 'scatter',
+        mode: 'lines',
         x: timestampsIst,
         y: eulerAnglesIst.map((angles) => angles[1]),
-        name: "Pitch (Ist)",
-        line: { color: "green" },
+        name: 'Pitch (Ist)',
+        line: { color: 'green' },
       },
       {
-        type: "scatter",
-        mode: "lines",
+        type: 'scatter',
+        mode: 'lines',
         x: timestampsIst,
         y: eulerAnglesIst.map((angles) => angles[2]),
-        name: "Yaw (Ist)",
-        line: { color: "blue" },
+        name: 'Yaw (Ist)',
+        line: { color: 'blue' },
       },
       // Soll data
       {
-        type: "scatter",
-        mode: "lines",
+        type: 'scatter',
+        mode: 'lines',
         x: timestampsSoll,
         y: eulerAnglesSoll.map((angles) => angles[0]),
-        name: "Roll (Soll)",
-        line: { color: "pink" },
+        name: 'Roll (Soll)',
+        line: { color: 'pink' },
       },
       {
-        type: "scatter",
-        mode: "lines",
+        type: 'scatter',
+        mode: 'lines',
         x: timestampsSoll,
         y: eulerAnglesSoll.map((angles) => angles[1]),
-        name: "Pitch (Soll)",
-        line: { color: "lightgreen" },
+        name: 'Pitch (Soll)',
+        line: { color: 'lightgreen' },
       },
       {
-        type: "scatter",
-        mode: "lines",
+        type: 'scatter',
+        mode: 'lines',
         x: timestampsSoll,
         y: eulerAnglesSoll.map((angles) => angles[2]),
-        name: "Yaw (Soll)",
-        line: { color: "lightblue" },
+        name: 'Yaw (Soll)',
+        line: { color: 'lightblue' },
       },
     ];
     return { plotData, maxTimeOrientation };
@@ -107,18 +107,18 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
     createCombinedEulerAnglePlotData();
 
   const combinedEulerLayout: Partial<Layout> = {
-    title: "Euler-Winkel",
+    title: 'Euler-Winkel',
     font: {
-      family: "Helvetica",
+      family: 'Helvetica',
     },
     xaxis: {
-      title: "s",
-      tickformat: ".2f",
+      title: 's',
+      tickformat: '.2f',
       range: [0, maxTimeOrientation],
     },
-    yaxis: { title: "°" },
-    legend: { orientation: "h", y: -0.2 },
-    hovermode: "x unified",
+    yaxis: { title: '°' },
+    legend: { orientation: 'h', y: -0.2 },
+    hovermode: 'x unified',
   };
 
   return (
@@ -129,10 +129,10 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
         useResizeHandler
         config={{
           displaylogo: false,
-          modeBarButtonsToRemove: ["toImage", "orbitRotation"],
+          modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
           responsive: true,
         }}
-        style={{ width: "100%", height: "500px" }}
+        style={{ width: '100%', height: '500px' }}
       />
     </div>
   );

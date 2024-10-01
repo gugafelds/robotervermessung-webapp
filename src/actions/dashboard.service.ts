@@ -32,6 +32,7 @@ export const getBahnCount = async (): Promise<number> => {
 
     return result[0].count;
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error fetching bahn count:', error);
     throw error;
   }
@@ -70,6 +71,7 @@ export const getComponentPointCounts = async (): Promise<
       {} as Record<string, number>,
     );
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error fetching component point counts:', error);
     throw error;
   }

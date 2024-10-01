@@ -1,5 +1,6 @@
-import dotenv from "dotenv";
-import { Pool, QueryResultRow } from "pg";
+import dotenv from 'dotenv';
+import type { QueryResultRow } from 'pg';
+import { Pool } from 'pg';
 
 dotenv.config();
 
@@ -11,7 +12,7 @@ export function getPostgresPool(): Pool {
       user: process.env.POSTGRES_USER,
       password: process.env.POSTGRES_PASSWORD,
       host: process.env.POSTGRES_HOST,
-      port: parseInt(process.env.POSTGRES_PORT || "5432", 10),
+      port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
       database: process.env.POSTGRES_DB,
     });
   }

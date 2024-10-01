@@ -1,22 +1,21 @@
 /* eslint-disable react/button-has-type */
 
-"use client";
+'use client';
 
-import { CubeIcon } from "@heroicons/react/20/solid";
-import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
-import { useState } from "react";
-import React from "react";
+import { CubeIcon } from '@heroicons/react/20/solid';
+import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import React, { useState } from 'react';
 
-import { Typography } from "@/src/components/Typography";
-import { useTrajectory } from "@/src/providers/trajectory.provider";
-import { ConsistencyCheck } from "./ConsistencyCheck";
+import { Typography } from '@/src/components/Typography';
+import { useTrajectory } from '@/src/providers/trajectory.provider';
 
-import { JointStatesPlot } from "./JointStatesPlot";
-import { OrientationPlot } from "./OrientationPlot";
-import { Position2DPlot } from "./Position2DPlot";
-import SlideOver from "./SlideOver";
-import { TCPAccelPlot } from "./TCPAccelPlot";
-import { TCPSpeedPlot } from "./TCPSpeedPlot";
+import { ConsistencyCheck } from './ConsistencyCheck';
+import { JointStatesPlot } from './JointStatesPlot';
+import { OrientationPlot } from './OrientationPlot';
+import { Position2DPlot } from './Position2DPlot';
+import SlideOver from './SlideOver';
+import { TCPAccelPlot } from './TCPAccelPlot';
+import { TCPSpeedPlot } from './TCPSpeedPlot';
 
 export const TrajectoryPlot = () => {
   const {
@@ -379,6 +378,7 @@ export const TrajectoryPlot = () => {
     );
   }
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [isSlideOverOpen, setIsSlideOverOpen] = useState(false);
 
   const openSlideOver = () => setIsSlideOverOpen(true);

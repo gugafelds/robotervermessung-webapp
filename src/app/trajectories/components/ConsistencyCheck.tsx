@@ -1,16 +1,17 @@
-"use client";
+'use client';
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
+
 import type {
-  BahnTwistIst,
-  BahnTwistSoll,
+  BahnAccelIst,
+  BahnEvents,
+  BahnJointStates,
+  BahnOrientationSoll,
   BahnPoseIst,
   BahnPositionSoll,
-  BahnEvents,
-  BahnOrientationSoll,
-  BahnAccelIst,
-  BahnJointStates,
-} from "@/types/main";
+  BahnTwistIst,
+  BahnTwistSoll,
+} from '@/types/main';
 
 interface ConsistencyCheckProps {
   currentBahnPoseIst: BahnPoseIst[];
@@ -53,7 +54,7 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
     const checkConsistency = () => {
       try {
         if (currentBahnEvents.length < 2) {
-          throw new Error("Not enough events to define a range");
+          throw new Error('Not enough events to define a range');
         }
 
         const firstEventTime = Number(currentBahnEvents[0].timestamp);
@@ -96,7 +97,7 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
               intervals.reduce((a, b) => a + b, 0) / intervals.length;
             const stdDevInterval = Math.sqrt(
               intervals
-                .map((x) => Math.pow(x - avgInterval, 2))
+                .map((x) => (x - avgInterval) ** 2)
                 .reduce((a, b) => a + b, 0) / intervals.length,
             );
             const maxGap = Math.max(...intervals);
@@ -123,8 +124,8 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
         setMetrics(newMetrics);
         setError(null);
       } catch (e) {
-        console.error("Error in consistency check:", e);
-        setError(isError(e) ? e.message : "An unknown error occurred");
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define
+        setError(isError(e) ? e.message : 'An unknown error occurred');
       }
     };
 
@@ -142,8 +143,8 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
 
   if (error) {
     return (
-      <div className="p-4 border rounded-md mb-4 bg-red-100">
-        <h2 className="text-lg font-semibold mb-2">
+      <div className="mb-4 rounded-md border bg-red-100 p-4">
+        <h2 className="mb-2 text-lg font-semibold">
           Fehler bei der Konsistenzprüfung
         </h2>
         <p className="text-red-600">{error}</p>
@@ -152,12 +153,12 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
   }
 
   return (
-    <div className="p-4 border rounded-md mb-4">
-      <h2 className="text-lg font-semibold mb-2">Konsistenzmetriken</h2>
+    <div className="mb-4 rounded-md border p-4">
+      <h2 className="mb-2 text-lg font-semibold">Konsistenzmetriken</h2>
       {timeRange && (
         <p className="mb-2">
-          Analyse durchgeführt für Daten zwischen{" "}
-          {new Date(timeRange.start / 1e6).toISOString()} und{" "}
+          Analyse durchgeführt für Daten zwischen{' '}
+          {new Date(timeRange.start / 1e6).toISOString()} und{' '}
           {new Date(timeRange.end / 1e6).toISOString()}
         </p>
       )}
