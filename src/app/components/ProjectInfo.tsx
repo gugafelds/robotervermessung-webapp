@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
+import Link from "next/link";
+import React from "react";
 
-import { Typography } from '@/src/components/Typography';
+import { Typography } from "@/src/components/Typography";
 
 export const ProjectInfo = () => {
   return (
@@ -69,13 +70,13 @@ export const ProjectInfo = () => {
       <div className="mt-8 flex flex-col rounded-lg bg-gray-100 p-4">
         <Typography as="h6" className="block">
           Das Forschungsprojekt wird von der Deutschen Forschungsgemeinschaft
-          (DFG) unter der Projektnummer{' '}
+          (DFG) unter der Projektnummer{" "}
           <Link
             href="https://gepris.dfg.de/gepris/projekt/515675259"
             className="border-b-2 border-dotted border-b-black font-extrabold"
           >
             515675259
-          </Link>{' '}
+          </Link>{" "}
           gefördert.
         </Typography>
       </div>

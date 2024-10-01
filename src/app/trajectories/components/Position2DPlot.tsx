@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import dynamic from 'next/dynamic';
-import type { Layout, PlotData } from 'plotly.js';
-import React from 'react';
+import dynamic from "next/dynamic";
+import type { Layout, PlotData } from "plotly.js";
+import React from "react";
 
-import type { BahnEvents, BahnPoseIst, BahnPositionSoll } from '@/types/main';
+import type { BahnEvents, BahnPoseIst, BahnPositionSoll } from "@/types/main";
 
-const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
+const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
 interface Position2DPlotProps {
   idealTrajectory: BahnPositionSoll[];
@@ -87,111 +87,111 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
     const plotData: Partial<PlotData>[] = [
       // X Position
       {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'X Position Soll',
+        type: "scatter",
+        mode: "lines",
+        name: "X Position Soll",
         x: positionSollData.map((d) => d.x),
         y: positionSollData.map((d) => d.xPos),
-        line: { color: 'blue', width: 2 },
+        line: { color: "blue", width: 2 },
       },
       {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'X Position Ist',
+        type: "scatter",
+        mode: "lines",
+        name: "X Position Ist",
         x: positionIstData.map((d) => d.x),
         y: positionIstData.map((d) => d.xPos),
-        line: { color: 'darkblue', width: 2 },
+        line: { color: "darkblue", width: 2 },
       },
       {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'X Position Achieved',
+        type: "scatter",
+        mode: "lines",
+        name: "X Position Achieved",
         x: xAchievedData.x,
         y: xAchievedData.y,
-        line: { color: 'lightblue', width: 2, shape: 'hv' },
+        line: { color: "lightblue", width: 2, shape: "hv" },
         showlegend: false,
       },
       {
-        type: 'scatter',
-        mode: 'markers',
-        name: 'X Position Achieved',
+        type: "scatter",
+        mode: "markers",
+        name: "X Position Achieved",
         x: currentBahnEvents.map(
           (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
         ),
         y: currentBahnEvents.map((b) => b.xReached),
-        marker: { color: 'blue', size: 8, symbol: 'circle' },
+        marker: { color: "blue", size: 8, symbol: "circle" },
       },
       // Y Position
       {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Y Position Soll',
+        type: "scatter",
+        mode: "lines",
+        name: "Y Position Soll",
         x: positionSollData.map((d) => d.x),
         y: positionSollData.map((d) => d.yPos),
-        line: { color: 'green', width: 2 },
+        line: { color: "green", width: 2 },
       },
       {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Y Position Ist',
+        type: "scatter",
+        mode: "lines",
+        name: "Y Position Ist",
         x: positionIstData.map((d) => d.x),
         y: positionIstData.map((d) => d.yPos),
-        line: { color: 'darkgreen', width: 2 },
+        line: { color: "darkgreen", width: 2 },
       },
       {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Y Position Achieved',
+        type: "scatter",
+        mode: "lines",
+        name: "Y Position Achieved",
         x: yAchievedData.x,
         y: yAchievedData.y,
-        line: { color: 'lightgreen', width: 2, shape: 'hv' },
+        line: { color: "lightgreen", width: 2, shape: "hv" },
         showlegend: false,
       },
       {
-        type: 'scatter',
-        mode: 'markers',
-        name: 'Y Position Achieved',
+        type: "scatter",
+        mode: "markers",
+        name: "Y Position Achieved",
         x: currentBahnEvents.map(
           (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
         ),
         y: currentBahnEvents.map((b) => b.yReached),
-        marker: { color: 'green', size: 8, symbol: 'circle' },
+        marker: { color: "green", size: 8, symbol: "circle" },
       },
       // Z Position
       {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Z Position Soll',
+        type: "scatter",
+        mode: "lines",
+        name: "Z Position Soll",
         x: positionSollData.map((d) => d.x),
         y: positionSollData.map((d) => d.zPos),
-        line: { color: 'red', width: 2 },
+        line: { color: "red", width: 2 },
       },
       {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Z Position Ist',
+        type: "scatter",
+        mode: "lines",
+        name: "Z Position Ist",
         x: positionIstData.map((d) => d.x),
         y: positionIstData.map((d) => d.zPos),
-        line: { color: 'darkred', width: 2 },
+        line: { color: "darkred", width: 2 },
       },
       {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Z Position Achieved',
+        type: "scatter",
+        mode: "lines",
+        name: "Z Position Achieved",
         x: zAchievedData.x,
         y: zAchievedData.y,
-        line: { color: 'pink', width: 2, shape: 'hv' },
+        line: { color: "pink", width: 2, shape: "hv" },
         showlegend: false,
       },
       {
-        type: 'scatter',
-        mode: 'markers',
-        name: 'Z Position Achieved',
+        type: "scatter",
+        mode: "markers",
+        name: "Z Position Achieved",
         x: currentBahnEvents.map(
           (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
         ),
         y: currentBahnEvents.map((b) => b.zReached),
-        marker: { color: 'red', size: 8, symbol: 'circle' },
+        marker: { color: "red", size: 8, symbol: "circle" },
       },
     ];
 
@@ -202,14 +202,14 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
     createCombinedPositionPlot();
 
   const combinedPositionLayout: Partial<Layout> = {
-    title: 'Position',
+    title: "Position",
     font: {
-      family: 'Helvetica',
+      family: "Helvetica",
     },
-    xaxis: { title: 's', range: [0, positionMaxTime], tickformat:'.2f' },
-    yaxis: { title: 'mm' },
-    legend: { orientation: 'h', y: -0.2 },
-    hovermode: 'x unified',
+    xaxis: { title: "s", range: [0, positionMaxTime], tickformat: ".2f" },
+    yaxis: { title: "mm" },
+    legend: { orientation: "h", y: -0.2 },
+    hovermode: "x unified",
   };
 
   return (
@@ -220,10 +220,10 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
         useResizeHandler
         config={{
           displaylogo: false,
-          modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+          modeBarButtonsToRemove: ["toImage", "orbitRotation"],
           responsive: true,
         }}
-        style={{ width: '100%', height: '500px' }}
+        style={{ width: "100%", height: "500px" }}
       />
     </div>
   );

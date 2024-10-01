@@ -1,15 +1,14 @@
-import dynamic from 'next/dynamic';
-import type { Layout, PlotData } from 'plotly.js';
-import React from 'react';
-import type { BahnTwistIst, BahnTwistSoll } from '@/types/main';
+import dynamic from "next/dynamic";
+import type { Layout, PlotData } from "plotly.js";
+import React from "react";
+import type { BahnTwistIst, BahnTwistSoll } from "@/types/main";
 
-const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
+const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
 interface TCPSpeedPlotProps {
   currentBahnTwistIst: BahnTwistIst[];
   currentBahnTwistSoll: BahnTwistSoll[];
 }
-
 export const TCPSpeedPlot: React.FC<TCPSpeedPlotProps> = ({
   currentBahnTwistIst,
   currentBahnTwistSoll,
@@ -21,7 +20,7 @@ export const TCPSpeedPlot: React.FC<TCPSpeedPlotProps> = ({
     // Find the global start time
     const globalStartTime = Math.min(
       ...currentBahnTwistIst.map((bahn) => Number(bahn.timestamp)),
-      ...currentBahnTwistSoll.map((bahn) => Number(bahn.timestamp))
+      ...currentBahnTwistSoll.map((bahn) => Number(bahn.timestamp)),
     );
 
     // Process Ist data
@@ -39,27 +38,27 @@ export const TCPSpeedPlot: React.FC<TCPSpeedPlotProps> = ({
     const maxTimeSpeed = Math.max(...timestampsIst, ...timestampsSoll);
 
     const istPlot: Partial<PlotData> = {
-      type: 'scatter',
-      mode: 'lines',
+      type: "scatter",
+      mode: "lines",
       x: timestampsIst,
       y: currentBahnTwistIst.map((bahn) => bahn.tcpSpeedIst),
       line: {
-        color: 'blue',
+        color: "blue",
         width: 3,
       },
-      name: 'TCP-Geschwindigkeit (Ist)',
+      name: "TCP-Geschwindigkeit (Ist)",
     };
 
     const sollPlot: Partial<PlotData> = {
-      type: 'scatter',
-      mode: 'lines',
+      type: "scatter",
+      mode: "lines",
       x: timestampsSoll,
       y: currentBahnTwistSoll.map((bahn) => bahn.tcpSpeedSoll),
       line: {
-        color: 'lightblue',
+        color: "lightblue",
         width: 3,
       },
-      name: 'TCP-Geschwindigkeit (Soll)',
+      name: "TCP-Geschwindigkeit (Soll)",
     };
 
     return {
@@ -71,18 +70,18 @@ export const TCPSpeedPlot: React.FC<TCPSpeedPlotProps> = ({
   const { plotData: tcpSpeedPlotData, maxTimeSpeed } = createTcpSpeedPlot();
 
   const tcpSpeedLayout: Partial<Layout> = {
-    title: 'TCP-Geschwindigkeit',
+    title: "TCP-Geschwindigkeit",
     font: {
-      family: 'Helvetica',
+      family: "Helvetica",
     },
     xaxis: {
-      title: 's',
-      tickformat: '.2f',
+      title: "s",
+      tickformat: ".2f",
       range: [0, maxTimeSpeed],
     },
-    yaxis: { title: 'mm/s' },
-    legend: { orientation: 'h', y: -0.2 },
-    hovermode: 'x unified',
+    yaxis: { title: "mm/s" },
+    legend: { orientation: "h", y: -0.2 },
+    hovermode: "x unified",
   };
 
   return (
@@ -93,10 +92,10 @@ export const TCPSpeedPlot: React.FC<TCPSpeedPlotProps> = ({
         useResizeHandler
         config={{
           displaylogo: false,
-          modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+          modeBarButtonsToRemove: ["toImage", "orbitRotation"],
           responsive: true,
         }}
-        style={{ width: '100%', height: '500px' }}
+        style={{ width: "100%", height: "500px" }}
       />
     </div>
   );

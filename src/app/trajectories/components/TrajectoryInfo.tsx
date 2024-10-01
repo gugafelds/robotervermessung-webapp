@@ -1,162 +1,196 @@
-'use client';
+"use client";
 
-import ErrorIcon from '@heroicons/react/24/outline/FaceFrownIcon';
-import InfoIcon from '@heroicons/react/24/outline/InformationCircleIcon';
-import React from 'react';
+import ErrorIcon from "@heroicons/react/24/outline/FaceFrownIcon";
+import InfoIcon from "@heroicons/react/24/outline/InformationCircleIcon";
+import React from "react";
 
-import { Typography } from '@/src/components/Typography';
-import { formatDate, formatNumber } from '@/src/lib/functions';
-import { useTrajectory } from '@/src/providers/trajectory.provider';
+import { Typography } from "@/src/components/Typography";
+import { formatDate, formatNumber } from "@/src/lib/functions";
+import { useTrajectory } from "@/src/providers/trajectory.provider";
+
+interface InfoRowProps {
+  label: string;
+  value: React.ReactNode;
+  singleColumn?: boolean;
+}
+
+interface InfoSectionProps {
+  title: string;
+  children: React.ReactNode;
+}
 
 export const TrajectoryInfo = () => {
   const { currentBahnInfo } = useTrajectory();
 
+  const InfoRow: React.FC<InfoRowProps> = ({
+    label,
+    value,
+    singleColumn = false,
+  }) => (
+    <div
+      className={`border-b border-gray-100 py-2 text-base ${singleColumn ? "flex flex-col" : "flex justify-between"}`}
+    >
+      <span className="font-medium">{singleColumn ? `${label}:` : label}</span>
+      <span
+        className={`font-semibold text-[#003560] ${singleColumn ? "mt-1" : ""}`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+
+  const InfoSection: React.FC<InfoSectionProps> = ({ title, children }) => (
+    <div className="mb-5 rounded-lg border-l-4 border-[#003560] bg-white p-5 shadow-md">
+      <h3 className="mb-4 text-xl font-bold text-[#003560]">{title}</h3>
+      {children}
+    </div>
+  );
+
   if (currentBahnInfo === null) {
     return (
       <span className="flex flex-row justify-center p-10">
-        <Typography as="h2">keine Trajektorie gefunden</Typography>
+        <Typography as="h2">keine Bahn gefunden</Typography>
         <span>
-          <ErrorIcon className="mx-2 my-0.5 w-7 " />
+          <ErrorIcon className="mx-2 my-0.5 w-7 text-[#003560]" />
         </span>
       </span>
     );
   }
 
-  /*
-  const metricGroups = [
-    {
-      title: 'Euklidischer Abst.',
-      data: currentEuclidean,
-      max: 'euclideanMaxDistance',
-      avg: 'euclideanAverageDistance',
-      errorMsg: 'Keine euklidischen Metriken.',
-    },
-    {
-      title: 'DTW',
-      data: currentDTW,
-      max: 'dtwMaxDistance',
-      avg: 'dtwAverageDistance',
-      errorMsg: 'Keine DTW-Standardmetriken.',
-    },
-    {
-      title: 'DTW-SI',
-      data: currentDTWJohnen,
-      max: 'dtwJohnenMaxDistance',
-      avg: 'dtwJohnenAverageDistance',
-      errorMsg: 'Keine DTW-Johnen-Metriken.',
-    },
-    {
-      title: 'Diskr. Fréchet',
-      data: currentDFD,
-      max: 'dfdMaxDistance',
-      avg: 'dfdAverageDistance',
-      errorMsg: 'Keine DFD-Metriken.',
-    },
-    {
-      title: 'LCSS',
-      data: currentLCSS,
-      max: 'lcssMaxDistance',
-      avg: 'lcssAverageDistance',
-      errorMsg: 'Keine LCSS-Metriken.',
-    },
-  ];
-  */
   return (
-    <div className="flex h-full w-auto flex-col bg-gray-50 p-2 lg:h-fullscreen lg:w-3/12 lg:overflow-scroll">
+    <div className="flex h-full w-auto flex-col bg-gray-50 p-4 lg:h-fullscreen lg:w-3/12 lg:overflow-scroll">
       <span className="inline-flex">
-        <InfoIcon className="w-8" />
-        <span className="mx-2 my-4 flex text-2xl font-semibold text-primary">
+        <InfoIcon className="w-8 text-[#003560]" />
+        <span className="mx-2 my-4 flex text-2xl font-semibold text-[#003560]">
           bahn info
         </span>
       </span>
 
       {currentBahnInfo && Object.keys(currentBahnInfo).length !== 0 && (
-        <ul>
-          <li className="px-4 text-lg font-bold text-primary">
-            {`Aufnahmedatei:`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${currentBahnInfo.recordFilename || 'n. a.'}`}
-            </span>
-          </li>
-          <li className="px-4 text-lg font-bold text-primary">
-            {`Roboter:`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${currentBahnInfo.robotModel || 'n. a.'}`}
-            </span>
-          </li>
-          <li className="px-4 text-lg font-bold text-primary">
-            {`Startzeitpunkt:`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${currentBahnInfo.startTime ? formatDate(currentBahnInfo.startTime) : 'n. a.'}`}
-            </span>
-          </li>
-          <li className="px-4 text-lg font-bold text-primary">
-            {`Endzeitpunkt:`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${currentBahnInfo.startTime ? formatDate(currentBahnInfo.endTime) : 'n. a.'}`}
-            </span>
-          </li>
-          <li className="px-4 text-lg font-bold text-primary">
-            {`Anzahl der Ereignisse:`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${formatNumber(currentBahnInfo.numberPoints) || 'n. a.'}`}
-            </span>
-          </li>
-          <li className="px-4 text-lg font-bold text-primary">
-            {`Abtastrate (Pose Ist):`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${formatNumber(currentBahnInfo.frequencyPoseIst) || 'n. a.'} Hz`}
-            </span>
-          </li>
-          <li className="px-4 text-lg font-bold text-primary">
-            {`Abtastrate (Twist Ist):`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${formatNumber(currentBahnInfo.frequencyTwistIst) || 'n. a.'} Hz`}
-            </span>
-          </li>
-          <li className="px-4 text-lg font-bold text-primary">
-            {`Abtastrate (Accel Ist):`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${formatNumber(currentBahnInfo.frequencyAccelIst) || 'n. a.'} Hz`}
-            </span>
-          </li>
-          <li className="px-4 text-lg font-bold text-primary">
-            {`Abtastrate (Position Soll):`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${formatNumber(currentBahnInfo.frequencyPositionSoll) || 'n. a.'} Hz`}
-            </span>
-          </li>
-          <li className="px-4 text-lg font-bold text-primary">
-            {`Abtastrate (Rotation Soll):`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${formatNumber(currentBahnInfo.frequencyOrientationSoll) || 'n. a.'} Hz`}
-            </span>
-          </li>
-          <li className="px-4 text-lg font-bold text-primary">
-            {`Abtastrate (Twist Soll):`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${formatNumber(currentBahnInfo.frequencyTwistSoll) || 'n. a.'} Hz`}
-            </span>
-          </li>
-          <li className="px-4 text-lg font-bold text-primary">
-            {`Abtastrate (Joint States):`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${formatNumber(currentBahnInfo.frequencyJointStates) || 'n. a.'} Hz`}
-            </span>
-          </li>
-          <li className="px-4 text-lg font-bold text-primary">
-            {`Datenquelle (Ist):`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${currentBahnInfo.sourceDataIst || 'n. a.'}`}
-            </span>
-          </li>
-          <li className="mb-2 px-4 text-lg font-bold text-primary">
-            {`Datenquelle (Soll):`}{' '}
-            <span className="text-lg font-light text-primary">
-              {`${currentBahnInfo.sourceDataSoll || 'n. a.'}`}
-            </span>
-          </li>
-        </ul>
+        <>
+          <InfoSection title="Allgemein">
+            <InfoRow
+              label="Datei"
+              value={currentBahnInfo.recordFilename || "n. a."}
+              singleColumn
+            />
+            <InfoRow
+              label="Roboter"
+              value={currentBahnInfo.robotModel || "n. a."}
+              singleColumn
+            />
+            <InfoRow
+              label="Startzeitpunkt"
+              value={
+                currentBahnInfo.startTime
+                  ? formatDate(currentBahnInfo.startTime)
+                  : "n. a."
+              }
+              singleColumn
+            />
+            <InfoRow
+              label="Endzeitpunkt"
+              value={
+                currentBahnInfo.endTime
+                  ? formatDate(currentBahnInfo.endTime)
+                  : "n. a."
+              }
+              singleColumn
+            />
+            <InfoRow
+              label="Datenquelle (Ist)"
+              value={currentBahnInfo.sourceDataIst || "n. a."}
+              singleColumn
+            />
+            <InfoRow
+              label="Datenquelle (Soll)"
+              value={currentBahnInfo.sourceDataSoll || "n. a."}
+              singleColumn
+            />
+          </InfoSection>
+
+          <InfoSection title="Punkteanzahl">
+            <InfoRow
+              label="Ereignisse"
+              value={
+                formatNumber(currentBahnInfo.numberPointsEvents) || "n. a."
+              }
+            />
+            <InfoRow
+              label="Pose Ist"
+              value={
+                formatNumber(currentBahnInfo.numberPointsPoseIst) || "n. a."
+              }
+            />
+            <InfoRow
+              label="Twist Ist"
+              value={
+                formatNumber(currentBahnInfo.numberPointsTwistIst) || "n. a."
+              }
+            />
+            <InfoRow
+              label="Accel Ist"
+              value={
+                formatNumber(currentBahnInfo.numberPointsAccelIst) || "n. a."
+              }
+            />
+            <InfoRow
+              label="Pos. Soll"
+              value={
+                formatNumber(currentBahnInfo.numberPointsPosSoll) || "n. a."
+              }
+            />
+            <InfoRow
+              label="Orient. Soll"
+              value={
+                formatNumber(currentBahnInfo.numberPointsOrientSoll) || "n. a."
+              }
+            />
+            <InfoRow
+              label="Twist Soll"
+              value={
+                formatNumber(currentBahnInfo.numberPointsTwistSoll) || "n. a."
+              }
+            />
+            <InfoRow
+              label="Joint States"
+              value={
+                formatNumber(currentBahnInfo.numberPointsJointStates) || "n. a."
+              }
+            />
+          </InfoSection>
+
+          <InfoSection title="Abtastraten">
+            <InfoRow
+              label="Pose Ist"
+              value={`${formatNumber(currentBahnInfo.frequencyPoseIst) || "n. a."} Hz`}
+            />
+            <InfoRow
+              label="Twist Ist"
+              value={`${formatNumber(currentBahnInfo.frequencyTwistIst) || "n. a."} Hz`}
+            />
+            <InfoRow
+              label="Accel Ist"
+              value={`${formatNumber(currentBahnInfo.frequencyAccelIst) || "n. a."} Hz`}
+            />
+            <InfoRow
+              label="Position Soll"
+              value={`${formatNumber(currentBahnInfo.frequencyPositionSoll) || "n. a."} Hz`}
+            />
+            <InfoRow
+              label="Orient. Soll"
+              value={`${formatNumber(currentBahnInfo.frequencyOrientationSoll) || "n. a."} Hz`}
+            />
+            <InfoRow
+              label="Twist Soll"
+              value={`${formatNumber(currentBahnInfo.frequencyTwistSoll) || "n. a."} Hz`}
+            />
+            <InfoRow
+              label="Joint States"
+              value={`${formatNumber(currentBahnInfo.frequencyJointStates) || "n. a."} Hz`}
+            />
+          </InfoSection>
+        </>
       )}
     </div>
   );

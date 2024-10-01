@@ -3,6 +3,7 @@
 import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/20/solid';
 import { Fragment, type ReactNode } from 'react';
+import React from 'react';
 
 import type { BahnPoseIst, BahnPositionSoll } from '@/types/main'; // Adjust import path as needed
 

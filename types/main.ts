@@ -258,7 +258,6 @@ export interface BahnInfo {
   sourceDataIst: string;
   sourceDataSoll: string;
   recordFilename: string;
-  numberPoints: number;
   frequencyPoseIst: number;
   frequencyPositionSoll: number;
   frequencyOrientationSoll: number;
@@ -267,6 +266,14 @@ export interface BahnInfo {
   frequencyAccelIst: number;
   frequencyJointStates: number;
   calibrationRun: boolean;
+  numberPointsEvents: number;
+  numberPointsPoseIst: number;
+  numberPointsTwistIst: number;
+  numberPointsAccelIst: number;
+  numberPointsPosSoll: number;
+  numberPointsOrientSoll: number;
+  numberPointsTwistSoll: number;
+  numberPointsJointStates: number;
 }
 
 export interface BahnInfoRaw {
@@ -280,7 +287,6 @@ export interface BahnInfoRaw {
   source_data_ist: string;
   source_data_soll: string;
   record_filename: string;
-  number_of_points: number;
   frequency_pose_ist: number;
   frequency_position_soll: number;
   frequency_orientation_soll: number;
@@ -289,6 +295,15 @@ export interface BahnInfoRaw {
   frequency_accel_ist: number;
   frequency_joint_states: number;
   calibration_run: boolean;
+  np_ereignisse: number;
+  np_pose_ist: number;
+  np_twist_ist: number;
+  np_accel_ist: number;
+  np_pos_soll: number;
+  np_orient_soll: number;
+  np_twist_soll: number;
+  np_jointstates: number;
+
 }
 
 export interface BahnPoseIst {

@@ -19,7 +19,7 @@ export const getCSVData = (data: TrajectoryData): CSVRow[] => {
   Object.keys(data).forEach((key: string) => {
     if (!key.includes('_')) {
       if (Array.isArray(data[key as keyof TrajectoryData])) {
-        const arr = data[key as keyof TrajectoryData] as any[];
+        const arr = data[key as keyof TrajectoryData] as never[];
 
         arr.forEach((item, index) => {
           if (!rows[index]) rows[index] = {};

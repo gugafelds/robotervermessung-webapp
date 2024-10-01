@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect } from "react";
 
-import { TrajectoryInfo } from '@/src/app/trajectories/components/TrajectoryInfo';
-import { TrajectoryPlot } from '@/src/app/trajectories/components/TrajectoryPlot';
-import { useTrajectory } from '@/src/providers/trajectory.provider';
+import { TrajectoryInfo } from "@/src/app/trajectories/components/TrajectoryInfo";
+import { TrajectoryPlot } from "@/src/app/trajectories/components/TrajectoryPlot";
+import { useTrajectory } from "@/src/providers/trajectory.provider";
 import type {
   BahnAccelIst,
   BahnEvents,
@@ -15,7 +15,7 @@ import type {
   BahnPositionSoll,
   BahnTwistIst,
   BahnTwistSoll,
-} from '@/types/main';
+} from "@/types/main";
 
 type TrajectoryPageProps = {
   currentBahnInfo: BahnInfo;

@@ -1,21 +1,22 @@
 /* eslint-disable react/button-has-type */
 
-'use client';
+"use client";
 
-import { CubeIcon } from '@heroicons/react/20/solid';
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { CubeIcon } from "@heroicons/react/20/solid";
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { useState } from "react";
+import React from "react";
 
-import { Typography } from '@/src/components/Typography';
-import { useTrajectory } from '@/src/providers/trajectory.provider';
-import { ConsistencyCheck } from './ConsistencyCheck';
+import { Typography } from "@/src/components/Typography";
+import { useTrajectory } from "@/src/providers/trajectory.provider";
+import { ConsistencyCheck } from "./ConsistencyCheck";
 
-import { JointStatesPlot } from './JointStatesPlot';
-import { OrientationPlot } from './OrientationPlot';
-import { Position2DPlot } from './Position2DPlot';
-import SlideOver from './SlideOver';
-import { TCPAccelPlot } from './TCPAccelPlot';
-import { TCPSpeedPlot } from './TCPSpeedPlot';
+import { JointStatesPlot } from "./JointStatesPlot";
+import { OrientationPlot } from "./OrientationPlot";
+import { Position2DPlot } from "./Position2DPlot";
+import SlideOver from "./SlideOver";
+import { TCPAccelPlot } from "./TCPAccelPlot";
+import { TCPSpeedPlot } from "./TCPSpeedPlot";
 
 export const TrajectoryPlot = () => {
   const {
@@ -372,12 +373,12 @@ export const TrajectoryPlot = () => {
         <div>
           <ExclamationTriangleIcon className="mx-auto w-16" color="#003560" />
         </div>
+        {/* eslint-disable-next-line react/react-in-jsx-scope */}
         <Typography as="h3">no plot was found</Typography>
       </div>
     );
   }
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [isSlideOverOpen, setIsSlideOverOpen] = useState(false);
 
   const openSlideOver = () => setIsSlideOverOpen(true);
@@ -424,18 +425,16 @@ export const TrajectoryPlot = () => {
         3D-Plot
       </button>
 
-
       <ConsistencyCheck
-  currentBahnTwistIst={currentBahnTwistIst}
-  currentBahnTwistSoll={currentBahnTwistSoll}
-  currentBahnPoseIst={currentBahnPoseIst}
-  idealTrajectory={currentBahnPositionSoll}
-  currentBahnEvents={currentBahnEvents}
-  currentBahnOrientationSoll={currentBahnOrientationSoll}
-  currentBahnAccelIst={currentBahnAccelIst}
-  currentBahnJointStates={currentBahnJointStates}
-/>
-
-</div>
+        currentBahnTwistIst={currentBahnTwistIst}
+        currentBahnTwistSoll={currentBahnTwistSoll}
+        currentBahnPoseIst={currentBahnPoseIst}
+        idealTrajectory={currentBahnPositionSoll}
+        currentBahnEvents={currentBahnEvents}
+        currentBahnOrientationSoll={currentBahnOrientationSoll}
+        currentBahnAccelIst={currentBahnAccelIst}
+        currentBahnJointStates={currentBahnJointStates}
+      />
+    </div>
   );
 };

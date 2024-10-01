@@ -1,6 +1,5 @@
-import dotenv from 'dotenv';
-// eslint-disable-next-line import/no-extraneous-dependencies
-import { Pool } from 'pg';
+import dotenv from "dotenv";
+import { Pool, QueryResultRow } from "pg";
 
 dotenv.config();
 
@@ -12,20 +11,20 @@ export function getPostgresPool(): Pool {
       user: process.env.POSTGRES_USER,
       password: process.env.POSTGRES_PASSWORD,
       host: process.env.POSTGRES_HOST,
-      port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
+      port: parseInt(process.env.POSTGRES_PORT || "5432", 10),
       database: process.env.POSTGRES_DB,
     });
   }
   return pool;
 }
 
-export async function queryPostgres<T>(
+export async function queryPostgres<T extends QueryResultRow>(
   sql: string,
-  params: any[] = [],
+  params: unknown[] = [],
 ): Promise<T[]> {
   const client = await getPostgresPool().connect();
   try {
-    const result = await client.query(sql, params);
+    const result = await client.query<T>(sql, params);
     return result.rows;
   } finally {
     client.release();

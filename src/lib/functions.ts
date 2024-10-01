@@ -14,20 +14,6 @@ export const formatDate = (dateString: string) => {
     )}.${year} ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
-export const camelToWords = (str: string) =>
-  str
-    .replace(/([A-Z])/g, ' $1')
-    .trim()
-    .replace(/^\w/, (c) => c.toUpperCase());
-
-export const getDataToBeDisplayed = (object: object, dataIncluded: string[]) =>
-  Object.keys(object).filter((data) => dataIncluded.includes(data));
-
-export const isDateString = (value: unknown) => {
-  const regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}$/;
-  return regex.test(value as string);
-};
-
 export const formatNumber = (
   num: number | null | undefined | unknown,
 ): string | number => {

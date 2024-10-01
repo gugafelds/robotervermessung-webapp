@@ -1,11 +1,11 @@
-import dynamic from 'next/dynamic';
-import type { Layout, PlotData } from 'plotly.js';
-import React from 'react';
+import dynamic from "next/dynamic";
+import type { Layout, PlotData } from "plotly.js";
+import React from "react";
 
-import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config'; // Adjust import path as needed
-import type { BahnPoseIst, BahnPositionSoll } from '@/types/main'; // Adjust import path as needed
+import { dataPlotConfig, plotLayoutConfig } from "@/src/lib/plot-config"; // Adjust import path as needed
+import type { BahnPoseIst, BahnPositionSoll } from "@/types/main"; //
 
-const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
+const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
 interface Position3DPlotProps {
   realTrajectory: BahnPoseIst[];
@@ -17,14 +17,14 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
   idealTrajectory,
 }) => {
   const realTrajectoryData: Partial<PlotData> = {
-    ...dataPlotConfig('lines', 'ist', 6, 'darkblue'),
+    ...dataPlotConfig("lines", "ist", 6, "darkblue"),
     x: realTrajectory.map((row) => row.xIst),
     y: realTrajectory.map((row) => row.yIst),
     z: realTrajectory.map((row) => row.zIst),
   };
 
   const idealTrajectoryData: Partial<PlotData> = {
-    ...dataPlotConfig('lines', 'soll', 6, 'blue'),
+    ...dataPlotConfig("lines", "soll", 6, "blue"),
     x: idealTrajectory.map((row) => row.xSoll),
     y: idealTrajectory.map((row) => row.ySoll),
     z: idealTrajectory.map((row) => row.zSoll),
@@ -35,7 +35,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     autosize: true,
     margin: { l: 0, r: 0, b: 0, t: 0 },
     scene: {
-      aspectmode: 'data',
+      aspectmode: "data",
     },
   };
 
@@ -44,10 +44,10 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
       data={[realTrajectoryData, idealTrajectoryData]}
       layout={layout}
       useResizeHandler
-      style={{ width: '100%', height: '100%' }}
+      style={{ width: "100%", height: "100%" }}
       config={{
         displaylogo: false,
-        modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+        modeBarButtonsToRemove: ["toImage", "orbitRotation"],
         responsive: true,
       }}
     />

@@ -34,7 +34,6 @@ export const transformBahnInfoResult = (
       sourceDataIst: bahn.source_data_ist,
       sourceDataSoll: bahn.source_data_soll,
       recordFilename: bahn.record_filename,
-      numberPoints: bahn.number_of_points,
       frequencyPoseIst: bahn.frequency_pose_ist,
       frequencyPositionSoll: bahn.frequency_position_soll,
       frequencyOrientationSoll: bahn.frequency_orientation_soll,
@@ -43,6 +42,14 @@ export const transformBahnInfoResult = (
       frequencyAccelIst: bahn.frequency_accel_ist,
       frequencyJointStates: bahn.frequency_joint_states,
       calibrationRun: bahn.calibration_run,
+      numberPointsEvents: bahn.np_ereignisse,
+      numberPointsPoseIst: bahn.np_pose_ist,
+      numberPointsTwistIst: bahn.np_twist_ist,
+      numberPointsAccelIst: bahn.np_accel_ist,
+      numberPointsPosSoll: bahn.np_pos_soll,
+      numberPointsOrientSoll: bahn.np_orient_soll,
+      numberPointsTwistSoll: bahn.np_twist_soll,
+      numberPointsJointStates: bahn.np_jointstates,
     }),
   );
 };
@@ -60,7 +67,6 @@ export const transformBahnInfobyIDResult = (
   sourceDataIst: bahnRaw.source_data_ist,
   sourceDataSoll: bahnRaw.source_data_soll,
   recordFilename: bahnRaw.record_filename,
-  numberPoints: bahnRaw.number_of_points,
   frequencyPoseIst: bahnRaw.frequency_pose_ist,
   frequencyPositionSoll: bahnRaw.frequency_position_soll,
   frequencyOrientationSoll: bahnRaw.frequency_orientation_soll,
@@ -69,6 +75,14 @@ export const transformBahnInfobyIDResult = (
   frequencyAccelIst: bahnRaw.frequency_accel_ist,
   frequencyJointStates: bahnRaw.frequency_joint_states,
   calibrationRun: bahnRaw.calibration_run,
+  numberPointsEvents: bahnRaw.np_ereignisse,
+  numberPointsPoseIst: bahnRaw.np_pose_ist,
+  numberPointsTwistIst: bahnRaw.np_twist_ist,
+  numberPointsAccelIst: bahnRaw.np_accel_ist,
+  numberPointsPosSoll: bahnRaw.np_pos_soll,
+  numberPointsOrientSoll: bahnRaw.np_orient_soll,
+  numberPointsTwistSoll: bahnRaw.np_twist_soll,
+  numberPointsJointStates: bahnRaw.np_jointstates,
 });
 
 export const transformBahnPoseIstResult = (
