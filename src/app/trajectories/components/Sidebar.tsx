@@ -13,9 +13,13 @@ import { useTrajectory } from '@/src/providers/trajectory.provider';
 
 export const Sidebar = () => {
   const { bahnInfo } = useTrajectory();
-  const [filteredTrajectories, setFilteredTrajectories] = useState(bahnInfo);
+  const [filteredBahnen, setFilteredBahnen] = useState(bahnInfo);
   const pathname = usePathname();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFilteredBahnen(bahnInfo);
+  }, [bahnInfo]);
 
   useEffect(() => {
     const pathParts = pathname.split('/');
@@ -24,14 +28,14 @@ export const Sidebar = () => {
   }, [pathname]);
 
   const handleFilterChange = (filter: string) => {
-    const filtered = bahnInfo.filter((trajectory) =>
+    const filtered = bahnInfo.filter((bahn) =>
       filterBy(filter, [
-        trajectory.recordFilename,
-        trajectory.bahnID,
-        formatDate(trajectory.recordingDate),
+        bahn.recordFilename || '',
+        bahn.bahnID?.toString() || '',
+        formatDate(bahn.recordingDate || ''),
       ]),
     );
-    setFilteredTrajectories(filtered);
+    setFilteredBahnen(filtered);
   };
 
   return (
@@ -49,40 +53,43 @@ export const Sidebar = () => {
       </div>
 
       <div className="mt-4 overflow-scroll">
-        {filteredTrajectories.map((trajectory) => (
-          <div
-            key={trajectory.bahnID.toString()}
-            className={classNames(
-              'mt-1 rounded-xl p-3 transition-colors duration-200 ease-in',
-              {
-                'bg-gray-300': selectedId === trajectory.bahnID.toString(),
-                'hover:bg-gray-200':
-                  selectedId !== trajectory.bahnID.toString(),
-              },
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <Link
-                href={`/trajectories/${trajectory.bahnID.toString()}`}
-                className="ml-2 flex-1"
-              >
-                <div>
-                  <Typography as="h6" className="font-extrabold text-primary">
-                    {trajectory.recordFilename}
-                  </Typography>
-                  <Typography as="h6" className="font-semibold text-primary">
-                    {`ID: ${trajectory.bahnID}`}
-                  </Typography>
-                  <Typography as="h6" className="text-primary">
-                    {trajectory.startTime
-                      ? formatDate(trajectory.recordingDate)
-                      : 'n. a.'}
-                  </Typography>
-                </div>
-              </Link>
+        {filteredBahnen.length === 0 ? (
+          <div>loading...</div>
+        ) : (
+          filteredBahnen.map((bahn) => (
+            <div
+              key={bahn.bahnID?.toString()}
+              className={classNames(
+                'mt-1 rounded-xl p-3 transition-colors duration-200 ease-in',
+                {
+                  'bg-gray-300': selectedId === bahn.bahnID?.toString(),
+                  'hover:bg-gray-200': selectedId !== bahn.bahnID?.toString(),
+                },
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <Link
+                  href={`/trajectories/${bahn.bahnID?.toString()}`}
+                  className="ml-2 flex-1"
+                >
+                  <div>
+                    <Typography as="h6" className="font-extrabold text-primary">
+                      {bahn.recordFilename || 'No filename'}
+                    </Typography>
+                    <Typography as="h6" className="font-semibold text-primary">
+                      {`ID: ${bahn.bahnID}`}
+                    </Typography>
+                    <Typography as="h6" className="text-primary">
+                      {bahn.recordingDate
+                        ? formatDate(bahn.recordingDate)
+                        : 'n. a.'}
+                    </Typography>
+                  </div>
+                </Link>
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

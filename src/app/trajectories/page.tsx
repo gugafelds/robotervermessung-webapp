@@ -1,13 +1,15 @@
-'use client';
+// File: app/trajectories/page.tsx
 
 import { redirect } from 'next/navigation';
 
-import { useTrajectory } from '@/src/providers/trajectory.provider';
+import { getAllBahnInfo } from '@/src/actions/bewegungsdaten.service';
 
-export default function TrajectoriesPage() {
-  const {
-    bahnInfo: [{ bahnID }],
-  } = useTrajectory();
+export default async function TrajectoriesPage() {
+  const bahnInfo = await getAllBahnInfo();
 
-  return redirect(`/trajectories/${bahnID}`);
+  if (bahnInfo.length > 0) {
+    redirect(`/trajectories/${bahnInfo[0].bahnID}`);
+  }
+
+  return <div>No trajectories available</div>;
 }

@@ -1,16 +1,12 @@
-// DashboardServer.tsx
-import {
-  getBahnCount,
-  getComponentPointCounts,
-  getFrequencyData,
-} from '@/src/actions/dashboard.service';
+// File: src/app/dashboard/DashboardServer.tsx
+
+import { getDashboardData } from '@/src/actions/dashboard.service';
 
 import DashboardClient from './DashboardClient';
 
 export default async function DashboardServer() {
-  const trajectoriesCount = await getBahnCount();
-  const componentCounts = await getComponentPointCounts();
-  const frequencyData = await getFrequencyData();
+  const { trajectoriesCount, componentCounts, frequencyData } =
+    await getDashboardData();
 
   return (
     <DashboardClient

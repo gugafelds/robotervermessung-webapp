@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 import type {
   BahnAccelIst,
@@ -47,16 +47,16 @@ export interface TrajectoryState {
 
 type TrajectoryProviderProps = {
   children: ReactNode;
-  bahnInfoDB: BahnInfo[];
+  initialBahnInfo: BahnInfo[];
 };
 
 const TrajectoryContext = createContext<TrajectoryState>({} as TrajectoryState);
 
 export const TrajectoryProvider = ({
   children,
-  bahnInfoDB,
+  initialBahnInfo,
 }: TrajectoryProviderProps) => {
-  const [bahnInfo] = useState<BahnInfo[]>(bahnInfoDB);
+  const [bahnInfo, setBahnInfo] = useState<BahnInfo[]>(initialBahnInfo);
   const [currentBahnInfo, setCurrentBahnInfo] = useState<BahnInfo | null>(null);
   const [currentBahnPoseIst, setCurrentBahnPoseIst] = useState<BahnPoseIst[]>(
     [],
@@ -80,6 +80,10 @@ export const TrajectoryProvider = ({
     BahnJointStates[]
   >([]);
   const [currentBahnEvents, setCurrentBahnEvents] = useState<BahnEvents[]>([]);
+
+  useEffect(() => {
+    setBahnInfo(initialBahnInfo);
+  }, [initialBahnInfo]);
 
   const contextValue = useMemo(
     () => ({
@@ -124,5 +128,10 @@ export const TrajectoryProvider = ({
   );
 };
 
-export const useTrajectory = (): TrajectoryState =>
-  useContext(TrajectoryContext);
+export const useTrajectory = (): TrajectoryState => {
+  const context = useContext(TrajectoryContext);
+  if (context === undefined) {
+    throw new Error('useTrajectory must be used within a TrajectoryProvider');
+  }
+  return context;
+};

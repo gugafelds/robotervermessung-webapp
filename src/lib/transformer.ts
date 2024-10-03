@@ -1,256 +1,242 @@
 import type {
-  SegmentHeader,
-  SegmentHeaderRaw,
-  TrajectoryData,
-  TrajectoryDataRaw,
-  TrajectoryDFDMetrics,
-  TrajectoryDFDMetricsRaw,
-  TrajectoryDTWJohnenMetrics,
-  TrajectoryDTWJohnenMetricsRaw,
-  TrajectoryDTWMetrics,
-  TrajectoryDTWMetricsRaw,
-  TrajectoryEuclideanMetrics,
-  TrajectoryEuclideanMetricsRaw,
-  TrajectoryHeader,
-  TrajectoryHeaderRaw,
-  TrajectoryLCSSMetrics,
-  TrajectoryLCSSMetricsRaw,
+  BahnAccelIst,
+  BahnAccelIstRaw,
+  BahnEvents,
+  BahnEventsRaw,
+  BahnInfo,
+  BahnInfoRaw,
+  BahnJointStates,
+  BahnJointStatesRaw,
+  BahnOrientationSoll,
+  BahnOrientationSollRaw,
+  BahnPoseIst,
+  BahnPoseIstRaw,
+  BahnPositionSoll,
+  BahnPositionSollRaw,
+  BahnTwistIst,
+  BahnTwistIstRaw,
+  BahnTwistSoll,
+  BahnTwistSollRaw,
 } from '@/types/main';
 
-export const transformTrajectoryResult = (
-  trajectoryRaw: TrajectoryDataRaw,
-): TrajectoryData => ({
-  _id: trajectoryRaw._id,
-  trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
-  timestampIst: trajectoryRaw.timestamp_ist,
-  xIst: trajectoryRaw.x_ist,
-  yIst: trajectoryRaw.y_ist,
-  zIst: trajectoryRaw.z_ist,
-  q1Ist: trajectoryRaw.q1_ist,
-  q2Ist: trajectoryRaw.q2_ist,
-  q3Ist: trajectoryRaw.q3_ist,
-  q4Ist: trajectoryRaw.q4_ist,
-  tcpVelocityIst: trajectoryRaw.tcp_velocity_ist,
-  tcpAcceleration: trajectoryRaw.tcp_acceleration,
-  jointStateIst: trajectoryRaw.joint_state_ist,
-  timestampSoll: trajectoryRaw.timestamp_soll,
-  xSoll: trajectoryRaw.x_soll,
-  ySoll: trajectoryRaw.y_soll,
-  zSoll: trajectoryRaw.z_soll,
-  q1Soll: trajectoryRaw.q1_soll,
-  q2Soll: trajectoryRaw.q2_soll,
-  q3Soll: trajectoryRaw.q3_soll,
-  q4Soll: trajectoryRaw.q4_soll,
-  tcpVelocitySoll: trajectoryRaw.tcp_velocity_soll,
-  jointStateSoll: trajectoryRaw.joint_state_soll,
-  segmentId: trajectoryRaw.segment_id,
-});
-
-export const transformEuclideanMetricResult = (
-  trajectoryRaw: TrajectoryEuclideanMetricsRaw,
-): TrajectoryEuclideanMetrics => ({
-  _id: trajectoryRaw._id,
-  trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
-  euclideanDistances: trajectoryRaw.euclidean_distances,
-  euclideanMaxDistance: trajectoryRaw.euclidean_max_distance,
-  euclideanAverageDistance: trajectoryRaw.euclidean_average_distance,
-  euclideanStandardDeviation: trajectoryRaw.euclidean_standard_deviation,
-  euclideanIntersections: trajectoryRaw.euclidean_intersections,
-  metricType: trajectoryRaw.metric_type,
-});
-
-export const transformDTWMetricResult = (
-  trajectoryRaw: TrajectoryDTWMetricsRaw,
-): TrajectoryDTWMetrics => ({
-  _id: trajectoryRaw._id,
-  trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
-  dtwMaxDistance: trajectoryRaw.dtw_max_distance,
-  dtwAverageDistance: trajectoryRaw.dtw_average_distance,
-  dtwDistances: trajectoryRaw.dtw_distances,
-  dtwX: trajectoryRaw.dtw_X,
-  dtwY: trajectoryRaw.dtw_Y,
-  dtwAccDist: trajectoryRaw.dtw_accdist,
-  dtwPath: trajectoryRaw.dtw_path,
-  metricType: trajectoryRaw.metric_type,
-});
-
-export const transformDTWJohnenMetricResult = (
-  trajectoryRaw: TrajectoryDTWJohnenMetricsRaw,
-): TrajectoryDTWJohnenMetrics => ({
-  _id: trajectoryRaw._id,
-  trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
-  dtwJohnenMaxDistance: trajectoryRaw.dtw_max_distance,
-  dtwJohnenAverageDistance: trajectoryRaw.dtw_average_distance,
-  dtwJohnenDistances: trajectoryRaw.dtw_distances,
-  dtwJohnenX: trajectoryRaw.dtw_x,
-  dtwJohnenY: trajectoryRaw.dtw_y,
-  dtwAccDist: trajectoryRaw.dtw_accdist,
-  dtwPath: trajectoryRaw.dtw_path,
-  metricType: trajectoryRaw.metric_type,
-});
-
-export const transformDFDMetricResult = (
-  trajectoryRaw: TrajectoryDFDMetricsRaw,
-): TrajectoryDFDMetrics => ({
-  _id: trajectoryRaw._id,
-  trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
-  dfdMaxDistance: trajectoryRaw.frechet_max_distance,
-  dfdAverageDistance: trajectoryRaw.frechet_average_distance,
-  dfdDistances: trajectoryRaw.frechet_distances,
-  dfdAccDist: trajectoryRaw.frechet_accdist,
-  dfdPath: trajectoryRaw.frechet_path,
-  metricType: trajectoryRaw.metric_type,
-});
-
-export const transformLCSSMetricResult = (
-  trajectoryRaw: TrajectoryLCSSMetricsRaw,
-): TrajectoryLCSSMetrics => ({
-  _id: trajectoryRaw._id,
-  trajectoryHeaderId: trajectoryRaw.trajectory_header_id,
-  lcssMaxDistance: trajectoryRaw.lcss_max_distance,
-  lcssAverageDistance: trajectoryRaw.lcss_average_distance,
-  lcssDistances: trajectoryRaw.lcss_distances,
-  lcssAccDist: trajectoryRaw.lcss_accdist,
-  lcssPath: trajectoryRaw.lcss_path,
-  lcssX: trajectoryRaw.lcss_X,
-  lcssY: trajectoryRaw.lcss_Y,
-  lcssScore: trajectoryRaw.lcss_score,
-  lcssThreshold: trajectoryRaw.lcss_threshold,
-  metricType: trajectoryRaw.metric_type,
-});
-export const transformTrajectoriesHeadersResult = (
-  trajectoriesRaw: TrajectoryHeaderRaw[],
-): TrajectoryHeader[] => {
-  return trajectoriesRaw.map(
-    (trajectory): TrajectoryHeader => ({
-      _id: trajectory._id,
-      dataId: trajectory.data_id,
-      robotName: trajectory.robot_name,
-      robotModel: trajectory.robot_model,
-      trajectoryType: trajectory.trajectory_type,
-      carthesian: trajectory.carthesian,
-      pathSolver: trajectory.path_solver,
-      recordingDate: trajectory.recording_date,
-      realRobot: trajectory.real_robot,
-      numberPointsIst: trajectory.number_of_points_ist,
-      numberPointsSoll: trajectory.number_of_points_soll,
-      SampleFrequencyIst: trajectory.sample_frequency_ist,
-      SampleFrequencySoll: trajectory.sample_frequency_soll,
-      SourceDataIst: trajectory.source_data_ist,
-      SourceDataSoll: trajectory.source_data_soll,
-      startTime: trajectory.start_time,
-      endTime: trajectory.end_time,
+export const transformBahnInfoResult = (
+  bahnenRaw: BahnInfoRaw[],
+): BahnInfo[] => {
+  return bahnenRaw.map(
+    (bahn): BahnInfo => ({
+      _id: bahn.id,
+      bahnID: bahn.bahn_id,
+      robotModel: bahn.robot_model,
+      bahnplanung: bahn.bahnplanung,
+      recordingDate: bahn.recording_date,
+      startTime: bahn.start_time,
+      endTime: bahn.end_time,
+      sourceDataIst: bahn.source_data_ist,
+      sourceDataSoll: bahn.source_data_soll,
+      recordFilename: bahn.record_filename,
+      frequencyPoseIst: bahn.frequency_pose_ist,
+      frequencyPositionSoll: bahn.frequency_position_soll,
+      frequencyOrientationSoll: bahn.frequency_orientation_soll,
+      frequencyTwistIst: bahn.frequency_twist_ist,
+      frequencyTwistSoll: bahn.frequency_twist_soll,
+      frequencyAccelIst: bahn.frequency_accel_ist,
+      frequencyJointStates: bahn.frequency_joint_states,
+      calibrationRun: bahn.calibration_run,
+      numberPointsEvents: bahn.np_ereignisse,
+      numberPointsPoseIst: bahn.np_pose_ist,
+      numberPointsTwistIst: bahn.np_twist_ist,
+      numberPointsAccelIst: bahn.np_accel_ist,
+      numberPointsPosSoll: bahn.np_pos_soll,
+      numberPointsOrientSoll: bahn.np_orient_soll,
+      numberPointsTwistSoll: bahn.np_twist_soll,
+      numberPointsJointStates: bahn.np_jointstates,
     }),
   );
 };
 
-export const transformSegmentsHeadersResult = (
-  trajectoriesRaw: SegmentHeaderRaw[],
-): SegmentHeader[] => {
-  return trajectoriesRaw.map(
-    (trajectory): SegmentHeader => ({
-      _id: trajectory._id,
-      trajectoryHeaderId: trajectory.trajectory_header_id,
-      segmentId: trajectory.segment_id,
-      startTime: trajectory.start_time,
-      endTime: trajectory.end_time,
-      numberPointsIst: trajectory.number_of_points_ist,
-      numberPointsSoll: trajectory.number_of_points_soll,
-      SampleFrequencyIst: trajectory.sample_frequency_ist,
-      SampleFrequencySoll: trajectory.sample_frequency_soll,
+export const transformBahnInfobyIDResult = (
+  bahnRaw: BahnInfoRaw,
+): BahnInfo => ({
+  _id: bahnRaw.id,
+  bahnID: bahnRaw.bahn_id,
+  robotModel: bahnRaw.robot_model,
+  bahnplanung: bahnRaw.bahnplanung,
+  recordingDate: bahnRaw.recording_date,
+  startTime: bahnRaw.start_time,
+  endTime: bahnRaw.end_time,
+  sourceDataIst: bahnRaw.source_data_ist,
+  sourceDataSoll: bahnRaw.source_data_soll,
+  recordFilename: bahnRaw.record_filename,
+  frequencyPoseIst: bahnRaw.frequency_pose_ist,
+  frequencyPositionSoll: bahnRaw.frequency_position_soll,
+  frequencyOrientationSoll: bahnRaw.frequency_orientation_soll,
+  frequencyTwistIst: bahnRaw.frequency_twist_ist,
+  frequencyTwistSoll: bahnRaw.frequency_twist_soll,
+  frequencyAccelIst: bahnRaw.frequency_accel_ist,
+  frequencyJointStates: bahnRaw.frequency_joint_states,
+  calibrationRun: bahnRaw.calibration_run,
+  numberPointsEvents: bahnRaw.np_ereignisse,
+  numberPointsPoseIst: bahnRaw.np_pose_ist,
+  numberPointsTwistIst: bahnRaw.np_twist_ist,
+  numberPointsAccelIst: bahnRaw.np_accel_ist,
+  numberPointsPosSoll: bahnRaw.np_pos_soll,
+  numberPointsOrientSoll: bahnRaw.np_orient_soll,
+  numberPointsTwistSoll: bahnRaw.np_twist_soll,
+  numberPointsJointStates: bahnRaw.np_jointstates,
+});
+
+export const transformBahnPoseIstResult = (
+  bahnenPoseIstRaw: BahnPoseIstRaw[],
+): BahnPoseIst[] => {
+  return bahnenPoseIstRaw.map(
+    (bahn): BahnPoseIst => ({
+      _id: bahn.id,
+      bahnID: bahn.bahn_id,
+      segmentID: bahn.segment_id,
+      timestamp: bahn.timestamp,
+      xIst: bahn.x_ist,
+      yIst: bahn.y_ist,
+      zIst: bahn.z_ist,
+      qxIst: bahn.qx_ist,
+      qyIst: bahn.qy_ist,
+      qzIst: bahn.qz_ist,
+      qwIst: bahn.qw_ist,
+      sourceDataIst: bahn.source_data_ist,
     }),
   );
 };
 
-export const transformTrajectoriesEuclideanMetricsResult = (
-  trajectoriesEuclideanMetricsRaw: TrajectoryEuclideanMetricsRaw[],
-): TrajectoryEuclideanMetrics[] => {
-  return trajectoriesEuclideanMetricsRaw.map(
-    (trajectory): TrajectoryEuclideanMetrics => ({
-      _id: trajectory._id,
-      trajectoryHeaderId: trajectory.trajectory_header_id,
-      euclideanDistances: trajectory.euclidean_distances,
-      euclideanMaxDistance: trajectory.euclidean_max_distance,
-      euclideanAverageDistance: trajectory.euclidean_average_distance,
-      euclideanStandardDeviation: trajectory.euclidean_standard_deviation,
-      euclideanIntersections: trajectory.euclidean_intersections,
-      metricType: trajectory.metric_type,
+export const transformBahnTwistIstResult = (
+  bahnenTwistIstRaw: BahnTwistIstRaw[],
+): BahnTwistIst[] => {
+  return bahnenTwistIstRaw.map(
+    (bahn): BahnTwistIst => ({
+      id: bahn.id,
+      bahnId: bahn.bahn_id,
+      segmentId: bahn.segment_id,
+      timestamp: bahn.timestamp,
+      tcpSpeedX: bahn.tcp_speed_x,
+      tcpSpeedY: bahn.tcp_speed_y,
+      tcpSpeedZ: bahn.tcp_speed_z,
+      tcpSpeedIst: bahn.tcp_speed_ist,
+      tcpAngularX: bahn.tcp_angular_x,
+      tcpAngularY: bahn.tcp_angular_y,
+      tcpAngularZ: bahn.tcp_angular_z,
+      tcpAngularIst: bahn.tcp_angular_ist,
+      sourceDataIst: bahn.source_data_ist,
     }),
   );
 };
 
-export const transformTrajectoriesDTWMetricsResult = (
-  trajectoriesDTWMetricsRaw: TrajectoryDTWMetricsRaw[],
-): TrajectoryDTWMetrics[] => {
-  return trajectoriesDTWMetricsRaw.map(
-    (trajectory): TrajectoryDTWMetrics => ({
-      _id: trajectory._id,
-      trajectoryHeaderId: trajectory.trajectory_header_id,
-      dtwMaxDistance: trajectory.dtw_max_distance,
-      dtwAverageDistance: trajectory.dtw_average_distance,
-      dtwDistances: trajectory.dtw_distances,
-      dtwX: trajectory.dtw_X,
-      dtwY: trajectory.dtw_Y,
-      dtwAccDist: trajectory.dtw_accdist,
-      dtwPath: trajectory.dtw_path,
-      metricType: trajectory.metric_type,
+export const transformBahnAccelIstResult = (
+  bahnenAccelIstRaw: BahnAccelIstRaw[],
+): BahnAccelIst[] => {
+  return bahnenAccelIstRaw.map(
+    (bahn): BahnAccelIst => ({
+      id: bahn.id,
+      bahnId: bahn.bahn_id,
+      segmentId: bahn.segment_id,
+      timestamp: bahn.timestamp,
+      tcpAccelX: bahn.tcp_accel_x,
+      tcpAccelY: bahn.tcp_accel_y,
+      tcpAccelZ: bahn.tcp_accel_z,
+      tcpAccelIst: bahn.tcp_accel_ist,
+      tcpAngularAccelX: bahn.tcp_angular_accel_x,
+      tcpAngularAccelY: bahn.tcp_angular_accel_y,
+      tcpAngularAccelZ: bahn.tcp_angular_accel_z,
+      tcpAngularAccelIst: bahn.tcp_angular_accel_ist,
+      sourceDataIst: bahn.source_data_ist,
     }),
   );
 };
 
-export const transformTrajectoriesDTWJohnenMetricsResult = (
-  trajectoriesDTWJohnenMetricsRaw: TrajectoryDTWJohnenMetricsRaw[],
-): TrajectoryDTWJohnenMetrics[] => {
-  return trajectoriesDTWJohnenMetricsRaw.map(
-    (trajectory): TrajectoryDTWJohnenMetrics => ({
-      _id: trajectory._id,
-      trajectoryHeaderId: trajectory.trajectory_header_id,
-      dtwJohnenMaxDistance: trajectory.dtw_max_distance,
-      dtwJohnenAverageDistance: trajectory.dtw_average_distance,
-      dtwJohnenDistances: trajectory.dtw_distances,
-      dtwJohnenX: trajectory.dtw_x,
-      dtwJohnenY: trajectory.dtw_y,
-      dtwAccDist: trajectory.dtw_accdist,
-      dtwPath: trajectory.dtw_path,
-      metricType: trajectory.metric_type,
+export const transformBahnPositionSollResult = (
+  bahnenPositionSollRaw: BahnPositionSollRaw[],
+): BahnPositionSoll[] => {
+  return bahnenPositionSollRaw.map(
+    (bahn): BahnPositionSoll => ({
+      id: bahn.id,
+      bahnId: bahn.bahn_id,
+      segmentId: bahn.segment_id,
+      timestamp: bahn.timestamp,
+      xSoll: bahn.x_soll,
+      ySoll: bahn.y_soll,
+      zSoll: bahn.z_soll,
+      sourceDataSoll: bahn.source_data_soll,
     }),
   );
 };
 
-export const transformTrajectoriesDFDMetricsResult = (
-  trajectoriesDFDMetricsRaw: TrajectoryDFDMetricsRaw[],
-): TrajectoryDFDMetrics[] => {
-  return trajectoriesDFDMetricsRaw.map(
-    (trajectory): TrajectoryDFDMetrics => ({
-      _id: trajectory._id,
-      trajectoryHeaderId: trajectory.trajectory_header_id,
-      dfdMaxDistance: trajectory.frechet_max_distance,
-      dfdAverageDistance: trajectory.frechet_average_distance,
-      dfdDistances: trajectory.frechet_distances,
-      dfdAccDist: trajectory.frechet_accdist,
-      dfdPath: trajectory.frechet_path,
-      metricType: trajectory.metric_type,
+export const transformBahnOrientationSollResult = (
+  bahnenOrientationSollRaw: BahnOrientationSollRaw[],
+): BahnOrientationSoll[] => {
+  return bahnenOrientationSollRaw.map(
+    (bahn): BahnOrientationSoll => ({
+      id: bahn.id,
+      bahnId: bahn.bahn_id,
+      segmentId: bahn.segment_id,
+      timestamp: bahn.timestamp,
+      qxSoll: bahn.qx_soll,
+      qySoll: bahn.qy_soll,
+      qzSoll: bahn.qz_soll,
+      qwSoll: bahn.qw_soll,
+      sourceDataSoll: bahn.source_data_soll,
     }),
   );
 };
 
-export const transformTrajectoriesLCSSMetricsResult = (
-  trajectoriesLCSSMetricsRaw: TrajectoryLCSSMetricsRaw[],
-): TrajectoryLCSSMetrics[] => {
-  return trajectoriesLCSSMetricsRaw.map(
-    (trajectory): TrajectoryLCSSMetrics => ({
-      _id: trajectory._id,
-      trajectoryHeaderId: trajectory.trajectory_header_id,
-      lcssMaxDistance: trajectory.lcss_max_distance,
-      lcssAverageDistance: trajectory.lcss_average_distance,
-      lcssDistances: trajectory.lcss_distances,
-      lcssAccDist: trajectory.lcss_accdist,
-      lcssPath: trajectory.lcss_path,
-      lcssX: trajectory.lcss_X,
-      lcssY: trajectory.lcss_Y,
-      lcssScore: trajectory.lcss_score,
-      lcssThreshold: trajectory.lcss_threshold,
-      metricType: trajectory.metric_type,
+export const transformBahnTwistSollResult = (
+  bahnenTwistSollRaw: BahnTwistSollRaw[],
+): BahnTwistSoll[] => {
+  return bahnenTwistSollRaw.map(
+    (bahn): BahnTwistSoll => ({
+      id: bahn.id,
+      bahnId: bahn.bahn_id,
+      segmentId: bahn.segment_id,
+      timestamp: bahn.timestamp,
+      tcpSpeedSoll: bahn.tcp_speed_soll,
+      sourceDataSoll: bahn.source_data_soll,
+    }),
+  );
+};
+
+export const transformBahnJointStatesResult = (
+  bahnJointStatesRaw: BahnJointStatesRaw[],
+): BahnJointStates[] => {
+  return bahnJointStatesRaw.map(
+    (bahn): BahnJointStates => ({
+      id: bahn.id,
+      bahnId: bahn.bahn_id,
+      segmentId: bahn.segment_id,
+      timestamp: bahn.timestamp,
+      joint1: bahn.joint_1,
+      joint2: bahn.joint_2,
+      joint3: bahn.joint_3,
+      joint4: bahn.joint_4,
+      joint5: bahn.joint_5,
+      joint6: bahn.joint_6,
+      sourceDataSoll: bahn.source_data_soll,
+    }),
+  );
+};
+
+export const transformBahnEventsResult = (
+  bahnEventsRaw: BahnEventsRaw[],
+): BahnEvents[] => {
+  return bahnEventsRaw.map(
+    (event): BahnEvents => ({
+      id: event.id,
+      bahnId: event.bahn_id,
+      segmentId: event.segment_id,
+      timestamp: event.timestamp,
+      xReached: event.x_reached,
+      yReached: event.y_reached,
+      zReached: event.z_reached,
+      qxReached: event.qx_reached,
+      qyReached: event.qy_reached,
+      qzReached: event.qz_reached,
+      qwReached: event.qw_reached,
+      sourceDataSoll: event.source_data_soll,
     }),
   );
 };
