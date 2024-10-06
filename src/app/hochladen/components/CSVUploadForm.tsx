@@ -15,8 +15,6 @@ const CSVUploadForm: React.FC = () => {
   const [success, setSuccess] = useState<string>('');
   const [progress, setProgress] = useState<number>(0);
 
-  const API_BASE_URL = 'http://134.147.100.22:8000/api';
-
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!files || files.length === 0) {
@@ -43,7 +41,7 @@ const CSVUploadForm: React.FC = () => {
 
       try {
         // eslint-disable-next-line no-await-in-loop
-        const response = await fetch(`${API_BASE_URL}/bahn/process-csv`, {
+        const response = await fetch('/api/bahn/process-csv', {
           method: 'POST',
           body: formData,
         });
