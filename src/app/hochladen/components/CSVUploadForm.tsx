@@ -15,7 +15,7 @@ const CSVUploadForm: React.FC = () => {
   const [success, setSuccess] = useState<string>('');
   const [progress, setProgress] = useState<number>(0);
 
-  const API_BASE_URL = 'http://localhost:8000/api';
+  const API_BASE_URL = 'http://134.147.100.22:8000/api';
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
