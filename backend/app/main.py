@@ -1,12 +1,7 @@
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .api.endpoints import bahn_route_handler
-from .models.bahn_models import Base
-from .database import engine
-
-# Note: We're not creating tables as they already exist
-# Base.metadata.create_all(bind=engine)
+from .database import init_db
 
 app = FastAPI(
     title="Bahn Data API",
@@ -16,13 +11,13 @@ app = FastAPI(
 
 # Configure CORS
 origins = [
-    "http://localhost:3000",  # Assuming your Next.js frontend is running on port 3000
+    "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origins],  # Add your Next.js frontend URL
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,19 +26,12 @@ app.add_middleware(
 # Include the router for Bahn-related endpoints
 app.include_router(bahn_route_handler.router, prefix="/api/bahn", tags=["bahn"])
 
+# Initialize the database
+init_db(app)
+
 @app.get("/")
 async def root():
     return {"message": "Welcome to the Bahn Data API"}
-
-@app.on_event("startup")
-async def startup_event():
-    # You can add any startup events here, like initializing database connections
-    print("Starting up the Bahn Data API...")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    # You can add any shutdown events here, like closing database connections
-    print("Shutting down the Bahn Data API...")
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,239 +1,84 @@
-import psycopg2
-from psycopg2 import sql
+import asyncpg
+import logging
+
+logger = logging.getLogger(__name__)
 
 class DatabaseOperations:
     def __init__(self, db_params):
         self.db_params = db_params
 
-    def connect_to_db(self):
+    async def connect_to_db(self):
         try:
-            return psycopg2.connect(**self.db_params)
-        except (Exception, psycopg2.Error) as error:
-            print(f"Error while connecting to PostgreSQL: {error}")
+            return await asyncpg.connect(**self.db_params)
+        except Exception as error:
+            logger.error(f"Error while connecting to PostgreSQL: {error}")
             raise
 
-    def check_bahn_id_exists(self, conn, table_name, bahn_id):
-        with conn.cursor() as cur:
-            cur.execute(f"SELECT COUNT(*) FROM bewegungsdaten.{table_name} WHERE bahn_id = %s", (bahn_id,))
-            return cur.fetchone()[0] > 0
+    async def check_bahn_id_exists(self, conn, table_name, bahn_id):
+        query = f"SELECT COUNT(*) FROM bewegungsdaten.{table_name} WHERE bahn_id = $1"
+        return await conn.fetchval(query, bahn_id) > 0
 
-    def insert_bahn_info(self, conn, data):
-        if self.check_bahn_id_exists(conn, 'bahn_info', data[0]):
-            print(f"bahn_info for bahn_id {data[0]} already exists. Skipping insertion.")
+    async def insert_bahn_info(self, conn, data):
+        if await self.check_bahn_id_exists(conn, 'bahn_info', data[0]):
+            logger.info(f"bahn_info for bahn_id {data[0]} already exists. Skipping insertion.")
             return
 
-        with conn.cursor() as cur:
-            insert_query = sql.SQL("""
-                INSERT INTO bewegungsdaten.bahn_info 
-                (bahn_id, robot_model, bahnplanung, recording_date, start_time, end_time, 
-                 source_data_ist, source_data_soll, record_filename, 
-                 np_ereignisse, frequency_pose_ist, frequency_position_soll, 
-                 frequency_orientation_soll, frequency_twist_ist, frequency_twist_soll, 
-                 frequency_accel_ist, frequency_joint_states, calibration_run, np_pose_ist, np_twist_ist, np_accel_ist, np_pos_soll, np_orient_soll, np_twist_soll, np_jointstates)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """)
-            try:
-                cur.execute(insert_query, data)
-                conn.commit()
-                print(f"Data inserted successfully into bahn_info")
-            except (Exception, psycopg2.Error) as error:
-                conn.rollback()
-                print(f"Error inserting data into bahn_info: {error}")
+        query = """
+            INSERT INTO bewegungsdaten.bahn_info 
+            (bahn_id, robot_model, bahnplanung, recording_date, start_time, end_time, 
+             source_data_ist, source_data_soll, record_filename, 
+             np_ereignisse, frequency_pose_ist, frequency_position_soll, 
+             frequency_orientation_soll, frequency_twist_ist, frequency_twist_soll, 
+             frequency_accel_ist, frequency_joint_states, calibration_run, np_pose_ist, np_twist_ist, np_accel_ist, np_pos_soll, np_orient_soll, np_twist_soll, np_jointstates)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+        """
+        try:
+            await conn.execute(query, *data)
+            logger.info(f"Data inserted successfully into bahn_info")
+        except Exception as error:
+            logger.error(f"Error inserting data into bahn_info: {error}")
+            raise
 
-    def insert_pose_data(self, conn, data):
+    async def insert_data(self, conn, table_name, data):
         if not data:
-            print("No pose data to insert.")
+            logger.info(f"No {table_name} data to insert.")
             return
 
         bahn_id = data[0][0]
-        if self.check_bahn_id_exists(conn, 'bahn_pose_ist', bahn_id):
-            print(f"Pose data for bahn_id {bahn_id} already exists. Skipping insertion.")
+        if await self.check_bahn_id_exists(conn, table_name, bahn_id):
+            logger.info(f"{table_name} data for bahn_id {bahn_id} already exists. Skipping insertion.")
             return
 
-        with conn.cursor() as cur:
-            insert_query = sql.SQL("""
-                INSERT INTO bewegungsdaten.bahn_pose_ist 
-                (bahn_id, segment_id, timestamp, x_ist, y_ist, z_ist, qx_ist, qy_ist, qz_ist, qw_ist, 
-                source_data_ist)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """)
-            try:
-                cur.executemany(insert_query, data)
-                conn.commit()
-                print(f"Data inserted successfully into bahn_pose_ist")
-            except (Exception, psycopg2.Error) as error:
-                conn.rollback()
-                print(f"Error inserting data into bahn_pose_ist: {error}")
+        columns = ', '.join(f'${i+1}' for i in range(len(data[0])))
+        query = f"INSERT INTO bewegungsdaten.{table_name} VALUES ({columns})"
+        try:
+            await conn.executemany(query, data)
+            logger.info(f"Data inserted successfully into {table_name}")
+        except Exception as error:
+            logger.error(f"Error inserting data into {table_name}: {error}")
+            raise
 
-    def insert_position_soll_data(self, conn, data):
-        if not data:
-            print("No position_soll data to insert.")
-            return
+    # You can keep the specific insert methods if you want, but they'll all use insert_data now
+    async def insert_pose_data(self, conn, data):
+        await self.insert_data(conn, 'bahn_pose_ist', data)
 
-        bahn_id = data[0][0]
-        if self.check_bahn_id_exists(conn, 'bahn_position_soll', bahn_id):
-            print(f"Position_soll data for bahn_id {bahn_id} already exists. Skipping insertion.")
-            return
+    async def insert_position_soll_data(self, conn, data):
+        await self.insert_data(conn, 'bahn_position_soll', data)
 
-        with conn.cursor() as cur:
-            insert_query = sql.SQL("""
-                INSERT INTO bewegungsdaten.bahn_position_soll 
-                (bahn_id, segment_id, timestamp, x_soll, y_soll, z_soll, source_data_soll)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """)
-            try:
-                cur.executemany(insert_query, data)
-                conn.commit()
-                print(f"Data inserted successfully into bahn_position_soll")
-            except (Exception, psycopg2.Error) as error:
-                conn.rollback()
-                print(f"Error inserting data into bahn_position_soll: {error}")
+    async def insert_twist_soll_data(self, conn, data):
+        await self.insert_data(conn, 'bahn_twist_soll', data)
 
-    def insert_twist_soll_data(self, conn, data):
-        if not data:
-            print("No twist_soll data to insert.")
-            return
+    async def insert_orientation_soll_data(self, conn, data):
+        await self.insert_data(conn, 'bahn_orientation_soll', data)
 
-        bahn_id = data[0][0]
-        if self.check_bahn_id_exists(conn, 'bahn_twist_soll', bahn_id):
-            print(f"Twist_soll data for bahn_id {bahn_id} already exists. Skipping insertion.")
-            return
+    async def insert_accel_data(self, conn, data):
+        await self.insert_data(conn, 'bahn_accel_ist', data)
 
-        with conn.cursor() as cur:
-            insert_query = sql.SQL("""
-                INSERT INTO bewegungsdaten.bahn_twist_soll 
-                (bahn_id, segment_id, timestamp, tcp_speed_soll, source_data_soll)
-                VALUES (%s, %s, %s, %s, %s)
-            """)
-            try:
-                cur.executemany(insert_query, data)
-                conn.commit()
-                print(f"Data inserted successfully into bahn_twist_soll")
-            except (Exception, psycopg2.Error) as error:
-                conn.rollback()
-                print(f"Error inserting data into bahn_twist_soll: {error}")
+    async def insert_twist_ist_data(self, conn, data):
+        await self.insert_data(conn, 'bahn_twist_ist', data)
 
-    def insert_orientation_soll_data(self, conn, data):
-        if not data:
-            print("No orientation_soll data to insert.")
-            return
+    async def insert_rapid_events_data(self, conn, data):
+        await self.insert_data(conn, 'bahn_events', data)
 
-        bahn_id = data[0][0]
-        if self.check_bahn_id_exists(conn, 'bahn_orientation_soll', bahn_id):
-            print(f"Orientation_soll data for bahn_id {bahn_id} already exists. Skipping insertion.")
-            return
-
-        with conn.cursor() as cur:
-            insert_query = sql.SQL("""
-                INSERT INTO bewegungsdaten.bahn_orientation_soll 
-                (bahn_id, segment_id, timestamp, qx_soll, qy_soll, qz_soll, qw_soll, source_data_soll)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """)
-            try:
-                cur.executemany(insert_query, data)
-                conn.commit()
-                print(f"Data inserted successfully into bahn_orientation_soll")
-            except (Exception, psycopg2.Error) as error:
-                conn.rollback()
-                print(f"Error inserting data into bahn_orientation_soll: {error}")
-
-    def insert_accel_data(self, conn, data):
-        if not data:
-            print("No accel data to insert.")
-            return
-
-        bahn_id = data[0][0]
-        if self.check_bahn_id_exists(conn, 'bahn_accel_ist', bahn_id):
-            print(f"Accel data for bahn_id {bahn_id} already exists. Skipping insertion.")
-            return
-
-        with conn.cursor() as cur:
-            insert_query = sql.SQL("""
-                INSERT INTO bewegungsdaten.bahn_accel_ist 
-                (bahn_id, segment_id, timestamp, tcp_accel_x, tcp_accel_y, tcp_accel_z, tcp_accel_ist, 
-                tcp_angular_accel_x, tcp_angular_accel_y, tcp_angular_accel_z, tcp_angular_accel_ist, 
-                source_data_ist)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """)
-            try:
-                cur.executemany(insert_query, data)
-                conn.commit()
-                print(f"Data inserted successfully into bahn_accel_ist")
-            except (Exception, psycopg2.Error) as error:
-                conn.rollback()
-                print(f"Error inserting data into bahn_accel_ist: {error}")
-
-    def insert_twist_ist_data(self, conn, data):
-        if not data:
-            print("No twist_ist data to insert.")
-            return
-
-        bahn_id = data[0][0]
-        if self.check_bahn_id_exists(conn, 'bahn_twist_ist', bahn_id):
-            print(f"Twist_ist data for bahn_id {bahn_id} already exists. Skipping insertion.")
-            return
-
-        with conn.cursor() as cur:
-            insert_query = sql.SQL("""
-                INSERT INTO bewegungsdaten.bahn_twist_ist 
-                (bahn_id, segment_id, timestamp, tcp_speed_x, tcp_speed_y, tcp_speed_z, tcp_speed_ist, 
-                tcp_angular_x, tcp_angular_y, tcp_angular_z, tcp_angular_ist, 
-                source_data_ist)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """)
-            try:
-                cur.executemany(insert_query, data)
-                conn.commit()
-                print(f"Data inserted successfully into bahn_twist_ist")
-            except (Exception, psycopg2.Error) as error:
-                conn.rollback()
-                print(f"Error inserting data into bahn_twist_ist: {error}")
-
-    def insert_rapid_events_data(self, conn, data):
-        if not data:
-            print("No rapid_events data to insert.")
-            return
-
-        bahn_id = data[0][0]
-        if self.check_bahn_id_exists(conn, 'bahn_events', bahn_id):
-            print(f"Rapid_events data for bahn_id {bahn_id} already exists. Skipping insertion.")
-            return
-
-        with conn.cursor() as cur:
-            insert_query = sql.SQL("""
-                INSERT INTO bewegungsdaten.bahn_events 
-                (bahn_id, segment_id, timestamp, x_reached, y_reached, z_reached, qx_reached, qy_reached, qz_reached, qw_reached, source_data_soll)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """)
-            try:
-                cur.executemany(insert_query, data)
-                conn.commit()
-                print(f"Data inserted successfully into bahn_events")
-            except (Exception, psycopg2.Error) as error:
-                conn.rollback()
-                print(f"Error inserting data into bahn_events: {error}")
-
-    def insert_joint_data(self, conn, data):
-        if not data:
-            print("No joint data to insert.")
-            return
-
-        bahn_id = data[0][0]
-        if self.check_bahn_id_exists(conn, 'bahn_joint_states', bahn_id):
-            print(f"Joint data for bahn_id {bahn_id} already exists. Skipping insertion.")
-            return
-
-        with conn.cursor() as cur:
-            insert_query = sql.SQL("""
-                INSERT INTO bewegungsdaten.bahn_joint_states 
-                (bahn_id, segment_id, timestamp, joint_1, joint_2, joint_3, joint_4, joint_5, joint_6, 
-                source_data_soll)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """)
-            try:
-                cur.executemany(insert_query, data)
-                conn.commit()
-                print(f"Data inserted successfully into bahn_joint_states")
-            except (Exception, psycopg2.Error) as error:
-                conn.rollback()
-                print(f"Error inserting data into bahn_joint_states: {error}")
+    async def insert_joint_data(self, conn, data):
+        await self.insert_data(conn, 'bahn_joint_states', data)

@@ -3,6 +3,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import PQueue from 'p-queue';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
@@ -21,7 +22,6 @@ import { TrajectoryPlot } from '@/src/app/trajectories/components/TrajectoryPlot
 import { Typography } from '@/src/components/Typography';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 
-// New progress bar component
 const ProgressBar = ({ value }: { value: number }) => (
   <div className="h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
     <div
@@ -31,9 +31,10 @@ const ProgressBar = ({ value }: { value: number }) => (
   </div>
 );
 
-export function TrajectoryWrapper() {
-  console.log('TrajectoryWrapper rendered');
+// Create a new queue with a concurrency of 3
+const queue = new PQueue({ concurrency: 5 });
 
+export function TrajectoryWrapper() {
   const params = useParams();
   const id = params?.id as string;
   const [isInfoLoaded, setIsInfoLoaded] = useState(false);
@@ -41,7 +42,6 @@ export function TrajectoryWrapper() {
   const [error, setError] = useState<string | null>(null);
   const latestInfoRequestId = useRef<string | null>(null);
   const latestPlotRequestId = useRef<string | null>(null);
-  // New state for tracking loading progress
   const [loadingProgress, setLoadingProgress] = useState(0);
 
   const {
@@ -77,11 +77,10 @@ export function TrajectoryWrapper() {
     setCurrentBahnJointStates,
     setCurrentBahnEvents,
   ]);
+
   const fetchInfoData = useCallback(
     async (signal: AbortSignal, requestId: string) => {
       if (!id) return;
-
-      console.log('Fetching info data'); // Debug log
 
       try {
         const bahnInfo = await getBahnInfoById(id);
@@ -90,8 +89,7 @@ export function TrajectoryWrapper() {
           setIsInfoLoaded(true);
         }
         // eslint-disable-next-line @typescript-eslint/no-shadow
-      } catch (error) {
-        // @ts-ignore
+      } catch (error: any) {
         if (error.name === 'AbortError') {
           console.log('Info fetch aborted');
         } else {
@@ -141,27 +139,31 @@ export function TrajectoryWrapper() {
       };
 
       const fetchPromises = fetchFunctions.map(({ func, setter }) =>
-        func(id)
-          .then((data) => {
-            if (requestId === latestPlotRequestId.current) {
-              setter(data);
+        queue.add(() =>
+          func(id)
+            .then((data) => {
+              if (
+                requestId === latestPlotRequestId.current &&
+                !signal.aborted
+              ) {
+                setter(data);
+                updateProgress();
+              }
+            })
+            .catch((fetchError) => {
+              console.error(`Error fetching data: ${fetchError}`);
               updateProgress();
-            }
-          })
-          .catch((fetchError) => {
-            console.error(`Error fetching data: ${fetchError}`);
-            updateProgress();
-            return null;
-          }),
+              return null;
+            }),
+        ),
       );
 
       try {
         await Promise.all(fetchPromises);
-        if (requestId === latestPlotRequestId.current) {
+        if (requestId === latestPlotRequestId.current && !signal.aborted) {
           setIsPlotDataLoaded(true);
         }
-      } catch (fetchError) {
-        // @ts-ignore
+      } catch (fetchError: any) {
         if (fetchError.name === 'AbortError') {
           console.log('Plot data fetch aborted');
         } else {
@@ -186,14 +188,14 @@ export function TrajectoryWrapper() {
   );
 
   useEffect(() => {
-    console.log('Info effect running, id:', id); // Debug log
+    console.log('Info effect running, id:', id);
     const abortController = new AbortController();
     const requestId = Date.now().toString();
     latestInfoRequestId.current = requestId;
 
     setIsInfoLoaded(false);
     setError(null);
-    clearPlotData(); // Clear plot data when fetching new info
+    clearPlotData();
     fetchInfoData(abortController.signal, requestId);
 
     return () => {
@@ -202,7 +204,7 @@ export function TrajectoryWrapper() {
   }, [id, fetchInfoData, clearPlotData]);
 
   useEffect(() => {
-    console.log('Plot data effect running, isInfoLoaded:', isInfoLoaded); // Debug log
+    console.log('Plot data effect running, isInfoLoaded:', isInfoLoaded);
     let abortController: AbortController | null = null;
 
     if (isInfoLoaded) {
@@ -212,7 +214,7 @@ export function TrajectoryWrapper() {
 
       setIsPlotDataLoaded(false);
       setError(null);
-      clearPlotData(); // Clear plot data before fetching new data
+      clearPlotData();
       fetchPlotData(abortController.signal, requestId);
     }
 

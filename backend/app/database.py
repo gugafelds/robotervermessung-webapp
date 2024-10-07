@@ -1,6 +1,5 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+import asyncpg
+from fastapi import FastAPI
 from dotenv import load_dotenv
 import os
 
@@ -10,22 +9,40 @@ load_dotenv()
 # Get database URL from environment variable
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/dbname")
 
-# Create SQLAlchemy engine
-engine = create_engine(DATABASE_URL)
+class Database:
+    def __init__(self):
+        self.pool = None
 
-# Create SessionLocal class
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    async def connect(self):
+        if not self.pool:
+            self.pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=10)
 
-# Create Base class
-Base = declarative_base()
+    async def disconnect(self):
+        if self.pool:
+            await self.pool.close()
 
-# Set the default schema for all tables
-Base.metadata.schema = 'bewegungsdaten'
+    async def get_connection(self):
+        if not self.pool:
+            await self.connect()
+        return await self.pool.acquire()
 
-# Dependency
-def get_db():
-    db = SessionLocal()
+    async def release_connection(self, connection):
+        await self.pool.release(connection)
+
+db = Database()
+
+async def get_db():
+    conn = await db.get_connection()
     try:
-        yield db
+        yield conn
     finally:
-        db.close()
+        await db.release_connection(conn)
+
+def init_db(app: FastAPI):
+    @app.on_event("startup")
+    async def startup():
+        await db.connect()
+
+    @app.on_event("shutdown")
+    async def shutdown():
+        await db.disconnect()
