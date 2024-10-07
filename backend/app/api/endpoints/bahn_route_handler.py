@@ -8,6 +8,7 @@ import shutil
 from ...utils.csv_processor import CSVProcessor
 from ...utils.db_operations import DatabaseOperations
 from ...utils.db_config import DB_PARAMS
+from fastapi_cache.decorator import cache
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -90,16 +91,22 @@ async def get_bahn_info(conn = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @router.get("/bahn_info/{bahn_id}")
+@cache(expire=600)
 async def get_bahn_info_by_id(bahn_id: str, conn = Depends(get_db)):
-    bahn_info = await conn.fetchrow(
-        "SELECT * FROM bewegungsdaten.bahn_info WHERE bahn_id = $1",
-        bahn_id
-    )
-    if bahn_info is None:
-        raise HTTPException(status_code=404, detail="Bahn info not found")
-    return dict(bahn_info)
+    try:
+        bahn_info = await conn.fetchrow(
+            "SELECT * FROM bewegungsdaten.bahn_info WHERE bahn_id = $1",
+            bahn_id
+        )
+        if bahn_info is None:
+            raise HTTPException(status_code=404, detail="Bahn info not found")
+        return dict(bahn_info)
+    except Exception as e:
+        logger.error(f"Error fetching Bahn info: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @router.get("/bahn_pose_ist/{bahn_id}")
+@cache(expire=600)
 async def get_bahn_pose_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_pose_ist WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -108,6 +115,7 @@ async def get_bahn_pose_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     return [dict(row) for row in rows]
 
 @router.get("/bahn_twist_ist/{bahn_id}")
+@cache(expire=600)
 async def get_bahn_twist_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_twist_ist WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -116,6 +124,7 @@ async def get_bahn_twist_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     return [dict(row) for row in rows]
 
 @router.get("/bahn_accel_ist/{bahn_id}")
+@cache(expire=600)
 async def get_bahn_accel_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_accel_ist WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -124,6 +133,7 @@ async def get_bahn_accel_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     return [dict(row) for row in rows]
 
 @router.get("/bahn_position_soll/{bahn_id}")
+@cache(expire=600)
 async def get_bahn_position_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_position_soll WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -132,6 +142,7 @@ async def get_bahn_position_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     return [dict(row) for row in rows]
 
 @router.get("/bahn_orientation_soll/{bahn_id}")
+@cache(expire=600)
 async def get_bahn_orientation_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_orientation_soll WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -140,6 +151,7 @@ async def get_bahn_orientation_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     return [dict(row) for row in rows]
 
 @router.get("/bahn_twist_soll/{bahn_id}")
+@cache(expire=600)
 async def get_bahn_twist_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_twist_soll WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -148,6 +160,7 @@ async def get_bahn_twist_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     return [dict(row) for row in rows]
 
 @router.get("/bahn_joint_states/{bahn_id}")
+@cache(expire=600)
 async def get_bahn_joint_states_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_joint_states WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -156,6 +169,7 @@ async def get_bahn_joint_states_by_id(bahn_id: str, conn = Depends(get_db)):
     return [dict(row) for row in rows]
 
 @router.get("/bahn_events/{bahn_id}")
+@cache(expire=600)
 async def get_bahn_events_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_events WHERE bahn_id = $1 ORDER BY timestamp ASC",

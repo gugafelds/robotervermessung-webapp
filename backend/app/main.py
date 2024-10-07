@@ -2,6 +2,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .api.endpoints import bahn_route_handler
 from .database import init_db
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+import aioredis
+import os
+from dotenv import load_dotenv
+import logging
+
+# Load environment variables
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Bahn Data API",
@@ -28,6 +41,18 @@ app.include_router(bahn_route_handler.router, prefix="/api/bahn", tags=["bahn"])
 
 # Initialize the database
 init_db(app)
+
+# Initialize Redis cache
+@app.on_event("startup")
+async def startup_event():
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    try:
+        redis_client = aioredis.from_url(redis_url, encoding="utf8", decode_responses=True)
+        await redis_client.ping()
+        FastAPICache.init(RedisBackend(redis_client), prefix="fastapi-cache:")
+        print("Successfully connected to Redis")
+    except Exception as e:
+        print(f"Failed to connect to Redis: {e}")
 
 @app.get("/")
 async def root():
