@@ -13,7 +13,7 @@ export default async function DashboardLayout({
 
   return (
     <TrajectoryProvider initialBahnInfo={json(bahnInfo)}>
-      <main className="flex flex-col lg:flex-row">{children}</main>
+      <main className="flex-col">{children}</main>
     </TrajectoryProvider>
   );
 }

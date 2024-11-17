@@ -76,6 +76,41 @@ async def get_dashboard_data(conn = Depends(get_db)):
         logger.error(f"Error fetching dashboard data: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
+
+@router.get("/collection_sizes")
+async def get_collection_sizes(conn = Depends(get_db)):
+    try:
+        collection_sizes = {
+            "bahnPoseIst": await conn.fetchval(
+                "SELECT pg_total_relation_size('bewegungsdaten.bahn_pose_ist')"
+            ),
+            "bahnTwistIst": await conn.fetchval(
+                "SELECT pg_total_relation_size('bewegungsdaten.bahn_twist_ist')"
+            ),
+            "bahnAccelIst": await conn.fetchval(
+                "SELECT pg_total_relation_size('bewegungsdaten.bahn_accel_ist')"
+            ),
+            "bahnPositionSoll": await conn.fetchval(
+                "SELECT pg_total_relation_size('bewegungsdaten.bahn_position_soll')"
+            ),
+            "bahnOrientationSoll": await conn.fetchval(
+                "SELECT pg_total_relation_size('bewegungsdaten.bahn_orientation_soll')"
+            ),
+            "bahnJointStates": await conn.fetchval(
+                "SELECT pg_total_relation_size('bewegungsdaten.bahn_joint_states')"
+            ),
+            "bahnEvents": await conn.fetchval(
+                "SELECT pg_total_relation_size('bewegungsdaten.bahn_events')"
+            ),
+        }
+
+        # Convert bytes to MB
+        return {k: round(v / (1024 * 1024), 2) for k, v in collection_sizes.items()}
+    except Exception as e:
+        logger.error(f"Error fetching collection sizes: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
 @router.get("/bahn_info")
 async def get_bahn_info(conn = Depends(get_db)):
     try:

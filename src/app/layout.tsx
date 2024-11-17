@@ -1,6 +1,5 @@
 import '@/src/app/globals.css';
 
-import { SpeedInsights } from '@vercel/speed-insights/next';
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import type { ReactNode } from 'react';
@@ -28,7 +27,6 @@ export default async function RootLayout({
       <body className={`${inter.className} h-full`}>
         <Navbar />
         {children}
-        <SpeedInsights />
       </body>
     </html>
   );

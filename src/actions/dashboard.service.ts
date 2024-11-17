@@ -23,3 +23,14 @@ export const getDashboardData = async () => {
     throw error;
   }
 };
+
+export const getCollectionSizes = async () => {
+  try {
+    const result = await fetchFromAPI('/bahn/collection_sizes');
+    return result;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching collection sizes:', error);
+    throw error;
+  }
+};
