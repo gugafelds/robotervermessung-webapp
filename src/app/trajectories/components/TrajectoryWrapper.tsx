@@ -13,12 +13,14 @@ import React, {
 } from 'react';
 
 import {
+  checkTransformedDataExists,
   getBahnAccelIstById,
   getBahnEventsById,
   getBahnInfoById,
   getBahnJointStatesById,
   getBahnOrientationSollById,
   getBahnPoseIstById,
+  getBahnPoseTransById,
   getBahnPositionSollById,
   getBahnTwistIstById,
   getBahnTwistSollById,
@@ -52,11 +54,13 @@ export function TrajectoryWrapper() {
   const latestInfoRequestId = useRef<string | null>(null);
   const latestPlotRequestId = useRef<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [isTransformed, setIsTransformed] = useState(false);
 
   const {
     currentBahnInfo,
     setCurrentBahnInfo,
     setCurrentBahnPoseIst,
+    setCurrentBahnPoseTrans,
     setCurrentBahnTwistIst,
     setCurrentBahnAccelIst,
     setCurrentBahnPositionSoll,
@@ -105,6 +109,16 @@ export function TrajectoryWrapper() {
 
       console.log('Fetching plot data');
 
+      // Prüfe zuerst ob transformierte Daten existieren
+      let useTrans = false;
+      try {
+        useTrans = await checkTransformedDataExists(id);
+        setIsTransformed(useTrans);
+        // eslint-disable-next-line @typescript-eslint/no-shadow
+      } catch (error) {
+        console.error('Error checking transformed data:', error);
+      }
+
       type SetterFunction<T> = (value: T) => void;
 
       interface FetchFunction<T> {
@@ -115,9 +129,9 @@ export function TrajectoryWrapper() {
 
       const fetchFunctions: FetchFunction<any>[] = [
         {
-          func: getBahnPoseIstById,
-          setter: setCurrentBahnPoseIst,
-          key: 'pose_ist',
+          func: useTrans ? getBahnPoseTransById : getBahnPoseIstById,
+          setter: useTrans ? setCurrentBahnPoseTrans : setCurrentBahnPoseIst,
+          key: useTrans ? 'pose_trans' : 'pose_ist',
         },
         {
           func: getBahnTwistIstById,
@@ -219,6 +233,7 @@ export function TrajectoryWrapper() {
       setCurrentBahnTwistSoll,
       setCurrentBahnJointStates,
       setCurrentBahnEvents,
+      setCurrentBahnPoseTrans,
     ],
   );
 
@@ -265,8 +280,10 @@ export function TrajectoryWrapper() {
     };
   }, [isInfoLoaded, fetchPlotData, isPlotDataLoaded]);
 
-  // Memoize the TrajectoryPlot component to prevent unnecessary re-renders
-  const memoizedTrajectoryPlot = useMemo(() => <TrajectoryPlot />, []);
+  const memoizedTrajectoryPlot = useMemo(
+    () => <TrajectoryPlot isTransformed={isTransformed} />,
+    [isTransformed],
+  );
 
   if (error) {
     return <div>Error: {error}</div>;

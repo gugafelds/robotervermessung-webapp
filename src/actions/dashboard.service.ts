@@ -27,6 +27,7 @@ export const getDashboardData = async () => {
 export const getCollectionSizes = async () => {
   try {
     const result = await fetchFromAPI('/bahn/collection_sizes');
+    revalidatePath('/dashboard');
     return result;
   } catch (error) {
     // eslint-disable-next-line no-console

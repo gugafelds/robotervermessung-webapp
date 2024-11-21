@@ -11,6 +11,8 @@ import type {
   BahnOrientationSollRaw,
   BahnPoseIst,
   BahnPoseIstRaw,
+  BahnPoseTrans,
+  BahnPoseTransRaw,
   BahnPositionSoll,
   BahnPositionSollRaw,
   BahnTwistIst,
@@ -102,6 +104,25 @@ export const transformBahnPoseIstResult = (
       qzIst: bahn.qz_ist,
       qwIst: bahn.qw_ist,
       sourceDataIst: bahn.source_data_ist,
+    }),
+  );
+};
+
+export const transformBahnPoseTransResult = (
+  bahnenPoseTransRaw: BahnPoseTransRaw[],
+): BahnPoseTrans[] => {
+  return bahnenPoseTransRaw.map(
+    (bahn): BahnPoseTrans => ({
+      bahnID: bahn.bahn_id,
+      segmentID: bahn.segment_id,
+      timestamp: bahn.timestamp,
+      xTrans: bahn.x_trans,
+      yTrans: bahn.y_trans,
+      zTrans: bahn.z_trans,
+      rollTrans: bahn.roll_trans,
+      pitchTrans: bahn.pitch_trans,
+      yawTrans: bahn.yaw_trans,
+      calibrationID: bahn.calibration_id,
     }),
   );
 };

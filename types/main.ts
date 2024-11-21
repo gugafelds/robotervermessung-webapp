@@ -272,3 +272,29 @@ export interface BahnEventsRaw {
   qw_reached: number;
   source_data_soll: string;
 }
+
+export interface BahnPoseTrans {
+  bahnID: string;
+  segmentID: string;
+  timestamp: string;
+  xTrans: number;
+  yTrans: number;
+  zTrans: number;
+  rollTrans: number;
+  pitchTrans: number;
+  yawTrans: number;
+  calibrationID: string;
+}
+
+export interface BahnPoseTransRaw {
+  bahn_id: string;
+  segment_id: string;
+  timestamp: string;
+  x_trans: string;
+  y_trans: string;
+  z_trans: string;
+  roll_trans: number;
+  pitch_trans: number;
+  yaw_trans: number;
+  calibration_id: string;
+}

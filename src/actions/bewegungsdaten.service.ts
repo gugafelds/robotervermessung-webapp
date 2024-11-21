@@ -10,6 +10,7 @@ import {
   transformBahnJointStatesResult,
   transformBahnOrientationSollResult,
   transformBahnPoseIstResult,
+  transformBahnPoseTransResult,
   transformBahnPositionSollResult,
   transformBahnTwistIstResult,
   transformBahnTwistSollResult,
@@ -21,6 +22,7 @@ import type {
   BahnJointStates,
   BahnOrientationSoll,
   BahnPoseIst,
+  BahnPoseTrans,
   BahnPositionSoll,
   BahnTwistIst,
   BahnTwistSoll,
@@ -73,6 +75,21 @@ export const getBahnPoseIstById = async (
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error fetching Bahn pose ist by ID:', error);
+    throw error;
+  }
+};
+
+export const getBahnPoseTransById = async (
+  id: string,
+): Promise<BahnPoseTrans[]> => {
+  try {
+    const result = await fetchFromAPI(`/bahn/bahn_pose_trans/${id}`);
+    const transformedResult = transformBahnPoseTransResult(result);
+    revalidatePath(`/trajectories/${id}`);
+    return transformedResult;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching transformed pose data:', error);
     throw error;
   }
 };
@@ -177,5 +194,18 @@ export const getBahnEventsById = async (id: string): Promise<BahnEvents[]> => {
     // eslint-disable-next-line no-console
     console.error('Error fetching Bahn events by ID:', error);
     throw error;
+  }
+};
+
+export const checkTransformedDataExists = async (
+  id: string,
+): Promise<boolean> => {
+  try {
+    const result = await fetchFromAPI(`/bahn/check_transformed_data/${id}`);
+    return result.exists;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error checking transformed data:', error);
+    return false;
   }
 };

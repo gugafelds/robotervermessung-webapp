@@ -2,25 +2,46 @@ import dynamic from 'next/dynamic';
 import type { Layout, PlotData } from 'plotly.js';
 import React from 'react';
 
-import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config'; // Adjust import path as needed
-import type { BahnPoseIst, BahnPositionSoll } from '@/types/main'; //
+import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
+import type {
+  BahnPoseIst,
+  BahnPoseTrans,
+  BahnPositionSoll,
+} from '@/types/main';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 interface Position3DPlotProps {
-  realTrajectory: BahnPoseIst[];
+  currentBahnPoseIst: BahnPoseIst[];
+  currentBahnPoseTrans: BahnPoseTrans[];
   idealTrajectory: BahnPositionSoll[];
+  isTransformed: boolean;
 }
 
 export const Position3DPlot: React.FC<Position3DPlotProps> = ({
-  realTrajectory,
+  currentBahnPoseTrans,
+  currentBahnPoseIst,
   idealTrajectory,
+  isTransformed,
 }) => {
+  // Überprüfe, ob es sich um transformierte Daten handelt
+
+  const realTrajectory = isTransformed
+    ? currentBahnPoseTrans
+    : currentBahnPoseIst;
+
   const realTrajectoryData: Partial<PlotData> = {
     ...dataPlotConfig('lines', 'ist', 6, 'darkblue'),
-    x: realTrajectory.map((row) => row.xIst),
-    y: realTrajectory.map((row) => row.yIst),
-    z: realTrajectory.map((row) => row.zIst),
+    x: realTrajectory.map((row) =>
+      isTransformed ? (row as BahnPoseTrans).xTrans : (row as BahnPoseIst).xIst,
+    ),
+    y: realTrajectory.map((row) =>
+      isTransformed ? (row as BahnPoseTrans).yTrans : (row as BahnPoseIst).yIst,
+    ),
+    z: realTrajectory.map((row) =>
+      isTransformed ? (row as BahnPoseTrans).zTrans : (row as BahnPoseIst).zIst,
+    ),
+    name: isTransformed ? 'transformiert' : 'ist',
   };
 
   const idealTrajectoryData: Partial<PlotData> = {
@@ -28,6 +49,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     x: idealTrajectory.map((row) => row.xSoll),
     y: idealTrajectory.map((row) => row.ySoll),
     z: idealTrajectory.map((row) => row.zSoll),
+    name: 'soll',
   };
 
   const layout: Partial<Layout> = {

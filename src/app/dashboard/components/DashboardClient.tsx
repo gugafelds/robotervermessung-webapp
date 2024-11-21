@@ -19,6 +19,7 @@ interface DashboardClientProps {
     bahnOrientationSoll: number;
     bahnJointStates: number;
     bahnEvents: number;
+    bahnPoseTrans: number;
   };
 }
 
@@ -53,6 +54,11 @@ export default function DashboardClient({
               componentName="Roboterpose (Ist)"
               value={componentCounts.bahnPoseIst}
               size={collectionSizes?.bahnPoseIst}
+            />
+            <DataCard
+              componentName="Roboterpose (Transf.)"
+              value={componentCounts.bahnPoseTrans}
+              size={collectionSizes?.bahnPoseTrans}
             />
             <DataCard
               componentName="Robotergeschwindigkeit (Ist)"

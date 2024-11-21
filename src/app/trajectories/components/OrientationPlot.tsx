@@ -5,37 +5,81 @@ import type { Layout, PlotData } from 'plotly.js';
 import React from 'react';
 
 import { quaternionToEuler } from '@/src/lib/functions';
-import type { BahnOrientationSoll, BahnPoseIst } from '@/types/main';
+import type {
+  BahnOrientationSoll,
+  BahnPoseIst,
+  BahnPoseTrans,
+} from '@/types/main';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 interface OrientationPlotProps {
   currentBahnPoseIst: BahnPoseIst[];
+  currentBahnPoseTrans: BahnPoseTrans[];
   currentBahnOrientationSoll: BahnOrientationSoll[];
+  isTransformed: boolean;
 }
 
 export const OrientationPlot: React.FC<OrientationPlotProps> = ({
   currentBahnPoseIst,
   currentBahnOrientationSoll,
+  currentBahnPoseTrans,
+  isTransformed,
 }) => {
   const createCombinedEulerAnglePlotData = (): {
     plotData: Partial<PlotData>[];
     maxTimeOrientation: number;
   } => {
+    const currentPoseData = isTransformed
+      ? currentBahnPoseTrans
+      : currentBahnPoseIst;
+
     // Find the global start time
     const globalStartTime = Math.min(
-      ...currentBahnPoseIst.map((bahn) => Number(bahn.timestamp)),
+      ...currentPoseData.map((bahn) => Number(bahn.timestamp)),
       ...currentBahnOrientationSoll.map((bahn) => Number(bahn.timestamp)),
     );
 
     // Process Ist data
-    const timestampsIst = currentBahnPoseIst.map((bahn) => {
+    const timestampsIst = currentPoseData.map((bahn) => {
       const elapsedNanoseconds = Number(bahn.timestamp) - globalStartTime;
       return elapsedNanoseconds / 1e9; // Convert to seconds
     });
-    const eulerAnglesIst = currentBahnPoseIst.map((bahn) =>
-      quaternionToEuler(bahn.qxIst, bahn.qyIst, bahn.qzIst, bahn.qwIst),
-    );
+
+    interface TransformedAngles {
+      roll: number;
+      pitch: number;
+      yaw: number;
+    }
+
+    interface QuaternionAngles {
+      angles: number[];
+    }
+
+    function isTransformedAngles(
+      angles: TransformedAngles | QuaternionAngles,
+    ): angles is TransformedAngles {
+      return 'roll' in angles;
+    }
+
+    const eulerAnglesIst = isTransformed
+      ? currentBahnPoseTrans.map(
+          (bahn): TransformedAngles => ({
+            roll: bahn.rollTrans,
+            pitch: bahn.pitchTrans,
+            yaw: bahn.yawTrans,
+          }),
+        )
+      : currentBahnPoseIst.map(
+          (bahn): QuaternionAngles => ({
+            angles: quaternionToEuler(
+              bahn.qxIst,
+              bahn.qyIst,
+              bahn.qzIst,
+              bahn.qwIst,
+            ),
+          }),
+        );
 
     // Process Soll data
     const timestampsSoll = currentBahnOrientationSoll.map((bahn) => {
@@ -54,24 +98,30 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
         type: 'scatter',
         mode: 'lines',
         x: timestampsIst,
-        y: eulerAnglesIst.map((angles) => angles[0]),
-        name: 'Roll (Ist)',
+        y: eulerAnglesIst.map((angles) =>
+          isTransformedAngles(angles) ? angles.roll : angles.angles[0],
+        ),
+        name: isTransformed ? 'Roll (Trans)' : 'Roll (Ist)',
         line: { color: 'red' },
       },
       {
         type: 'scatter',
         mode: 'lines',
         x: timestampsIst,
-        y: eulerAnglesIst.map((angles) => angles[1]),
-        name: 'Pitch (Ist)',
+        y: eulerAnglesIst.map((angles) =>
+          isTransformedAngles(angles) ? angles.pitch : angles.angles[1],
+        ),
+        name: isTransformed ? 'Pitch (Trans)' : 'Pitch (Ist)',
         line: { color: 'green' },
       },
       {
         type: 'scatter',
         mode: 'lines',
         x: timestampsIst,
-        y: eulerAnglesIst.map((angles) => angles[2]),
-        name: 'Yaw (Ist)',
+        y: eulerAnglesIst.map((angles) =>
+          isTransformedAngles(angles) ? angles.yaw : angles.angles[2],
+        ),
+        name: isTransformed ? 'Yaw (Trans)' : 'Yaw (Ist)',
         line: { color: 'blue' },
       },
       // Soll data

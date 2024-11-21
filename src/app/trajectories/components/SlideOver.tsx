@@ -5,7 +5,11 @@ import { XMarkIcon } from '@heroicons/react/20/solid';
 import { Fragment, type ReactNode } from 'react';
 import React from 'react';
 
-import type { BahnPoseIst, BahnPositionSoll } from '@/types/main'; // Adjust import path as needed
+import type {
+  BahnPoseIst,
+  BahnPoseTrans,
+  BahnPositionSoll,
+} from '@/types/main'; // Adjust import path as needed
 
 import { Position3DPlot } from './Position3DPlot'; // Adjust import path as needed
 
@@ -14,8 +18,10 @@ type ModalProps = {
   open: boolean;
   onClose: () => void;
   children?: ReactNode;
-  realTrajectory: BahnPoseIst[];
+  currentBahnPoseIst: BahnPoseIst[];
+  currentBahnPoseTrans: BahnPoseTrans[];
   idealTrajectory: BahnPositionSoll[];
+  isTransformed: boolean;
 };
 
 const SlideOver = ({
@@ -23,8 +29,10 @@ const SlideOver = ({
   open,
   onClose,
   children,
-  realTrajectory,
+  currentBahnPoseTrans,
+  currentBahnPoseIst,
   idealTrajectory,
+  isTransformed,
 }: ModalProps) => {
   return (
     <Transition.Root show={open} as={Fragment}>
@@ -88,8 +96,10 @@ const SlideOver = ({
                         {' '}
                         {/* Adjusted height */}
                         <Position3DPlot
-                          realTrajectory={realTrajectory}
+                          currentBahnPoseIst={currentBahnPoseIst}
+                          currentBahnPoseTrans={currentBahnPoseTrans}
                           idealTrajectory={idealTrajectory}
+                          isTransformed={isTransformed}
                         />
                       </div>
                       {children}

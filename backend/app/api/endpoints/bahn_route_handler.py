@@ -30,6 +30,7 @@ async def get_dashboard_data(conn = Depends(get_db)):
             "bahnOrientationSoll": await conn.fetchval("SELECT COUNT(*) FROM bewegungsdaten.bahn_orientation_soll"),
             "bahnJointStates": await conn.fetchval("SELECT COUNT(*) FROM bewegungsdaten.bahn_joint_states"),
             "bahnEvents": await conn.fetchval("SELECT COUNT(*) FROM bewegungsdaten.bahn_events"),
+            "bahnPoseTrans": await conn.fetchval("SELECT COUNT(*) FROM bewegungsdaten.bahn_pose_trans"),
         }
 
         frequency_result = await conn.fetch("""
@@ -102,6 +103,9 @@ async def get_collection_sizes(conn = Depends(get_db)):
             "bahnEvents": await conn.fetchval(
                 "SELECT pg_total_relation_size('bewegungsdaten.bahn_events')"
             ),
+            "bahnPoseTrans": await conn.fetchval(
+                "SELECT pg_total_relation_size('bewegungsdaten.bahn_pose_trans')"
+            ),
         }
 
         # Convert bytes to MB
@@ -140,6 +144,23 @@ async def get_bahn_info_by_id(bahn_id: str, conn = Depends(get_db)):
         logger.error(f"Error fetching Bahn info: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
+@router.get("/check_transformed_data/{bahn_id}")
+@cache(expire=2400)
+async def check_transformed_data(bahn_id: str, conn = Depends(get_db)):
+    try:
+        exists = await conn.fetchval("""
+            SELECT EXISTS (
+                SELECT 1 
+                FROM bewegungsdaten.bahn_pose_trans 
+                WHERE bahn_id = $1
+                LIMIT 1
+            )
+        """, bahn_id)
+        return {"exists": exists}
+    except Exception as e:
+        logger.error(f"Error checking transformed data: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/bahn_pose_ist/{bahn_id}")
 @cache(expire=600)
 async def get_bahn_pose_ist_by_id(bahn_id: str, conn = Depends(get_db)):
@@ -148,6 +169,16 @@ async def get_bahn_pose_ist_by_id(bahn_id: str, conn = Depends(get_db)):
         bahn_id
     )
     return [dict(row) for row in rows]
+
+@router.get("/bahn_pose_trans/{bahn_id}")
+@cache(expire=600)
+async def get_bahn_pose_trans_by_id(bahn_id: str, conn = Depends(get_db)):
+    rows = await conn.fetch(
+        "SELECT * FROM bewegungsdaten.bahn_pose_trans WHERE bahn_id = $1 ORDER BY timestamp ASC",
+        bahn_id
+    )
+    return [dict(row) for row in rows]
+
 
 @router.get("/bahn_twist_ist/{bahn_id}")
 @cache(expire=600)

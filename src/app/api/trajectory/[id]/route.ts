@@ -10,6 +10,7 @@ import {
   getBahnJointStatesById,
   getBahnOrientationSollById,
   getBahnPoseIstById,
+  getBahnPoseTransById,
   getBahnPositionSollById,
   getBahnTwistIstById,
   getBahnTwistSollById,
@@ -36,6 +37,7 @@ export async function GET(
       currentBahnTwistSoll,
       currentBahnJointStates,
       currentBahnEvents,
+      currentBahnPoseTrans,
     ] = await Promise.all([
       getBahnInfoById(id),
       getBahnPoseIstById(id),
@@ -46,6 +48,7 @@ export async function GET(
       getBahnTwistSollById(id),
       getBahnJointStatesById(id),
       getBahnEventsById(id),
+      getBahnPoseTransById(id),
     ]);
 
     return NextResponse.json(
@@ -59,6 +62,7 @@ export async function GET(
         currentBahnTwistSoll,
         currentBahnJointStates,
         currentBahnEvents,
+        currentBahnPoseTrans,
       },
       {
         headers: {

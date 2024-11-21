@@ -15,10 +15,17 @@ import SlideOver from './SlideOver';
 import { TCPAccelPlot } from './TCPAccelPlot';
 import { TCPSpeedPlot } from './TCPSpeedPlot';
 
-export const TrajectoryPlot = () => {
+interface TrajectoryPlotProps {
+  isTransformed: boolean;
+}
+
+export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
+  isTransformed,
+}) => {
   const {
     bahnInfo,
     currentBahnPoseIst,
+    currentBahnPoseTrans,
     currentBahnTwistIst,
     currentBahnAccelIst,
     currentBahnPositionSoll,
@@ -55,7 +62,7 @@ export const TrajectoryPlot = () => {
 
   // Check if all required data is available
   const isDataAvailable =
-    currentBahnPoseIst &&
+    (isTransformed ? currentBahnPoseTrans : currentBahnPoseIst) &&
     currentBahnTwistIst &&
     currentBahnAccelIst &&
     currentBahnPositionSoll &&
@@ -81,19 +88,25 @@ export const TrajectoryPlot = () => {
         title="3D-Plot"
         open={isSlideOverOpen}
         onClose={closeSlideOver}
-        realTrajectory={currentBahnPoseIst}
+        currentBahnPoseIst={currentBahnPoseIst}
+        currentBahnPoseTrans={currentBahnPoseTrans}
         idealTrajectory={currentBahnPositionSoll}
+        isTransformed={isTransformed}
       />
 
       <Position2DPlot
         currentBahnEvents={currentBahnEvents}
         idealTrajectory={currentBahnPositionSoll}
         currentBahnPoseIst={currentBahnPoseIst}
+        currentBahnPoseTrans={currentBahnPoseTrans}
+        isTransformed={isTransformed}
       />
 
       <OrientationPlot
         currentBahnOrientationSoll={currentBahnOrientationSoll}
         currentBahnPoseIst={currentBahnPoseIst}
+        currentBahnPoseTrans={currentBahnPoseTrans}
+        isTransformed={isTransformed}
       />
 
       <TCPSpeedPlot

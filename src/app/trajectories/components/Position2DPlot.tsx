@@ -4,7 +4,12 @@ import dynamic from 'next/dynamic';
 import type { Layout, PlotData } from 'plotly.js';
 import React from 'react';
 
-import type { BahnEvents, BahnPoseIst, BahnPositionSoll } from '@/types/main';
+import type {
+  BahnEvents,
+  BahnPoseIst,
+  BahnPoseTrans,
+  BahnPositionSoll,
+} from '@/types/main';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
@@ -12,21 +17,29 @@ interface Position2DPlotProps {
   idealTrajectory: BahnPositionSoll[];
   currentBahnEvents: BahnEvents[];
   currentBahnPoseIst: BahnPoseIst[];
+  currentBahnPoseTrans: BahnPoseTrans[];
+  isTransformed: boolean;
 }
 
 export const Position2DPlot: React.FC<Position2DPlotProps> = ({
   idealTrajectory,
   currentBahnEvents,
   currentBahnPoseIst,
+  currentBahnPoseTrans,
+  isTransformed,
 }) => {
   const createCombinedPositionPlot = (): {
     plotData: Partial<PlotData>[];
     maxTimePos: number;
   } => {
+    const currentPoseData = isTransformed
+      ? currentBahnPoseTrans
+      : currentBahnPoseIst;
+
     const globalStartTime = Math.min(
       ...idealTrajectory.map((b) => Number(b.timestamp)),
       ...currentBahnEvents.map((b) => Number(b.timestamp)),
-      ...currentBahnPoseIst.map((b) => Number(b.timestamp)),
+      ...currentPoseData.map((b) => Number(b.timestamp)),
     );
 
     const positionSollData = idealTrajectory.map((b) => ({
@@ -36,12 +49,25 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       zPos: b.zSoll,
     }));
 
-    const positionIstData = currentBahnPoseIst.map((b) => ({
-      x: (Number(b.timestamp) - globalStartTime) / 1e9,
-      xPos: b.xIst,
-      yPos: b.yIst,
-      zPos: b.zIst,
-    }));
+    const positionIstData = currentPoseData.map((b) => {
+      const x = (Number(b.timestamp) - globalStartTime) / 1e9;
+      if (isTransformed) {
+        const transPose = b as BahnPoseTrans;
+        return {
+          x,
+          xPos: transPose.xTrans,
+          yPos: transPose.yTrans,
+          zPos: transPose.zTrans,
+        };
+      }
+      const istPose = b as BahnPoseIst;
+      return {
+        x,
+        xPos: istPose.xIst,
+        yPos: istPose.yIst,
+        zPos: istPose.zIst,
+      };
+    });
 
     const createStairStepData = (
       data: { x: number; pos: number }[],
