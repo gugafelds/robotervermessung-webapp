@@ -4,6 +4,7 @@ import React from 'react';
 
 import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
 import type {
+  BahnEvents,
   BahnPoseIst,
   BahnPoseTrans,
   BahnPositionSoll,
@@ -15,6 +16,7 @@ interface Position3DPlotProps {
   currentBahnPoseIst: BahnPoseIst[];
   currentBahnPoseTrans: BahnPoseTrans[];
   idealTrajectory: BahnPositionSoll[];
+  currentBahnEvents: BahnEvents[]; // Neue Prop
   isTransformed: boolean;
 }
 
@@ -22,10 +24,9 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
   currentBahnPoseTrans,
   currentBahnPoseIst,
   idealTrajectory,
+  currentBahnEvents, // Neue Prop
   isTransformed,
 }) => {
-  // Überprüfe, ob es sich um transformierte Daten handelt
-
   const realTrajectory = isTransformed
     ? currentBahnPoseTrans
     : currentBahnPoseIst;
@@ -52,6 +53,43 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     name: 'soll',
   };
 
+  // Neue Daten für die Zielpunkte
+  const targetPointsData: Partial<PlotData> = {
+    type: 'scatter3d',
+    mode: 'markers',
+    name: 'Zielpunkte',
+    x: currentBahnEvents.map((row) => row.xReached),
+    y: currentBahnEvents.map((row) => row.yReached),
+    z: currentBahnEvents.map((row) => row.zReached),
+    marker: {
+      size: 8,
+      color: 'red',
+      symbol: 'circle', // Anderes Symbol für Firefox
+      opacity: 1,
+      sizeref: 2,
+      sizemode: 'absolute', // Absoluter Größenmodus
+    },
+    hoverlabel: {
+      bgcolor: 'red',
+    },
+    visible: true,
+  };
+
+  // Optional: Verbindungslinien zwischen den Zielpunkten
+  const targetLinesData: Partial<PlotData> = {
+    type: 'scatter3d',
+    mode: 'lines',
+    name: 'Zielpunkt-Verbindungen',
+    x: currentBahnEvents.map((row) => row.xReached),
+    y: currentBahnEvents.map((row) => row.yReached),
+    z: currentBahnEvents.map((row) => row.zReached),
+    line: {
+      color: 'rgba(255, 0, 0, 0.3)', // Halbtransparentes Rot
+      width: 2,
+    },
+    showlegend: false,
+  };
+
   const layout: Partial<Layout> = {
     ...plotLayoutConfig,
     autosize: true,
@@ -63,7 +101,12 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
 
   return (
     <Plot
-      data={[realTrajectoryData, idealTrajectoryData]}
+      data={[
+        realTrajectoryData,
+        idealTrajectoryData,
+        targetLinesData,
+        targetPointsData,
+      ]}
       layout={layout}
       useResizeHandler
       style={{ width: '100%', height: '100%' }}

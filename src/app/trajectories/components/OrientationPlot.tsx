@@ -6,6 +6,7 @@ import React from 'react';
 
 import { quaternionToEuler } from '@/src/lib/functions';
 import type {
+  BahnEvents,
   BahnOrientationSoll,
   BahnPoseIst,
   BahnPoseTrans,
@@ -17,6 +18,7 @@ interface OrientationPlotProps {
   currentBahnPoseIst: BahnPoseIst[];
   currentBahnPoseTrans: BahnPoseTrans[];
   currentBahnOrientationSoll: BahnOrientationSoll[];
+  currentBahnEvents: BahnEvents[];
   isTransformed: boolean;
 }
 
@@ -24,6 +26,7 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
   currentBahnPoseIst,
   currentBahnOrientationSoll,
   currentBahnPoseTrans,
+  currentBahnEvents,
   isTransformed,
 }) => {
   const createCombinedEulerAnglePlotData = (): {
@@ -38,6 +41,7 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
     const globalStartTime = Math.min(
       ...currentPoseData.map((bahn) => Number(bahn.timestamp)),
       ...currentBahnOrientationSoll.map((bahn) => Number(bahn.timestamp)),
+      ...currentBahnEvents.map((bahn) => Number(bahn.timestamp)),
     );
 
     // Process Ist data
@@ -90,64 +94,128 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       quaternionToEuler(bahn.qxSoll, bahn.qySoll, bahn.qzSoll, bahn.qwSoll),
     );
 
+    const eventEulerAngles = currentBahnEvents.map((event) => ({
+      time: (Number(event.timestamp) - globalStartTime) / 1e9,
+      angles: quaternionToEuler(
+        event.qxReached,
+        event.qyReached,
+        event.qzReached,
+        event.qwReached,
+      ),
+    }));
+
     const maxTimeOrientation = Math.max(...timestampsIst, ...timestampsSoll);
 
     const plotData: Partial<PlotData>[] = [
-      // Ist data
+      // Roll (X-Rotation) - Blau-Töne wie X-Position
       {
         type: 'scatter',
         mode: 'lines',
+        name: 'Roll-Sollwinkel',
+        x: timestampsSoll,
+        y: eulerAnglesSoll.map((angles) => angles[0]),
+        line: { color: 'blue', width: 2 },
+      },
+      {
+        type: 'scatter',
+        mode: 'lines',
+        name: isTransformed ? 'Roll-Transwinkel' : 'Roll-Istwinkel',
         x: timestampsIst,
         y: eulerAnglesIst.map((angles) =>
           isTransformedAngles(angles) ? angles.roll : angles.angles[0],
         ),
-        name: isTransformed ? 'Roll (Trans)' : 'Roll (Ist)',
-        line: { color: 'red' },
+        line: { color: 'darkblue', width: 2 },
       },
       {
         type: 'scatter',
         mode: 'lines',
+        name: 'Roll-Zielpunkte',
+        x: eventEulerAngles.map((e) => e.time),
+        y: eventEulerAngles.map((e) => e.angles[0]),
+        line: { color: 'lightblue', width: 2, shape: 'hv' },
+        showlegend: false,
+      },
+      {
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Roll-Zielpunkte',
+        x: eventEulerAngles.map((e) => e.time),
+        y: eventEulerAngles.map((e) => e.angles[0]),
+        marker: { color: 'blue', size: 8, symbol: 'circle' },
+      },
+
+      // Pitch (Y-Rotation) - Grün-Töne wie Y-Position
+      {
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Pitch-Sollwinkel',
+        x: timestampsSoll,
+        y: eulerAnglesSoll.map((angles) => angles[1]),
+        line: { color: 'green', width: 2 },
+      },
+      {
+        type: 'scatter',
+        mode: 'lines',
+        name: isTransformed ? 'Pitch-Transwinkel' : 'Pitch-Istwinkel',
         x: timestampsIst,
         y: eulerAnglesIst.map((angles) =>
           isTransformedAngles(angles) ? angles.pitch : angles.angles[1],
         ),
-        name: isTransformed ? 'Pitch (Trans)' : 'Pitch (Ist)',
-        line: { color: 'green' },
+        line: { color: 'darkgreen', width: 2 },
       },
       {
         type: 'scatter',
         mode: 'lines',
+        name: 'Pitch-Zielpunkte',
+        x: eventEulerAngles.map((e) => e.time),
+        y: eventEulerAngles.map((e) => e.angles[1]),
+        line: { color: 'lightgreen', width: 2, shape: 'hv' },
+        showlegend: false,
+      },
+      {
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Pitch-Zielpunkte',
+        x: eventEulerAngles.map((e) => e.time),
+        y: eventEulerAngles.map((e) => e.angles[1]),
+        marker: { color: 'green', size: 8, symbol: 'circle' },
+      },
+
+      // Yaw (Z-Rotation) - Rot-Töne wie Z-Position
+      {
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Gier-Sollwinkel',
+        x: timestampsSoll,
+        y: eulerAnglesSoll.map((angles) => angles[2]),
+        line: { color: 'red', width: 2 },
+      },
+      {
+        type: 'scatter',
+        mode: 'lines',
+        name: isTransformed ? 'Gier-Transwinkel' : 'Gier-Istwinkel',
         x: timestampsIst,
         y: eulerAnglesIst.map((angles) =>
           isTransformedAngles(angles) ? angles.yaw : angles.angles[2],
         ),
-        name: isTransformed ? 'Yaw (Trans)' : 'Yaw (Ist)',
-        line: { color: 'blue' },
-      },
-      // Soll data
-      {
-        type: 'scatter',
-        mode: 'lines',
-        x: timestampsSoll,
-        y: eulerAnglesSoll.map((angles) => angles[0]),
-        name: 'Roll (Soll)',
-        line: { color: 'pink' },
+        line: { color: 'darkred', width: 2 },
       },
       {
         type: 'scatter',
         mode: 'lines',
-        x: timestampsSoll,
-        y: eulerAnglesSoll.map((angles) => angles[1]),
-        name: 'Pitch (Soll)',
-        line: { color: 'lightgreen' },
+        name: 'Gier-Zielpunkte',
+        x: eventEulerAngles.map((e) => e.time),
+        y: eventEulerAngles.map((e) => e.angles[2]),
+        line: { color: 'pink', width: 2, shape: 'hv' },
+        showlegend: false,
       },
       {
         type: 'scatter',
-        mode: 'lines',
-        x: timestampsSoll,
-        y: eulerAnglesSoll.map((angles) => angles[2]),
-        name: 'Yaw (Soll)',
-        line: { color: 'lightblue' },
+        mode: 'markers',
+        name: 'Gier-Zielpunkte',
+        x: eventEulerAngles.map((e) => e.time),
+        y: eventEulerAngles.map((e) => e.angles[2]),
+        marker: { color: 'red', size: 8, symbol: 'circle' },
       },
     ];
     return { plotData, maxTimeOrientation };

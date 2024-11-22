@@ -38,6 +38,10 @@ interface InfoSectionProps {
   children: React.ReactNode;
 }
 
+interface TrajectoryInfoProps {
+  isTransformed: boolean;
+}
+
 const InfoSection: React.FC<InfoSectionProps> = ({ title, children }) => (
   <div className="mb-5 rounded-lg border-l-4 border-primary bg-white p-5 shadow-md">
     <h3 className="mb-4 text-xl font-bold text-primary">{title}</h3>
@@ -45,8 +49,12 @@ const InfoSection: React.FC<InfoSectionProps> = ({ title, children }) => (
   </div>
 );
 
-export const TrajectoryInfo: React.FC = () => {
-  const { currentBahnInfo } = useTrajectory();
+export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = ({
+  isTransformed,
+}) => {
+  const { currentBahnInfo, currentBahnPoseTrans } = useTrajectory();
+
+  const calibrationId = currentBahnPoseTrans?.[0]?.calibrationID;
 
   if (currentBahnInfo === null) {
     return (
@@ -109,6 +117,18 @@ export const TrajectoryInfo: React.FC = () => {
               value={currentBahnInfo.sourceDataSoll || 'n. a.'}
               singleColumn
             />
+            <InfoRow
+              label="Transformiert"
+              value={isTransformed ? 'Ja' : 'Nein'}
+              singleColumn
+            />
+            {isTransformed && calibrationId && (
+              <InfoRow
+                label="Kalibrierungsdatei-ID"
+                value={calibrationId}
+                singleColumn
+              />
+            )}
           </InfoSection>
 
           <InfoSection title="Punkteanzahl">

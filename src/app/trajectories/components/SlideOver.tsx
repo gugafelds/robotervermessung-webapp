@@ -6,6 +6,7 @@ import { Fragment, type ReactNode } from 'react';
 import React from 'react';
 
 import type {
+  BahnEvents,
   BahnPoseIst,
   BahnPoseTrans,
   BahnPositionSoll,
@@ -20,6 +21,7 @@ type ModalProps = {
   children?: ReactNode;
   currentBahnPoseIst: BahnPoseIst[];
   currentBahnPoseTrans: BahnPoseTrans[];
+  currentBahnEvents: BahnEvents[];
   idealTrajectory: BahnPositionSoll[];
   isTransformed: boolean;
 };
@@ -31,6 +33,7 @@ const SlideOver = ({
   children,
   currentBahnPoseTrans,
   currentBahnPoseIst,
+  currentBahnEvents,
   idealTrajectory,
   isTransformed,
 }: ModalProps) => {
@@ -98,6 +101,7 @@ const SlideOver = ({
                         <Position3DPlot
                           currentBahnPoseIst={currentBahnPoseIst}
                           currentBahnPoseTrans={currentBahnPoseTrans}
+                          currentBahnEvents={currentBahnEvents}
                           idealTrajectory={idealTrajectory}
                           isTransformed={isTransformed}
                         />

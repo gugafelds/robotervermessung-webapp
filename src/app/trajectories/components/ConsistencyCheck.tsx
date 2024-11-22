@@ -8,6 +8,7 @@ import type {
   BahnJointStates,
   BahnOrientationSoll,
   BahnPoseIst,
+  BahnPoseTrans,
   BahnPositionSoll,
   BahnTwistIst,
   BahnTwistSoll,
@@ -15,6 +16,7 @@ import type {
 
 interface ConsistencyCheckProps {
   currentBahnPoseIst: BahnPoseIst[];
+  currentBahnPoseTrans: BahnPoseTrans[];
   currentBahnTwistIst: BahnTwistIst[];
   currentBahnAccelIst: BahnAccelIst[];
   idealTrajectory: BahnPositionSoll[];
@@ -22,6 +24,7 @@ interface ConsistencyCheckProps {
   currentBahnOrientationSoll: BahnOrientationSoll[];
   currentBahnJointStates: BahnJointStates[];
   currentBahnEvents: BahnEvents[];
+  isTransformed: boolean;
 }
 
 interface ConsistencyMetrics {
@@ -30,6 +33,7 @@ interface ConsistencyMetrics {
   stdDevInterval: number;
   maxGap: number;
   coefficientOfVariation: number;
+  isTransformed: boolean;
 }
 export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
   currentBahnTwistIst,
@@ -40,6 +44,8 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
   currentBahnOrientationSoll,
   currentBahnAccelIst,
   currentBahnJointStates,
+  currentBahnPoseTrans,
+  isTransformed,
 }) => {
   const [metrics, setMetrics] = useState<Record<string, ConsistencyMetrics>>(
     {},
@@ -74,7 +80,9 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
         };
 
         const dataArrays = {
-          poseIst: filterDataByTimeRange(currentBahnPoseIst),
+          poseIst: isTransformed
+            ? filterDataByTimeRange(currentBahnPoseTrans)
+            : filterDataByTimeRange(currentBahnPoseIst),
           twistIst: filterDataByTimeRange(currentBahnTwistIst),
           accelIst: filterDataByTimeRange(currentBahnAccelIst),
           positionSoll: filterDataByTimeRange(idealTrajectory),
@@ -109,6 +117,7 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
               stdDevInterval,
               maxGap,
               coefficientOfVariation,
+              isTransformed,
             };
           } else {
             newMetrics[key] = {
@@ -117,6 +126,7 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
               stdDevInterval: 0,
               maxGap: 0,
               coefficientOfVariation: 0,
+              isTransformed: false,
             };
           }
         });
@@ -139,6 +149,7 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
     currentBahnOrientationSoll,
     currentBahnAccelIst,
     currentBahnJointStates,
+    isTransformed,
   ]);
 
   if (error) {

@@ -90,6 +90,7 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
         onClose={closeSlideOver}
         currentBahnPoseIst={currentBahnPoseIst}
         currentBahnPoseTrans={currentBahnPoseTrans}
+        currentBahnEvents={currentBahnEvents}
         idealTrajectory={currentBahnPositionSoll}
         isTransformed={isTransformed}
       />
@@ -106,6 +107,7 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
         currentBahnOrientationSoll={currentBahnOrientationSoll}
         currentBahnPoseIst={currentBahnPoseIst}
         currentBahnPoseTrans={currentBahnPoseTrans}
+        currentBahnEvents={currentBahnEvents}
         isTransformed={isTransformed}
       />
 
@@ -139,6 +141,8 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
         currentBahnOrientationSoll={currentBahnOrientationSoll}
         currentBahnAccelIst={currentBahnAccelIst}
         currentBahnJointStates={currentBahnJointStates}
+        currentBahnPoseTrans={currentBahnPoseTrans}
+        isTransformed={isTransformed}
       />
     </div>
   );

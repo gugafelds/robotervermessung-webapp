@@ -115,7 +115,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'X Position Soll',
+        name: 'X-Sollposition',
         x: positionSollData.map((d) => d.x),
         y: positionSollData.map((d) => d.xPos),
         line: { color: 'blue', width: 2 },
@@ -123,7 +123,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'X Position Ist',
+        name: 'X-Istposition',
         x: positionIstData.map((d) => d.x),
         y: positionIstData.map((d) => d.xPos),
         line: { color: 'darkblue', width: 2 },
@@ -131,7 +131,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'X Position Achieved',
+        name: 'X-Zielpunkte',
         x: xAchievedData.x,
         y: xAchievedData.y,
         line: { color: 'lightblue', width: 2, shape: 'hv' },
@@ -140,7 +140,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'markers',
-        name: 'X Position Achieved',
+        name: 'X-Zielpunkte',
         x: currentBahnEvents.map(
           (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
         ),
@@ -151,7 +151,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'Y Position Soll',
+        name: 'Y-Sollposition',
         x: positionSollData.map((d) => d.x),
         y: positionSollData.map((d) => d.yPos),
         line: { color: 'green', width: 2 },
@@ -159,7 +159,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'Y Position Ist',
+        name: 'Y-Istposition',
         x: positionIstData.map((d) => d.x),
         y: positionIstData.map((d) => d.yPos),
         line: { color: 'darkgreen', width: 2 },
@@ -167,7 +167,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'Y Position Achieved',
+        name: 'Y-Zielpunkte',
         x: yAchievedData.x,
         y: yAchievedData.y,
         line: { color: 'lightgreen', width: 2, shape: 'hv' },
@@ -176,7 +176,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'markers',
-        name: 'Y Position Achieved',
+        name: 'Y-Zielpunkte',
         x: currentBahnEvents.map(
           (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
         ),
@@ -187,7 +187,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'Z Position Soll',
+        name: 'Z-Sollposition',
         x: positionSollData.map((d) => d.x),
         y: positionSollData.map((d) => d.zPos),
         line: { color: 'red', width: 2 },
@@ -195,7 +195,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'Z Position Ist',
+        name: 'Z-Istposition',
         x: positionIstData.map((d) => d.x),
         y: positionIstData.map((d) => d.zPos),
         line: { color: 'darkred', width: 2 },
@@ -203,7 +203,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'Z Position Achieved',
+        name: 'Z-Zielpunkte',
         x: zAchievedData.x,
         y: zAchievedData.y,
         line: { color: 'pink', width: 2, shape: 'hv' },
@@ -212,7 +212,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'markers',
-        name: 'Z Position Achieved',
+        name: 'Z-Zielpunkte',
         x: currentBahnEvents.map(
           (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
         ),

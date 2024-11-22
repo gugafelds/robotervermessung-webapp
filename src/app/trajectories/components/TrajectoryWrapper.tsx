@@ -291,7 +291,7 @@ export function TrajectoryWrapper() {
 
   return (
     <>
-      <TrajectoryInfo />
+      <TrajectoryInfo isTransformed={isTransformed} />
       {!isPlotDataLoaded ? (
         <div className="m-10 flex h-full flex-col justify-normal overflow-hidden align-middle">
           <Typography as="h2">plotdaten werden heruntergeladen...</Typography>
