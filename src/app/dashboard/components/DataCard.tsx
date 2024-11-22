@@ -7,7 +7,7 @@ type Props = {
 };
 
 const formatNumber = (num: number) => {
-  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return new Intl.NumberFormat('de-DE').format(num);
 };
 
 const formatSize = (size: number) => {
