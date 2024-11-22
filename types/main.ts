@@ -290,9 +290,9 @@ export interface BahnPoseTransRaw {
   bahn_id: string;
   segment_id: string;
   timestamp: string;
-  x_trans: string;
-  y_trans: string;
-  z_trans: string;
+  x_trans: number;
+  y_trans: number;
+  z_trans: number;
   roll_trans: number;
   pitch_trans: number;
   yaw_trans: number;
