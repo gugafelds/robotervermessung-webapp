@@ -64,10 +64,9 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     marker: {
       size: 8,
       color: 'red',
-      symbol: 'circle', // Anderes Symbol für Firefox
+      symbol: 'circle',
       opacity: 1,
       sizeref: 2,
-      sizemode: 'absolute', // Absoluter Größenmodus
     },
     hoverlabel: {
       bgcolor: 'red',

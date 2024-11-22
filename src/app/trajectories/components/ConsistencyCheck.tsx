@@ -149,6 +149,7 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
     currentBahnOrientationSoll,
     currentBahnAccelIst,
     currentBahnJointStates,
+    currentBahnPoseTrans,
     isTransformed,
   ]);
 
