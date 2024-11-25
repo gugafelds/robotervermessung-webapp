@@ -5,7 +5,13 @@ import { revalidatePath } from 'next/cache';
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000/api';
 
 async function fetchFromAPI(endpoint: string) {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`);
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    cache: 'no-store',  // Verhindert Caching
+    next: {
+      revalidate: 0 // Erzwingt Revalidierung
+    }
+  });
+
   if (!response.ok) {
     throw new Error(`API request failed: ${response.statusText}`);
   }
@@ -15,10 +21,8 @@ async function fetchFromAPI(endpoint: string) {
 export const getDashboardData = async () => {
   try {
     const result = await fetchFromAPI('/bahn/dashboard_data');
-    revalidatePath('/dashboard');
     return result;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error fetching dashboard data:', error);
     throw error;
   }
@@ -27,11 +31,30 @@ export const getDashboardData = async () => {
 export const getCollectionSizes = async () => {
   try {
     const result = await fetchFromAPI('/bahn/collection_sizes');
-    revalidatePath('/dashboard');
     return result;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('Error fetching collection sizes:', error);
+    throw error;
+  }
+};
+
+// Neue Funktion die beide Datensätze kombiniert holt
+export const getAllDashboardData = async () => {
+  try {
+    const [dashboardData, collectionSizes] = await Promise.all([
+      getDashboardData(),
+      getCollectionSizes()
+    ]);
+
+    // Revalidiere erst nachdem alle Daten geholt wurden
+    revalidatePath('/dashboard');
+
+    return {
+      dashboardData,
+      collectionSizes
+    };
+  } catch (error) {
+    console.error('Error fetching all dashboard data:', error);
     throw error;
   }
 };

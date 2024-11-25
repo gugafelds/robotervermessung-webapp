@@ -9,7 +9,16 @@ import { FrequencyPanel } from './FrequencyPanel';
 
 interface DashboardClientProps {
   trajectoriesCount: number;
-  componentCounts: Record<string, number>;
+  componentCounts: {
+    bahnPoseIst: number;
+    bahnTwistIst: number;
+    bahnAccelIst: number;
+    bahnPositionSoll: number;
+    bahnOrientationSoll: number;
+    bahnJointStates: number;
+    bahnEvents: number;
+    bahnPoseTrans: number;
+  };
   frequencyData: Record<string, string[]>;
   collectionSizes: {
     bahnPoseIst: number;
@@ -33,7 +42,6 @@ export default function DashboardClient({
     (sum, size) => sum + size,
     0,
   );
-
   return (
     <div className="flex">
       <div className="flex-1 p-6">

@@ -2,13 +2,16 @@ import {
   getCollectionSizes,
   getDashboardData,
 } from '@/src/actions/dashboard.service';
-
 import DashboardClient from './DashboardClient';
 
 export default async function DashboardServer() {
-  const { trajectoriesCount, componentCounts, frequencyData } =
-    await getDashboardData();
-  const collectionSizes = await getCollectionSizes();
+  // Parallel data fetching für bessere Performance
+  const [dashboardData, collectionSizes] = await Promise.all([
+    getDashboardData(),
+    getCollectionSizes()
+  ]);
+
+  const { trajectoriesCount, componentCounts, frequencyData } = dashboardData;
 
   return (
     <DashboardClient
