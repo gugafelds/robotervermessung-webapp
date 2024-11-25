@@ -6,10 +6,7 @@ const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000/api';
 
 async function fetchFromAPI(endpoint: string) {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    cache: 'no-store',  // Verhindert Caching
-    next: {
-      revalidate: 0 // Erzwingt Revalidierung
-    }
+    cache: 'no-store', // Verhindert Caching
   });
 
   if (!response.ok) {
@@ -23,6 +20,7 @@ export const getDashboardData = async () => {
     const result = await fetchFromAPI('/bahn/dashboard_data');
     return result;
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error fetching dashboard data:', error);
     throw error;
   }
@@ -33,6 +31,7 @@ export const getCollectionSizes = async () => {
     const result = await fetchFromAPI('/bahn/collection_sizes');
     return result;
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error fetching collection sizes:', error);
     throw error;
   }
@@ -43,7 +42,7 @@ export const getAllDashboardData = async () => {
   try {
     const [dashboardData, collectionSizes] = await Promise.all([
       getDashboardData(),
-      getCollectionSizes()
+      getCollectionSizes(),
     ]);
 
     // Revalidiere erst nachdem alle Daten geholt wurden
@@ -51,9 +50,10 @@ export const getAllDashboardData = async () => {
 
     return {
       dashboardData,
-      collectionSizes
+      collectionSizes,
     };
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Error fetching all dashboard data:', error);
     throw error;
   }

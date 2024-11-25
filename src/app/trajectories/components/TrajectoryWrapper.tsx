@@ -1,16 +1,8 @@
-/* eslint-disable no-console */
-
 'use client';
 
 import { useParams } from 'next/navigation';
 import PQueue from 'p-queue';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   checkTransformedDataExists,
@@ -30,6 +22,38 @@ import { TrajectoryPlot } from '@/src/app/trajectories/components/TrajectoryPlot
 import { Typography } from '@/src/components/Typography';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 
+const CHUNK_SIZE = 1000;
+const BATCH_SIZE = 2;
+const CACHE_DURATION = 1000 * 60 * 15;
+
+interface CacheItem {
+  data: any;
+  timestamp: number;
+}
+
+class TimedCache {
+  private cache = new Map<string, CacheItem>();
+
+  set(key: string, data: any): void {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+    });
+  }
+
+  get(key: string): any | null {
+    const item = this.cache.get(key);
+    if (!item) return null;
+
+    if (Date.now() - item.timestamp > CACHE_DURATION) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    return item.data;
+  }
+}
+
 const ProgressBar = ({ value }: { value: number }) => (
   <div className="h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
     <div
@@ -39,11 +63,38 @@ const ProgressBar = ({ value }: { value: number }) => (
   </div>
 );
 
-// Create a new queue with a concurrency of 10
-const queue = new PQueue({ concurrency: 10 });
+const queue = new PQueue({
+  concurrency: BATCH_SIZE,
+  interval: 1000,
+  intervalCap: 10,
+  timeout: 60000,
+});
 
-// Simple frontend cache
-const cache = new Map();
+const cache = new TimedCache();
+
+const processInChunks = async <T,>(
+  data: T[],
+  processChunk: (chunk: T[]) => void,
+  signal?: AbortSignal,
+  chunkSize: number = CHUNK_SIZE,
+): Promise<void> => {
+  const chunks = [];
+  for (let i = 0; i < data.length; i += chunkSize) {
+    chunks.push(data.slice(i, i + chunkSize));
+  }
+
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      if (signal?.aborted) {
+        throw new Error('Processing aborted');
+      }
+      processChunk(chunk);
+      return new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    }),
+  );
+};
 
 export function TrajectoryWrapper() {
   const params = useParams();
@@ -51,10 +102,10 @@ export function TrajectoryWrapper() {
   const [isInfoLoaded, setIsInfoLoaded] = useState(false);
   const [isPlotDataLoaded, setIsPlotDataLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const latestInfoRequestId = useRef<string | null>(null);
-  const latestPlotRequestId = useRef<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isTransformed, setIsTransformed] = useState(false);
+  const latestInfoRequestId = useRef<string | null>(null);
+  const latestPlotRequestId = useRef<string | null>(null);
 
   const {
     currentBahnInfo,
@@ -75,157 +126,167 @@ export function TrajectoryWrapper() {
       if (!id) return;
 
       try {
-        let bahnInfo;
-        if (cache.has(`info_${id}`)) {
-          console.log('Using cached info data');
-          bahnInfo = cache.get(`info_${id}`);
-        } else {
+        const cacheKey = `info_${id}`;
+        let bahnInfo = cache.get(cacheKey);
+
+        if (!bahnInfo) {
           bahnInfo = await getBahnInfoById(id);
-          cache.set(`info_${id}`, bahnInfo);
+          cache.set(cacheKey, bahnInfo);
         }
 
-        if (requestId === latestInfoRequestId.current) {
+        if (requestId === latestInfoRequestId.current && !signal.aborted) {
           setCurrentBahnInfo(bahnInfo);
           setIsInfoLoaded(true);
         }
-        // eslint-disable-next-line @typescript-eslint/no-shadow
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          console.log('Info fetch aborted');
-        } else {
-          console.error('Error fetching Bahn info:', error);
-          if (requestId === latestInfoRequestId.current) {
-            setError('Failed to fetch Bahn info');
-          }
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return;
+        if (requestId === latestInfoRequestId.current) {
+          setError('Failed to fetch Bahn info');
         }
       }
     },
     [id, setCurrentBahnInfo],
   );
 
+  const fetchDataWithProgress = async <T,>(
+    fetchFunction: () => Promise<T[]>,
+    setter: (data: T[]) => void,
+    signal: AbortSignal,
+    cacheKey: string,
+  ): Promise<T[]> => {
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      setter(cachedData);
+      return cachedData;
+    }
+
+    const data = await fetchFunction();
+    const processedData: T[] = [];
+
+    await processInChunks(
+      data,
+      (chunk) => {
+        processedData.push(...chunk);
+        setter([...processedData]);
+      },
+      signal,
+    );
+
+    cache.set(cacheKey, processedData);
+    return processedData;
+  };
+
+  type FetchFunction<T> = () => Promise<T[]>;
+
   const fetchPlotData = useCallback(
     async (signal: AbortSignal, requestId: string) => {
       if (!id) return;
 
-      console.log('Fetching plot data');
-
-      // Prüfe zuerst ob transformierte Daten existieren
-      let useTrans = false;
       try {
-        useTrans = await checkTransformedDataExists(id);
+        const useTrans = await checkTransformedDataExists(id);
         setIsTransformed(useTrans);
-        // eslint-disable-next-line @typescript-eslint/no-shadow
-      } catch (error) {
-        console.error('Error checking transformed data:', error);
-      }
 
-      type SetterFunction<T> = (value: T) => void;
+        type FetchConfig<T> = {
+          func: FetchFunction<T>;
+          setter: (data: T[]) => void;
+          key: string;
+          priority: number;
+        };
 
-      interface FetchFunction<T> {
-        func: (id: string) => Promise<T>;
-        setter: SetterFunction<T>;
-        key: string;
-      }
+        const fetchConfigs: FetchConfig<any>[] = [
+          {
+            func: () =>
+              (useTrans
+                ? getBahnPoseTransById(id)
+                : getBahnPoseIstById(id)) as Promise<any>,
+            setter: useTrans ? setCurrentBahnPoseTrans : setCurrentBahnPoseIst,
+            key: useTrans ? 'pose_trans' : 'pose_ist',
+            priority: 1,
+          },
+          {
+            func: () => getBahnTwistIstById(id),
+            setter: setCurrentBahnTwistIst,
+            key: 'twist_ist',
+            priority: 2,
+          },
+          {
+            func: () => getBahnAccelIstById(id),
+            setter: setCurrentBahnAccelIst,
+            key: 'accel_ist',
+            priority: 3,
+          },
+          {
+            func: () => getBahnPositionSollById(id),
+            setter: setCurrentBahnPositionSoll,
+            key: 'position_soll',
+            priority: 4,
+          },
+          {
+            func: () => getBahnOrientationSollById(id),
+            setter: setCurrentBahnOrientationSoll,
+            key: 'orientation_soll',
+            priority: 5,
+          },
+          {
+            func: () => getBahnTwistSollById(id),
+            setter: setCurrentBahnTwistSoll,
+            key: 'twist_soll',
+            priority: 6,
+          },
+          {
+            func: () => getBahnJointStatesById(id),
+            setter: setCurrentBahnJointStates,
+            key: 'joint_states',
+            priority: 7,
+          },
+          {
+            func: () => getBahnEventsById(id),
+            setter: setCurrentBahnEvents,
+            key: 'events',
+            priority: 8,
+          },
+        ];
 
-      const fetchFunctions: FetchFunction<any>[] = [
-        {
-          func: useTrans ? getBahnPoseTransById : getBahnPoseIstById,
-          setter: useTrans ? setCurrentBahnPoseTrans : setCurrentBahnPoseIst,
-          key: useTrans ? 'pose_trans' : 'pose_ist',
-        },
-        {
-          func: getBahnTwistIstById,
-          setter: setCurrentBahnTwistIst,
-          key: 'twist_ist',
-        },
-        {
-          func: getBahnAccelIstById,
-          setter: setCurrentBahnAccelIst,
-          key: 'accel_ist',
-        },
-        {
-          func: getBahnPositionSollById,
-          setter: setCurrentBahnPositionSoll,
-          key: 'position_soll',
-        },
-        {
-          func: getBahnOrientationSollById,
-          setter: setCurrentBahnOrientationSoll,
-          key: 'orientation_soll',
-        },
-        {
-          func: getBahnTwistSollById,
-          setter: setCurrentBahnTwistSoll,
-          key: 'twist_soll',
-        },
-        {
-          func: getBahnJointStatesById,
-          setter: setCurrentBahnJointStates,
-          key: 'joint_states',
-        },
-        {
-          func: getBahnEventsById,
-          setter: setCurrentBahnEvents,
-          key: 'events',
-        },
-      ];
+        const totalConfigs = fetchConfigs.length;
+        let completedCount = 0;
 
-      const totalFunctions = fetchFunctions.length;
-      let completedFunctions = 0;
+        await Promise.all(
+          fetchConfigs.map(({ func, setter, key, priority }) =>
+            queue.add(
+              async () => {
+                if (signal.aborted) return;
 
-      const updateProgress = () => {
-        completedFunctions += 1;
-        setLoadingProgress((completedFunctions / totalFunctions) * 100);
-      };
+                try {
+                  await fetchDataWithProgress(
+                    func,
+                    setter,
+                    signal,
+                    `${key}_${id}`,
+                  );
+                } finally {
+                  completedCount += 1;
+                  setLoadingProgress((completedCount / totalConfigs) * 100);
+                }
+              },
+              { priority },
+            ),
+          ),
+        );
 
-      const fetchPromises = fetchFunctions.map(({ func, setter, key }) =>
-        queue.add(() => {
-          const cacheKey = `${key}_${id}`;
-          if (cache.has(cacheKey)) {
-            console.log(`Using cached ${key} data`);
-            const cachedData = cache.get(cacheKey);
-            setter(cachedData);
-            updateProgress();
-            return Promise.resolve();
-          }
-          return func(id)
-            .then((data) => {
-              if (
-                requestId === latestPlotRequestId.current &&
-                !signal.aborted
-              ) {
-                setter(data);
-                cache.set(cacheKey, data);
-                updateProgress();
-              }
-            })
-            .catch((fetchError) => {
-              console.error(`Error fetching ${key} data: ${fetchError}`);
-              updateProgress();
-              return null;
-            });
-        }),
-      );
-
-      try {
-        await Promise.all(fetchPromises);
         if (requestId === latestPlotRequestId.current && !signal.aborted) {
           setIsPlotDataLoaded(true);
         }
-      } catch (fetchError: any) {
-        if (fetchError.name === 'AbortError') {
-          console.log('Plot data fetch aborted');
-        } else {
-          console.error('Error fetching plot data:', fetchError);
-          if (requestId === latestPlotRequestId.current) {
-            setError('Failed to fetch some plot data');
-          }
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return;
+        if (requestId === latestPlotRequestId.current) {
+          setError('Failed to fetch plot data');
         }
       }
     },
     [
       id,
       setCurrentBahnPoseIst,
+      setCurrentBahnPoseTrans,
       setCurrentBahnTwistIst,
       setCurrentBahnAccelIst,
       setCurrentBahnPositionSoll,
@@ -233,63 +294,56 @@ export function TrajectoryWrapper() {
       setCurrentBahnTwistSoll,
       setCurrentBahnJointStates,
       setCurrentBahnEvents,
-      setCurrentBahnPoseTrans,
     ],
   );
 
   useEffect(() => {
-    if (currentBahnInfo?.bahnID === id) {
-      console.log('Bahn info already loaded');
-      setIsInfoLoaded(true);
-      return;
-    }
+    const loadInfo = async () => {
+      if (currentBahnInfo?.bahnID === id) {
+        setIsInfoLoaded(true);
+        return undefined;
+      }
 
-    console.log('Info effect running, id:', id);
-    const abortController = new AbortController();
-    const requestId = Date.now().toString();
-    latestInfoRequestId.current = requestId;
+      const abortController = new AbortController();
+      const requestId = Date.now().toString();
+      latestInfoRequestId.current = requestId;
 
-    setIsInfoLoaded(false);
-    setError(null);
-    fetchInfoData(abortController.signal, requestId);
+      setIsInfoLoaded(false);
+      setError(null);
+      await fetchInfoData(abortController.signal, requestId);
+      return () => abortController.abort();
+    };
 
-    // eslint-disable-next-line consistent-return
+    const cleanup = loadInfo();
     return () => {
-      abortController.abort();
+      cleanup?.then((fn) => fn?.());
     };
   }, [id, fetchInfoData, currentBahnInfo]);
 
   useEffect(() => {
-    console.log('Plot data effect running, isInfoLoaded:', isInfoLoaded);
-    let abortController: AbortController | null = null;
+    const loadPlotData = async () => {
+      if (!isInfoLoaded || isPlotDataLoaded) {
+        return undefined;
+      }
 
-    if (isInfoLoaded && !isPlotDataLoaded) {
-      abortController = new AbortController();
+      const abortController = new AbortController();
       const requestId = Date.now().toString();
       latestPlotRequestId.current = requestId;
 
-      setIsPlotDataLoaded(false);
       setError(null);
-      fetchPlotData(abortController.signal, requestId);
-    }
+      await fetchPlotData(abortController.signal, requestId);
+      return () => abortController.abort();
+    };
 
+    const cleanup = loadPlotData();
     return () => {
-      if (abortController) {
-        abortController.abort();
-      }
+      cleanup?.then((fn) => fn?.());
     };
   }, [isInfoLoaded, fetchPlotData, isPlotDataLoaded]);
 
-  const memoizedTrajectoryPlot = useMemo(
-    () => <TrajectoryPlot isTransformed={isTransformed} />,
-    [isTransformed],
-  );
-
-  if (error) {
-    return <div>Error: {error}</div>;
-  }
-
-  return (
+  return error ? (
+    <div>Error: {error}</div>
+  ) : (
     <>
       <TrajectoryInfo isTransformed={isTransformed} />
       {!isPlotDataLoaded ? (
@@ -303,7 +357,7 @@ export function TrajectoryWrapper() {
           </Typography>
         </div>
       ) : (
-        memoizedTrajectoryPlot
+        <TrajectoryPlot isTransformed={isTransformed} />
       )}
     </>
   );

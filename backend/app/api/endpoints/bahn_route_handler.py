@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/dashboard_data")
+@cache(expire=24000)
 async def get_dashboard_data(conn = Depends(get_db)):
     try:
         trajectories_count = await conn.fetchval(
@@ -79,6 +80,7 @@ async def get_dashboard_data(conn = Depends(get_db)):
 
 
 @router.get("/collection_sizes")
+@cache(expire=24000)
 async def get_collection_sizes(conn = Depends(get_db)):
     try:
         collection_sizes = {
