@@ -7,19 +7,38 @@ type Props = {
 };
 
 const formatNumber = (num: number) => {
-  return new Intl.NumberFormat('de-DE').format(num);
+  // Prüfe ob der Wert eine gültige Zahl ist
+  if (num === undefined || num === null || Number.isNaN(num)) {
+    return '0';
+  }
+  try {
+    return new Intl.NumberFormat('de-DE').format(Number(num));
+  } catch {
+    return '0';
+  }
 };
 
 const formatSize = (size: number) => {
-  return `(${size.toFixed(2)} MB)`;
+  // Prüfe ob der Größenwert eine gültige Zahl ist
+  if (size === undefined || size === null || Number.isNaN(size)) {
+    return '(0.00 MB)';
+  }
+  try {
+    const safeSize = Number(size);
+    return `(${safeSize.toFixed(2)} MB)`;
+  } catch {
+    return '(0.00 MB)';
+  }
 };
 
-export const DataCard = ({ value, componentName, size }: Props) => {
+export const DataCard = ({ value = 0, componentName = '', size }: Props) => {
   return (
     <div className="rounded-lg bg-primary p-5">
       <Typography as="h2" className="text-white">
         {formatNumber(value)}{' '}
-        {size && <span className="text-sm">{formatSize(size)}</span>}
+        {size !== undefined && (
+          <span className="text-sm">{formatSize(size)}</span>
+        )}
       </Typography>
       <Typography as="h5" className="font-light text-white">
         {componentName}
