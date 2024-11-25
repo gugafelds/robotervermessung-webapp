@@ -32,7 +32,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     : currentBahnPoseIst;
 
   const realTrajectoryData: Partial<PlotData> = {
-    ...dataPlotConfig('lines', 'ist', 6, 'darkblue'),
+    ...dataPlotConfig('lines', 'ist', 4, 'darkblue'),
     x: realTrajectory.map((row) =>
       isTransformed ? (row as BahnPoseTrans).xTrans : (row as BahnPoseIst).xIst,
     ),
@@ -42,15 +42,15 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     z: realTrajectory.map((row) =>
       isTransformed ? (row as BahnPoseTrans).zTrans : (row as BahnPoseIst).zIst,
     ),
-    name: isTransformed ? 'transformiert' : 'ist',
+    name: isTransformed ? 'Transformierte Bahn' : 'Istbahn',
   };
 
   const idealTrajectoryData: Partial<PlotData> = {
-    ...dataPlotConfig('lines', 'soll', 6, 'blue'),
+    ...dataPlotConfig('lines', 'soll', 3, 'blue'),
     x: idealTrajectory.map((row) => row.xSoll),
     y: idealTrajectory.map((row) => row.ySoll),
     z: idealTrajectory.map((row) => row.zSoll),
-    name: 'soll',
+    name: 'Sollbahn',
   };
 
   // Neue Daten für die Zielpunkte
@@ -62,7 +62,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     y: currentBahnEvents.map((row) => row.yReached),
     z: currentBahnEvents.map((row) => row.zReached),
     marker: {
-      size: 8,
+      size: 4,
       color: 'red',
       symbol: 'circle',
       opacity: 1,
@@ -95,6 +95,13 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     margin: { l: 0, r: 0, b: 0, t: 0 },
     scene: {
       aspectmode: 'data',
+    },
+    showlegend: true,
+    legend: {
+      orientation: 'h',
+      y: -0.15,
+      x: 0.5,
+      xanchor: 'center',
     },
   };
 
