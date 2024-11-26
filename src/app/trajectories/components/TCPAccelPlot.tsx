@@ -30,11 +30,22 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
   currentBahnTwistSoll,
 }) => {
   const createTcpAccelPlot = () => {
-    // Find the global start time
-    const globalStartTime = Math.min(
-      ...currentBahnAccelIst.map((bahn) => Number(bahn.timestamp)),
-      ...currentBahnTwistSoll.map((bahn) => Number(bahn.timestamp)),
-    );
+    // Optimierte Berechnung von globalStartTime
+    const getGlobalStartTime = () => {
+      let minTime = Number.MAX_VALUE;
+
+      currentBahnAccelIst.forEach((bahn) => {
+        minTime = Math.min(minTime, Number(bahn.timestamp));
+      });
+
+      currentBahnTwistSoll.forEach((bahn) => {
+        minTime = Math.min(minTime, Number(bahn.timestamp));
+      });
+
+      return minTime;
+    };
+
+    const globalStartTime = getGlobalStartTime();
 
     // Process Ist data
     const timestampsIst = currentBahnAccelIst.map(
@@ -60,8 +71,22 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
     // Ensure derivative values are positive (magnitude)
     const derivativeMagnitudes = derivativeValues.map(Math.abs);
 
-    // Calculate maxTime once, considering all relevant timestamps
-    const maxTimeAccel = Math.max(...timestampsIst, ...timestampsSoll);
+    // Optimierte Berechnung von maxTimeAccel
+    const getMaxTimeAccel = () => {
+      let maxTime = 0;
+
+      timestampsIst.forEach((time) => {
+        maxTime = Math.max(maxTime, time);
+      });
+
+      timestampsSoll.forEach((time) => {
+        maxTime = Math.max(maxTime, time);
+      });
+
+      return maxTime;
+    };
+
+    const maxTimeAccel = getMaxTimeAccel();
 
     const istPlot: Partial<PlotData> = {
       type: 'scatter',
@@ -93,7 +118,6 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
     };
   };
 
-  // Usage in your component
   const { plotData: tcpAccelPlotData, maxTimeAccel } = createTcpAccelPlot();
 
   const tcpAccelLayout: Partial<Layout> = {

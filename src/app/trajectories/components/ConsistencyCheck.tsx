@@ -63,10 +63,15 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
           throw new Error('Not enough events to define a range');
         }
 
-        const firstEventTime = Number(currentBahnEvents[0].timestamp);
-        const lastEventTime = Number(
-          currentBahnEvents[currentBahnEvents.length - 1].timestamp,
-        );
+        // Direkte Berechnung der Zeitbereiche
+        let firstEventTime = Number.MAX_VALUE;
+        let lastEventTime = Number.MIN_VALUE;
+
+        currentBahnEvents.forEach((event) => {
+          const timestamp = Number(event.timestamp);
+          firstEventTime = Math.min(firstEventTime, timestamp);
+          lastEventTime = Math.max(lastEventTime, timestamp);
+        });
 
         setTimeRange({ start: firstEventTime, end: lastEventTime });
 
@@ -95,20 +100,36 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
 
         Object.entries(dataArrays).forEach(([key, data]) => {
           if (data.length > 1) {
-            const intervals = data
-              .slice(1)
-              .map(
-                (d, i) =>
-                  (Number(d.timestamp) - Number(data[i].timestamp)) / 1e9,
+            // Berechnung der Intervalle
+            const intervals: number[] = [];
+            // eslint-disable-next-line no-plusplus
+            for (let i = 1; i < data.length; i++) {
+              intervals.push(
+                (Number(data[i].timestamp) - Number(data[i - 1].timestamp)) /
+                  1e9,
               );
-            const avgInterval =
-              intervals.reduce((a, b) => a + b, 0) / intervals.length;
-            const stdDevInterval = Math.sqrt(
-              intervals
-                .map((x) => (x - avgInterval) ** 2)
-                .reduce((a, b) => a + b, 0) / intervals.length,
-            );
-            const maxGap = Math.max(...intervals);
+            }
+
+            // Durchschnitt berechnen
+            let sum = 0;
+            intervals.forEach((interval) => {
+              sum += interval;
+            });
+            const avgInterval = sum / intervals.length;
+
+            // Standardabweichung berechnen
+            let sumSquaredDiff = 0;
+            intervals.forEach((interval) => {
+              sumSquaredDiff += (interval - avgInterval) ** 2;
+            });
+            const stdDevInterval = Math.sqrt(sumSquaredDiff / intervals.length);
+
+            // Maximum finden
+            let maxGap = 0;
+            intervals.forEach((interval) => {
+              maxGap = Math.max(maxGap, interval);
+            });
+
             const coefficientOfVariation = (stdDevInterval / avgInterval) * 100;
 
             newMetrics[key] = {
@@ -165,7 +186,7 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
   }
 
   return (
-    <div className="mb-4 rounded-md border p-4">
+    <div className="mb-2 rounded-md border p-4">
       <h2 className="mb-2 text-lg font-semibold">Konsistenzmetriken</h2>
       {timeRange && (
         <p className="mb-2">
@@ -218,7 +239,6 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
   );
 };
 
-// Type guard function to check if an object is an Error
 function isError(error: unknown): error is Error {
   return error instanceof Error;
 }

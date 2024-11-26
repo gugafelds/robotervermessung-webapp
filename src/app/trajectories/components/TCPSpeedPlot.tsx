@@ -1,3 +1,5 @@
+'use client';
+
 import dynamic from 'next/dynamic';
 import type { Layout, PlotData } from 'plotly.js';
 import React from 'react';
@@ -10,6 +12,7 @@ interface TCPSpeedPlotProps {
   currentBahnTwistIst: BahnTwistIst[];
   currentBahnTwistSoll: BahnTwistSoll[];
 }
+
 export const TCPSpeedPlot: React.FC<TCPSpeedPlotProps> = ({
   currentBahnTwistIst,
   currentBahnTwistSoll,
@@ -18,25 +21,37 @@ export const TCPSpeedPlot: React.FC<TCPSpeedPlotProps> = ({
     plotData: Partial<PlotData>[];
     maxTimeSpeed: number;
   } => {
-    // Find the global start time
-    const globalStartTime = Math.min(
-      ...currentBahnTwistIst.map((bahn) => Number(bahn.timestamp)),
-      ...currentBahnTwistSoll.map((bahn) => Number(bahn.timestamp)),
-    );
+    // Direkte Berechnung statt Funktionsdefinition
+    let minTime = Number.MAX_VALUE;
+    currentBahnTwistIst.forEach((bahn) => {
+      minTime = Math.min(minTime, Number(bahn.timestamp));
+    });
+    currentBahnTwistSoll.forEach((bahn) => {
+      minTime = Math.min(minTime, Number(bahn.timestamp));
+    });
+    const globalStartTime = minTime;
 
     // Process Ist data
     const timestampsIst = currentBahnTwistIst.map((bahn) => {
       const elapsedNanoseconds = Number(bahn.timestamp) - globalStartTime;
-      return elapsedNanoseconds / 1e9; // Convert to seconds
+      return elapsedNanoseconds / 1e9;
     });
 
     // Process Soll data
     const timestampsSoll = currentBahnTwistSoll.map((bahn) => {
       const elapsedNanoseconds = Number(bahn.timestamp) - globalStartTime;
-      return elapsedNanoseconds / 1e9; // Convert to seconds
+      return elapsedNanoseconds / 1e9;
     });
 
-    const maxTimeSpeed = Math.max(...timestampsIst, ...timestampsSoll);
+    // Direkte Berechnung von maxTimeSpeed
+    let maxTime = 0;
+    timestampsIst.forEach((time) => {
+      maxTime = Math.max(maxTime, time);
+    });
+    timestampsSoll.forEach((time) => {
+      maxTime = Math.max(maxTime, time);
+    });
+    const maxTimeSpeed = maxTime;
 
     const istPlot: Partial<PlotData> = {
       type: 'scatter',

@@ -116,6 +116,7 @@ async def get_collection_sizes(conn = Depends(get_db)):
         logger.error(f"Error fetching collection sizes: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
+########################## BEWEGUNGSDATEN #########################################
 
 @router.get("/bahn_info")
 async def get_bahn_info(conn = Depends(get_db)):
@@ -132,7 +133,7 @@ async def get_bahn_info(conn = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @router.get("/bahn_info/{bahn_id}")
-@cache(expire=600)
+@cache(expire=24000)
 async def get_bahn_info_by_id(bahn_id: str, conn = Depends(get_db)):
     try:
         bahn_info = await conn.fetchrow(
@@ -147,7 +148,7 @@ async def get_bahn_info_by_id(bahn_id: str, conn = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @router.get("/check_transformed_data/{bahn_id}")
-@cache(expire=2400)
+@cache(expire=24000)
 async def check_transformed_data(bahn_id: str, conn = Depends(get_db)):
     try:
         exists = await conn.fetchval("""
@@ -164,7 +165,7 @@ async def check_transformed_data(bahn_id: str, conn = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/bahn_pose_ist/{bahn_id}")
-@cache(expire=600)
+@cache(expire=2400)
 async def get_bahn_pose_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_pose_ist WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -173,7 +174,7 @@ async def get_bahn_pose_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     return [dict(row) for row in rows]
 
 @router.get("/bahn_pose_trans/{bahn_id}")
-@cache(expire=600)
+@cache(expire=2400)
 async def get_bahn_pose_trans_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_pose_trans WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -183,7 +184,7 @@ async def get_bahn_pose_trans_by_id(bahn_id: str, conn = Depends(get_db)):
 
 
 @router.get("/bahn_twist_ist/{bahn_id}")
-@cache(expire=600)
+@cache(expire=2400)
 async def get_bahn_twist_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_twist_ist WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -192,7 +193,7 @@ async def get_bahn_twist_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     return [dict(row) for row in rows]
 
 @router.get("/bahn_accel_ist/{bahn_id}")
-@cache(expire=600)
+@cache(expire=2400)
 async def get_bahn_accel_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_accel_ist WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -201,7 +202,7 @@ async def get_bahn_accel_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     return [dict(row) for row in rows]
 
 @router.get("/bahn_position_soll/{bahn_id}")
-@cache(expire=600)
+@cache(expire=2400)
 async def get_bahn_position_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_position_soll WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -210,7 +211,7 @@ async def get_bahn_position_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     return [dict(row) for row in rows]
 
 @router.get("/bahn_orientation_soll/{bahn_id}")
-@cache(expire=600)
+@cache(expire=2400)
 async def get_bahn_orientation_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_orientation_soll WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -219,7 +220,7 @@ async def get_bahn_orientation_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     return [dict(row) for row in rows]
 
 @router.get("/bahn_twist_soll/{bahn_id}")
-@cache(expire=600)
+@cache(expire=2400)
 async def get_bahn_twist_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_twist_soll WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -228,7 +229,7 @@ async def get_bahn_twist_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     return [dict(row) for row in rows]
 
 @router.get("/bahn_joint_states/{bahn_id}")
-@cache(expire=600)
+@cache(expire=2400)
 async def get_bahn_joint_states_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_joint_states WHERE bahn_id = $1 ORDER BY timestamp ASC",
@@ -237,7 +238,7 @@ async def get_bahn_joint_states_by_id(bahn_id: str, conn = Depends(get_db)):
     return [dict(row) for row in rows]
 
 @router.get("/bahn_events/{bahn_id}")
-@cache(expire=600)
+@cache(expire=2400)
 async def get_bahn_events_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_events WHERE bahn_id = $1 ORDER BY timestamp ASC",

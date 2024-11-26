@@ -19,10 +19,16 @@ export const JointStatesPlot: React.FC<JointStatesPlotProps> = ({
     plotData: Partial<PlotData>[];
     maxTimeJoints: number;
   } => {
-    // Find the global start time
-    const globalStartTime = Math.min(
-      ...currentBahnJointStates.map((bahn) => Number(bahn.timestamp)),
-    );
+    // Optimierte Berechnung von globalStartTime
+    const getGlobalStartTime = () => {
+      let minTime = Number.MAX_VALUE;
+      currentBahnJointStates.forEach((bahn) => {
+        minTime = Math.min(minTime, Number(bahn.timestamp));
+      });
+      return minTime;
+    };
+
+    const globalStartTime = getGlobalStartTime();
 
     // Process data
     const timestamps = currentBahnJointStates.map((bahn) => {
@@ -30,7 +36,16 @@ export const JointStatesPlot: React.FC<JointStatesPlotProps> = ({
       return elapsedNanoseconds / 1e9; // Convert to seconds
     });
 
-    const maxTimeJoints = Math.max(...timestamps);
+    // Optimierte Berechnung von maxTimeJoints
+    const getMaxTimeJoints = () => {
+      let maxTime = 0;
+      timestamps.forEach((time) => {
+        maxTime = Math.max(maxTime, time);
+      });
+      return maxTime;
+    };
+
+    const maxTimeJoints = getMaxTimeJoints();
 
     const plotData: Partial<PlotData>[] = [
       {

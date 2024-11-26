@@ -1,5 +1,11 @@
 fastapi
+fastapi[standard]
 uvicorn
 sqlalchemy
 psycopg2-binary
 python-dotenv
+tqdm
+asyncpg
+asyncio
+fastapi-cache2[redis]
+aioredis==2.0.1

@@ -45,3 +45,10 @@ next-env.d.ts
 
 # vscode
 .vscode/
+
+# venv
+.venv/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]

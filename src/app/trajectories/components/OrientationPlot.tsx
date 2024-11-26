@@ -38,11 +38,25 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       : currentBahnPoseIst;
 
     // Find the global start time
-    const globalStartTime = Math.min(
-      ...currentPoseData.map((bahn) => Number(bahn.timestamp)),
-      ...currentBahnOrientationSoll.map((bahn) => Number(bahn.timestamp)),
-      ...currentBahnEvents.map((bahn) => Number(bahn.timestamp)),
-    );
+    const getGlobalStartTime = () => {
+      let minTime = Number.MAX_VALUE;
+
+      currentPoseData.forEach((bahn) => {
+        minTime = Math.min(minTime, Number(bahn.timestamp));
+      });
+
+      currentBahnOrientationSoll.forEach((bahn) => {
+        minTime = Math.min(minTime, Number(bahn.timestamp));
+      });
+
+      currentBahnEvents.forEach((bahn) => {
+        minTime = Math.min(minTime, Number(bahn.timestamp));
+      });
+
+      return minTime;
+    };
+
+    const globalStartTime = getGlobalStartTime();
 
     // Process Ist data
     const timestampsIst = currentPoseData.map((bahn) => {
@@ -104,7 +118,21 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       ),
     }));
 
-    const maxTimeOrientation = Math.max(...timestampsIst, ...timestampsSoll);
+    const getMaxTimeOrientation = () => {
+      let maxTime = 0;
+
+      timestampsIst.forEach((time) => {
+        maxTime = Math.max(maxTime, time);
+      });
+
+      timestampsSoll.forEach((time) => {
+        maxTime = Math.max(maxTime, time);
+      });
+
+      return maxTime;
+    };
+
+    const maxTimeOrientation = getMaxTimeOrientation();
 
     const plotData: Partial<PlotData>[] = [
       // Roll (X-Rotation) - Blau-Töne wie X-Position

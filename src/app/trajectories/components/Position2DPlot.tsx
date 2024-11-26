@@ -36,11 +36,26 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       ? currentBahnPoseTrans
       : currentBahnPoseIst;
 
-    const globalStartTime = Math.min(
-      ...idealTrajectory.map((b) => Number(b.timestamp)),
-      ...currentBahnEvents.map((b) => Number(b.timestamp)),
-      ...currentPoseData.map((b) => Number(b.timestamp)),
-    );
+    // Neue optimierte Berechnung von globalStartTime
+    const getGlobalStartTime = () => {
+      let minTime = Number.MAX_VALUE;
+
+      idealTrajectory.forEach((b) => {
+        minTime = Math.min(minTime, Number(b.timestamp));
+      });
+
+      currentBahnEvents.forEach((b) => {
+        minTime = Math.min(minTime, Number(b.timestamp));
+      });
+
+      currentPoseData.forEach((b) => {
+        minTime = Math.min(minTime, Number(b.timestamp));
+      });
+
+      return minTime;
+    };
+
+    const globalStartTime = getGlobalStartTime();
 
     const positionSollData = idealTrajectory.map((b) => ({
       x: (Number(b.timestamp) - globalStartTime) / 1e9,
@@ -104,11 +119,25 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       })),
     );
 
-    const maxTimePos = Math.max(
-      ...positionSollData.map((d) => d.x),
-      ...xAchievedData.x,
-      ...positionIstData.map((d) => d.x),
-    );
+    const getMaxTimePos = () => {
+      let maxTime = 0;
+
+      positionSollData.forEach((d) => {
+        maxTime = Math.max(maxTime, d.x);
+      });
+
+      xAchievedData.x.forEach((x) => {
+        maxTime = Math.max(maxTime, x);
+      });
+
+      positionIstData.forEach((d) => {
+        maxTime = Math.max(maxTime, d.x);
+      });
+
+      return maxTime;
+    };
+
+    const maxTimePos = getMaxTimePos();
 
     const plotData: Partial<PlotData>[] = [
       // X Position

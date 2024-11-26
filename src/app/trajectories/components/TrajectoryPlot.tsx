@@ -83,7 +83,7 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
   }
 
   return (
-    <div className="flex h-fullscreen w-full flex-wrap overflow-scroll p-4">
+    <div className="flex h-fullscreen w-full flex-wrap justify-center overflow-scroll p-4">
       <SlideOver
         title="3D-Plot"
         open={isSlideOverOpen}
@@ -131,7 +131,6 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
         <CubeIcon className="mr-2 size-5" />
         3D-Plot
       </button>
-
       <ConsistencyCheck
         currentBahnTwistIst={currentBahnTwistIst}
         currentBahnTwistSoll={currentBahnTwistSoll}

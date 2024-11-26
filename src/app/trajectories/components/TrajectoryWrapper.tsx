@@ -22,8 +22,8 @@ import { TrajectoryPlot } from '@/src/app/trajectories/components/TrajectoryPlot
 import { Typography } from '@/src/components/Typography';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 
-const CHUNK_SIZE = 1000;
-const BATCH_SIZE = 2;
+const CHUNK_SIZE = 5000;
+const BATCH_SIZE = 3;
 const CACHE_DURATION = 1000 * 60 * 15;
 
 interface CacheItem {
