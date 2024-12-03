@@ -10,7 +10,7 @@ import type {
   BahnOrientationSoll,
   BahnPoseIst,
   BahnPoseTrans,
-} from '@/types/main';
+} from '@/types/bewegungsdaten.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 

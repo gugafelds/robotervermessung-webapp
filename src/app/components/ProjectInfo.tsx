@@ -9,7 +9,7 @@ export const ProjectInfo = () => {
   return (
     <section className="mx-auto mb-12 mt-8 max-w-xl text-pretty px-8 md:max-w-2xl xl:max-w-4xl">
       <div className="mb-2 flex flex-col gap-3">
-        <Typography as="h1">projektinfo</Typography>
+        <Typography as="h1">Projektinfo</Typography>
         <Typography as="h2">
           Autonome Messung und effiziente Speicherung von
           Industrieroboterbewegungsdaten

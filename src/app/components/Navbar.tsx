@@ -15,7 +15,7 @@ export const Navbar = () => {
       <div className="flex flex-row flex-wrap items-center gap-10 px-6 py-4">
         <Link href="/">
           <div className="items-center rounded-md p-2">
-            <Typography as="h1">robotervermessung</Typography>
+            <Typography as="h1">Robotervermessung</Typography>
           </div>
         </Link>
         <Link href="/dashboard">
@@ -25,7 +25,7 @@ export const Navbar = () => {
               pathname.includes('dashboard') ? 'bg-gray-300' : ''
             }`}
           >
-            dashboard
+            Dashboard
           </Typography>
         </Link>
         <Link href="/trajectories">
@@ -35,7 +35,17 @@ export const Navbar = () => {
               pathname.includes('trajectories') ? 'bg-gray-300' : ''
             }`}
           >
-            bewegungsdaten
+            Bewegungsdaten
+          </Typography>
+        </Link>
+        <Link href="/auswertung">
+          <Typography
+            as="h2"
+            className={`my-0 items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300 ${
+              pathname.includes('auswertung') ? 'bg-gray-300' : ''
+            }`}
+          >
+            Auswertung
           </Typography>
         </Link>
         <Link href="/hochladen">
@@ -45,7 +55,7 @@ export const Navbar = () => {
               pathname.includes('hochladen') ? 'bg-gray-300' : ''
             }`}
           >
-            hochladen
+            Hochladen
           </Typography>
         </Link>
         <Link

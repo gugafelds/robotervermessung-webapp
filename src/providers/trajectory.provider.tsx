@@ -20,7 +20,7 @@ import type {
   BahnPositionSoll,
   BahnTwistIst,
   BahnTwistSoll,
-} from '@/types/main';
+} from '@/types/bewegungsdaten.types';
 
 export interface TrajectoryState {
   bahnInfo: BahnInfo[];

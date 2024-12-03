@@ -12,7 +12,7 @@ import {
   transformBahnPositionSollResult,
   transformBahnTwistIstResult,
   transformBahnTwistSollResult,
-} from '@/src/lib/transformer';
+} from '@/src/lib/transformer.bewegungsdaten';
 import type {
   BahnAccelIst,
   BahnEvents,
@@ -24,7 +24,7 @@ import type {
   BahnPositionSoll,
   BahnTwistIst,
   BahnTwistSoll,
-} from '@/types/main';
+} from '@/types/bewegungsdaten.types';
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000/api';
 
@@ -57,7 +57,7 @@ async function fetchFromAPI(endpoint: string, useStream = false) {
   }
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    cache: 'force-cache',
+    cache: 'reload',
   });
   if (!response.ok) {
     throw new Error(`API request failed: ${response.statusText}`);

@@ -4,7 +4,7 @@ const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000/api';
 
 async function fetchFromAPI(endpoint: string) {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    cache: 'force-cache', // Verwendet den Standard-Cache Mechanismus
+    cache: 'reload', // Verwendet den Standard-Cache Mechanismus
   });
   if (!response.ok) {
     throw new Error(`API request failed: ${response.statusText}`);

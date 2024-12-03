@@ -1,7 +1,11 @@
 'use client';
 
 import { CubeIcon } from '@heroicons/react/20/solid';
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import {
+  ChartBarIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/react/24/outline';
+import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
 
 import { Typography } from '@/src/components/Typography';
@@ -24,6 +28,7 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
 }) => {
   const {
     bahnInfo,
+    currentBahnInfo,
     currentBahnPoseIst,
     currentBahnPoseTrans,
     currentBahnTwistIst,
@@ -131,6 +136,21 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
         <CubeIcon className="mr-2 size-5" />
         3D-Plot
       </button>
+
+      {/* Button Container */}
+      <div className="fixed right-4 top-40 flex -translate-y-1/2 items-center rounded-lg bg-primary px-4 py-2 font-bold text-white shadow-lg transition duration-300 ease-in-out hover:bg-gray-800">
+        {/* Auswertung Button - only show if currentBahnInfo exists */}
+        {currentBahnInfo && (
+          <Link
+            href={`/auswertung/${currentBahnInfo.bahnID}`}
+            className="flex items-center"
+          >
+            <ChartBarIcon className="mr-2 size-5" />
+            <span>Auswertung</span>
+          </Link>
+        )}
+      </div>
+
       <ConsistencyCheck
         currentBahnTwistIst={currentBahnTwistIst}
         currentBahnTwistSoll={currentBahnTwistSoll}

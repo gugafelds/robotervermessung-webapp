@@ -10,7 +10,7 @@ import type {
   BahnPoseIst,
   BahnPoseTrans,
   BahnPositionSoll,
-} from '@/types/main'; // Adjust import path as needed
+} from '@/types/bewegungsdaten.types'; // Adjust import path as needed
 
 import { Position3DPlot } from './Position3DPlot'; // Adjust import path as needed
 

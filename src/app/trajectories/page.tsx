@@ -1,5 +1,3 @@
-// File: app/trajectories/page.tsx
-
 import { redirect } from 'next/navigation';
 
 import { getAllBahnInfo } from '@/src/actions/bewegungsdaten.service';
@@ -11,5 +9,5 @@ export default async function TrajectoriesPage() {
     redirect(`/trajectories/${bahnInfo[0].bahnID}`);
   }
 
-  return <div>No trajectories available</div>;
+  return <div>Keine Bahndaten verfügbar</div>;
 }

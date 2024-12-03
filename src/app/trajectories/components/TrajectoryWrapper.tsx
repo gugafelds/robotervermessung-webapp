@@ -279,7 +279,7 @@ export function TrajectoryWrapper() {
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') return;
         if (requestId === latestPlotRequestId.current) {
-          setError('Failed to fetch plot data');
+          setError('Plotdaten konnten nicht abgerufen werden');
         }
       }
     },
@@ -342,7 +342,9 @@ export function TrajectoryWrapper() {
   }, [isInfoLoaded, fetchPlotData, isPlotDataLoaded]);
 
   return error ? (
-    <div>Error: {error}</div>
+    <div className="m-10 flex h-full flex-col justify-normal overflow-hidden rounded-md bg-gray-50 p-5 align-middle">
+      <Typography as="h3">Fehler: {error} :(</Typography>
+    </div>
   ) : (
     <>
       <TrajectoryInfo isTransformed={isTransformed} />
