@@ -28,6 +28,7 @@
     "formatter": "^0.4.2",
     "global-require": "^0.0.1",
     "graceful-fs": "^4.2.11",
+    "lucide-react": "^0.465.0",
     "mongodb": "^6.5.0",
     "mongodb-uri": "^0.9.7",
     "mongoose": "^8.2.2",

@@ -19,7 +19,7 @@ async def get_auswertung_info(conn=Depends(get_db)):
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'auswertung' 
-        AND table_name LIKE '%_info'
+        AND table_name LIKE 'info_%'
         """
 
         tables = await conn.fetch(table_query)
@@ -65,7 +65,7 @@ async def get_auswertung_info(conn=Depends(get_db)):
             query = f"""
             SELECT *
             FROM auswertung.{table_name}
-            WHERE bahn_id IN (SELECT bahn_id FROM ({bahn_ids_query}) AS unique_ids)
+            WHERE bahn_id IN (SELECT bahn_id FROM ({bahn_ids_query}) AS unique_ids) AND evaluation = 'position'
             ORDER BY bahn_id
             """
 
@@ -80,18 +80,17 @@ async def get_auswertung_info(conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 
-@router.get("/euclidean_deviation/{bahn_id}")
+@router.get("/position_euclidean/{bahn_id}")
 @cache(expire=2400)
-async def get_euclidean_deviation_by_id(bahn_id: str, conn=Depends(get_db)):
+async def get_position_euclidean_by_id(bahn_id: str, conn=Depends(get_db)):
     try:
         query = """
         SELECT 
             bahn_id,
             segment_id,
             euclidean_distances,
-            points_order,
-            evaluation
-        FROM auswertung.euclidean_deviation 
+            points_order
+        FROM auswertung.position_euclidean 
         WHERE bahn_id = $1
         ORDER BY points_order ASC
         """
@@ -102,7 +101,7 @@ async def get_euclidean_deviation_by_id(bahn_id: str, conn=Depends(get_db)):
             raise HTTPException(status_code=404, detail=f"No euclidean deviation data found for bahn_id {bahn_id}")
 
         return {
-            "euclidean_deviation": [dict(row) for row in rows]
+            "position_euclidean": [dict(row) for row in rows]
         }
 
     except Exception as e:
@@ -110,9 +109,9 @@ async def get_euclidean_deviation_by_id(bahn_id: str, conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 
-@router.get("/dfd_deviation/{bahn_id}")
+@router.get("/position_dfd/{bahn_id}")
 @cache(expire=2400)
-async def get_dfd_deviation_by_id(bahn_id: str, conn=Depends(get_db)):
+async def get_position_dfd_by_id(bahn_id: str, conn=Depends(get_db)):
     try:
         query = """
         SELECT 
@@ -125,9 +124,8 @@ async def get_dfd_deviation_by_id(bahn_id: str, conn=Depends(get_db)):
             dfd_ist_x,
             dfd_ist_y,
             dfd_ist_z,
-            points_order,
-            evaluation
-        FROM auswertung.dfd_deviation 
+            points_order
+        FROM auswertung.position_dfd 
         WHERE bahn_id = $1
         ORDER BY points_order ASC
         """
@@ -138,7 +136,7 @@ async def get_dfd_deviation_by_id(bahn_id: str, conn=Depends(get_db)):
             raise HTTPException(status_code=404, detail=f"No DFD deviation data found for bahn_id {bahn_id}")
 
         return {
-            "dfd_deviation": [dict(row) for row in rows]
+            "position_dfd": [dict(row) for row in rows]
         }
 
     except Exception as e:
@@ -146,9 +144,9 @@ async def get_dfd_deviation_by_id(bahn_id: str, conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 
-@router.get("/sidtw_deviation/{bahn_id}")
+@router.get("/position_sidtw/{bahn_id}")
 @cache(expire=2400)
-async def get_sidtw_deviation_by_id(bahn_id: str, conn=Depends(get_db)):
+async def get_position_sidtw_by_id(bahn_id: str, conn=Depends(get_db)):
     try:
         query = """
         SELECT 
@@ -161,9 +159,8 @@ async def get_sidtw_deviation_by_id(bahn_id: str, conn=Depends(get_db)):
             sidtw_ist_x,
             sidtw_ist_y,
             sidtw_ist_z,
-            points_order,
-            evaluation
-        FROM auswertung.sidtw_deviation 
+            points_order
+        FROM auswertung.position_sidtw 
         WHERE bahn_id = $1
         ORDER BY points_order ASC
         """
@@ -174,7 +171,7 @@ async def get_sidtw_deviation_by_id(bahn_id: str, conn=Depends(get_db)):
             raise HTTPException(status_code=404, detail=f"No SIDTW deviation data found for bahn_id {bahn_id}")
 
         return {
-            "sidtw_deviation": [dict(row) for row in rows]
+            "position_sidtw": [dict(row) for row in rows]
         }
 
     except Exception as e:
@@ -189,9 +186,9 @@ async def check_deviation_data(bahn_id: str, conn=Depends(get_db)):
         query = """
         SELECT 
             CASE 
-                WHEN EXISTS (SELECT 1 FROM auswertung.euclidean_deviation WHERE bahn_id = $1) AND
-                     EXISTS (SELECT 1 FROM auswertung.dfd_deviation WHERE bahn_id = $1) AND
-                     EXISTS (SELECT 1 FROM auswertung.sidtw_deviation WHERE bahn_id = $1)
+                WHEN EXISTS (SELECT 1 FROM auswertung.position_euclidean WHERE bahn_id = $1) AND
+                     EXISTS (SELECT 1 FROM auswertung.position_dfd WHERE bahn_id = $1) AND
+                     EXISTS (SELECT 1 FROM auswertung.position_sidtw WHERE bahn_id = $1)
                 THEN true
                 ELSE false
             END as has_data

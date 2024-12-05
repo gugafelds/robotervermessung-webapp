@@ -1,16 +1,16 @@
 import type {
-  DFDDeviation,
-  DFDDeviationRaw,
   DFDInfo,
   DFDInfoRaw,
-  EADeviation,
-  EADeviationRaw,
+  DFDPosition,
+  DFDPositionRaw,
   EAInfo,
   EAInfoRaw,
-  SIDTWDeviation,
-  SIDTWDeviationRaw,
+  EAPosition,
+  EAPositionRaw,
   SIDTWInfo,
   SIDTWInfoRaw,
+  SIDTWPosition,
+  SIDTWPositionRaw,
 } from '@/types/auswertung.types';
 
 export const transformEAInfoResult = (bahnenRaw: EAInfoRaw[]): EAInfo[] => {
@@ -58,20 +58,19 @@ export const transformSIDTWInfoResult = (
 };
 
 export const transformEADeviationResult = (
-  data: EADeviationRaw[],
-): EADeviation[] => {
+  data: EAPositionRaw[],
+): EAPosition[] => {
   return data.map((item) => ({
     bahnID: item.bahn_id,
     segmentID: item.segment_id,
     EADistances: item.euclidean_distances,
     pointsOrder: item.points_order,
-    evaluation: item.evaluation,
   }));
 };
 
 export const transformDFDDeviationResult = (
-  data: DFDDeviationRaw[],
-): DFDDeviation[] => {
+  data: DFDPositionRaw[],
+): DFDPosition[] => {
   return data.map((item) => ({
     bahnID: item.bahn_id,
     segmentID: item.segment_id,
@@ -83,13 +82,12 @@ export const transformDFDDeviationResult = (
     DFDIstY: item.dfd_ist_y,
     DFDIstZ: item.dfd_ist_z,
     pointsOrder: item.points_order,
-    evaluation: item.evaluation,
   }));
 };
 
 export const transformSIDTWDeviationResult = (
-  data: SIDTWDeviationRaw[],
-): SIDTWDeviation[] => {
+  data: SIDTWPositionRaw[],
+): SIDTWPosition[] => {
   return data.map((item) => ({
     bahnID: item.bahn_id,
     segmentID: item.segment_id,
@@ -101,6 +99,5 @@ export const transformSIDTWDeviationResult = (
     SIDTWIstY: item.sidtw_ist_y,
     SIDTWIstZ: item.sidtw_ist_z,
     pointsOrder: item.points_order,
-    evaluation: item.evaluation,
   }));
 };

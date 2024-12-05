@@ -1,7 +1,9 @@
+/* eslint-disable react/button-has-type */
+
 'use client';
 
 import dynamic from 'next/dynamic';
-import type { Layout, PlotData } from 'plotly.js';
+import type { Layout, PlotData, PlotType } from 'plotly.js';
 import React, { useState } from 'react';
 
 import type { DFDInfo, EAInfo, SIDTWInfo } from '@/types/auswertung.types';
@@ -14,18 +16,24 @@ interface CombinedAnalysisPlotProps {
   sidtwAnalyses: SIDTWInfo[];
 }
 
+// Erweitere das Layout-Interface für die Box-Plot-spezifischen Properties
+interface ExtendedLayout extends Partial<Layout> {
+  boxgap?: number;
+  boxgroupgap?: number;
+  hoverinfo?: string;
+}
+
 export const MetrikenPanelPlot: React.FC<CombinedAnalysisPlotProps> = ({
   eaAnalyses,
   dfdAnalyses,
   sidtwAnalyses,
 }) => {
-  // Konfiguration für das Segment-Fenster
   const [windowStart, setWindowStart] = useState(0);
   const WINDOW_SIZE = 15;
 
-  // Navigationsfunktionen
   const handlePrevious = () =>
     setWindowStart(Math.max(0, windowStart - WINDOW_SIZE));
+
   const handleNext = () => {
     const maxLength = Math.max(
       eaAnalyses.length,
@@ -38,194 +46,133 @@ export const MetrikenPanelPlot: React.FC<CombinedAnalysisPlotProps> = ({
   };
 
   const createPlotData = (): Partial<PlotData>[] => {
-    // Datenverarbeitung mit Fenster-Filterung
     const processData = (data: any[]) => {
-      const filtered = [...data]
+      return [...data]
         .filter((a) => a.bahnID !== a.segmentID)
         .sort((a, b) => {
           const segmentA = parseInt(a.segmentID.split('_')[1], 10);
           const segmentB = parseInt(b.segmentID.split('_')[1], 10);
           return segmentA - segmentB;
-        });
-      return filtered.slice(windowStart, windowStart + WINDOW_SIZE);
+        })
+        .slice(windowStart, windowStart + WINDOW_SIZE);
+    };
+
+    // Funktion zur Erzeugung von transparenten Farben
+    const getColorWithOpacity = (color: string, opacity: number) => {
+      // Für unsere vordefinierten Farben wandeln wir sie in RGBA um
+      const colorMap: any = {
+        '#003560': `rgba(0, 53, 96, ${opacity})`, // Blau
+        '#2a9d8f': `rgba(42, 157, 143, ${opacity})`, // Grün
+        '#e63946': `rgba(230, 57, 70, ${opacity})`, // Rot
+      };
+      return colorMap[color] || color;
+    };
+
+    const createBoxTrace = (
+      data: any[],
+      methodPrefix: string,
+      color: string,
+      name: string,
+    ) => {
+      const methodNames = {
+        EA: 'EA',
+        DFD: 'DFD',
+        SIDTW: 'SIDTW',
+      };
+
+      const segments = data.map((d) => ({
+        segment: parseInt(d.segmentID.split('_')[1], 10),
+        minDistance: d[`${methodPrefix}MinDistance`],
+        maxDistance: d[`${methodPrefix}MaxDistance`],
+        avgDistance: d[`${methodPrefix}AvgDistance`],
+        stdPlus:
+          d[`${methodPrefix}AvgDistance`] + d[`${methodPrefix}StdDeviation`],
+        stdMinus:
+          d[`${methodPrefix}AvgDistance`] - d[`${methodPrefix}StdDeviation`],
+      }));
+
+      // Erstelle den eigentlichen Box-Plot mit Opacity 0
+      const boxTrace: any = {
+        type: 'box' as PlotType,
+        name,
+        x: segments.map((s) => s.segment),
+        q1: segments.map((s) => s.stdMinus),
+        median: segments.map((s) => s.avgDistance),
+        q3: segments.map((s) => s.stdPlus),
+        lowerfence: segments.map((s) => s.minDistance),
+        upperfence: segments.map((s) => s.maxDistance),
+        marker: { color: 'rgba(0,0,0,0)' }, // Unsichtbarer Marker
+        line: { color },
+        fillcolor: getColorWithOpacity(color, 0.2),
+        whiskerwidth: 0.8,
+        hoverinfo: 'skip', // Deaktiviere den Standard-Hover
+      };
+
+      // Erstelle einen unsichtbaren Scatter-Plot für den benutzerdefinierten Hover
+      const hoverTrace: Partial<PlotData> = {
+        type: 'scatter' as PlotType,
+        name,
+        x: segments.map((s) => s.segment),
+        y: segments.map((s) => s.avgDistance),
+        mode: 'markers',
+        marker: {
+          color: 'rgba(0,0,0,0)',
+          size: 20,
+        },
+        showlegend: false,
+        hovertemplate:
+          `${methodNames[methodPrefix as keyof typeof methodNames]}<br>` + // Fügt den Methodennamen hinzu
+          'Segment: %{x}<br>' +
+          'Max: %{customdata[0]:.2f}mm<br>' +
+          'Durchschnitt + Std.: %{customdata[1]:.2f}mm<br>' +
+          'Durchschnitt: %{y:.2f}mm<br>' +
+          'Durchschnitt - Std.: %{customdata[2]:.2f}mm<br>' +
+          'Min: %{customdata[3]:.2f}mm<extra></extra>',
+        customdata: segments.map((s) => [
+          s.maxDistance,
+          s.stdPlus,
+          s.stdMinus,
+          s.minDistance,
+        ]),
+      };
+
+      return [boxTrace, hoverTrace];
     };
 
     const eaData = processData(eaAnalyses);
     const dfdData = processData(dfdAnalyses);
     const sidtwData = processData(sidtwAnalyses);
 
-    // Farbpaletten für jede Metrik
-    const colors = {
-      ea: {
-        main: 'rgba(0, 53, 96, 0.7)',
-        error: 'rgba(0, 53, 96, 1)',
-      },
-      dfd: {
-        main: 'rgba(230, 57, 70, 0.7)',
-        error: 'rgba(230, 57, 70, 1)',
-      },
-      sidtw: {
-        main: 'rgba(42, 157, 143, 0.7)',
-        error: 'rgba(42, 157, 143, 1)',
-      },
-    };
-
-    const barWidth = 0.25;
-
+    // Flatten das Array, da createBoxTrace jetzt zwei Traces zurückgibt
     return [
-      // EA Bars mit zwei Fehlerbalken
-      {
-        type: 'bar',
-        name: 'EA Durchschnitt',
-        x: eaData.map((d) => parseInt(d.segmentID.split('_')[1], 10)),
-        y: eaData.map((d) => d.EAAvgDistance),
-        error_y: {
-          type: 'data',
-          array: eaData.map((d) => d.EAMaxDistance - d.EAAvgDistance),
-          arrayminus: eaData.map((d) => d.EAAvgDistance - d.EAMinDistance),
-          width: 5,
-          color: colors.ea.error,
-        },
-        marker: {
-          color: colors.ea.main,
-        },
-        width: barWidth,
-        offset: -barWidth,
-        legendgroup: 'ea',
-      },
-      {
-        type: 'bar',
-        name: 'EA Std. Abw.',
-        x: eaData.map((d) => parseInt(d.segmentID.split('_')[1], 10)),
-        y: eaData.map((d) => d.EAAvgDistance),
-        error_y: {
-          type: 'data',
-          array: eaData.map((d) => d.EAStdDeviation),
-          arrayminus: eaData.map((d) => d.EAStdDeviation),
-          width: 3,
-          color: colors.ea.error,
-          thickness: 3,
-        },
-        marker: {
-          color: 'rgba(0,0,0,0)',
-        },
-        width: barWidth,
-        offset: -barWidth,
-        showlegend: false,
-        legendgroup: 'ea',
-      },
-
-      // SIDTW Bars mit zwei Fehlerbalken
-      {
-        type: 'bar',
-        name: 'SIDTW Durchschnitt',
-        x: sidtwData.map((d) => parseInt(d.segmentID.split('_')[1], 10)),
-        y: sidtwData.map((d) => d.SIDTWAvgDistance),
-        error_y: {
-          type: 'data',
-          array: sidtwData.map((d) => d.SIDTWMaxDistance - d.SIDTWAvgDistance),
-          arrayminus: sidtwData.map(
-            (d) => d.SIDTWAvgDistance - d.SIDTWMinDistance,
-          ),
-          width: 5,
-          color: colors.sidtw.error,
-        },
-        marker: {
-          color: colors.sidtw.main,
-        },
-        width: barWidth,
-        offset: 0,
-        legendgroup: 'sidtw',
-      },
-      {
-        type: 'bar',
-        name: 'SIDTW Std. Abw.',
-        x: sidtwData.map((d) => parseInt(d.segmentID.split('_')[1], 10)),
-        y: sidtwData.map((d) => d.SIDTWAvgDistance),
-        error_y: {
-          type: 'data',
-          array: sidtwData.map((d) => d.SIDTWStdDeviation),
-          arrayminus: sidtwData.map((d) => d.SIDTWStdDeviation),
-          width: 3,
-          color: colors.sidtw.error,
-          thickness: 3,
-        },
-        marker: {
-          color: 'rgba(0,0,0,0)',
-        },
-        width: barWidth,
-        offset: 0,
-        showlegend: false,
-        legendgroup: 'sidtw',
-      },
-
-      // DFD Bars mit zwei Fehlerbalken
-      {
-        type: 'bar',
-        name: 'DFD Durchschnitt',
-        x: dfdData.map((d) => parseInt(d.segmentID.split('_')[1], 10)),
-        y: dfdData.map((d) => d.DFDAvgDistance),
-        error_y: {
-          type: 'data',
-          array: dfdData.map((d) => d.DFDMaxDistance - d.DFDAvgDistance),
-          arrayminus: dfdData.map((d) => d.DFDAvgDistance - d.DFDMinDistance),
-          width: 5,
-          color: colors.dfd.error,
-        },
-        marker: {
-          color: colors.dfd.main,
-        },
-        width: barWidth,
-        offset: barWidth,
-        legendgroup: 'dfd',
-      },
-      {
-        type: 'bar',
-        name: 'DFD Std. Abw.',
-        x: dfdData.map((d) => parseInt(d.segmentID.split('_')[1], 10)),
-        y: dfdData.map((d) => d.DFDAvgDistance),
-        error_y: {
-          type: 'data',
-          array: dfdData.map((d) => d.DFDStdDeviation),
-          arrayminus: dfdData.map((d) => d.DFDStdDeviation),
-          width: 3,
-          color: colors.dfd.error,
-          thickness: 3,
-        },
-        marker: {
-          color: 'rgba(0,0,0,0)',
-        },
-        width: barWidth,
-        offset: barWidth,
-        showlegend: false,
-        legendgroup: 'dfd',
-      },
+      ...createBoxTrace(eaData, 'EA', '#003560', 'EA'),
+      ...createBoxTrace(sidtwData, 'SIDTW', '#2a9d8f', 'SIDTW'),
+      ...createBoxTrace(dfdData, 'DFD', '#e63946', 'DFD'),
     ];
   };
 
-  const layout: Partial<Layout> = {
-    title: `(${eaAnalyses[0]?.evaluation || ''})`,
-    font: {
-      family: 'Helvetica',
-    },
+  const layout: ExtendedLayout = {
+    title: '3D-Position (Soll vs. Ist)',
+    font: { family: 'Helvetica' },
     xaxis: {
       title: 'Segment',
       tickformat: 'd',
       ticks: 'outside',
       dtick: 1,
-      // Sichtbarer Bereich wird auf das aktuelle Fenster beschränkt
       range: [windowStart - 0.5, windowStart + WINDOW_SIZE - 0.5],
     },
     yaxis: {
       title: 'Abweichung (mm)',
       zeroline: true,
     },
+    boxmode: 'group',
+    boxgap: 0.2,
+    boxgroupgap: 0.1,
     legend: {
       orientation: 'h',
       y: -0.2,
     },
-    barmode: 'group',
-    hovermode: 'x unified',
+    hovermode: 'x',
   };
 
   return (
@@ -242,7 +189,6 @@ export const MetrikenPanelPlot: React.FC<CombinedAnalysisPlotProps> = ({
         style={{ width: '100%', height: '500px' }}
       />
       <div className="mt-4 flex justify-center gap-4">
-        {/* eslint-disable-next-line react/button-has-type */}
         <button
           onClick={handlePrevious}
           disabled={windowStart === 0}
@@ -250,7 +196,6 @@ export const MetrikenPanelPlot: React.FC<CombinedAnalysisPlotProps> = ({
         >
           ← Zurück
         </button>
-        {/* eslint-disable-next-line react/button-has-type */}
         <button
           onClick={handleNext}
           disabled={

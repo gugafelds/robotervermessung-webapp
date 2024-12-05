@@ -11,12 +11,12 @@ import React, {
 
 import type {
   AuswertungInfo,
-  DFDDeviation,
   DFDInfo,
-  EADeviation,
+  DFDPosition,
   EAInfo,
-  SIDTWDeviation,
+  EAPosition,
   SIDTWInfo,
+  SIDTWPosition,
 } from '@/types/auswertung.types';
 
 export interface AuswertungState {
@@ -29,17 +29,17 @@ export interface AuswertungState {
   >;
   currentEuclideanInfo: EAInfo[];
   setCurrentEuclideanInfo: React.Dispatch<React.SetStateAction<EAInfo[]>>;
-  currentSIDTWDeviation: SIDTWDeviation[];
+  currentSIDTWDeviation: SIDTWPosition[];
   setCurrentSIDTWDeviation: React.Dispatch<
-    React.SetStateAction<SIDTWDeviation[]>
+    React.SetStateAction<SIDTWPosition[]>
   >;
-  currentEuclideanDeviation: EADeviation[];
+  currentEuclideanDeviation: EAPosition[];
   setCurrentEuclideanDeviation: React.Dispatch<
-    React.SetStateAction<EADeviation[]>
+    React.SetStateAction<EAPosition[]>
   >;
-  currentDiscreteFrechetDeviation: DFDDeviation[];
+  currentDiscreteFrechetDeviation: DFDPosition[];
   setCurrentDiscreteFrechetDeviation: React.Dispatch<
-    React.SetStateAction<DFDDeviation[]>
+    React.SetStateAction<DFDPosition[]>
   >;
 }
 
@@ -70,12 +70,12 @@ export const AuswertungProvider = ({
 
   // Deviation Zustände
   const [currentSIDTWDeviation, setCurrentSIDTWDeviation] = useState<
-    SIDTWDeviation[]
+    SIDTWPosition[]
   >([]);
   const [currentDiscreteFrechetDeviation, setCurrentDiscreteFrechetDeviation] =
-    useState<DFDDeviation[]>([]);
+    useState<DFDPosition[]>([]);
   const [currentEuclideanDeviation, setCurrentEuclideanDeviation] = useState<
-    EADeviation[]
+    EAPosition[]
   >([]);
 
   // Aktualisiere den Hauptzustand wenn sich die initialAuswertungInfo ändert

@@ -63,7 +63,7 @@ export const ProjectInfo = () => {
         </div>
         <Typography as="p" className="mt-5">
           Diese Webseite dient als Remote-Anwendung mit direkter Visualisierung
-          der Daten, die in der MongoDB-Datenbank gespeichert sind.
+          der Daten, die in der PostgreSQL-Datenbank gespeichert sind.
         </Typography>
       </div>
 

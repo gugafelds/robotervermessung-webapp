@@ -3,7 +3,7 @@
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import React, { useEffect, useState } from 'react';
 
-import { checkDeviationDataAvailability } from '@/src/actions/auswertung.service';
+import { checkPositionDataAvailability } from '@/src/actions/auswertung.service';
 import { AllDeviationsPlot } from '@/src/app/auswertung/components/AllDeviationsPlot';
 import { MetrikenPanel } from '@/src/app/auswertung/components/MetrikenPanel';
 import { MetrikenPanelPlot } from '@/src/app/auswertung/components/MetrikenPanelPlot';
@@ -33,7 +33,7 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
 
   useEffect(() => {
     const checkData = async () => {
-      const hasData = await checkDeviationDataAvailability(bahnId);
+      const hasData = await checkPositionDataAvailability(bahnId);
       setHasDeviationData(hasData);
     };
     checkData();
@@ -44,15 +44,15 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
   );
 
   const euclideanAnalyses =
-    auswertungInfo.auswertung_info.euclidean_info.filter(
+    auswertungInfo.auswertung_info.info_euclidean.filter(
       (info) => info.bahnID === bahnId,
     );
 
-  const dfdAnalyses = auswertungInfo.auswertung_info.dfd_info.filter(
+  const dfdAnalyses = auswertungInfo.auswertung_info.info_dfd.filter(
     (info) => info.bahnID === bahnId,
   );
 
-  const sidtwAnalyses = auswertungInfo.auswertung_info.sidtw_info.filter(
+  const sidtwAnalyses = auswertungInfo.auswertung_info.info_sidtw.filter(
     (info) => info.bahnID === bahnId,
   );
 

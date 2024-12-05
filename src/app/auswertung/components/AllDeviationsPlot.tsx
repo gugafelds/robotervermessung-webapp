@@ -1,17 +1,26 @@
+/* eslint-disable react/button-has-type */
+/* eslint-disable no-console */
+
 'use client';
 
+import { Loader2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import type { Layout, PlotData, Shape } from 'plotly.js';
+import type { Layout, PlotData } from 'plotly.js';
 import React, { useState } from 'react';
 
 import {
-  getDFDDeviationById,
-  getEADeviationById,
-  getSIDTWDeviationById,
+  getDFDPositionById,
+  getEAPositionById,
+  getSIDTWPositionById,
 } from '@/src/actions/auswertung.service';
 import { useAuswertung } from '@/src/providers/auswertung.provider';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
+
+interface MetricState {
+  isLoaded: boolean;
+  isLoading: boolean;
+}
 
 interface AllDeviationsPlotProps {
   hasDeviationData: boolean;
@@ -22,8 +31,16 @@ export const AllDeviationsPlot: React.FC<AllDeviationsPlotProps> = ({
   hasDeviationData,
   bahnId,
 }) => {
-  const [showPlot, setShowPlot] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [metrics, setMetrics] = useState<{
+    ea: MetricState;
+    dfd: MetricState;
+    sidtw: MetricState;
+  }>({
+    ea: { isLoaded: false, isLoading: false },
+    dfd: { isLoaded: false, isLoading: false },
+    sidtw: { isLoaded: false, isLoading: false },
+  });
+
   const {
     currentEuclideanDeviation,
     currentDiscreteFrechetDeviation,
@@ -34,26 +51,46 @@ export const AllDeviationsPlot: React.FC<AllDeviationsPlotProps> = ({
     auswertungInfo,
   } = useAuswertung();
 
-  const loadDeviationData = async () => {
+  const loadMetricData = async (metricType: 'ea' | 'dfd' | 'sidtw') => {
     if (!bahnId) return;
 
-    setIsLoading(true);
-    try {
-      const [ea, dfd, sidtw] = await Promise.all([
-        getEADeviationById(bahnId),
-        getDFDDeviationById(bahnId),
-        getSIDTWDeviationById(bahnId),
-      ]);
+    setMetrics((prev) => ({
+      ...prev,
+      [metricType]: { ...prev[metricType], isLoading: true },
+    }));
 
-      setCurrentEuclideanDeviation(ea);
-      setCurrentDiscreteFrechetDeviation(dfd);
-      setCurrentSIDTWDeviation(sidtw);
-      setShowPlot(true);
+    try {
+      let data;
+      switch (metricType) {
+        case 'ea':
+          data = await getEAPositionById(bahnId);
+          setCurrentEuclideanDeviation(data);
+          break;
+        case 'dfd':
+          data = await getDFDPositionById(bahnId);
+          setCurrentDiscreteFrechetDeviation(data);
+          break;
+        case 'sidtw':
+          data = await getSIDTWPositionById(bahnId);
+          setCurrentSIDTWDeviation(data);
+          break;
+        default: {
+          const exhaustiveCheck: never = metricType;
+          throw new Error(`Unhandled metric type: ${exhaustiveCheck}`);
+        }
+      }
+
+      setMetrics((prev) => ({
+        ...prev,
+        [metricType]: { isLoaded: true, isLoading: false },
+      }));
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Error loading deviation data:', error);
+      console.error(`Error loading ${metricType} data:`, error);
+      setMetrics((prev) => ({
+        ...prev,
+        [metricType]: { ...prev[metricType], isLoading: false },
+      }));
     }
-    setIsLoading(false);
   };
 
   const calculateTimePoints = (points: number) => {
@@ -79,36 +116,51 @@ export const AllDeviationsPlot: React.FC<AllDeviationsPlotProps> = ({
       });
   };
 
-  const createCombinedPlot = (): Partial<PlotData>[] => {
-    const sortedEA = [...currentEuclideanDeviation].sort(
-      (a, b) => a.pointsOrder - b.pointsOrder,
-    );
-    const sortedDFD = [...currentDiscreteFrechetDeviation].sort(
-      (a, b) => a.pointsOrder - b.pointsOrder,
-    );
-    const sortedSIDTW = [...currentSIDTWDeviation].sort(
-      (a, b) => a.pointsOrder - b.pointsOrder,
-    );
+  const getSegmentTransitions = () => {
+    let data;
+    let timePoints;
 
-    const timePointsEA = calculateTimePoints(sortedEA.length);
-    const timePointsDFD = calculateTimePoints(sortedDFD.length);
-    const timePointsSIDTW = calculateTimePoints(sortedSIDTW.length);
+    // Verwende die erste verfügbare Metrik für die Segmentierung
+    if (metrics.ea.isLoaded) {
+      data = [...currentEuclideanDeviation].sort(
+        (a, b) => a.pointsOrder - b.pointsOrder,
+      );
+    } else if (metrics.dfd.isLoaded) {
+      data = [...currentDiscreteFrechetDeviation].sort(
+        (a, b) => a.pointsOrder - b.pointsOrder,
+      );
+    } else if (metrics.sidtw.isLoaded) {
+      data = [...currentSIDTWDeviation].sort(
+        (a, b) => a.pointsOrder - b.pointsOrder,
+      );
+    } else {
+      return { timePoints: [], transitions: [] };
+    }
+
+    // eslint-disable-next-line prefer-const
+    timePoints = calculateTimePoints(data.length);
+    const transitions: number[] = [];
 
     // Finde Segmentübergänge
-    const segmentTransitions: number[] = [];
-    const segmentIds: string[] = [];
     // eslint-disable-next-line no-plusplus
-    for (let i = 1; i < sortedEA.length; i++) {
-      if (sortedEA[i].segmentID !== sortedEA[i - 1].segmentID) {
-        segmentTransitions.push(timePointsEA[i]);
-        segmentIds.push(sortedEA[i - 1].segmentID.split('_')[1]);
+    for (let i = 1; i < data.length; i++) {
+      if (data[i].segmentID !== data[i - 1].segmentID) {
+        transitions.push(timePoints[i]);
       }
     }
-    // Füge das letzte Segment hinzu
-    segmentIds.push(sortedEA[sortedEA.length - 1].segmentID.split('_')[1]);
 
-    return [
-      {
+    return { timePoints, transitions };
+  };
+
+  const createCombinedPlot = (): Partial<PlotData>[] => {
+    const plots: Partial<PlotData>[] = [];
+
+    if (metrics.ea.isLoaded) {
+      const sortedEA = [...currentEuclideanDeviation].sort(
+        (a, b) => a.pointsOrder - b.pointsOrder,
+      );
+      const timePointsEA = calculateTimePoints(sortedEA.length);
+      plots.push({
         type: 'scatter',
         mode: 'lines',
         name: 'Euklidischer Abstand',
@@ -116,8 +168,15 @@ export const AllDeviationsPlot: React.FC<AllDeviationsPlotProps> = ({
         y: sortedEA.map((d) => d.EADistances),
         line: { color: '#003560', width: 2 },
         hovertemplate: 'Zeit: %{x:.3f}s<br>EA: %{y:.1f}mm<extra></extra>',
-      },
-      {
+      });
+    }
+
+    if (metrics.dfd.isLoaded) {
+      const sortedDFD = [...currentDiscreteFrechetDeviation].sort(
+        (a, b) => a.pointsOrder - b.pointsOrder,
+      );
+      const timePointsDFD = calculateTimePoints(sortedDFD.length);
+      plots.push({
         type: 'scatter',
         mode: 'lines',
         name: 'Diskrete Fréchet-Distanz',
@@ -125,8 +184,15 @@ export const AllDeviationsPlot: React.FC<AllDeviationsPlotProps> = ({
         y: sortedDFD.map((d) => d.DFDDistances),
         line: { color: '#e63946', width: 2 },
         hovertemplate: 'Zeit: %{x:.3f}s<br>DFD: %{y:.1f}mm<extra></extra>',
-      },
-      {
+      });
+    }
+
+    if (metrics.sidtw.isLoaded) {
+      const sortedSIDTW = [...currentSIDTWDeviation].sort(
+        (a, b) => a.pointsOrder - b.pointsOrder,
+      );
+      const timePointsSIDTW = calculateTimePoints(sortedSIDTW.length);
+      plots.push({
         type: 'scatter',
         mode: 'lines',
         name: 'SIDTW',
@@ -134,98 +200,77 @@ export const AllDeviationsPlot: React.FC<AllDeviationsPlotProps> = ({
         y: sortedSIDTW.map((d) => d.SIDTWDistances),
         line: { color: '#457b9d', width: 2 },
         hovertemplate: 'Zeit: %{x:.3f}s<br>SIDTW: %{y:.1f}mm<extra></extra>',
-      },
-    ];
+      });
+    }
+
+    return plots;
   };
 
-  if (!hasDeviationData) {
-    return (
-      // eslint-disable-next-line react/button-has-type
-      <button disabled className="rounded bg-gray-300 px-4 py-2 text-gray-600">
-        Keine Abweichungsdaten verfügbar
-      </button>
-    );
-  }
+  const getLayoutWithShapes = (): Partial<Layout> => {
+    const baseLayout: Partial<Layout> = {
+      title: '3D-Position (Soll vs. Ist)',
+      font: { family: 'Helvetica' },
+      xaxis: {
+        title: 'Zeit (s)',
+        tickformat: '.1f',
+      },
+      yaxis: {
+        title: 'Abweichung (mm)',
+      },
+      hovermode: 'x unified',
+      height: 500,
+      margin: { t: 40, b: 40, l: 60, r: 20 },
+      showlegend: true,
+      legend: {
+        orientation: 'h',
+        y: -0.2,
+      },
+    };
 
-  if (!showPlot) {
-    return (
-      // eslint-disable-next-line react/button-has-type
-      <button
-        onClick={loadDeviationData}
-        disabled={isLoading}
-        className="rounded bg-primary px-4 py-2 text-white hover:bg-primary/80 disabled:bg-gray-300 disabled:text-gray-600"
-      >
-        {isLoading ? 'Lade Daten...' : 'Abweichungen anzeigen'}
-      </button>
-    );
-  }
+    const { timePoints, transitions } = getSegmentTransitions();
 
-  const evaluation = currentEuclideanDeviation[0]?.evaluation || '';
-  const timePoints = calculateTimePoints(currentEuclideanDeviation.length);
-  const segmentTransitions: number[] = [];
-
-  // Finde Segmentübergänge für Shapes
-  // eslint-disable-next-line no-plusplus
-  for (let i = 1; i < currentEuclideanDeviation.length; i++) {
-    if (
-      currentEuclideanDeviation[i].segmentID !==
-      currentEuclideanDeviation[i - 1].segmentID
-    ) {
-      segmentTransitions.push(timePoints[i]);
+    // Wenn keine Daten geladen sind, geben wir das Basis-Layout zurück
+    if (transitions.length === 0) {
+      return baseLayout;
     }
-  }
 
-  const layout: Partial<Layout> = {
-    title: `(${evaluation})`,
-    font: { family: 'Helvetica' },
-    xaxis: {
-      title: 'Zeit (s)',
-      tickformat: '.1f',
-    },
-    yaxis: {
-      title: 'Abstand (mm)',
-    },
-    hovermode: 'x unified',
-    height: 500,
-    margin: { t: 40, b: 40, l: 60, r: 20 },
-    showlegend: true,
-    legend: {
-      orientation: 'h',
-      y: -0.2,
-    },
-    shapes: [
-      ...segmentTransitions.map((transition, index) => ({
-        type: 'rect' as const,
-        xref: 'x' as const,
-        yref: 'paper' as const,
-        x0: index === 0 ? 0 : segmentTransitions[index - 1],
+    // Shapes für alternierende Hintergrundfärbung und Segmentlinien erstellen
+    const shapes = [
+      // Alternierende Rechtecke für Segmente
+      ...transitions.map((transition, index) => ({
+        type: 'rect',
+        xref: 'x',
+        yref: 'paper',
+        x0: index === 0 ? 0 : transitions[index - 1],
         x1: transition,
         y0: 0,
         y1: 1,
         fillcolor:
           index % 2 === 0 ? 'rgba(240,240,240,0.5)' : 'rgba(255,255,255,0.5)',
         line: { width: 0 },
-        layer: 'below' as const,
+        layer: 'below',
       })),
+      // Letztes Segment
       {
-        type: 'rect' as const,
-        xref: 'x' as const,
-        yref: 'paper' as const,
-        x0: segmentTransitions[segmentTransitions.length - 1] || 0,
+        type: 'rect',
+        xref: 'x',
+        yref: 'paper',
+        x0: transitions[transitions.length - 1] || 0,
         x1: timePoints[timePoints.length - 1],
         y0: 0,
         y1: 1,
         fillcolor:
-          segmentTransitions.length % 2 === 0
+          transitions.length % 2 === 0
             ? 'rgba(240,240,240,0.5)'
             : 'rgba(255,255,255,0.5)',
         line: { width: 0 },
-        layer: 'below' as const,
+        layer: 'below',
       },
-      ...segmentTransitions.map((transition) => ({
-        type: 'line' as const,
-        xref: 'x' as const,
-        yref: 'paper' as const,
+      // Vertikale Linien an den Segmentgrenzen
+      ...transitions.map((transition) => ({
+        type: 'line',
+        xref: 'x',
+        yref: 'paper',
         x0: transition,
         x1: transition,
         y0: 0,
@@ -235,25 +280,78 @@ export const AllDeviationsPlot: React.FC<AllDeviationsPlotProps> = ({
           width: 1,
           dash: 'dot',
         },
-        layer: 'below' as const,
+        layer: 'below',
       })),
-    ] as Partial<Shape>[],
+    ] as Plotly.Shape[];
+
+    return {
+      ...baseLayout,
+      shapes,
+    };
+  };
+
+  const anyMetricLoaded = Object.values(metrics).some((m) => m.isLoaded);
+
+  if (!hasDeviationData) {
+    return (
+      <button disabled className="rounded bg-gray-300 px-4 py-2 text-gray-600">
+        Keine Abweichungsdaten verfügbar
+      </button>
+    );
+  }
+
+  const getButtonContent = (metric: MetricState, label: string) => {
+    if (metric.isLoading) {
+      return (
+        <>
+          <Loader2 className="size-4 animate-spin" />
+          <span>Lädt {label}...</span>
+        </>
+      );
+    }
+
+    if (metric.isLoaded) {
+      return `${label} geladen`;
+    }
+
+    return `${label} laden`;
   };
 
   return (
-    <div className="w-full">
-      {!showPlot ? (
-        // eslint-disable-next-line react/button-has-type
+    <div className="w-full space-y-4">
+      <div className="flex flex-wrap gap-4">
+        {/* EA Control */}
         <button
-          onClick={() => setShowPlot(true)}
-          className="rounded bg-primary px-4 py-2 text-white hover:bg-primary/80"
+          onClick={() => loadMetricData('ea')}
+          disabled={metrics.ea.isLoaded || metrics.ea.isLoading}
+          className="inline-flex items-center space-x-2 rounded bg-primary px-3 py-1 text-sm text-white hover:bg-primary/80 disabled:bg-gray-300 disabled:text-gray-600"
         >
-          Abweichungen anzeigen
+          {getButtonContent(metrics.ea, 'EA')}
         </button>
-      ) : (
+
+        {/* DFD Control */}
+        <button
+          onClick={() => loadMetricData('dfd')}
+          disabled={metrics.dfd.isLoaded || metrics.dfd.isLoading}
+          className="inline-flex items-center space-x-2 rounded bg-primary px-3 py-1 text-sm text-white hover:bg-primary/80 disabled:bg-gray-300 disabled:text-gray-600"
+        >
+          {getButtonContent(metrics.dfd, 'DFD')}
+        </button>
+
+        {/* SIDTW Control */}
+        <button
+          onClick={() => loadMetricData('sidtw')}
+          disabled={metrics.sidtw.isLoaded || metrics.sidtw.isLoading}
+          className="inline-flex items-center space-x-2 rounded bg-primary px-3 py-1 text-sm text-white hover:bg-primary/80 disabled:bg-gray-300 disabled:text-gray-600"
+        >
+          {getButtonContent(metrics.sidtw, 'SIDTW')}
+        </button>
+      </div>
+
+      {anyMetricLoaded && (
         <Plot
           data={createCombinedPlot()}
-          layout={layout}
+          layout={getLayoutWithShapes()}
           useResizeHandler
           config={{
             displaylogo: false,

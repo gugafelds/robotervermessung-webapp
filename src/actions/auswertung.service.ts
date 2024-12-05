@@ -13,12 +13,12 @@ import {
 import { transformBahnInfoResult } from '@/src/lib/transformer.bewegungsdaten';
 import type {
   AuswertungInfo,
-  DFDDeviation,
-  DFDDeviationRaw,
-  EADeviation,
-  EADeviationRaw,
-  SIDTWDeviation,
-  SIDTWDeviationRaw,
+  DFDPosition,
+  DFDPositionRaw,
+  EAPosition,
+  EAPositionRaw,
+  SIDTWPosition,
+  SIDTWPositionRaw,
 } from '@/types/auswertung.types';
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000/api';
@@ -27,9 +27,9 @@ const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000/api';
 interface ApiResponse {
   bahn_info: any[]; // oder spezifischer Type
   auswertung_info: {
-    dfd_info: any[]; // oder spezifischer Type
-    sidtw_info: any[]; // oder spezifischer Type
-    euclidean_info: any[]; // oder spezifischer Type
+    info_dfd: any[]; // oder spezifischer Type
+    info_sidtw: any[]; // oder spezifischer Type
+    info_euclidean: any[]; // oder spezifischer Type
   };
 }
 
@@ -82,10 +82,10 @@ export const getAllAuswertungInfo = async (): Promise<AuswertungInfo> => {
     return {
       bahn_info: transformBahnInfoResult(result.bahn_info),
       auswertung_info: {
-        dfd_info: transformDFDInfoResult(result.auswertung_info.dfd_info),
-        sidtw_info: transformSIDTWInfoResult(result.auswertung_info.sidtw_info),
-        euclidean_info: transformEAInfoResult(
-          result.auswertung_info.euclidean_info,
+        info_dfd: transformDFDInfoResult(result.auswertung_info.info_dfd),
+        info_sidtw: transformSIDTWInfoResult(result.auswertung_info.info_sidtw),
+        info_euclidean: transformEAInfoResult(
+          result.auswertung_info.info_euclidean,
         ),
       },
     };
@@ -95,49 +95,47 @@ export const getAllAuswertungInfo = async (): Promise<AuswertungInfo> => {
   }
 };
 
-export const getEADeviationById = async (
-  id: string,
-): Promise<EADeviation[]> => {
+export const getEAPositionById = async (id: string): Promise<EAPosition[]> => {
   try {
     const result = await fetchFromAPI<{
-      euclidean_deviation: EADeviationRaw[];
-    }>(`/auswertung/euclidean_deviation/${id}`);
-    return transformEADeviationResult(result.euclidean_deviation);
+      position_euclidean: EAPositionRaw[];
+    }>(`/auswertung/position_euclidean/${id}`);
+    return transformEADeviationResult(result.position_euclidean);
   } catch (error) {
     console.error('Error fetching Euclidean deviation data:', error);
     throw error;
   }
 };
 
-export const getDFDDeviationById = async (
+export const getDFDPositionById = async (
   id: string,
-): Promise<DFDDeviation[]> => {
+): Promise<DFDPosition[]> => {
   try {
-    const result = await fetchFromAPI<{ dfd_deviation: DFDDeviationRaw[] }>(
-      `/auswertung/dfd_deviation/${id}`,
+    const result = await fetchFromAPI<{ position_dfd: DFDPositionRaw[] }>(
+      `/auswertung/position_dfd/${id}`,
     );
-    return transformDFDDeviationResult(result.dfd_deviation);
+    return transformDFDDeviationResult(result.position_dfd);
   } catch (error) {
     console.error('Error fetching DFD deviation data:', error);
     throw error;
   }
 };
 
-export const getSIDTWDeviationById = async (
+export const getSIDTWPositionById = async (
   id: string,
-): Promise<SIDTWDeviation[]> => {
+): Promise<SIDTWPosition[]> => {
   try {
-    const result = await fetchFromAPI<{ sidtw_deviation: SIDTWDeviationRaw[] }>(
-      `/auswertung/sidtw_deviation/${id}`,
+    const result = await fetchFromAPI<{ position_sidtw: SIDTWPositionRaw[] }>(
+      `/auswertung/position_sidtw/${id}`,
     );
-    return transformSIDTWDeviationResult(result.sidtw_deviation);
+    return transformSIDTWDeviationResult(result.position_sidtw);
   } catch (error) {
     console.error('Error fetching SIDTW deviation data:', error);
     throw error;
   }
 };
 
-export const checkDeviationDataAvailability = async (
+export const checkPositionDataAvailability = async (
   id: string,
 ): Promise<boolean> => {
   try {

@@ -20,7 +20,7 @@ export interface DFDInfo {
   evaluation: string;
 }
 
-export interface DFDDeviationRaw {
+export interface DFDPositionRaw {
   bahn_id: string;
   segment_id: string;
   dfd_distances: number;
@@ -31,10 +31,9 @@ export interface DFDDeviationRaw {
   dfd_ist_y: number;
   dfd_ist_z: number;
   points_order: number;
-  evaluation: string;
 }
 
-export interface DFDDeviation {
+export interface DFDPosition {
   bahnID: string;
   segmentID: string;
   DFDDistances: number;
@@ -45,7 +44,6 @@ export interface DFDDeviation {
   DFDIstY: number;
   DFDIstZ: number;
   pointsOrder: number;
-  evaluation: string;
 }
 
 export interface SIDTWInfoRaw {
@@ -68,7 +66,7 @@ export interface SIDTWInfo {
   evaluation: string;
 }
 
-export interface SIDTWDeviationRaw {
+export interface SIDTWPositionRaw {
   bahn_id: string;
   segment_id: string;
   sidtw_distances: number;
@@ -79,10 +77,9 @@ export interface SIDTWDeviationRaw {
   sidtw_ist_y: number;
   sidtw_ist_z: number;
   points_order: number;
-  evaluation: string;
 }
 
-export interface SIDTWDeviation {
+export interface SIDTWPosition {
   bahnID: string;
   segmentID: string;
   SIDTWDistances: number;
@@ -93,7 +90,6 @@ export interface SIDTWDeviation {
   SIDTWIstY: number;
   SIDTWIstZ: number;
   pointsOrder: number;
-  evaluation: string;
 }
 
 export interface EAInfoRaw {
@@ -116,27 +112,25 @@ export interface EAInfo {
   evaluation: string;
 }
 
-export interface EADeviationRaw {
+export interface EAPositionRaw {
   bahn_id: string;
   segment_id: string;
   euclidean_distances: number;
   points_order: number;
-  evaluation: string;
 }
 
-export interface EADeviation {
+export interface EAPosition {
   bahnID: string;
   segmentID: string;
   EADistances: number;
   pointsOrder: number;
-  evaluation: string;
 }
 
 export interface AuswertungInfo {
   bahn_info: BahnInfo[];
   auswertung_info: {
-    dfd_info: DFDInfo[];
-    sidtw_info: SIDTWInfo[];
-    euclidean_info: EAInfo[];
+    info_dfd: DFDInfo[];
+    info_sidtw: SIDTWInfo[];
+    info_euclidean: EAInfo[];
   };
 }
