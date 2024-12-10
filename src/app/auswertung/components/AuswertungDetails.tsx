@@ -73,10 +73,10 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
         {/* Main Info */}
         <div className="border-b pb-4">
           <Typography as="h1" className="text-2xl font-bold text-primary">
-            {currentBahn.recordFilename || 'Keine Datei'}
+            Bahn ID: {currentBahn.bahnID}
           </Typography>
           <Typography as="h2" className="text-xl text-gray-600">
-            Bahn ID: {currentBahn.bahnID}
+            {currentBahn.recordFilename || 'Keine Datei'}
           </Typography>
           <Typography as="p" className="text-gray-500">
             Aufnahmedatum: {formatDate(currentBahn.recordingDate)}

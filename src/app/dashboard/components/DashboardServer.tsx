@@ -12,11 +12,13 @@ export default async function DashboardServer() {
     getCollectionSizes(),
   ]);
 
-  const { trajectoriesCount, componentCounts, frequencyData } = dashboardData;
+  const { bahnenCount, filenamesCount, componentCounts, frequencyData } =
+    dashboardData;
 
   return (
     <DashboardClient
-      trajectoriesCount={trajectoriesCount}
+      bahnenCount={bahnenCount}
+      filenamesCount={filenamesCount}
       componentCounts={componentCounts}
       frequencyData={frequencyData}
       collectionSizes={collectionSizes}

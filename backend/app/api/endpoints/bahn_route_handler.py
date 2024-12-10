@@ -19,9 +19,14 @@ router = APIRouter()
 @cache(expire=24000)
 async def get_dashboard_data(conn = Depends(get_db)):
     try:
-        trajectories_count = await conn.fetchval(
+        filenames_count = await conn.fetchval(
             "SELECT COUNT(DISTINCT record_filename) FROM bewegungsdaten.bahn_info"
         )
+
+        bahnen_count = await conn.fetchval(
+            "SELECT COUNT(DISTINCT bahn_id) FROM bewegungsdaten.bahn_info"
+        )
+        
 
         component_counts = {
             "bahnPoseIst": await conn.fetchval("SELECT COUNT(*) FROM bewegungsdaten.bahn_pose_ist"),
@@ -70,7 +75,8 @@ async def get_dashboard_data(conn = Depends(get_db)):
             frequency_data[key].extend(row['ids'])
 
         return {
-            "trajectoriesCount": trajectories_count,
+            "filenamesCount": filenames_count,
+            "bahnenCount": bahnen_count,
             "componentCounts": component_counts,
             "frequencyData": frequency_data
         }
@@ -252,6 +258,7 @@ async def get_bahn_events_by_id(bahn_id: str, conn = Depends(get_db)):
 ######################### CSV HOCHLADEN ##################################################
 
 # Add this new endpoint to your existing router
+# Add this new endpoint to your existing router
 @router.post("/process-csv")
 async def process_csv(
     file: UploadFile = File(...),
@@ -270,7 +277,7 @@ async def process_csv(
         record_filename = file.filename
 
         csv_processor = CSVProcessor(temp_file_path)
-        processed_data = csv_processor.process_csv(
+        processed_data_list = csv_processor.process_csv(
             upload_database,
             robot_model,
             bahnplanung,
@@ -279,35 +286,59 @@ async def process_csv(
             record_filename
         )
 
-        if upload_database:
-            await save_processed_data_to_db(processed_data, conn)
+        if upload_database and processed_data_list:
+            for segment_data in processed_data_list:
+                await save_processed_data_to_db(segment_data, conn)
+                logger.info(f"Processed segment with bahn_id {segment_data['bahn_info_data'][0]}")
 
         os.unlink(temp_file_path)
 
-        return {"message": "CSV processed successfully", "data": processed_data}
+        return {
+            "message": f"CSV processed successfully. Found {len(processed_data_list)} segments",
+            "data": processed_data_list
+        }
     except Exception as e:
         logger.error(f"Error processing CSV: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing CSV: {str(e)}")
 
 
 async def save_processed_data_to_db(processed_data, conn):
+    if not isinstance(processed_data, dict):
+        raise ValueError(f"Expected dict but got {type(processed_data)}")
+        
     try:
         db_ops = DatabaseOperations(DB_PARAMS)
+
+        if 'bahn_info_data' not in processed_data:
+            raise ValueError("No bahn_info_data found in processed data")
 
         # Insert bahn_info
         await db_ops.insert_bahn_info(conn, processed_data['bahn_info_data'])
 
-        # Insert other data
-        await db_ops.insert_rapid_events_data(conn, processed_data['RAPID_EVENTS_MAPPING'])
-        await db_ops.insert_pose_data(conn, processed_data['POSE_MAPPING'])
-        await db_ops.insert_position_soll_data(conn, processed_data['POSITION_SOLL_MAPPING'])
-        await db_ops.insert_orientation_soll_data(conn, processed_data['ORIENTATION_SOLL_MAPPING'])
-        await db_ops.insert_twist_ist_data(conn, processed_data['TWIST_IST_MAPPING'])
-        await db_ops.insert_twist_soll_data(conn, processed_data['TWIST_SOLL_MAPPING'])
-        await db_ops.insert_accel_data(conn, processed_data['ACCEL_MAPPING'])
-        await db_ops.insert_joint_data(conn, processed_data['JOINT_MAPPING'])
+        # Define mapping of data types to their insertion functions
+        data_mappings = [
+            ('RAPID_EVENTS_MAPPING', db_ops.insert_rapid_events_data),
+            ('POSE_MAPPING', db_ops.insert_pose_data),
+            ('POSITION_SOLL_MAPPING', db_ops.insert_position_soll_data),
+            ('ORIENTATION_SOLL_MAPPING', db_ops.insert_orientation_soll_data),
+            ('TWIST_IST_MAPPING', db_ops.insert_twist_ist_data),
+            ('TWIST_SOLL_MAPPING', db_ops.insert_twist_soll_data),
+            ('ACCEL_MAPPING', db_ops.insert_accel_data),
+            ('JOINT_MAPPING', db_ops.insert_joint_data)
+        ]
 
-        logger.info(f"All data for bahn_id {processed_data['bahn_info_data'][0]} inserted successfully")
+        # Insert each type of data
+        bahn_id = processed_data['bahn_info_data'][0]
+        for mapping_key, insert_func in data_mappings:
+            if mapping_key in processed_data and processed_data[mapping_key]:
+                try:
+                    await insert_func(conn, processed_data[mapping_key])
+                    logger.info(f"Inserted {mapping_key} data for bahn_id {bahn_id}")
+                except Exception as e:
+                    logger.error(f"Error inserting {mapping_key} for bahn_id {bahn_id}: {str(e)}")
+                    raise
+
+        logger.info(f"All data for bahn_id {bahn_id} inserted successfully")
     except Exception as e:
         logger.error(f"Database error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")

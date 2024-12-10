@@ -8,7 +8,8 @@ import { Typography } from '@/src/components/Typography';
 import { FrequencyPanel } from './FrequencyPanel';
 
 interface DashboardClientProps {
-  trajectoriesCount: number;
+  filenamesCount: number;
+  bahnenCount: number;
   componentCounts: {
     bahnPoseIst: number;
     bahnTwistIst: number;
@@ -33,7 +34,8 @@ interface DashboardClientProps {
 }
 
 export default function DashboardClient({
-  trajectoriesCount,
+  filenamesCount,
+  bahnenCount,
   componentCounts,
   frequencyData,
   collectionSizes,
@@ -42,6 +44,7 @@ export default function DashboardClient({
     (sum, size) => sum + size,
     0,
   );
+
   return (
     <div className="flex">
       <div className="flex-1 p-6">
@@ -49,8 +52,13 @@ export default function DashboardClient({
 
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           <DataCard
+            componentName="Roboterbahnen insgesamt"
+            value={bahnenCount}
+            size={totalSize}
+          />
+          <DataCard
             componentName="Aufnahmendateien insgesamt"
-            value={trajectoriesCount}
+            value={filenamesCount}
             size={totalSize}
           />
         </div>

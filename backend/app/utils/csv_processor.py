@@ -1,6 +1,5 @@
 # csv_processor.py
 import csv
-import os
 import re
 from datetime import datetime, timedelta
 from tqdm import tqdm
@@ -11,147 +10,263 @@ class CSVProcessor:
         self.file_path = file_path
         self.mappings = MAPPINGS
 
+    def find_path_cycles(self, rows, filename):
+        """
+        Find segments based on occurrences of initial AP coordinates.
+        For calibration runs, creates one segment from first to last AP coordinates.
+        For normal runs, creates segments between each occurrence of initial coordinates.
+        Each segment includes a 0.02s buffer at start and end.
+        """
+        # First check if this is a calibration run
+        is_calibration = "calibration_run" in filename
+        
+        # Find first and last AP coordinates
+        first_ap_idx = None
+        first_ap_time = None
+        last_ap_idx = None
+        last_ap_time = None
+
+        # Find first AP coordinates
+        for i, row in enumerate(rows):
+            if all(row.get(f'ap_{coord}', '').strip() for coord in ['x', 'y', 'z']):
+                if first_ap_idx is None:
+                    first_ap_idx = i
+                    first_ap_time = self.convert_timestamp(row['timestamp'])
+                    print(f"First AP coordinates found at timestamp {row['timestamp']}")
+                last_ap_idx = i
+                last_ap_time = self.convert_timestamp(row['timestamp'])
+
+        if first_ap_idx is None:
+            return [(0, len(rows)-1)]
+
+        print(f"Last AP coordinates found at timestamp {rows[last_ap_idx]['timestamp']}")
+
+        if is_calibration:
+            # For calibration runs, create single segment from first to last AP coordinates
+            buffer_start = first_ap_time - timedelta(seconds=0.02)
+            buffer_end = last_ap_time + timedelta(seconds=0.02)
+
+            # Find actual indices with buffer
+            actual_start = next(
+                (j for j in range(max(0, first_ap_idx-1000), first_ap_idx + 1)
+                if self.convert_timestamp(rows[j]['timestamp']) >= buffer_start),
+                first_ap_idx
+            )
+            
+            actual_end = next(
+                (j for j in range(last_ap_idx, min(len(rows), last_ap_idx + 1000))
+                if self.convert_timestamp(rows[j]['timestamp']) > buffer_end),
+                min(len(rows), last_ap_idx + 1000) - 1
+            )
+
+            print("\nCalibration run detected - creating single segment")
+            print(f"Segment with buffer: {buffer_start} to {buffer_end}")
+            print(f"Final indices: {actual_start} to {actual_end}")
+
+            return [(actual_start, actual_end)]
+
+        else:
+            # Original segmentation logic for non-calibration runs
+            reference_coords = (
+                float(rows[first_ap_idx]['ap_x']),
+                float(rows[first_ap_idx]['ap_y']),
+                float(rows[first_ap_idx]['ap_z'])
+            )
+            segment_starts = [(first_ap_idx, first_ap_time)]
+            
+            # Find all other occurrences of these coordinates
+            for i in range(first_ap_idx + 1, len(rows)):
+                row = rows[i]
+                if all(row.get(f'ap_{coord}', '').strip() for coord in ['x', 'y', 'z']):
+                    current_coords = (
+                        float(row['ap_x']),
+                        float(row['ap_y']),
+                        float(row['ap_z'])
+                    )
+                    if current_coords == reference_coords:
+                        segment_starts.append((i, self.convert_timestamp(row['timestamp'])))
+                        print(f"Found matching coordinates at timestamp {row['timestamp']}")
+
+            # Create segments with buffered timestamps
+            segments = []
+            for i in range(len(segment_starts)):
+                start_idx, start_time = segment_starts[i]
+                
+                # Determine end point
+                if i < len(segment_starts) - 1:
+                    # For all segments except the last one
+                    end_idx = segment_starts[i + 1][0]
+                    end_time = self.convert_timestamp(rows[end_idx]['timestamp'])
+                else:
+                    # For the last segment: use the last AP coordinates
+                    end_idx = last_ap_idx
+                    end_time = last_ap_time
+
+                # Calculate buffered timestamps
+                buffer_start = start_time - timedelta(seconds=0.02)
+                buffer_end = end_time + timedelta(seconds=0.02)
+
+                # Find rows within buffered times
+                actual_start = next(
+                    (j for j in range(max(0, start_idx-1000), start_idx + 1)
+                    if self.convert_timestamp(rows[j]['timestamp']) >= buffer_start),
+                    start_idx
+                )
+                
+                actual_end = next(
+                    (j for j in range(end_idx, min(len(rows), end_idx + 1000))
+                    if self.convert_timestamp(rows[j]['timestamp']) > buffer_end),
+                    min(len(rows), end_idx + 1000) - 1
+                )
+
+                segments.append((actual_start, actual_end))
+                
+                print(f"\nSegment {i+1}:")
+                if i == len(segment_starts) - 1:
+                    print("Last segment - ending at last AP coordinates plus buffer")
+                print(f"Reference point at index {start_idx}")
+                print(f"Segment with buffer: {buffer_start} to {buffer_end}")
+                print(f"Final indices: {actual_start} to {actual_end}")
+
+            return segments
+
     def process_csv(self, upload_database, robot_model, bahnplanung, source_data_ist, source_data_soll, record_filename):
         """Process the CSV file and prepare data for database insertion."""
         try:
             with open(self.file_path, 'r') as csvfile:
                 reader = csv.DictReader(csvfile)
-                rows = list(reader)  # Convert the reader to a list to process in reverse order
+                rows = list(reader)
 
-                # Find the first and last appearances of 'ap_x'
-                first_ap_x_index = next((i for i, row in enumerate(rows) if row.get('ap_x', '').strip()), None)
-                last_ap_x_index = next((i for i, row in enumerate(reversed(rows)) if row.get('ap_x', '').strip()), None)
+                # Find path cycles based on reference coordinates
+                filename = record_filename
+                paths = self.find_path_cycles(rows, filename)
+                all_processed_data = []
 
-                if first_ap_x_index is None or last_ap_x_index is None:
-                    # If 'ap_x' is not found, use the entire dataset
-                    first_timestamp = self.convert_timestamp(rows[0]['timestamp'])
-                    last_timestamp = self.convert_timestamp(rows[-1]['timestamp'])
-                else:
-                    # Calculate the actual last index from the end of the list
-                    last_ap_x_index = len(rows) - 1 - last_ap_x_index
+                for path_idx, (start_index, end_index) in enumerate(paths):
+                    # Get rows for this segment (already includes buffer)
+                    filtered_rows = rows[start_index:end_index+1]
 
-                    # Get timestamps for the first and last 'ap_x' appearances
-                    first_ap_x_timestamp = self.convert_timestamp(rows[first_ap_x_index]['timestamp'])
-                    last_ap_x_timestamp = self.convert_timestamp(rows[last_ap_x_index]['timestamp'])
+                    # Get the reference point (first AP coordinates) for this segment
+                    first_ap_timestamp = next(
+                        (row['timestamp'] for row in filtered_rows if row.get('ap_x', '').strip()), 
+                        filtered_rows[0]['timestamp']
+                    )
+                    bahn_id = str(first_ap_timestamp[:10])
 
-                    # Extend the range by 1 second on both sides
-                    first_timestamp = first_ap_x_timestamp - timedelta(seconds=1)
-                    last_timestamp = last_ap_x_timestamp + timedelta(seconds=1)
+                    recording_date = str(self.convert_timestamp(filtered_rows[0]['timestamp']))
+                    start_time = str(self.convert_timestamp(filtered_rows[0]['timestamp']))
+                    end_time = str(self.convert_timestamp(filtered_rows[-1]['timestamp']))
 
-                # Find the indices for the extended range
-                start_index = next(
-                    (i for i, row in enumerate(rows) if self.convert_timestamp(row['timestamp']) >= first_timestamp), 0)
-                end_index = next((i for i in range(len(rows) - 1, -1, -1) if
-                                  self.convert_timestamp(rows[i]['timestamp']) <= last_timestamp), len(rows) - 1)
+                    print(f"\nProcessing Path {path_idx + 1}")
+                    print(f"Bahn ID: {bahn_id}")
+                    print(f"Start Time: {start_time}")
+                    print(f"End Time: {end_time}")
+                    print(f"Number of rows in path: {len(filtered_rows)}")
 
-                filtered_rows = rows[start_index:end_index + 1]
+                    # Initialize data structures for this path
+                    processed_data = {key: [] for key in self.mappings.keys()}
+                    processed_data['bahn_info_data'] = []
 
-                recording_date = self.convert_timestamp(rows[0]['timestamp'])
-                start_time = self.convert_timestamp(filtered_rows[0]['timestamp'])
-                end_time = self.convert_timestamp(filtered_rows[-1]['timestamp'])
+                    segment_counter = 0
+                    current_segment_id = f"{bahn_id}_{segment_counter}"
 
-                print(f"Recording Date: {recording_date}")
-                print(f"Start Time: {start_time}")
-                print(f"End Time: {end_time}")
+                    record_filename = self.extract_record_part(record_filename)
 
-                total_rows = len(filtered_rows)
-                processed_data = {key: [] for key in self.mappings.keys()}
-                processed_data['bahn_info_data'] = []
+                    rows_processed = {key: 0 for key in self.mappings.keys()}
+                    calibration_run = "calibration_run" in self.file_path
 
-                bahn_id = None
-                segment_counter = 0
-                current_segment_id = None
+                    point_counts = {
+                        'np_ereignisse': 0,
+                        'np_pose_ist': 0,
+                        'np_twist_ist': 0,
+                        'np_accel_ist': 0,
+                        'np_pos_soll': 0,
+                        'np_orient_soll': 0,
+                        'np_twist_soll': 0,
+                        'np_jointstates': 0
+                    }
 
-                record_filename = self.extract_record_part(record_filename)
+                    # Process each row in this path
+                    for row in filtered_rows:
+                        timestamp = row['timestamp']
 
-                rows_processed = {key: 0 for key in self.mappings.keys()}
-                calibration_run = "calibration_run" in self.file_path
+                        if row.get('ap_x', '').strip():
+                            point_counts['np_ereignisse'] += 1
+                            segment_counter += 1
+                            current_segment_id = f"{bahn_id}_{segment_counter}"
 
-                point_counts = {
-                    'np_ereignisse': 0,
-                    'np_pose_ist': 0,
-                    'np_twist_ist': 0,
-                    'np_accel_ist': 0,
-                    'np_pos_soll': 0,
-                    'np_orient_soll': 0,
-                    'np_twist_soll': 0,
-                    'np_jointstates': 0
-                }
-
-                for row in tqdm(filtered_rows, total=total_rows, desc="Processing CSV", unit="row"):
-                    timestamp = row['timestamp']
-                    if bahn_id is None:
-                        bahn_id = timestamp[:9]
-                        current_segment_id = f"{bahn_id}_{segment_counter}"
-
-                    if row.get('ap_x', '').strip():
-                        point_counts['np_ereignisse'] += 1
-                        segment_counter += 1
-                        current_segment_id = f"{bahn_id}_{segment_counter}"
-
-                    for mapping_name, mapping in self.mappings.items():
-                        processed_data[mapping_name], rows_processed[mapping_name], point_counts = self.process_mapping(
-                            row, mapping, bahn_id, current_segment_id, timestamp,
-                            source_data_ist if mapping_name in ['ACCEL_MAPPING', 'POSE_MAPPING',
+                        for mapping_name, mapping in self.mappings.items():
+                            processed_data[mapping_name], rows_processed[mapping_name], point_counts = self.process_mapping(
+                                row, mapping, bahn_id, current_segment_id, timestamp,
+                                source_data_ist if mapping_name in ['ACCEL_MAPPING', 'POSE_MAPPING',
                                                                 'TWIST_IST_MAPPING'] else source_data_soll,
-                            processed_data[mapping_name], rows_processed[mapping_name],
-                            mapping_name, point_counts
-                        )
+                                processed_data[mapping_name], rows_processed[mapping_name],
+                                mapping_name, point_counts
+                            )
 
-                frequencies = {
-                    f"frequency_{key.lower().replace('_mapping', '')}": self.calculate_frequencies(filtered_rows,
-                                                                                                   mapping)
-                    for key, mapping in self.mappings.items()
-                }
+                    frequencies = {
+                        f"frequency_{key.lower().replace('_mapping', '')}": self.calculate_frequencies(filtered_rows,
+                                                                                                mapping)
+                        for key, mapping in self.mappings.items()
+                    }
 
-                if frequencies['frequency_pose'] == 0 or rows_processed['POSE_MAPPING'] == 0:
-                    source_data_ist = "abb_websocket"
+                    if frequencies['frequency_pose'] == 0 or rows_processed['POSE_MAPPING'] == 0:
+                        source_data_ist = "abb_websocket"
 
-                bahn_info_data = (
-                    bahn_id,
-                    robot_model,
-                    bahnplanung,
-                    recording_date,
-                    start_time,
-                    end_time,
-                    source_data_ist,
-                    source_data_soll,
-                    record_filename,
-                    point_counts['np_ereignisse'],
-                    frequencies['frequency_pose'],
-                    frequencies['frequency_position_soll'],
-                    frequencies['frequency_orientation_soll'],
-                    frequencies['frequency_twist_ist'],
-                    frequencies['frequency_twist_soll'],
-                    frequencies['frequency_accel'],
-                    frequencies['frequency_joint'],
-                    calibration_run,
-                    point_counts['np_pose_ist'],
-                    point_counts['np_twist_ist'],
-                    point_counts['np_accel_ist'],
-                    point_counts['np_pos_soll'],
-                    point_counts['np_orient_soll'],
-                    point_counts['np_twist_soll'],
-                    point_counts['np_jointstates']
-                )
+                    bahn_info_data = (
+                        bahn_id,
+                        robot_model,
+                        bahnplanung,
+                        recording_date,
+                        start_time,
+                        end_time,
+                        source_data_ist,
+                        source_data_soll,
+                        record_filename,
+                        point_counts['np_ereignisse'],
+                        frequencies['frequency_pose'],
+                        frequencies['frequency_position_soll'],
+                        frequencies['frequency_orientation_soll'],
+                        frequencies['frequency_twist_ist'],
+                        frequencies['frequency_twist_soll'],
+                        frequencies['frequency_accel'],
+                        frequencies['frequency_joint'],
+                        calibration_run,
+                        point_counts['np_pose_ist'],
+                        point_counts['np_twist_ist'],
+                        point_counts['np_accel_ist'],
+                        point_counts['np_pos_soll'],
+                        point_counts['np_orient_soll'],
+                        point_counts['np_twist_soll'],
+                        point_counts['np_jointstates']
+                    )
 
-                processed_data['bahn_info_data'] = bahn_info_data
+                    processed_data['bahn_info_data'] = bahn_info_data
+                    all_processed_data.append(processed_data)
 
-                self.print_processing_stats(total_rows, rows_processed, point_counts)
+                    self.print_processing_stats(len(filtered_rows), rows_processed, point_counts)
 
-                return processed_data
+                # Moved outside the for loop
+                return all_processed_data
 
         except Exception as e:
             print(f"An error occurred while processing the CSV: {e}")
-        return None
+            return None
+
 
     def process_mapping(self, row, mapping, bahn_id, current_segment_id, timestamp, source_data, data_list,
                             rows_processed, mapping_name, point_counts):
             if mapping_name == 'RAPID_EVENTS_MAPPING':
                 if any(row.get(csv_col, '').strip() for csv_col in mapping):
                     data_row = [bahn_id, current_segment_id, timestamp]
+                    # Convert numeric strings to float for RAPID_EVENTS_MAPPING
                     for csv_col in mapping:
                         value = row.get(csv_col, '').strip()
+                        if value:
+                            # Convert to float if the column is for coordinates or quaternions
+                            if any(x in csv_col for x in ['x_reached', 'y_reached', 'z_reached', 
+                                                        'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached']):
+                                value = float(value)
                         data_row.append(value if value else None)
                     data_row.append(source_data)
                     data_list.append(data_row)

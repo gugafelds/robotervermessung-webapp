@@ -83,13 +83,13 @@ export const Sidebar = () => {
                         as="h6"
                         className="font-extrabold text-primary"
                       >
-                        {bahn.recordFilename || 'No filename'}
+                        {`ID: ${bahn.bahnID}`}
                       </Typography>
                       <Typography
                         as="h6"
                         className="font-semibold text-primary"
                       >
-                        {`ID: ${bahn.bahnID}`}
+                        {bahn.recordFilename || 'No filename'}
                       </Typography>
                       <Typography as="h6" className="text-primary">
                         {bahn.recordingDate
