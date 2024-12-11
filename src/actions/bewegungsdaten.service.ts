@@ -57,7 +57,7 @@ async function fetchFromAPI(endpoint: string, useStream = false) {
   }
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    cache: 'reload',
+    cache: 'no-cache',
   });
   if (!response.ok) {
     throw new Error(`API request failed: ${response.statusText}`);

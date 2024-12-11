@@ -94,9 +94,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     autosize: true,
     margin: { l: 0, r: 0, b: 0, t: 0 },
     scene: {
-      xaxis: { range: [650, 1450] },
-      yaxis: { range: [-1050, -250] },
-      zaxis: { range: [950, 1850] },
+      zaxis: { range: [650, 1850] },
     },
     showlegend: true,
     legend: {

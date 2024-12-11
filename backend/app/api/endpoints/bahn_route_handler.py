@@ -258,7 +258,6 @@ async def get_bahn_events_by_id(bahn_id: str, conn = Depends(get_db)):
 ######################### CSV HOCHLADEN ##################################################
 
 # Add this new endpoint to your existing router
-# Add this new endpoint to your existing router
 @router.post("/process-csv")
 async def process_csv(
     file: UploadFile = File(...),
@@ -287,6 +286,7 @@ async def process_csv(
         )
 
         if upload_database and processed_data_list:
+            segments_processed = len(processed_data_list)
             for segment_data in processed_data_list:
                 await save_processed_data_to_db(segment_data, conn)
                 logger.info(f"Processed segment with bahn_id {segment_data['bahn_info_data'][0]}")
@@ -295,6 +295,7 @@ async def process_csv(
 
         return {
             "message": f"CSV processed successfully. Found {len(processed_data_list)} segments",
+            "segments_found": len(processed_data_list),
             "data": processed_data_list
         }
     except Exception as e:
