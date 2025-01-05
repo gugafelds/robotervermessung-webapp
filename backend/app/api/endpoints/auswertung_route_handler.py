@@ -186,8 +186,8 @@ async def check_deviation_data(bahn_id: str, conn=Depends(get_db)):
         query = """
         SELECT 
             CASE 
-                WHEN EXISTS (SELECT 1 FROM auswertung.position_euclidean WHERE bahn_id = $1) AND
-                     EXISTS (SELECT 1 FROM auswertung.position_dfd WHERE bahn_id = $1) AND
+                WHEN EXISTS (SELECT 1 FROM auswertung.position_euclidean WHERE bahn_id = $1) OR
+                     EXISTS (SELECT 1 FROM auswertung.position_dfd WHERE bahn_id = $1) OR
                      EXISTS (SELECT 1 FROM auswertung.position_sidtw WHERE bahn_id = $1)
                 THEN true
                 ELSE false

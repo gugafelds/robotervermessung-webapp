@@ -28,6 +28,12 @@ export const transformEAInfoResult = (bahnenRaw: EAInfoRaw[]): EAInfo[] => {
 };
 
 export const transformDFDInfoResult = (bahnenRaw: DFDInfoRaw[]): DFDInfo[] => {
+  if (!Array.isArray(bahnenRaw)) {
+    // eslint-disable-next-line no-console
+    console.warn('DFDInfoRaw data is not an array, returning empty array');
+    return [];
+  }
+
   return bahnenRaw.map(
     (bahn): DFDInfo => ({
       bahnID: bahn.bahn_id,

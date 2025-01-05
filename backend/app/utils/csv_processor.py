@@ -9,18 +9,125 @@ class CSVProcessor:
     def __init__(self, file_path):
         self.file_path = file_path
         self.mappings = MAPPINGS
-
+    
     def find_path_cycles(self, rows, filename):
         """
-        Find segments based on occurrences of initial AP coordinates.
-        For calibration runs, creates one segment from first to last AP coordinates.
-        For normal runs, creates segments between each occurrence of initial coordinates.
-        Each segment includes a 0.02s buffer at start and end.
+        Find segments based on different methods:
+        1. Home position detection (original method)
+        2. Fixed number of segments (new method)
         """
         # First check if this is a calibration run
         is_calibration = "calibration_run" in filename
-        
+        if is_calibration:
+            return self.create_calibration_segment(rows)
+
+        # Ask user for segmentation method
+        print("\nWählen Sie die Segmentierungsmethode:")
+        print("1: Nach Home-Position")
+        print("2: Feste Anzahl an Segmenten")
+        method = input("Bitte wählen Sie (1/2): ")
+
+        if method == "2":
+            num_segments = int(input("Wie viele Segmente pro Gruppe? "))
+            return self.create_fixed_segments(rows, num_segments)
+        else:
+            return self.create_home_position_segments(rows)
+    
+    def create_calibration_segment(self, rows):
+        """Creates a single segment for calibration runs."""
         # Find first and last AP coordinates
+        first_ap_idx = None
+        first_ap_time = None
+        last_ap_idx = None
+        last_ap_time = None
+
+        for i, row in enumerate(rows):
+            if all(row.get(f'ap_{coord}', '').strip() for coord in ['x', 'y', 'z']):
+                if first_ap_idx is None:
+                    first_ap_idx = i
+                    first_ap_time = self.convert_timestamp(row['timestamp'])
+                last_ap_idx = i
+                last_ap_time = self.convert_timestamp(row['timestamp'])
+
+        if first_ap_idx is None:
+            return [(0, len(rows)-1)]
+
+        # Add buffer
+        buffer_start = first_ap_time - timedelta(seconds=0.02)
+        buffer_end = last_ap_time + timedelta(seconds=0.02)
+
+        actual_start = next(
+            (j for j in range(max(0, first_ap_idx-1000), first_ap_idx + 1)
+            if self.convert_timestamp(rows[j]['timestamp']) >= buffer_start),
+            first_ap_idx
+        )
+        
+        actual_end = next(
+            (j for j in range(last_ap_idx, min(len(rows), last_ap_idx + 1000))
+            if self.convert_timestamp(rows[j]['timestamp']) > buffer_end),
+            min(len(rows), last_ap_idx + 1000) - 1
+        )
+
+        return [(actual_start, actual_end)]
+
+    def create_fixed_segments(self, rows, segments_per_group):
+        """Creates fixed-size groups of segments."""
+        # First, find all AP coordinates
+        ap_indices = []
+        for i, row in enumerate(rows):
+            if all(row.get(f'ap_{coord}', '').strip() for coord in ['x', 'y', 'z']):
+                ap_indices.append(i)
+
+        if not ap_indices:
+            return [(0, len(rows)-1)]
+
+        # Create groups of segments
+        groups = []
+        current_group = []
+        
+        for i, idx in enumerate(ap_indices):
+            current_group.append(idx)
+            
+            # When we reach the desired size or it's the last element
+            if len(current_group) == segments_per_group or i == len(ap_indices) - 1:
+                # If this is the last group and it only has one segment
+                if i == len(ap_indices) - 1 and len(current_group) == 1 and groups:
+                    # Add it to the previous group
+                    groups[-1].extend(current_group)
+                else:
+                    groups.append(current_group)
+                current_group = []
+
+        # Convert groups to segments with buffers
+        segments = []
+        for group in groups:
+            start_idx = group[0]
+            end_idx = group[-1]
+            
+            start_time = self.convert_timestamp(rows[start_idx]['timestamp'])
+            end_time = self.convert_timestamp(rows[end_idx]['timestamp'])
+            
+            buffer_start = start_time - timedelta(seconds=0.02)
+            buffer_end = end_time + timedelta(seconds=0.02)
+            
+            actual_start = next(
+                (j for j in range(max(0, start_idx-1000), start_idx + 1)
+                if self.convert_timestamp(rows[j]['timestamp']) >= buffer_start),
+                start_idx
+            )
+            
+            actual_end = next(
+                (j for j in range(end_idx, min(len(rows), end_idx + 1000))
+                if self.convert_timestamp(rows[j]['timestamp']) > buffer_end),
+                min(len(rows), end_idx + 1000) - 1
+            )
+            
+            segments.append((actual_start, actual_end))
+
+        return segments
+
+    def create_home_position_segments(self, rows):
+        """Original method that creates segments based on home position detection."""
         first_ap_idx = None
         first_ap_time = None
         last_ap_idx = None
@@ -39,96 +146,56 @@ class CSVProcessor:
         if first_ap_idx is None:
             return [(0, len(rows)-1)]
 
-        print(f"Last AP coordinates found at timestamp {rows[last_ap_idx]['timestamp']}")
+        # Find all occurrences of home position
+        reference_coords = (
+            float(rows[first_ap_idx]['ap_x']),
+            float(rows[first_ap_idx]['ap_y']),
+            float(rows[first_ap_idx]['ap_z'])
+        )
+        segment_starts = [(first_ap_idx, first_ap_time)]
+        
+        for i in range(first_ap_idx + 1, len(rows)):
+            row = rows[i]
+            if all(row.get(f'ap_{coord}', '').strip() for coord in ['x', 'y', 'z']):
+                current_coords = (
+                    float(row['ap_x']),
+                    float(row['ap_y']),
+                    float(row['ap_z'])
+                )
+                if current_coords == reference_coords:
+                    segment_starts.append((i, self.convert_timestamp(row['timestamp'])))
 
-        if is_calibration:
-            # For calibration runs, create single segment from first to last AP coordinates
-            buffer_start = first_ap_time - timedelta(seconds=0.02)
-            buffer_end = last_ap_time + timedelta(seconds=0.02)
+        # Create segments
+        segments = []
+        for i in range(len(segment_starts)):
+            start_idx, start_time = segment_starts[i]
+            
+            if i < len(segment_starts) - 1:
+                end_idx = segment_starts[i + 1][0]
+                end_time = self.convert_timestamp(rows[end_idx]['timestamp'])
+            else:
+                end_idx = last_ap_idx
+                end_time = last_ap_time
 
-            # Find actual indices with buffer
+            buffer_start = start_time - timedelta(seconds=0.02)
+            buffer_end = end_time + timedelta(seconds=0.02)
+
             actual_start = next(
-                (j for j in range(max(0, first_ap_idx-1000), first_ap_idx + 1)
+                (j for j in range(max(0, start_idx-1000), start_idx + 1)
                 if self.convert_timestamp(rows[j]['timestamp']) >= buffer_start),
-                first_ap_idx
+                start_idx
             )
             
             actual_end = next(
-                (j for j in range(last_ap_idx, min(len(rows), last_ap_idx + 1000))
+                (j for j in range(end_idx, min(len(rows), end_idx + 1000))
                 if self.convert_timestamp(rows[j]['timestamp']) > buffer_end),
-                min(len(rows), last_ap_idx + 1000) - 1
+                min(len(rows), end_idx + 1000) - 1
             )
 
-            print("\nCalibration run detected - creating single segment")
-            print(f"Segment with buffer: {buffer_start} to {buffer_end}")
-            print(f"Final indices: {actual_start} to {actual_end}")
+            segments.append((actual_start, actual_end))
 
-            return [(actual_start, actual_end)]
+        return segments
 
-        else:
-            # Original segmentation logic for non-calibration runs
-            reference_coords = (
-                float(rows[first_ap_idx]['ap_x']),
-                float(rows[first_ap_idx]['ap_y']),
-                float(rows[first_ap_idx]['ap_z'])
-            )
-            segment_starts = [(first_ap_idx, first_ap_time)]
-            
-            # Find all other occurrences of these coordinates
-            for i in range(first_ap_idx + 1, len(rows)):
-                row = rows[i]
-                if all(row.get(f'ap_{coord}', '').strip() for coord in ['x', 'y', 'z']):
-                    current_coords = (
-                        float(row['ap_x']),
-                        float(row['ap_y']),
-                        float(row['ap_z'])
-                    )
-                    if current_coords == reference_coords:
-                        segment_starts.append((i, self.convert_timestamp(row['timestamp'])))
-                        print(f"Found matching coordinates at timestamp {row['timestamp']}")
-
-            # Create segments with buffered timestamps
-            segments = []
-            for i in range(len(segment_starts)):
-                start_idx, start_time = segment_starts[i]
-                
-                # Determine end point
-                if i < len(segment_starts) - 1:
-                    # For all segments except the last one
-                    end_idx = segment_starts[i + 1][0]
-                    end_time = self.convert_timestamp(rows[end_idx]['timestamp'])
-                else:
-                    # For the last segment: use the last AP coordinates
-                    end_idx = last_ap_idx
-                    end_time = last_ap_time
-
-                # Calculate buffered timestamps
-                buffer_start = start_time - timedelta(seconds=0.02)
-                buffer_end = end_time + timedelta(seconds=0.02)
-
-                # Find rows within buffered times
-                actual_start = next(
-                    (j for j in range(max(0, start_idx-1000), start_idx + 1)
-                    if self.convert_timestamp(rows[j]['timestamp']) >= buffer_start),
-                    start_idx
-                )
-                
-                actual_end = next(
-                    (j for j in range(end_idx, min(len(rows), end_idx + 1000))
-                    if self.convert_timestamp(rows[j]['timestamp']) > buffer_end),
-                    min(len(rows), end_idx + 1000) - 1
-                )
-
-                segments.append((actual_start, actual_end))
-                
-                print(f"\nSegment {i+1}:")
-                if i == len(segment_starts) - 1:
-                    print("Last segment - ending at last AP coordinates plus buffer")
-                print(f"Reference point at index {start_idx}")
-                print(f"Segment with buffer: {buffer_start} to {buffer_end}")
-                print(f"Final indices: {actual_start} to {actual_end}")
-
-            return segments
 
     def process_csv(self, upload_database, robot_model, bahnplanung, source_data_ist, source_data_soll, record_filename):
         """Process the CSV file and prepare data for database insertion."""

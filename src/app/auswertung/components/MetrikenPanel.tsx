@@ -13,10 +13,10 @@ interface SegmentRange {
 }
 
 export const MetrikenPanel: React.FC<{
-  euclideanAnalyses: EAInfo[];
-  dfdAnalyses: DFDInfo[];
-  sidtwAnalyses: SIDTWInfo[];
-}> = ({ euclideanAnalyses, dfdAnalyses, sidtwAnalyses }) => {
+  EAInfo: EAInfo[];
+  DFDInfo: DFDInfo[];
+  SIDTWInfo: SIDTWInfo[];
+}> = ({ EAInfo, DFDInfo, SIDTWInfo }) => {
   // Finde das Minimum und Maximum der verfügbaren Segmente
   const getAllSegmentNumbers = (analyses: any[]) => {
     return analyses
@@ -37,9 +37,9 @@ export const MetrikenPanel: React.FC<{
   // Initialisiere den Bereich der verfügbaren Segmente
   useEffect(() => {
     const allSegments = [
-      ...getAllSegmentNumbers(euclideanAnalyses),
-      ...getAllSegmentNumbers(dfdAnalyses),
-      ...getAllSegmentNumbers(sidtwAnalyses),
+      ...getAllSegmentNumbers(EAInfo),
+      ...getAllSegmentNumbers(DFDInfo),
+      ...getAllSegmentNumbers(SIDTWInfo),
     ];
 
     if (allSegments.length > 0) {
@@ -48,7 +48,7 @@ export const MetrikenPanel: React.FC<{
       setSegmentRange({ min: minSegment, max: maxSegment });
       setSelectedRange({ min: minSegment, max: maxSegment });
     }
-  }, [euclideanAnalyses, dfdAnalyses, sidtwAnalyses]);
+  }, [EAInfo, DFDInfo, SIDTWInfo]);
 
   // Funktion zum Berechnen der Durchschnittswerte pro Metrik im ausgewählten Bereich
   const calculateMetricAverages = (analyses: any[], prefix: string) => {
@@ -87,9 +87,9 @@ export const MetrikenPanel: React.FC<{
     };
   };
 
-  const eaMetrics = calculateMetricAverages(euclideanAnalyses, 'EA');
-  const dfdMetrics = calculateMetricAverages(dfdAnalyses, 'DFD');
-  const sidtwMetrics = calculateMetricAverages(sidtwAnalyses, 'SIDTW');
+  const eaMetrics = calculateMetricAverages(EAInfo, 'EA');
+  const dfdMetrics = calculateMetricAverages(DFDInfo, 'DFD');
+  const sidtwMetrics = calculateMetricAverages(SIDTWInfo, 'SIDTW');
 
   return (
     <div className="mb-6 rounded-lg border bg-white p-6 shadow-sm">

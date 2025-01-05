@@ -80,12 +80,16 @@ export const getAllAuswertungInfo = async (): Promise<AuswertungInfo> => {
     );
 
     return {
-      bahn_info: transformBahnInfoResult(result.bahn_info),
+      bahn_info: transformBahnInfoResult(result.bahn_info || []),
       auswertung_info: {
-        info_dfd: transformDFDInfoResult(result.auswertung_info.info_dfd),
-        info_sidtw: transformSIDTWInfoResult(result.auswertung_info.info_sidtw),
+        info_dfd: transformDFDInfoResult(
+          result.auswertung_info?.info_dfd || [],
+        ),
+        info_sidtw: transformSIDTWInfoResult(
+          result.auswertung_info?.info_sidtw || [],
+        ),
         info_euclidean: transformEAInfoResult(
-          result.auswertung_info.info_euclidean,
+          result.auswertung_info?.info_euclidean || [],
         ),
       },
     };

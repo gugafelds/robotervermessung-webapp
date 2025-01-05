@@ -4,9 +4,9 @@ import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import React, { useEffect, useState } from 'react';
 
 import { checkPositionDataAvailability } from '@/src/actions/auswertung.service';
-import { AllDeviationsPlot } from '@/src/app/auswertung/components/AllDeviationsPlot';
+import { AuswertungInfoPlot } from '@/src/app/auswertung/components/AuswertungInfoPlot';
+import { DeviationsPlot } from '@/src/app/auswertung/components/DeviationsPlot';
 import { MetrikenPanel } from '@/src/app/auswertung/components/MetrikenPanel';
-import { MetrikenPanelPlot } from '@/src/app/auswertung/components/MetrikenPanelPlot';
 import { Typography } from '@/src/components/Typography';
 import { formatDate, formatNumber } from '@/src/lib/functions';
 import { useAuswertung } from '@/src/providers/auswertung.provider';
@@ -43,16 +43,15 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
     (bahn) => bahn.bahnID === bahnId,
   );
 
-  const euclideanAnalyses =
-    auswertungInfo.auswertung_info.info_euclidean.filter(
-      (info) => info.bahnID === bahnId,
-    );
-
-  const dfdAnalyses = auswertungInfo.auswertung_info.info_dfd.filter(
+  const EAInfo = auswertungInfo.auswertung_info.info_euclidean.filter(
     (info) => info.bahnID === bahnId,
   );
 
-  const sidtwAnalyses = auswertungInfo.auswertung_info.info_sidtw.filter(
+  const DFDInfo = auswertungInfo.auswertung_info.info_dfd.filter(
+    (info) => info.bahnID === bahnId,
+  );
+
+  const SIDTWInfo = auswertungInfo.auswertung_info.info_sidtw.filter(
     (info) => info.bahnID === bahnId,
   );
 
@@ -178,17 +177,17 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
 
       <div className="mb-6 rounded-lg border p-4">
         <MetrikenPanel
-          euclideanAnalyses={euclideanAnalyses}
-          dfdAnalyses={dfdAnalyses}
-          sidtwAnalyses={sidtwAnalyses}
+          EAInfo={EAInfo}
+          DFDInfo={DFDInfo}
+          SIDTWInfo={SIDTWInfo}
         />
 
         {/* Analysis Plots */}
-        {euclideanAnalyses.length > 0 ? (
-          <MetrikenPanelPlot
-            eaAnalyses={euclideanAnalyses}
-            dfdAnalyses={dfdAnalyses}
-            sidtwAnalyses={sidtwAnalyses}
+        {EAInfo.length > 0 ? (
+          <AuswertungInfoPlot
+            EAInfo={EAInfo}
+            DFDInfo={DFDInfo}
+            SIDTWInfo={SIDTWInfo}
           />
         ) : (
           <p className="text-gray-500">Keine Euclidean Analysen verfügbar</p>
@@ -199,10 +198,7 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
         <Typography as="h3" className="mb-3 font-semibold">
           Abweichungen nach aufgezeichneten Punkten
         </Typography>
-        <AllDeviationsPlot
-          hasDeviationData={hasDeviationData}
-          bahnId={bahnId}
-        />
+        <DeviationsPlot hasDeviationData={hasDeviationData} bahnId={bahnId} />
       </div>
     </div>
   );

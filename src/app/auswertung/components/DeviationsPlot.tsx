@@ -22,12 +22,12 @@ interface MetricState {
   isLoading: boolean;
 }
 
-interface AllDeviationsPlotProps {
+interface DeviationsPlotProps {
   hasDeviationData: boolean;
   bahnId: string;
 }
 
-export const AllDeviationsPlot: React.FC<AllDeviationsPlotProps> = ({
+export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   hasDeviationData,
   bahnId,
 }) => {
@@ -50,6 +50,17 @@ export const AllDeviationsPlot: React.FC<AllDeviationsPlotProps> = ({
     setCurrentSIDTWDeviation,
     auswertungInfo,
   } = useAuswertung();
+
+  // Prüfe, ob Daten für die jeweilige Methode existieren
+  const hasEAData = auswertungInfo.auswertung_info.info_euclidean.some(
+    (info) => info.bahnID === bahnId,
+  );
+  const hasDFDData = auswertungInfo.auswertung_info.info_dfd.some(
+    (info) => info.bahnID === bahnId,
+  );
+  const hasSIDTWData = auswertungInfo.auswertung_info.info_sidtw.some(
+    (info) => info.bahnID === bahnId,
+  );
 
   const loadMetricData = async (metricType: 'ea' | 'dfd' | 'sidtw') => {
     if (!bahnId) return;
@@ -94,8 +105,21 @@ export const AllDeviationsPlot: React.FC<AllDeviationsPlotProps> = ({
   };
 
   const calculateTimePoints = (points: number) => {
+    // Suche die bahnID aus den aktuell geladenen Daten
+    let currentBahnId = null;
+    if (metrics.ea.isLoaded && currentEuclideanDeviation.length > 0) {
+      currentBahnId = currentEuclideanDeviation[0].bahnID;
+    } else if (
+      metrics.dfd.isLoaded &&
+      currentDiscreteFrechetDeviation.length > 0
+    ) {
+      currentBahnId = currentDiscreteFrechetDeviation[0].bahnID;
+    } else if (metrics.sidtw.isLoaded && currentSIDTWDeviation.length > 0) {
+      currentBahnId = currentSIDTWDeviation[0].bahnID;
+    }
+
     const bahnInfo = auswertungInfo.bahn_info.find(
-      (info) => info.bahnID === currentEuclideanDeviation[0]?.bahnID,
+      (info) => info.bahnID === currentBahnId,
     );
 
     if (!bahnInfo?.startTime || !bahnInfo?.endTime) {
@@ -320,32 +344,38 @@ export const AllDeviationsPlot: React.FC<AllDeviationsPlotProps> = ({
   return (
     <div className="w-full space-y-4">
       <div className="flex flex-wrap gap-4">
-        {/* EA Control */}
-        <button
-          onClick={() => loadMetricData('ea')}
-          disabled={metrics.ea.isLoaded || metrics.ea.isLoading}
-          className="inline-flex items-center space-x-2 rounded bg-primary px-3 py-1 text-sm text-white hover:bg-primary/80 disabled:bg-gray-300 disabled:text-gray-600"
-        >
-          {getButtonContent(metrics.ea, 'EA')}
-        </button>
+        {/* EA Control - nur anzeigen wenn Daten existieren */}
+        {hasEAData && (
+          <button
+            onClick={() => loadMetricData('ea')}
+            disabled={metrics.ea.isLoaded || metrics.ea.isLoading}
+            className="inline-flex items-center space-x-2 rounded bg-primary px-3 py-1 text-sm text-white hover:bg-primary/80 disabled:bg-gray-300 disabled:text-gray-600"
+          >
+            {getButtonContent(metrics.ea, 'EA')}
+          </button>
+        )}
 
-        {/* DFD Control */}
-        <button
-          onClick={() => loadMetricData('dfd')}
-          disabled={metrics.dfd.isLoaded || metrics.dfd.isLoading}
-          className="inline-flex items-center space-x-2 rounded bg-primary px-3 py-1 text-sm text-white hover:bg-primary/80 disabled:bg-gray-300 disabled:text-gray-600"
-        >
-          {getButtonContent(metrics.dfd, 'DFD')}
-        </button>
+        {/* DFD Control - nur anzeigen wenn Daten existieren */}
+        {hasDFDData && (
+          <button
+            onClick={() => loadMetricData('dfd')}
+            disabled={metrics.dfd.isLoaded || metrics.dfd.isLoading}
+            className="inline-flex items-center space-x-2 rounded bg-primary px-3 py-1 text-sm text-white hover:bg-primary/80 disabled:bg-gray-300 disabled:text-gray-600"
+          >
+            {getButtonContent(metrics.dfd, 'DFD')}
+          </button>
+        )}
 
-        {/* SIDTW Control */}
-        <button
-          onClick={() => loadMetricData('sidtw')}
-          disabled={metrics.sidtw.isLoaded || metrics.sidtw.isLoading}
-          className="inline-flex items-center space-x-2 rounded bg-primary px-3 py-1 text-sm text-white hover:bg-primary/80 disabled:bg-gray-300 disabled:text-gray-600"
-        >
-          {getButtonContent(metrics.sidtw, 'SIDTW')}
-        </button>
+        {/* SIDTW Control - nur anzeigen wenn Daten existieren */}
+        {hasSIDTWData && (
+          <button
+            onClick={() => loadMetricData('sidtw')}
+            disabled={metrics.sidtw.isLoaded || metrics.sidtw.isLoading}
+            className="inline-flex items-center space-x-2 rounded bg-primary px-3 py-1 text-sm text-white hover:bg-primary/80 disabled:bg-gray-300 disabled:text-gray-600"
+          >
+            {getButtonContent(metrics.sidtw, 'SIDTW')}
+          </button>
+        )}
       </div>
 
       {anyMetricLoaded && (
