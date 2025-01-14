@@ -257,16 +257,17 @@ async def get_bahn_events_by_id(bahn_id: str, conn = Depends(get_db)):
 
 ######################### CSV HOCHLADEN ##################################################
 
-# Add this new endpoint to your existing router
 @router.post("/process-csv")
 async def process_csv(
-    file: UploadFile = File(...),
-    robot_model: str = Form(...),
-    bahnplanung: str = Form(...),
-    source_data_ist: str = Form(...),
-    source_data_soll: str = Form(...),
-    upload_database: bool = Form(...),
-    conn = Depends(get_db)
+        file: UploadFile = File(...),
+        robot_model: str = Form(...),
+        bahnplanung: str = Form(...),
+        source_data_ist: str = Form(...),
+        source_data_soll: str = Form(...),
+        upload_database: bool = Form(...),
+        segmentation_method: str = Form(default="home"),  # Neue Parameter
+        num_segments: int = Form(default=1),  # Neue Parameter
+        conn=Depends(get_db)
 ):
     try:
         with NamedTemporaryFile(delete=False) as temp_file:
@@ -282,7 +283,9 @@ async def process_csv(
             bahnplanung,
             source_data_ist,
             source_data_soll,
-            record_filename
+            record_filename,
+            segmentation_method,  # Neue Parameter weitergeben
+            num_segments  # Neue Parameter weitergeben
         )
 
         if upload_database and processed_data_list:
@@ -306,7 +309,7 @@ async def process_csv(
 async def save_processed_data_to_db(processed_data, conn):
     if not isinstance(processed_data, dict):
         raise ValueError(f"Expected dict but got {type(processed_data)}")
-        
+
     try:
         db_ops = DatabaseOperations(DB_PARAMS)
 

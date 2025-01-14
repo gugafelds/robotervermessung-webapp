@@ -10,25 +10,18 @@ class CSVProcessor:
         self.file_path = file_path
         self.mappings = MAPPINGS
     
-    def find_path_cycles(self, rows, filename):
+    def find_path_cycles(self, rows, filename, segmentation_method='home', num_segments=1):
         """
-        Find segments based on different methods:
-        1. Home position detection (original method)
-        2. Fixed number of segments (new method)
+        Find segments based on the specified method:
+        - 'home': Home position detection (original method)
+        - 'fixed': Fixed number of segments (new method)
         """
         # First check if this is a calibration run
         is_calibration = "calibration_run" in filename
         if is_calibration:
             return self.create_calibration_segment(rows)
 
-        # Ask user for segmentation method
-        print("\nWählen Sie die Segmentierungsmethode:")
-        print("1: Nach Home-Position")
-        print("2: Feste Anzahl an Segmenten")
-        method = input("Bitte wählen Sie (1/2): ")
-
-        if method == "2":
-            num_segments = int(input("Wie viele Segmente pro Gruppe? "))
+        if segmentation_method == 'fixed':
             return self.create_fixed_segments(rows, num_segments)
         else:
             return self.create_home_position_segments(rows)
@@ -197,7 +190,8 @@ class CSVProcessor:
         return segments
 
 
-    def process_csv(self, upload_database, robot_model, bahnplanung, source_data_ist, source_data_soll, record_filename):
+    def process_csv(self, upload_database, robot_model, bahnplanung, source_data_ist,
+                   source_data_soll, record_filename, segmentation_method='home', num_segments=1):
         """Process the CSV file and prepare data for database insertion."""
         try:
             with open(self.file_path, 'r') as csvfile:
@@ -206,7 +200,8 @@ class CSVProcessor:
 
                 # Find path cycles based on reference coordinates
                 filename = record_filename
-                paths = self.find_path_cycles(rows, filename)
+                paths = self.find_path_cycles(rows, record_filename,
+                                              segmentation_method, num_segments)
                 all_processed_data = []
 
                 for path_idx, (start_index, end_index) in enumerate(paths):

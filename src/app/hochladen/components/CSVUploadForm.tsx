@@ -27,6 +27,12 @@ const CSVUploadForm: React.FC = () => {
     ProcessingResult[]
   >([]);
 
+  // New state for segmentation method
+  const [segmentationMethod, setSegmentationMethod] = useState<
+    'home' | 'fixed'
+  >('home');
+  const [numSegments, setNumSegments] = useState<number>(1);
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!files || files.length === 0) {
@@ -53,6 +59,9 @@ const CSVUploadForm: React.FC = () => {
       formData.append('source_data_ist', sourceDataIst);
       formData.append('source_data_soll', sourceDataSoll);
       formData.append('upload_database', uploadDatabase.toString());
+      // Add new segmentation parameters
+      formData.append('segmentation_method', segmentationMethod);
+      formData.append('num_segments', numSegments.toString());
 
       try {
         const response = await fetch('/api/bahn/process-csv', {
@@ -62,37 +71,27 @@ const CSVUploadForm: React.FC = () => {
 
         if (!response.ok) {
           if (uploadDatabase) {
-            // Wenn Datenbankupload aktiviert ist, zeigen wir trotzdem Erfolg an
             results.push({
               filename: file.name,
-              segmentsFound: 1, // Mindestens eine Bahn
+              segmentsFound: 1,
               success: true,
             });
-            console.log(`File ${file.name} being processed in background`);
           } else {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
         } else {
           const result = await response.json();
-          const segmentsFound =
-            result.segments_found || result.data?.length || 0;
-
           results.push({
             filename: file.name,
-            segmentsFound,
+            segmentsFound: result.segments_found || result.data?.length || 0,
             success: true,
           });
-
-          console.log(`File ${file.name}: ${segmentsFound} segments processed`);
         }
       } catch (err) {
-        console.error(`Error processing CSV ${file.name}:`, err);
-
         if (uploadDatabase) {
-          // Bei aktiviertem Datenbankupload zeigen wir trotzdem Erfolg an
           results.push({
             filename: file.name,
-            segmentsFound: 1, // Mindestens eine Bahn
+            segmentsFound: 1,
             success: true,
           });
         } else {
@@ -258,6 +257,62 @@ const CSVUploadForm: React.FC = () => {
             </span>
           </label>
         </div>
+
+        {/* New Segmentation Method Selection */}
+        <div className="mb-4">
+          <label className="mb-2 block text-base font-bold text-primary">
+            Segmentierungsmethode
+            <div className="mt-2">
+              <label className="mr-4 inline-flex items-center">
+                <input
+                  type="radio"
+                  className="form-radio"
+                  name="segmentationMethod"
+                  value="home"
+                  checked={segmentationMethod === 'home'}
+                  onChange={(e) =>
+                    setSegmentationMethod(e.target.value as 'home' | 'fixed')
+                  }
+                />
+                <span className="ml-2">Nach Home-Position</span>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  className="form-radio"
+                  name="segmentationMethod"
+                  value="fixed"
+                  checked={segmentationMethod === 'fixed'}
+                  onChange={(e) =>
+                    setSegmentationMethod(e.target.value as 'home' | 'fixed')
+                  }
+                />
+                <span className="ml-2">Feste Anzahl</span>
+              </label>
+            </div>
+          </label>
+        </div>
+
+        {/* Number of Segments Input (only shown when fixed segmentation is selected) */}
+        {segmentationMethod === 'fixed' && (
+          <div className="mb-4">
+            <label
+              className="mb-2 block text-base font-bold text-primary"
+              htmlFor="num-segments"
+            >
+              Anzahl der Segmente pro Gruppe
+              <input
+                className="mt-2 w-full appearance-none rounded border px-3 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
+                id="num-segments"
+                type="number"
+                min="1"
+                value={numSegments}
+                onChange={(e) => setNumSegments(parseInt(e.target.value, 10))}
+                required
+              />
+            </label>
+          </div>
+        )}
 
         {/* Processing Results */}
         {processingResults.length > 0 && (
