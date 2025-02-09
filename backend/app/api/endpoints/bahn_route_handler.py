@@ -328,7 +328,8 @@ async def save_processed_data_to_db(processed_data, conn):
             ('TWIST_IST_MAPPING', db_ops.insert_twist_ist_data),
             ('TWIST_SOLL_MAPPING', db_ops.insert_twist_soll_data),
             ('ACCEL_MAPPING', db_ops.insert_accel_data),
-            ('JOINT_MAPPING', db_ops.insert_joint_data)
+            ('JOINT_MAPPING', db_ops.insert_joint_data),
+            ('IMU_MAPPING', db_ops.insert_imu_data)
         ]
 
         # Insert each type of data

@@ -69,7 +69,7 @@ export const Sidebar = () => {
             >
               <div className="flex items-center justify-between">
                 <Link
-                  href={`/trajectories/${bahn.bahnID?.toString()}`}
+                  href={`/bewegungsdaten/${bahn.bahnID?.toString()}`}
                   className="ml-2 flex-1"
                 >
                   <div>

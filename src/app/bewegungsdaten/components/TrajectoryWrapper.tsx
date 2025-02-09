@@ -17,8 +17,8 @@ import {
   getBahnTwistIstById,
   getBahnTwistSollById,
 } from '@/src/actions/bewegungsdaten.service';
-import { TrajectoryInfo } from '@/src/app/trajectories/components/TrajectoryInfo';
-import { TrajectoryPlot } from '@/src/app/trajectories/components/TrajectoryPlot';
+import { TrajectoryInfo } from '@/src/app/bewegungsdaten/components/TrajectoryInfo';
+import { TrajectoryPlot } from '@/src/app/bewegungsdaten/components/TrajectoryPlot';
 import { Typography } from '@/src/components/Typography';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 

@@ -1,27 +1,31 @@
 # csv_processor.py
 import csv
+import math
 import re
 from datetime import datetime, timedelta
-from tqdm import tqdm
 from .db_config import MAPPINGS
 
 class CSVProcessor:
     def __init__(self, file_path):
         self.file_path = file_path
         self.mappings = MAPPINGS
-    
+
     def find_path_cycles(self, rows, filename, segmentation_method='home', num_segments=1):
         """
         Find segments based on the specified method:
-        - 'home': Home position detection (original method)
-        - 'fixed': Fixed number of segments (new method)
+        - 'home': Home position detection
+        - 'fixed': Fixed number of segments
+        - 'pickplace': Pick and place operation segments
         """
-        # First check if this is a calibration run
+        # First check if this is a special type of run
         is_calibration = "calibration_run" in filename
+        is_pickplace = "pickplace" in filename
+
         if is_calibration:
             return self.create_calibration_segment(rows)
-
-        if segmentation_method == 'fixed':
+        elif is_pickplace:
+            return self.create_pickplace_segments(rows)
+        elif segmentation_method == 'fixed':
             return self.create_fixed_segments(rows, num_segments)
         else:
             return self.create_home_position_segments(rows)
@@ -189,28 +193,178 @@ class CSVProcessor:
 
         return segments
 
+    def create_pickplace_segments(self, rows):
+        """
+        Creates segments for pick and place operations based on DO_Signal transitions.
+        Similar to create_home_position_segments but specifically for pick and place operations.
+
+        Args:
+            rows (list): List of dictionaries containing CSV data
+
+        Returns:
+            list: List of tuples containing (start_index, end_index) for each segment
+        """
+        segments = []
+        current_position = 0
+        total_rows = len(rows)
+
+        # Find the last valid index by looking for the last '1.0' signal
+        # and then finding the next '0.0' signal after it
+        last_one_index = next((i for i, row in enumerate(reversed(rows))
+                               if row.get('DO_Signal', '').strip() == '1.0'), None)
+
+        if last_one_index is not None:
+            last_one_index = total_rows - 1 - last_one_index
+            final_end_index = next((i for i, row in enumerate(rows[last_one_index:], last_one_index)
+                                    if row.get('DO_Signal', '').strip() == '0.0'), None)
+            if final_end_index:
+                final_end_index += 1
+        else:
+            final_end_index = total_rows - 1
+
+        while current_position < final_end_index:
+            # Find next segment start (where DO_Signal becomes '1.0')
+            bahn_start = None
+            for i in range(current_position, total_rows):
+                if rows[i].get('DO_Signal', '').strip() == '1.0':
+                    # Add a small buffer before the start
+                    bahn_start = max(0, i - 2)
+                    break
+
+            if bahn_start is None:
+                break
+
+            # Find segment end (where DO_Signal becomes '0.0')
+            bahn_end = None
+            for i in range(bahn_start + 1, total_rows):
+                if rows[i].get('DO_Signal', '').strip() == '0.0':
+                    # Add a small buffer after the end
+                    bahn_end = min(total_rows - 1, i + 2)
+                    break
+
+            if bahn_end is None:
+                # If no end found, use the final_end_index
+                bahn_end = final_end_index
+
+            # Add time-based buffer around the segment
+            start_time = self.convert_timestamp(rows[bahn_start]['timestamp'])
+            end_time = self.convert_timestamp(rows[bahn_end]['timestamp'])
+
+            buffer_start = start_time - timedelta(seconds=0.02)
+            buffer_end = end_time + timedelta(seconds=0.02)
+
+            # Find actual start index with buffer
+            actual_start = next(
+                (j for j in range(max(0, bahn_start - 1000), bahn_start + 1)
+                 if self.convert_timestamp(rows[j]['timestamp']) >= buffer_start),
+                bahn_start
+            )
+
+            # Find actual end index with buffer
+            actual_end = next(
+                (j for j in range(bahn_end, min(total_rows, bahn_end + 1000))
+                 if self.convert_timestamp(rows[j]['timestamp']) > buffer_end),
+                min(total_rows, bahn_end + 1000) - 1
+            )
+
+            segments.append((actual_start, actual_end))
+            current_position = bahn_end + 1
+
+
+        return segments
 
     def process_csv(self, upload_database, robot_model, bahnplanung, source_data_ist,
-                   source_data_soll, record_filename, segmentation_method='home', num_segments=1):
+                    source_data_soll, record_filename, segmentation_method='home', num_segments=1):
         """Process the CSV file and prepare data for database insertion."""
         try:
             with open(self.file_path, 'r') as csvfile:
                 reader = csv.DictReader(csvfile)
                 rows = list(reader)
 
+                # Initialize pick and place specific variables
+                weight = None
+                velocity_picking = None
+                velocity_handling = None
+                is_pickplace = "pickplace" in record_filename
+                self.record_filename = record_filename
+
+                # Pick and place position variables
+                x_start_pos = None
+                y_start_pos = None
+                z_start_pos = None
+                x_end_pos = None
+                y_end_pos = None
+                z_end_pos = None
+                handling_height = None
+                # Quaternion variables
+                qx_start = None
+                qy_start = None
+                qz_start = None
+                qw_start = None
+                qx_end = None
+                qy_end = None
+                qz_end = None
+                qw_end = None
+
+                if is_pickplace:
+                    for row in rows:
+                        if velocity_picking is None and row.get('Velocity Picking', '').strip():
+                            try:
+                                velocity_picking = float(row['Velocity Picking'])
+                            except ValueError:
+                                print(f"Warning: Could not convert Velocity Picking value: {row['Velocity Picking']}")
+
+                        if velocity_handling is None and row.get('Velocity Handling', '').strip():
+                            try:
+                                velocity_handling = float(row['Velocity Handling'])
+                            except ValueError:
+                                print(f"Warning: Could not convert Velocity Handling value: {row['Velocity Handling']}")
+
+                        if weight is None and row.get('Weight', '').strip():
+                            try:
+                                weight = float(row['Weight'])
+                            except ValueError:
+                                print(f"Warning: Could not convert weight value: {row['Weight']}")
+
+                        # Break if we found all values
+                        if all(v is not None for v in [velocity_picking, velocity_handling, weight]):
+                            break
+
+                    # Debug output to verify values
+                    print(f"Found values: velocity_picking={velocity_picking}, "
+                          f"velocity_handling={velocity_handling}, weight={weight}")
+
                 # Find path cycles based on reference coordinates
-                filename = record_filename
                 paths = self.find_path_cycles(rows, record_filename,
                                               segmentation_method, num_segments)
                 all_processed_data = []
 
                 for path_idx, (start_index, end_index) in enumerate(paths):
-                    # Get rows for this segment (already includes buffer)
-                    filtered_rows = rows[start_index:end_index+1]
+                    # Reset position tracking for each path when doing pick and place
+                    if is_pickplace:
+                        segment_state = 0  # Track which segment we're in (0, 1, or 2)
+                        x_start_pos = None
+                        y_start_pos = None
+                        z_start_pos = None
+                        x_end_pos = None
+                        y_end_pos = None
+                        z_end_pos = None
+                        handling_height = None
+                        qx_start = None
+                        qy_start = None
+                        qz_start = None
+                        qw_start = None
+                        qx_end = None
+                        qy_end = None
+                        qz_end = None
+                        qw_end = None
 
-                    # Get the reference point (first AP coordinates) for this segment
+                    filtered_rows = rows[start_index:end_index + 1]
+                    movement_types = {}
+
+
                     first_ap_timestamp = next(
-                        (row['timestamp'] for row in filtered_rows if row.get('ap_x', '').strip()), 
+                        (row['timestamp'] for row in filtered_rows if row.get('ap_x', '').strip()),
                         filtered_rows[0]['timestamp']
                     )
                     bahn_id = str(first_ap_timestamp[:10])
@@ -219,23 +373,40 @@ class CSVProcessor:
                     start_time = str(self.convert_timestamp(filtered_rows[0]['timestamp']))
                     end_time = str(self.convert_timestamp(filtered_rows[-1]['timestamp']))
 
-                    print(f"\nProcessing Path {path_idx + 1}")
-                    print(f"Bahn ID: {bahn_id}")
-                    print(f"Start Time: {start_time}")
-                    print(f"End Time: {end_time}")
-                    print(f"Number of rows in path: {len(filtered_rows)}")
-
-                    # Initialize data structures for this path
                     processed_data = {key: [] for key in self.mappings.keys()}
                     processed_data['bahn_info_data'] = []
 
                     segment_counter = 0
                     current_segment_id = f"{bahn_id}_{segment_counter}"
 
-                    record_filename = self.extract_record_part(record_filename)
-
                     rows_processed = {key: 0 for key in self.mappings.keys()}
-                    calibration_run = "calibration_run" in self.file_path
+                    calibration_run = "calibration_run" in record_filename
+
+                    if "pickplace" in record_filename:
+                        segment_counter = 0
+                        for row in filtered_rows:
+                            if row.get('ap_x', '').strip():
+                                segment_counter += 1
+                                segment_id = f"{bahn_id}_{segment_counter}"
+
+                                # Determine movement type based on segment position
+                                if segment_counter % 3 == 1:  # First segment (picking)
+                                    movement_types[segment_id] = "linear"
+                                    print(f"Segment {segment_id}: Setting linear (picking)")
+                                elif segment_counter % 3 == 2:  # Second segment (transfer)
+                                    try:
+                                        movement_type = self.calculate_direction(filtered_rows)
+                                        movement_types[segment_id] = movement_type
+                                        print(f"Segment {segment_id}: Calculated {movement_type} (transfer)")
+                                    except Exception as e:
+                                        print(f"Error calculating direction for segment {segment_id}: {e}")
+                                        movement_types[segment_id] = None
+                                elif segment_counter % 3 == 0:  # Third segment (placing)
+                                    movement_types[segment_id] = "linear"
+                                    print(f"Segment {segment_id}: Setting linear (placing)")
+
+                    # Reset segment counter again for the main processing
+                    segment_counter = 0
 
                     point_counts = {
                         'np_ereignisse': 0,
@@ -245,37 +416,63 @@ class CSVProcessor:
                         'np_pos_soll': 0,
                         'np_orient_soll': 0,
                         'np_twist_soll': 0,
-                        'np_jointstates': 0
+                        'np_jointstates': 0,
+                        'np_imu': 0
                     }
 
-                    # Process each row in this path
+                    # Process each row
                     for row in filtered_rows:
                         timestamp = row['timestamp']
 
                         if row.get('ap_x', '').strip():
+                            if is_pickplace:
+                                # Track positions for pick and place operations
+                                if segment_state == 0:  # First position
+                                    x_start_pos = float(row['ap_x'])
+                                    y_start_pos = float(row['ap_y'])
+                                    qx_start = float(row['aq_x'])
+                                    qy_start = float(row['aq_y'])
+                                    qz_start = float(row['aq_z'])
+                                    qw_start = float(row['aq_w'])
+                                elif segment_state == 1:  # Handling height
+                                    handling_height = float(row['ap_z'])
+                                    z_start_pos = float(row['ap_z'])
+                                elif segment_state == 2:  # End position
+                                    x_end_pos = float(row['ap_x'])
+                                    y_end_pos = float(row['ap_y'])
+                                    z_end_pos = float(row['ap_z'])
+                                    qx_end = float(row['aq_x'])
+                                    qy_end = float(row['aq_y'])
+                                    qz_end = float(row['aq_z'])
+                                    qw_end = float(row['aq_w'])
+                                segment_state += 1
+
                             point_counts['np_ereignisse'] += 1
                             segment_counter += 1
                             current_segment_id = f"{bahn_id}_{segment_counter}"
 
                         for mapping_name, mapping in self.mappings.items():
-                            processed_data[mapping_name], rows_processed[mapping_name], point_counts = self.process_mapping(
+                            processed_data[mapping_name], rows_processed[
+                                mapping_name], point_counts = self.process_mapping(
                                 row, mapping, bahn_id, current_segment_id, timestamp,
                                 source_data_ist if mapping_name in ['ACCEL_MAPPING', 'POSE_MAPPING',
-                                                                'TWIST_IST_MAPPING'] else source_data_soll,
+                                                                    'TWIST_IST_MAPPING'] else source_data_soll,
                                 processed_data[mapping_name], rows_processed[mapping_name],
-                                mapping_name, point_counts
+                                mapping_name, point_counts, movement_types  # Add movement_types here
                             )
+
 
                     frequencies = {
                         f"frequency_{key.lower().replace('_mapping', '')}": self.calculate_frequencies(filtered_rows,
-                                                                                                mapping)
+                                                                                                       mapping)
                         for key, mapping in self.mappings.items()
                     }
 
                     if frequencies['frequency_pose'] == 0 or rows_processed['POSE_MAPPING'] == 0:
                         source_data_ist = "abb_websocket"
 
-                    bahn_info_data = (
+                    # Create base bahn_info_data tuple
+                    base_info = [
                         bahn_id,
                         robot_model,
                         bahnplanung,
@@ -284,7 +481,7 @@ class CSVProcessor:
                         end_time,
                         source_data_ist,
                         source_data_soll,
-                        record_filename,
+                        self.extract_record_part(record_filename),
                         point_counts['np_ereignisse'],
                         frequencies['frequency_pose'],
                         frequencies['frequency_position_soll'],
@@ -300,64 +497,122 @@ class CSVProcessor:
                         point_counts['np_pos_soll'],
                         point_counts['np_orient_soll'],
                         point_counts['np_twist_soll'],
-                        point_counts['np_jointstates']
-                    )
+                        point_counts['np_jointstates'],
+                    ]
+
+                    # Add pick and place specific data if applicable
+                    if is_pickplace:
+                        bahn_info_data = tuple(base_info + [
+                            weight,
+                            x_start_pos,
+                            y_start_pos,
+                            z_start_pos,
+                            x_end_pos,
+                            y_end_pos,
+                            z_end_pos,
+                            handling_height,
+                            qx_start,
+                            qy_start,
+                            qz_start,
+                            qw_start,
+                            qx_end,
+                            qy_end,
+                            qz_end,
+                            qw_end,
+                            velocity_handling,
+                            velocity_picking,
+                            frequencies['frequency_imu'],
+                            is_pickplace,
+                            point_counts['np_imu'],
+                        ])
+                    else:
+                        bahn_info_data = tuple(base_info)
 
                     processed_data['bahn_info_data'] = bahn_info_data
+                    print(bahn_info_data)
                     all_processed_data.append(processed_data)
 
                     self.print_processing_stats(len(filtered_rows), rows_processed, point_counts)
 
-                # Moved outside the for loop
                 return all_processed_data
 
         except Exception as e:
             print(f"An error occurred while processing the CSV: {e}")
             return None
 
-
     def process_mapping(self, row, mapping, bahn_id, current_segment_id, timestamp, source_data, data_list,
-                            rows_processed, mapping_name, point_counts):
-            if mapping_name == 'RAPID_EVENTS_MAPPING':
-                if any(row.get(csv_col, '').strip() for csv_col in mapping):
-                    data_row = [bahn_id, current_segment_id, timestamp]
-                    # Convert numeric strings to float for RAPID_EVENTS_MAPPING
-                    for csv_col in mapping:
-                        value = row.get(csv_col, '').strip()
+                        rows_processed, mapping_name, point_counts, movement_types=None):
+
+        if mapping_name == 'RAPID_EVENTS_MAPPING':
+            if any(row.get(csv_col, '').strip() for csv_col in mapping):
+                data_row = [bahn_id, current_segment_id, timestamp]
+                values = []
+
+                # Process normal values (positions and orientations)
+                for csv_col in mapping:
+                    value = row.get(csv_col, '').strip()
+                    if value:
+                        if any(x in csv_col for x in ['x_reached', 'y_reached', 'z_reached',
+                                                      'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached']):
+                            value = float(value)
+                    values.append(value if value else None)
+
+                data_row.extend(values)  # Add position values
+                data_row.append(source_data)  # Add source_data before movement_type
+
+                # Add movement_type last
+                if "pickplace" in self.record_filename and movement_types:
+                    movement_type = movement_types.get(current_segment_id)
+                    data_row.append(movement_type)
+                else:
+                    data_row.append(None)
+
+                data_list.append(data_row)
+                rows_processed += 1
+                print(data_list)
+
+        else:  # ACCEL_MAPPING, TWIST_IST_MAPPING, etc.
+            if all(row.get(csv_col, '').strip() for csv_col in mapping):
+                data_row = [bahn_id, current_segment_id, timestamp]
+                values = []
+                for csv_col in mapping:
+                    value = row.get(csv_col, '').strip()
+                    try:
                         if value:
-                            # Convert to float if the column is for coordinates or quaternions
-                            if any(x in csv_col for x in ['x_reached', 'y_reached', 'z_reached', 
-                                                        'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached']):
-                                value = float(value)
-                        data_row.append(value if value else None)
-                    data_row.append(source_data)
-                    data_list.append(data_row)
-                    rows_processed += 1
-            else:
-                if all(row.get(csv_col, '').strip() for csv_col in mapping):
-                    data_row = [bahn_id, current_segment_id, timestamp]
-                    data_row.extend([row[csv_col] for csv_col in mapping])
-                    data_row.append(source_data)
-                    data_list.append(data_row)
-                    rows_processed += 1
+                            value = float(value)
+                    except ValueError:
+                        print(f"Warning: Could not convert {csv_col} value: {value}")
+                    values.append(value if value else None)
 
-                    # Update point counts
-                    if mapping_name == 'POSE_MAPPING':
-                        point_counts['np_pose_ist'] += 1
-                    elif mapping_name == 'TWIST_IST_MAPPING':
-                        point_counts['np_twist_ist'] += 1
-                    elif mapping_name == 'ACCEL_MAPPING':
-                        point_counts['np_accel_ist'] += 1
-                    elif mapping_name == 'POSITION_SOLL_MAPPING':
-                        point_counts['np_pos_soll'] += 1
-                    elif mapping_name == 'ORIENTATION_SOLL_MAPPING':
-                        point_counts['np_orient_soll'] += 1
-                    elif mapping_name == 'TWIST_SOLL_MAPPING':
-                        point_counts['np_twist_soll'] += 1
-                    elif mapping_name == 'JOINT_MAPPING':
-                        point_counts['np_jointstates'] += 1
+                data_row.extend(values)
+                # Use 'sensehat' as source for IMU data
+                if mapping_name == 'IMU_MAPPING':
+                    data_row.append('sensehat')
+                else:
+                    data_row.append(source_data)
+                data_list.append(data_row)
+                rows_processed += 1
 
-            return data_list, rows_processed, point_counts
+                # Update point counts
+                if mapping_name == 'POSE_MAPPING':
+                    point_counts['np_pose_ist'] += 1
+                elif mapping_name == 'TWIST_IST_MAPPING':
+                    point_counts['np_twist_ist'] += 1
+                elif mapping_name == 'ACCEL_MAPPING':
+                    point_counts['np_accel_ist'] += 1
+                elif mapping_name == 'POSITION_SOLL_MAPPING':
+                    point_counts['np_pos_soll'] += 1
+                elif mapping_name == 'ORIENTATION_SOLL_MAPPING':
+                    point_counts['np_orient_soll'] += 1
+                elif mapping_name == 'TWIST_SOLL_MAPPING':
+                    point_counts['np_twist_soll'] += 1
+                elif mapping_name == 'JOINT_MAPPING':
+                    point_counts['np_jointstates'] += 1
+                elif mapping_name == 'IMU_MAPPING':
+                    point_counts['np_imu'] += 1
+
+        # Make sure we always return these three values
+        return data_list, rows_processed, point_counts
     @staticmethod
     def convert_timestamp(ts):
         try:
@@ -392,3 +647,96 @@ class CSVProcessor:
         print("\nPoint counts:")
         for key, value in point_counts.items():
             print(f"{key}: {value}")
+
+    # Funktion zur Berechnung der Richtung
+    def convert_to_float(self, value):
+        """Hilfsfunktion zur Umwandlung eines Strings in einen float."""
+        try:
+            return float(value)
+        except ValueError:
+            return None  # Falls der Wert nicht in einen float umgewandelt werden kann, None zurückgeben
+
+    def calculate_direction(self, bahn_rows):
+        """
+        Bestimmt die Richtung basierend auf allen Punkten zwischen Start und Ende in der Tabelle.
+        :param bahn_rows: Liste von Dictionaries mit den Schlüsseln 'ps_x' und 'ps_y'
+        :return: 'linear', 'circularleft' oder 'circularright'
+        """
+        # Schritt 1: Erster Punkt (ps_x, ps_y) mit Zahlenwert finden
+        first_point = None
+        start = None
+        for index, row in enumerate(bahn_rows):
+            ap_x = self.convert_to_float(row['ap_x'])
+            ap_y = self.convert_to_float(row['ap_y'])
+            if ap_x is not None and ap_y is not None:
+                first_point = (ap_x, ap_y)
+                start = index + 2
+                break
+
+        if not first_point:
+            raise ValueError("Kein gültiger erster Punkt gefunden.")
+
+        # Schritt 2: Letzter Punkt (ps_x, ps_y) mit Zahlenwert finden
+        last_point = None
+        end = None
+        for index, row in enumerate(bahn_rows[start:]):
+            ap_x = self.convert_to_float(row['ap_x'])
+            ap_y = self.convert_to_float(row['ap_y'])
+            if ap_x is not None and ap_y is not None:
+                last_point = (ap_x, ap_y)
+                end = index + start
+                break
+
+        if not last_point:
+            raise ValueError("Kein gültiger letzter Punkt gefunden.")
+
+        # Schritt 3: Alle gültigen ps_x, ps_y Punkte zwischen Start und Ende sammeln
+        points = []
+        for row in bahn_rows[start:end]:
+            ps_x = self.convert_to_float(row['ps_x'])
+            ps_y = self.convert_to_float(row['ps_y'])
+            if ps_x is not None and ps_y is not None:
+                points.append((ps_x, ps_y))
+
+        if not points:
+            raise ValueError("Keine gültigen Punkte für die Kurvenbestimmung gefunden.")
+
+        # Berechnung der Distanz zwischen dem ersten und letzten Punkt (Referenzgerade)
+        x1, y1 = first_point  # Erster Punkt
+        x2, y2 = last_point  # Letzter Punkt
+
+        # Berechne die Distanz zwischen dem ersten und letzten Punkt
+        p1p2_distance = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+        # Funktion zur Bestimmung des kürzesten Abstands eines Punktes zur Linie
+        def get_shortest_distance(xm, ym):
+            # Geradengleichung: Ax + By + C = 0
+            A = y2 - y1
+            B = x1 - x2
+            C = x2 * y1 - x1 * y2
+            return abs(A * xm + B * ym + C) / math.sqrt(A ** 2 + B ** 2)
+
+        # Bestimmung des besten Fits (linear oder circular)
+        linear_points = []
+        circular_left_points = []
+        circular_right_points = []
+
+        for (ps_x, ps_y) in points:
+            shortest_distance = get_shortest_distance(ps_x, ps_y)
+            if shortest_distance <= 0.1 * p1p2_distance:
+                linear_points.append((ps_x, ps_y))
+            else:
+                # Bestimme, ob der Punkt links oder rechts der Linie liegt
+                side_test = (x2 - x1) * (ps_y - y1) - (y2 - y1) * (ps_x - x1)
+                if side_test > 0:
+                    circular_left_points.append((ps_x, ps_y))
+                else:
+                    circular_right_points.append((ps_x, ps_y))
+
+        # Entscheidung über die Kurve
+        if len(linear_points) > len(circular_left_points) and len(linear_points) > len(circular_right_points):
+            return "linear"
+        elif len(circular_left_points) > len(circular_right_points):
+            return "circularleft"
+        else:
+            return "circularright"

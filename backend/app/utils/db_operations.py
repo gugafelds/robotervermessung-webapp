@@ -23,14 +23,31 @@ class DatabaseOperations:
             logger.info(f"bahn_info for bahn_id {data[0]} already exists. Skipping insertion.")
             return
 
+        # Erweitere data auf die benötigte Länge mit None-Werten wenn nötig
+        data_length = len(data)
+        if data_length < 46:  # Wenn weniger als 45 Werte vorhanden sind
+            data = list(data)  # Konvertiere zu Liste falls es ein Tuple ist
+            data.extend([None] * (46 - data_length))  # Fülle mit None auf
+
         query = """
             INSERT INTO bewegungsdaten.bahn_info 
             (bahn_id, robot_model, bahnplanung, recording_date, start_time, end_time, 
              source_data_ist, source_data_soll, record_filename, 
              np_ereignisse, frequency_pose_ist, frequency_position_soll, 
              frequency_orientation_soll, frequency_twist_ist, frequency_twist_soll, 
-             frequency_accel_ist, frequency_joint_states, calibration_run, np_pose_ist, np_twist_ist, np_accel_ist, np_pos_soll, np_orient_soll, np_twist_soll, np_jointstates)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+             frequency_accel_ist, frequency_joint_states, calibration_run, 
+             np_pose_ist, np_twist_ist, np_accel_ist, np_pos_soll, np_orient_soll, 
+             np_twist_soll, np_jointstates, weight, 
+             x_start_pos, y_start_pos, z_start_pos, 
+             x_end_pos, y_end_pos, z_end_pos, handling_height,
+             qx_start, qy_start, qz_start, qw_start,
+             qx_end, qy_end, qz_end, qw_end,
+             velocity_picking, velocity_handling, frequency_imu, pick_and_place, np_imu)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 
+                    $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
+                    $27, $28, $29, $30, $31, $32, $33,
+                    $34, $35, $36, $37, $38, $39, $40, $41,
+                    $42, $43, $44, $45, $46)
         """
         try:
             await conn.execute(query, *data)
@@ -52,45 +69,38 @@ class DatabaseOperations:
 
             table_schemas = {
                 'bahn_joint_states': {
-                    'columns': ['bahn_id', 'segment_id', 'timestamp', 'joint_1', 'joint_2', 'joint_3', 
-                            'joint_4', 'joint_5', 'joint_6', 'source_data_soll'],
-                    'types': ['varchar', 'varchar', 'varchar', 'double precision', 'double precision', 
-                            'double precision', 'double precision', 'double precision', 'double precision', 'varchar']
+                    'columns': ['bahn_id', 'segment_id', 'timestamp', 'joint_1', 'joint_2', 'joint_3',
+                                'joint_4', 'joint_5', 'joint_6', 'source_data_soll'],
+                    'types': ['varchar', 'varchar', 'varchar', 'double precision', 'double precision',
+                              'double precision', 'double precision', 'double precision', 'double precision', 'varchar']
                 },
                 'bahn_accel_ist': {
-                    'columns': ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_x', 'tcp_accel_y', 
-                            'tcp_accel_z', 'tcp_accel_ist', 'tcp_angular_accel_x', 'tcp_angular_accel_y',
-                            'tcp_angular_accel_z', 'tcp_angular_accel_ist', 'source_data_ist'],
-                    'types': ['varchar', 'varchar', 'varchar', 'double precision', 'double precision',
-                            'double precision', 'double precision', 'double precision', 'double precision',
-                            'double precision', 'double precision', 'varchar']
+                    'columns': ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_ist', 'tcp_angular_accel_ist', 'source_data_ist'],
+                    'types': ['varchar', 'varchar', 'varchar', 'double precision', 'double precision', 'varchar']
                 },
                 'bahn_orientation_soll': {
                     'columns': ['bahn_id', 'segment_id', 'timestamp', 'qx_soll', 'qy_soll', 'qz_soll',
-                            'qw_soll', 'source_data_soll'],
+                                'qw_soll', 'source_data_soll'],
                     'types': ['varchar', 'varchar', 'varchar', 'double precision', 'double precision',
-                            'double precision', 'double precision', 'varchar']
+                              'double precision', 'double precision', 'varchar']
                 },
                 'bahn_pose_ist': {
                     'columns': ['bahn_id', 'segment_id', 'timestamp', 'x_ist', 'y_ist', 'z_ist',
-                            'qx_ist', 'qy_ist', 'qz_ist', 'qw_ist', 'source_data_ist'],
+                                'qx_ist', 'qy_ist', 'qz_ist', 'qw_ist', 'source_data_ist'],
                     'types': ['varchar', 'varchar', 'varchar', 'double precision', 'double precision',
-                            'double precision', 'double precision', 'double precision', 'double precision',
-                            'double precision', 'varchar']
+                              'double precision', 'double precision', 'double precision', 'double precision',
+                              'double precision', 'varchar']
                 },
                 'bahn_position_soll': {
                     'columns': ['bahn_id', 'segment_id', 'timestamp', 'x_soll', 'y_soll', 'z_soll',
-                            'source_data_soll'],
+                                'source_data_soll'],
                     'types': ['varchar', 'varchar', 'varchar', 'double precision', 'double precision',
-                            'double precision', 'varchar']
+                              'double precision', 'varchar']
                 },
                 'bahn_twist_ist': {
-                    'columns': ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_x', 'tcp_speed_y',
-                            'tcp_speed_z', 'tcp_speed_ist', 'tcp_angular_x', 'tcp_angular_y',
-                            'tcp_angular_z', 'tcp_angular_ist', 'source_data_ist'],
-                    'types': ['varchar', 'varchar', 'varchar', 'double precision', 'double precision',
-                            'double precision', 'double precision', 'double precision', 'double precision',
-                            'double precision', 'double precision', 'varchar']
+                    'columns': ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_ist', 'tcp_angular_ist', 'source_data_ist'],
+                    'types': ['varchar', 'varchar', 'varchar', 'double precision',
+                              'double precision', 'varchar']
                 },
                 'bahn_twist_soll': {
                     'columns': ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_soll', 'source_data_soll'],
@@ -98,45 +108,67 @@ class DatabaseOperations:
                 },
                 'bahn_events': {
                     'columns': ['bahn_id', 'segment_id', 'timestamp', 'x_reached', 'y_reached', 'z_reached',
-                            'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached', 'source_data_soll'],
+                                'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached', 'source_data_soll',
+                                'movement_type'],
                     'types': ['varchar', 'varchar', 'varchar', 'double precision', 'double precision',
-                            'double precision', 'double precision', 'double precision', 'double precision',
-                            'double precision', 'varchar']
+                              'double precision', 'double precision', 'double precision', 'double precision',
+                              'double precision', 'varchar', 'varchar'],
+                'bahn_imu': {
+                    'columns': ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_pi', 'tcp_angular_vel_pi',
+                                'source_data_ist'],
+                    'types': ['varchar', 'varchar', 'varchar', 'double precision',
+                              'double precision', 'varchar']
+                },
                 }
             }
 
             if table_name in table_schemas:
                 schema = table_schemas[table_name]
-                
-                # Convert the data with proper types
                 converted_data = []
-                for row in data:
-                    converted_row = []
-                    for i, value in enumerate(row):
-                        if schema['types'][i] == 'varchar':
-                            converted_row.append(str(value) if value is not None else None)
-                        elif schema['types'][i] == 'double precision':
-                            converted_row.append(float(value) if value is not None else 0.0)
-                    converted_data.append(converted_row)
+
+                if table_name == 'bahn_events':
+                    for row in data:
+                        converted_row = []
+                        for i, value in enumerate(row):
+                            if i < len(schema['types']):  # Für vorhandene Spalten
+                                if schema['types'][i] == 'varchar':
+                                    converted_row.append(str(value) if value is not None else None)
+                                elif schema['types'][i] == 'double precision':
+                                    converted_row.append(float(value) if value is not None else 0.0)
+
+                        # Wenn movement_type fehlt (row hat weniger Spalten als das Schema)
+                        if len(row) < len(schema['columns']):
+                            converted_row.append(None)  # Füge None für movement_type hinzu
+
+                        converted_data.append(converted_row)
+                else:
+                    for row in data:
+                        converted_row = []
+                        for i, value in enumerate(row):
+                            if schema['types'][i] == 'varchar':
+                                converted_row.append(str(value) if value is not None else None)
+                            elif schema['types'][i] == 'double precision':
+                                converted_row.append(float(value) if value is not None else 0.0)
+                        converted_data.append(converted_row)
 
                 # Create the INSERT query with proper column names and type casting
                 columns = ', '.join(schema['columns'])
-                placeholders = ', '.join(f'${i+1}::{typ}' for i, typ in enumerate(schema['types']))
+                placeholders = ', '.join(f'${i + 1}::{typ}' for i, typ in enumerate(schema['types']))
                 query = f"""
                     INSERT INTO bewegungsdaten.{table_name} 
                     ({columns})
                     VALUES ({placeholders})
                 """
-                
+
                 await conn.executemany(query, converted_data)
             else:
                 # Fallback for any unhandled tables
-                columns = ', '.join(f'${i+1}' for i in range(len(data[0])))
+                columns = ', '.join(f'${i + 1}' for i in range(len(data[0])))
                 query = f"INSERT INTO bewegungsdaten.{table_name} VALUES ({columns})"
                 await conn.executemany(query, data)
-            
+
             logger.info(f"Data inserted successfully into {table_name}")
-            
+
         except Exception as error:
             logger.error(f"Error inserting data into {table_name}: {error}")
             raise
@@ -165,3 +197,6 @@ class DatabaseOperations:
 
     async def insert_joint_data(self, conn, data):
         await self.insert_data(conn, 'bahn_joint_states', data)
+
+    async def insert_imu_data(self, conn, data):
+        await self.insert_data(conn, 'bahn_imu', data)

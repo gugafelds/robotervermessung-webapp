@@ -9,6 +9,7 @@ export interface BahnInfo {
   sourceDataIst: string;
   sourceDataSoll: string;
   recordFilename: string;
+  numberPointsEvents: number;
   frequencyPoseIst: number;
   frequencyPositionSoll: number;
   frequencyOrientationSoll: number;
@@ -17,7 +18,6 @@ export interface BahnInfo {
   frequencyAccelIst: number;
   frequencyJointStates: number;
   calibrationRun: boolean;
-  numberPointsEvents: number;
   numberPointsPoseIst: number;
   numberPointsTwistIst: number;
   numberPointsAccelIst: number;
@@ -25,6 +25,27 @@ export interface BahnInfo {
   numberPointsOrientSoll: number;
   numberPointsTwistSoll: number;
   numberPointsJointStates: number;
+  weight: number;
+  xStartPos: string;
+  yStartPos: string;
+  zStartPos: string;
+  xEndPos: string;
+  yEndPos: string;
+  zEndPos: string;
+  handlingHeight: string;
+  qxStart: string;
+  qyStart: string;
+  qzStart: string;
+  qwStart: string;
+  qxEnd: string;
+  qyEnd: string;
+  qzEnd: string;
+  qwEnd: string;
+  velocityPicking: string;
+  velocityHandling: string;
+  frequencyIMU: number;
+  pickAndPlaceRun: boolean;
+  numberPointsIMU: number;
 }
 
 export interface BahnInfoRaw {
@@ -38,6 +59,7 @@ export interface BahnInfoRaw {
   source_data_ist: string;
   source_data_soll: string;
   record_filename: string;
+  np_ereignisse: number;
   frequency_pose_ist: number;
   frequency_position_soll: number;
   frequency_orientation_soll: number;
@@ -46,7 +68,6 @@ export interface BahnInfoRaw {
   frequency_accel_ist: number;
   frequency_joint_states: number;
   calibration_run: boolean;
-  np_ereignisse: number;
   np_pose_ist: number;
   np_twist_ist: number;
   np_accel_ist: number;
@@ -54,6 +75,27 @@ export interface BahnInfoRaw {
   np_orient_soll: number;
   np_twist_soll: number;
   np_jointstates: number;
+  weight: number;
+  x_start_pos: string;
+  y_start_pos: string;
+  z_start_pos: string;
+  x_end_pos: string;
+  y_end_pos: string;
+  z_end_pos: string;
+  handling_height: string;
+  qx_start: string;
+  qy_start: string;
+  qz_start: string;
+  qw_start: string;
+  qx_end: string;
+  qy_end: string;
+  qz_end: string;
+  qw_end: string;
+  velocity_picking: string;
+  velocity_handling: string;
+  frequency_imu: number;
+  pick_and_place: boolean;
+  np_imu: number;
 }
 
 export interface BahnPoseIst {
@@ -91,13 +133,7 @@ export interface BahnTwistIst {
   bahnId: string;
   segmentId: string;
   timestamp: string;
-  tcpSpeedX: number;
-  tcpSpeedY: number;
-  tcpSpeedZ: number;
   tcpSpeedIst: number;
-  tcpAngularX: number;
-  tcpAngularY: number;
-  tcpAngularZ: number;
   tcpAngularIst: number;
   sourceDataIst: string;
 }
@@ -107,13 +143,7 @@ export interface BahnTwistIstRaw {
   bahn_id: string;
   segment_id: string;
   timestamp: string;
-  tcp_speed_x: number;
-  tcp_speed_y: number;
-  tcp_speed_z: number;
   tcp_speed_ist: number;
-  tcp_angular_x: number;
-  tcp_angular_y: number;
-  tcp_angular_z: number;
   tcp_angular_ist: number;
   source_data_ist: string;
 }
@@ -123,13 +153,7 @@ export interface BahnAccelIst {
   bahnId: string;
   segmentId: string;
   timestamp: string;
-  tcpAccelX: number;
-  tcpAccelY: number;
-  tcpAccelZ: number;
   tcpAccelIst: number;
-  tcpAngularAccelX: number;
-  tcpAngularAccelY: number;
-  tcpAngularAccelZ: number;
   tcpAngularAccelIst: number;
   sourceDataIst: string;
 }
@@ -139,14 +163,26 @@ export interface BahnAccelIstRaw {
   bahn_id: string;
   segment_id: string;
   timestamp: string;
-  tcp_accel_x: number;
-  tcp_accel_y: number;
-  tcp_accel_z: number;
   tcp_accel_ist: number;
-  tcp_angular_accel_x: number;
-  tcp_angular_accel_y: number;
-  tcp_angular_accel_z: number;
   tcp_angular_accel_ist: number;
+  source_data_ist: string;
+}
+
+export interface BahnIMU {
+  bahnId: string;
+  segmentId: string;
+  timestamp: string;
+  tcpAccelPi: number;
+  tcpAngularVelPi: number;
+  sourceDataIst: string;
+}
+
+export interface BahnIMURaw {
+  bahn_id: string;
+  segment_id: string;
+  timestamp: string;
+  tcp_accel_pi: number;
+  tcp_angular_vel_pi: number;
   source_data_ist: string;
 }
 

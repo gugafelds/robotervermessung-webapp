@@ -67,7 +67,7 @@ export function FrequencyPanel({ frequencyData }: FrequencyPanelProps) {
                         {ids.map((id) => (
                           <Link
                             key={id}
-                            href={`/trajectories/${id}`}
+                            href={`/bewegungsdaten/${id}`}
                             className="truncate rounded bg-gray-200 px-2 py-1 text-center text-sm transition-colors hover:bg-gray-300"
                           >
                             {id}

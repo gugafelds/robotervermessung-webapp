@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .api.endpoints import bahn_route_handler, auswertung_route_handler
+from .api.endpoints import bahn_route_handler, auswertung_route_handler, rosbag_route_handler
 from .database import init_db
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
@@ -39,6 +39,7 @@ app.add_middleware(
 # Include the router for Bahn-related endpoints
 app.include_router(bahn_route_handler.router, prefix="/api/bahn", tags=["bahn"])
 app.include_router(auswertung_route_handler.router, prefix="/api/auswertung", tags=["auswertung"])
+app.include_router(rosbag_route_handler.router, prefix="/api/rosbag", tags=["rosbag"])
 
 # Initialize the database
 init_db(app)
@@ -61,4 +62,4 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True, timeout_keep_alive=300)

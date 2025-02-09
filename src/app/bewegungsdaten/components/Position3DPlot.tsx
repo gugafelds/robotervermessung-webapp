@@ -93,9 +93,6 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     ...plotLayoutConfig,
     autosize: true,
     margin: { l: 0, r: 0, b: 0, t: 0 },
-    scene: {
-      zaxis: { range: [650, 1850] },
-    },
     showlegend: true,
     legend: {
       orientation: 'h',

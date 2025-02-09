@@ -8,6 +8,9 @@ const nextConfig = {
       },
     ];
   },
+  experimental: {
+    proxyTimeout: 1000000,
+  },
 };
 
 module.exports = nextConfig;

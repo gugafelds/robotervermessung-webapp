@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ['latin'], display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'robotervermessung',
-  description: 'robots trajectories dataviz',
+  description: 'robots bewegungsdaten dataviz',
 };
 
 export const viewport: Viewport = {

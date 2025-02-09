@@ -16,14 +16,8 @@ DB_PARAMS = {
 # Mappings of CSV columns to database columns
 MAPPINGS = {
     'ACCEL_MAPPING': {
-        'tcp_accelv__x': 'tcp_accel_x',
-        'tcp_accelv__y': 'tcp_accel_y',
-        'tcp_accelv__z': 'tcp_accel_z',
         'tcp_accelv': 'tcp_accel_ist',
-        'tcp_accelv_angular_x': 'tcp_angular_accel_x',
-        'tcp_accelv_angular_y': 'tcp_angular_accel_y',
-        'tcp_accelv_angular_z': 'tcp_angular_accel_z',
-        'tcp_accelv_angular': 'tcp_angular_accel_ist'
+        'tcp_accelv_angular': 'tcp_angular_accel_ist',
     },
     'JOINT_MAPPING': {
         'joint_1': 'joint_1',
@@ -49,7 +43,7 @@ MAPPINGS = {
         'aq_x': 'qx_reached',
         'aq_y': 'qy_reached',
         'aq_z': 'qz_reached',
-        'aq_w': 'qw_reached'
+        'aq_w': 'qw_reached',
     },
     'ORIENTATION_SOLL_MAPPING': {
         'os_x': 'qx_soll',
@@ -63,16 +57,14 @@ MAPPINGS = {
         'ps_z': 'z_soll',
     },
     'TWIST_IST_MAPPING': {
-        'tcp_speedv_x': 'tcp_speed_x',
-        'tcp_speedv_y': 'tcp_speed_y',
-        'tcp_speedv_z': 'tcp_speed_z',
         'tcp_speedv': 'tcp_speed_ist',
-        'tcp_angularv_x': 'tcp_angular_x',
-        'tcp_angularv_y': 'tcp_angular_y',
-        'tcp_angularv_z': 'tcp_angular_z',
-        'tcp_angularv': 'tcp_angular_ist'
+        'tcp_angularv': 'tcp_angular_ist',
     },
     'TWIST_SOLL_MAPPING': {
         'tcp_speeds': 'tcp_speed_soll'
+    },
+    'IMU_MAPPING': {
+        'tcp_accel_pi': 'tcp_accel_pi',
+        'tcp_angular_vel_pi': 'tcp_angular_vel_pi',
     }
 }

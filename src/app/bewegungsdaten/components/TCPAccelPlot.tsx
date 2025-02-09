@@ -13,18 +13,6 @@ interface TCPAccelerationPlotProps {
   currentBahnTwistSoll: BahnTwistSoll[];
 }
 
-const calculateDerivative = (times: number[], values: number[]) => {
-  const derivative = [];
-  const derivativeTimes = times.slice(1);
-  // eslint-disable-next-line no-plusplus
-  for (let i = 1; i < times.length; i++) {
-    const dt = times[i] - times[i - 1];
-    const dv = values[i] - values[i - 1];
-    derivative.push(dv / dt);
-  }
-  return [derivativeTimes, derivative] as const;
-};
-
 export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
   currentBahnAccelIst,
   currentBahnTwistSoll,
@@ -57,20 +45,6 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
       (bahn) => (Number(bahn.timestamp) - globalStartTime) / 1e9,
     );
 
-    // Extract and smooth Soll speeds (use magnitude)
-    const sollSpeeds = currentBahnTwistSoll.map((bahn) =>
-      Math.abs(bahn.tcpSpeedSoll),
-    );
-
-    // Calculate derived acceleration from Soll speed data
-    const [derivativeTimes, derivativeValues] = calculateDerivative(
-      timestampsSoll,
-      sollSpeeds,
-    );
-
-    // Ensure derivative values are positive (magnitude)
-    const derivativeMagnitudes = derivativeValues.map(Math.abs);
-
     // Optimierte Berechnung von maxTimeAccel
     const getMaxTimeAccel = () => {
       let maxTime = 0;
@@ -100,20 +74,8 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
       name: 'Beschleunigung-Ist',
     };
 
-    const sollPlot: Partial<PlotData> = {
-      type: 'scatter',
-      mode: 'lines',
-      x: derivativeTimes,
-      y: derivativeMagnitudes.map((value: number) => value / 1000),
-      line: {
-        color: 'lightgreen',
-        width: 3,
-      },
-      name: 'Abgeleitet-Soll',
-    };
-
     return {
-      plotData: [istPlot, sollPlot],
+      plotData: [istPlot],
       maxTimeAccel,
     };
   };

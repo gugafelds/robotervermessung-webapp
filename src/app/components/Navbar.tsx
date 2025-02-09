@@ -28,11 +28,11 @@ export const Navbar = () => {
             Dashboard
           </Typography>
         </Link>
-        <Link href="/trajectories">
+        <Link href="/bewegungsdaten">
           <Typography
             as="h2"
             className={`my-0 items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300 ${
-              pathname.includes('trajectories') ? 'bg-gray-300' : ''
+              pathname.includes('bewegungsdaten') ? 'bg-gray-300' : ''
             }`}
           >
             Bewegungsdaten
