@@ -4,18 +4,18 @@ import dynamic from 'next/dynamic';
 import type { Layout, PlotData } from 'plotly.js';
 import React from 'react';
 
-import type { BahnAccelIst, BahnTwistSoll } from '@/types/bewegungsdaten.types';
+import type { BahnAccelIst, BahnIMU } from '@/types/bewegungsdaten.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 interface TCPAccelerationPlotProps {
   currentBahnAccelIst: BahnAccelIst[];
-  currentBahnTwistSoll: BahnTwistSoll[];
+  currentBahnIMU: BahnIMU[];
 }
 
 export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
   currentBahnAccelIst,
-  currentBahnTwistSoll,
+  currentBahnIMU,
 }) => {
   const createTcpAccelPlot = () => {
     // Optimierte Berechnung von globalStartTime
@@ -26,9 +26,11 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
         minTime = Math.min(minTime, Number(bahn.timestamp));
       });
 
-      currentBahnTwistSoll.forEach((bahn) => {
-        minTime = Math.min(minTime, Number(bahn.timestamp));
-      });
+      if (currentBahnIMU.length > 0) {
+        currentBahnIMU.forEach((bahn) => {
+          minTime = Math.min(minTime, Number(bahn.timestamp));
+        });
+      }
 
       return minTime;
     };
@@ -40,42 +42,59 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
       (bahn) => (Number(bahn.timestamp) - globalStartTime) / 1e9,
     );
 
-    // Process Soll data
-    const timestampsSoll = currentBahnTwistSoll.map(
-      (bahn) => (Number(bahn.timestamp) - globalStartTime) / 1e9,
-    );
+    // Process IMU data only if available
+    const hasIMUData = currentBahnIMU.length > 0;
+    const timestampsIMU = hasIMUData
+      ? currentBahnIMU.map(
+          (bahn) => (Number(bahn.timestamp) - globalStartTime) / 1e9,
+        )
+      : [];
 
-    // Optimierte Berechnung von maxTimeAccel
     const getMaxTimeAccel = () => {
-      let maxTime = 0;
+      let maxTime = Math.max(...timestampsIst);
 
-      timestampsIst.forEach((time) => {
-        maxTime = Math.max(maxTime, time);
-      });
-
-      timestampsSoll.forEach((time) => {
-        maxTime = Math.max(maxTime, time);
-      });
+      if (hasIMUData) {
+        maxTime = Math.max(maxTime, ...timestampsIMU);
+      }
 
       return maxTime;
     };
 
     const maxTimeAccel = getMaxTimeAccel();
 
-    const istPlot: Partial<PlotData> = {
+    const viconPlot: Partial<PlotData> = {
       type: 'scatter',
       mode: 'lines',
+      visible: hasIMUData ? 'legendonly' : true, // Nur versteckt wenn IMU-Daten vorhanden
       x: timestampsIst,
       y: currentBahnAccelIst.map((bahn) => Math.abs(bahn.tcpAccelIst)),
       line: {
         color: 'green',
         width: 3,
       },
-      name: 'Beschleunigung-Ist',
+      name: 'Beschleunigung-Vicon',
     };
 
+    const plotData = [viconPlot];
+
+    // IMU Plot nur hinzufügen wenn Daten vorhanden
+    if (hasIMUData) {
+      const IMUPlot: Partial<PlotData> = {
+        type: 'scatter',
+        mode: 'lines',
+        x: timestampsIMU,
+        y: currentBahnIMU.map((bahn) => Math.abs(bahn.tcpAccelPi)),
+        line: {
+          color: 'green',
+          width: 3,
+        },
+        name: 'Beschleunigung-Sensehat',
+      };
+      plotData.push(IMUPlot);
+    }
+
     return {
-      plotData: [istPlot],
+      plotData,
       maxTimeAccel,
     };
   };

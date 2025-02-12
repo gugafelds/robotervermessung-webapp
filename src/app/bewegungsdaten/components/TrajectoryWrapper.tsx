@@ -1,13 +1,13 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import PQueue from 'p-queue';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 import {
   checkTransformedDataExists,
   getBahnAccelIstById,
   getBahnEventsById,
+  getBahnIMUById,
   getBahnInfoById,
   getBahnJointStatesById,
   getBahnOrientationSollById,
@@ -22,9 +22,7 @@ import { TrajectoryPlot } from '@/src/app/bewegungsdaten/components/TrajectoryPl
 import { Typography } from '@/src/components/Typography';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 
-const CHUNK_SIZE = 5000;
-const BATCH_SIZE = 3;
-const CACHE_DURATION = 1000 * 60 * 15;
+const CACHE_DURATION = 1000 * 60 * 20;
 
 interface CacheItem {
   data: any;
@@ -54,58 +52,49 @@ class TimedCache {
   }
 }
 
-const ProgressBar = ({ value }: { value: number }) => (
-  <div className="h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-    <div
-      className="h-2.5 rounded-full bg-blue-600"
-      style={{ width: `${value}%` }}
-    />
-  </div>
-);
-
-const queue = new PQueue({
-  concurrency: BATCH_SIZE,
-  interval: 1000,
-  intervalCap: 10,
-  timeout: 60000,
-});
-
 const cache = new TimedCache();
 
-const processInChunks = async <T,>(
-  data: T[],
-  processChunk: (chunk: T[]) => void,
-  signal?: AbortSignal,
-  chunkSize: number = CHUNK_SIZE,
-): Promise<void> => {
-  const chunks = [];
-  for (let i = 0; i < data.length; i += chunkSize) {
-    chunks.push(data.slice(i, i + chunkSize));
-  }
-
-  await Promise.all(
-    chunks.map(async (chunk) => {
-      if (signal?.aborted) {
-        throw new Error('Processing aborted');
-      }
-      processChunk(chunk);
-      return new Promise((resolve) => {
-        setTimeout(resolve, 0);
-      });
-    }),
-  );
-};
+interface DataLoadingState {
+  pose: boolean;
+  twist: boolean;
+  accel: boolean;
+  positionSoll: boolean;
+  orientationSoll: boolean;
+  twistSoll: boolean;
+  jointStates: boolean;
+  events: boolean;
+  imu: boolean;
+}
 
 export function TrajectoryWrapper() {
   const params = useParams();
   const id = params?.id as string;
   const [isInfoLoaded, setIsInfoLoaded] = useState(false);
-  const [isPlotDataLoaded, setIsPlotDataLoaded] = useState(false);
+  const [loadingStates, setLoadingStates] = useState<DataLoadingState>({
+    pose: false,
+    twist: false,
+    accel: false,
+    positionSoll: false,
+    orientationSoll: false,
+    twistSoll: false,
+    jointStates: false,
+    events: false,
+    imu: false,
+  });
   const [error, setError] = useState<string | null>(null);
-  const [loadingProgress, setLoadingProgress] = useState(0);
   const [isTransformed, setIsTransformed] = useState(false);
-  const latestInfoRequestId = useRef<string | null>(null);
-  const latestPlotRequestId = useRef<string | null>(null);
+
+  const plotAvailability = {
+    position:
+      loadingStates.positionSoll && loadingStates.pose && loadingStates.events,
+    orientation:
+      loadingStates.pose &&
+      loadingStates.orientationSoll &&
+      loadingStates.events,
+    twist: loadingStates.twist && loadingStates.twistSoll,
+    acceleration: loadingStates.accel && loadingStates.imu,
+    joints: loadingStates.jointStates,
+  };
 
   const {
     currentBahnInfo,
@@ -119,248 +108,173 @@ export function TrajectoryWrapper() {
     setCurrentBahnTwistSoll,
     setCurrentBahnJointStates,
     setCurrentBahnEvents,
+    setCurrentBahnIMU,
   } = useTrajectory();
 
-  const fetchInfoData = useCallback(
-    async (signal: AbortSignal, requestId: string) => {
-      if (!id) return;
-
-      try {
-        const cacheKey = `info_${id}`;
-        let bahnInfo = cache.get(cacheKey);
-
-        if (!bahnInfo) {
-          bahnInfo = await getBahnInfoById(id);
-          cache.set(cacheKey, bahnInfo);
-        }
-
-        if (requestId === latestInfoRequestId.current && !signal.aborted) {
-          setCurrentBahnInfo(bahnInfo);
-          setIsInfoLoaded(true);
-        }
-      } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') return;
-        if (requestId === latestInfoRequestId.current) {
-          setError('Failed to fetch Bahn info');
-        }
-      }
-    },
-    [id, setCurrentBahnInfo],
-  );
-
-  const fetchDataWithProgress = async <T,>(
-    fetchFunction: () => Promise<T[]>,
-    setter: (data: T[]) => void,
-    signal: AbortSignal,
-    cacheKey: string,
-  ): Promise<T[]> => {
-    const cachedData = cache.get(cacheKey);
-    if (cachedData) {
-      setter(cachedData);
-      return cachedData;
-    }
-
-    const data = await fetchFunction();
-    const processedData: T[] = [];
-
-    await processInChunks(
-      data,
-      (chunk) => {
-        processedData.push(...chunk);
-        setter([...processedData]);
-      },
-      signal,
-    );
-
-    cache.set(cacheKey, processedData);
-    return processedData;
+  const updateLoadingState = (key: keyof DataLoadingState, value: boolean) => {
+    setLoadingStates((prev) => ({ ...prev, [key]: value }));
   };
 
-  type FetchFunction<T> = () => Promise<T[]>;
+  const fetchInfoData = useCallback(async () => {
+    if (!id) return;
 
-  const fetchPlotData = useCallback(
-    async (signal: AbortSignal, requestId: string) => {
-      if (!id) return;
+    try {
+      const cacheKey = `info_${id}`;
+      let bahnInfo = cache.get(cacheKey);
 
-      try {
-        const useTrans = await checkTransformedDataExists(id);
-        setIsTransformed(useTrans);
-
-        type FetchConfig<T> = {
-          func: FetchFunction<T>;
-          setter: (data: T[]) => void;
-          key: string;
-          priority: number;
-        };
-
-        const fetchConfigs: FetchConfig<any>[] = [
-          {
-            func: () =>
-              (useTrans
-                ? getBahnPoseTransById(id)
-                : getBahnPoseIstById(id)) as Promise<any>,
-            setter: useTrans ? setCurrentBahnPoseTrans : setCurrentBahnPoseIst,
-            key: useTrans ? 'pose_trans' : 'pose_ist',
-            priority: 1,
-          },
-          {
-            func: () => getBahnTwistIstById(id),
-            setter: setCurrentBahnTwistIst,
-            key: 'twist_ist',
-            priority: 2,
-          },
-          {
-            func: () => getBahnAccelIstById(id),
-            setter: setCurrentBahnAccelIst,
-            key: 'accel_ist',
-            priority: 3,
-          },
-          {
-            func: () => getBahnPositionSollById(id),
-            setter: setCurrentBahnPositionSoll,
-            key: 'position_soll',
-            priority: 4,
-          },
-          {
-            func: () => getBahnOrientationSollById(id),
-            setter: setCurrentBahnOrientationSoll,
-            key: 'orientation_soll',
-            priority: 5,
-          },
-          {
-            func: () => getBahnTwistSollById(id),
-            setter: setCurrentBahnTwistSoll,
-            key: 'twist_soll',
-            priority: 6,
-          },
-          {
-            func: () => getBahnJointStatesById(id),
-            setter: setCurrentBahnJointStates,
-            key: 'joint_states',
-            priority: 7,
-          },
-          {
-            func: () => getBahnEventsById(id),
-            setter: setCurrentBahnEvents,
-            key: 'events',
-            priority: 8,
-          },
-        ];
-
-        const totalConfigs = fetchConfigs.length;
-        let completedCount = 0;
-
-        await Promise.all(
-          fetchConfigs.map(({ func, setter, key, priority }) =>
-            queue.add(
-              async () => {
-                if (signal.aborted) return;
-
-                try {
-                  await fetchDataWithProgress(
-                    func,
-                    setter,
-                    signal,
-                    `${key}_${id}`,
-                  );
-                } finally {
-                  completedCount += 1;
-                  setLoadingProgress((completedCount / totalConfigs) * 100);
-                }
-              },
-              { priority },
-            ),
-          ),
-        );
-
-        if (requestId === latestPlotRequestId.current && !signal.aborted) {
-          setIsPlotDataLoaded(true);
-        }
-      } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') return;
-        if (requestId === latestPlotRequestId.current) {
-          setError('Plotdaten konnten nicht abgerufen werden');
-        }
+      if (!bahnInfo) {
+        bahnInfo = await getBahnInfoById(id);
+        cache.set(cacheKey, bahnInfo);
       }
-    },
-    [
-      id,
-      setCurrentBahnPoseIst,
-      setCurrentBahnPoseTrans,
-      setCurrentBahnTwistIst,
-      setCurrentBahnAccelIst,
-      setCurrentBahnPositionSoll,
-      setCurrentBahnOrientationSoll,
-      setCurrentBahnTwistSoll,
-      setCurrentBahnJointStates,
-      setCurrentBahnEvents,
-    ],
-  );
+
+      setCurrentBahnInfo(bahnInfo);
+      setIsInfoLoaded(true);
+    } catch (err) {
+      setError('Bahninfo wurde nicht gefunden');
+    }
+  }, [id, setCurrentBahnInfo]);
+
+  const fetchPlotData = useCallback(async () => {
+    if (!id) return;
+
+    const fetchDataWithCache = async <T,>(
+      fetchFunction: () => Promise<T[]>,
+      setter: (data: T[]) => void,
+      cacheKey: string,
+    ): Promise<void> => {
+      const fullKey = `${cacheKey}_${id}`;
+
+      // Versuch schnellen Cache-Zugriff
+      const cachedData = cache.get(fullKey);
+      if (cachedData) {
+        setter(cachedData);
+        return;
+      }
+
+      // Parallel: Daten holen und Cache setzen
+      const data = await fetchFunction();
+      setter(data);
+      cache.set(fullKey, data);
+    };
+
+    try {
+      const useTrans = await checkTransformedDataExists(id);
+      setIsTransformed(useTrans);
+
+      // Prioritätsgruppen für die Daten
+      const highPriorityFetches = [
+        // Pose Daten (höchste Priorität)
+        useTrans
+          ? fetchDataWithCache(
+              () => getBahnPoseTransById(id),
+              setCurrentBahnPoseTrans,
+              'pose_trans',
+            ).then(() => updateLoadingState('pose', true))
+          : fetchDataWithCache(
+              () => getBahnPoseIstById(id),
+              setCurrentBahnPoseIst,
+              'pose_ist',
+            ).then(() => updateLoadingState('pose', true)),
+        // Events werden auch sofort benötigt
+        fetchDataWithCache(
+          () => getBahnEventsById(id),
+          setCurrentBahnEvents,
+          'events',
+        ).then(() => updateLoadingState('events', true)),
+      ];
+
+      const mediumPriorityFetches = [
+        fetchDataWithCache(
+          () => getBahnPositionSollById(id),
+          setCurrentBahnPositionSoll,
+          'position_soll',
+        ).then(() => updateLoadingState('positionSoll', true)),
+        fetchDataWithCache(
+          () => getBahnOrientationSollById(id),
+          setCurrentBahnOrientationSoll,
+          'orientation_soll',
+        ).then(() => updateLoadingState('orientationSoll', true)),
+        fetchDataWithCache(
+          () => getBahnTwistIstById(id),
+          setCurrentBahnTwistIst,
+          'twist_ist',
+        ).then(() => updateLoadingState('twist', true)),
+      ];
+
+      const lowPriorityFetches = [
+        fetchDataWithCache(
+          () => getBahnAccelIstById(id),
+          setCurrentBahnAccelIst,
+          'accel_ist',
+        ).then(() => updateLoadingState('accel', true)),
+        fetchDataWithCache(
+          () => getBahnTwistSollById(id),
+          setCurrentBahnTwistSoll,
+          'twist_soll',
+        ).then(() => updateLoadingState('twistSoll', true)),
+        fetchDataWithCache(
+          () => getBahnJointStatesById(id),
+          setCurrentBahnJointStates,
+          'joint_states',
+        ).then(() => updateLoadingState('jointStates', true)),
+        fetchDataWithCache(
+          () => getBahnIMUById(id),
+          setCurrentBahnIMU,
+          'imu',
+        ).then(() => updateLoadingState('imu', true)),
+      ];
+
+      // Ausführung in Prioritätsgruppen
+      await Promise.all(highPriorityFetches);
+      await Promise.all(mediumPriorityFetches);
+      await Promise.all(lowPriorityFetches);
+    } catch (err) {
+      setError('Plotdaten konnten nicht abgerufen werden');
+    }
+  }, [
+    id,
+    setCurrentBahnPoseTrans,
+    setCurrentBahnPoseIst,
+    setCurrentBahnEvents,
+    setCurrentBahnPositionSoll,
+    setCurrentBahnOrientationSoll,
+    setCurrentBahnTwistIst,
+    setCurrentBahnAccelIst,
+    setCurrentBahnTwistSoll,
+    setCurrentBahnJointStates,
+    setCurrentBahnIMU,
+  ]);
 
   useEffect(() => {
-    const loadInfo = async () => {
-      if (currentBahnInfo?.bahnID === id) {
-        setIsInfoLoaded(true);
-        return undefined;
-      }
+    if (currentBahnInfo?.bahnID === id) {
+      setIsInfoLoaded(true);
+      return;
+    }
 
-      const abortController = new AbortController();
-      const requestId = Date.now().toString();
-      latestInfoRequestId.current = requestId;
-
-      setIsInfoLoaded(false);
-      setError(null);
-      await fetchInfoData(abortController.signal, requestId);
-      return () => abortController.abort();
-    };
-
-    const cleanup = loadInfo();
-    return () => {
-      cleanup?.then((fn) => fn?.());
-    };
+    fetchInfoData();
   }, [id, fetchInfoData, currentBahnInfo]);
 
   useEffect(() => {
-    const loadPlotData = async () => {
-      if (!isInfoLoaded || isPlotDataLoaded) {
-        return undefined;
-      }
+    if (!isInfoLoaded) {
+      return;
+    }
 
-      const abortController = new AbortController();
-      const requestId = Date.now().toString();
-      latestPlotRequestId.current = requestId;
-
-      setError(null);
-      await fetchPlotData(abortController.signal, requestId);
-      return () => abortController.abort();
-    };
-
-    const cleanup = loadPlotData();
-    return () => {
-      cleanup?.then((fn) => fn?.());
-    };
-  }, [isInfoLoaded, fetchPlotData, isPlotDataLoaded]);
+    fetchPlotData();
+  }, [isInfoLoaded, fetchPlotData]);
 
   return error ? (
-    <div className="m-10 flex h-full flex-col justify-normal overflow-hidden rounded-md bg-gray-50 p-5 align-middle">
-      <Typography as="h3">Fehler: {error} :(</Typography>
+    <div className="flex h-fullscreen w-full flex-wrap justify-center overflow-scroll p-4">
+      <div className="my-10 flex h-fit flex-col items-center justify-center rounded-xl bg-gray-200 p-2 shadow-sm">
+        <Typography as="h5">Fehler: {error}</Typography>
+      </div>
     </div>
   ) : (
     <>
       <TrajectoryInfo isTransformed={isTransformed} />
-      {!isPlotDataLoaded ? (
-        <div className="m-10 flex h-full flex-col justify-normal overflow-hidden align-middle">
-          <Typography as="h2">plotdaten werden heruntergeladen...</Typography>
-          <div className="mt-4 w-64">
-            <ProgressBar value={loadingProgress} />
-          </div>
-          <Typography as="p" className="mt-2">
-            {Math.round(loadingProgress)}%
-          </Typography>
-        </div>
-      ) : (
-        <TrajectoryPlot isTransformed={isTransformed} />
-      )}
+      <TrajectoryPlot
+        isTransformed={isTransformed}
+        plotAvailability={plotAvailability}
+      />
     </>
   );
 }

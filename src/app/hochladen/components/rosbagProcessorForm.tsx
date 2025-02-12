@@ -99,23 +99,21 @@ const ROSBAGProcessorForm: React.FC = () => {
   };
 
   return (
-    <div className="flex h-full items-center justify-center">
+    <div className="flex items-center justify-center p-4">
       <form
         onSubmit={handleSubmit}
-        className="mb-4 w-full max-w-lg rounded-xl bg-white px-8 pb-8 pt-6 shadow-md"
+        className="mb-4 w-full max-w-lg rounded-xl bg-gray-100 p-4 shadow-md"
       >
-        <h2 className="mb-6 text-xl font-bold text-primary">
-          rosbag-Prozessor
-        </h2>
+        <h2 className="mb-4 text-xl font-bold text-primary">rosbag2csv</h2>
 
         <div className="mb-4">
+          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label
             className="mb-2 block text-base font-bold text-primary"
             htmlFor="file-input"
           >
-            rosbag-Dateien
             <input
-              className="w-full appearance-none rounded border px-3 py-2 font-light leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded py-1 font-light leading-tight text-primary focus:outline-none focus:ring-2"
               id="file-input"
               type="file"
               accept=".bag,.db3"
@@ -168,13 +166,13 @@ const ROSBAGProcessorForm: React.FC = () => {
           </div>
         )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-end">
           <button
             className="rounded bg-primary px-4 py-2 font-bold text-white transition duration-300 ease-in-out hover:bg-primary/80 focus:outline-none focus:ring-2 focus:ring-blue-500"
             type="submit"
             disabled={isLoading}
           >
-            {isLoading ? 'Wird verarbeitet...' : 'rosbag verarbeiten'}
+            {isLoading ? 'Wird verarbeitet...' : 'Start'}
           </button>
         </div>
       </form>

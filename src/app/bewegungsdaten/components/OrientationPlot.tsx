@@ -37,6 +37,24 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       ? currentBahnPoseTrans
       : currentBahnPoseIst;
 
+    // First create a helper function to fix arrays of euler angles
+    const fixGimbalLockBatch = (eulerAngles: number[][]): number[][] => {
+      const eulerFixed = eulerAngles.map((row) => [...row]);
+
+      for (let i = 0; i < 3; i += 1) {
+        const angleColumn = eulerAngles.map((row) => row[i]);
+
+        // Only fix angles that are actually near -180°
+        angleColumn.forEach((angle, idx) => {
+          if (Math.abs(Math.abs(angle) - 180) < 2 && angle < 0) {
+            eulerFixed[idx][i] = angle + 360;
+          }
+        });
+      }
+
+      return eulerFixed;
+    };
+
     // Find the global start time
     const getGlobalStartTime = () => {
       let minTime = Number.MAX_VALUE;
@@ -104,18 +122,27 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       const elapsedNanoseconds = Number(bahn.timestamp) - globalStartTime;
       return elapsedNanoseconds / 1e9; // Convert to seconds
     });
-    const eulerAnglesSoll = currentBahnOrientationSoll.map((bahn) =>
-      quaternionToEuler(bahn.qxSoll, bahn.qySoll, bahn.qzSoll, bahn.qwSoll),
+    // Then modify where you process the SOLL data:
+    const eulerAnglesSoll = fixGimbalLockBatch(
+      currentBahnOrientationSoll.map((bahn) =>
+        quaternionToEuler(bahn.qxSoll, bahn.qySoll, bahn.qzSoll, bahn.qwSoll),
+      ),
     );
 
-    const eventEulerAngles = currentBahnEvents.map((event) => ({
-      time: (Number(event.timestamp) - globalStartTime) / 1e9,
-      angles: quaternionToEuler(
-        event.qxReached,
-        event.qyReached,
-        event.qzReached,
-        event.qwReached,
+    const processedEulerAngles = fixGimbalLockBatch(
+      currentBahnEvents.map((event) =>
+        quaternionToEuler(
+          event.qxReached,
+          event.qyReached,
+          event.qzReached,
+          event.qwReached,
+        ),
       ),
+    );
+
+    const eventEulerAngles = currentBahnEvents.map((event, index) => ({
+      time: (Number(event.timestamp) - globalStartTime) / 1e9,
+      angles: processedEulerAngles[index],
     }));
 
     const getMaxTimeOrientation = () => {

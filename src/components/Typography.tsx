@@ -11,7 +11,7 @@ type BaseTypographyProps = Props<'p'> &
   Props<'h5'> &
   Props<'h6'>;
 export type TypographyProps = BaseTypographyProps & {
-  as: 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+  as: 'p' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'small';
   className?: string;
   children: ReactNode;
 };
@@ -96,6 +96,17 @@ const TypographyComponent = (
           ...rest,
           ref,
           className: `${className} font-light text-primary`,
+        },
+        children,
+      );
+      break;
+    case 'small':
+      template = React.createElement(
+        as,
+        {
+          ...rest,
+          ref,
+          className: `${className} font-light text-xs`,
         },
         children,
       );

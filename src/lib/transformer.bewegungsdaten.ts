@@ -74,7 +74,7 @@ export const transformBahnInfoResult = (
       velocityHandling: bahn.velocity_handling,
       frequencyIMU: bahn.frequency_imu,
       pickAndPlaceRun: bahn.pick_and_place,
-      numberPointsIMU: bahn.np_ereignisse,
+      numberPointsIMU: bahn.np_imu,
     }),
   );
 };
@@ -128,7 +128,7 @@ export const transformBahnInfobyIDResult = (
   velocityHandling: bahnRaw.velocity_handling,
   frequencyIMU: bahnRaw.frequency_imu,
   pickAndPlaceRun: bahnRaw.pick_and_place,
-  numberPointsIMU: bahnRaw.np_ereignisse,
+  numberPointsIMU: bahnRaw.np_imu,
 });
 
 export const transformBahnPoseIstResult = (

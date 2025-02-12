@@ -119,7 +119,6 @@ const CSVUploadForm: React.FC = () => {
     let summaryMessage = '';
     if (successfulFiles.length > 0) {
       summaryMessage += `${successfulFiles.length} Datei(en) verarbeitet.\n`;
-      summaryMessage += `Insgesamt ${totalSegments} Bahnen gefunden:\n`;
       successfulFiles.forEach((r) => {
         summaryMessage += `\n${r.filename.substring(0, 22)}: ${r.segmentsFound} Bahn(en)`;
       });
@@ -135,20 +134,20 @@ const CSVUploadForm: React.FC = () => {
   };
 
   return (
-    <div className="flex h-full items-center justify-center">
+    <div className="flex items-center justify-center p-4">
       <form
         onSubmit={handleSubmit}
-        className="mb-4 w-full max-w-lg rounded-xl bg-white px-8 pb-8 pt-6 shadow-md"
+        className="mb-4 w-full max-w-lg rounded-xl bg-gray-100 p-4 shadow-md"
       >
         {/* File Input */}
-        <div className="mb-4">
+        <div className="mb-2">
+          <div className="text-xl font-bold text-primary">CSV-Uploader
           <label
             className="mb-2 block text-base font-bold text-primary"
             htmlFor="file-input"
           >
-            CSV-Dateien
             <input
-              className="w-full appearance-none rounded border px-3 py-2 font-light leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded py-1 font-light leading-tight text-primary focus:outline-none focus:ring-2"
               id="file-input"
               type="file"
               accept=".csv"
@@ -160,17 +159,17 @@ const CSVUploadForm: React.FC = () => {
               required
             />
           </label>
-        </div>
-        <div className="mb-4">
+        </div></div>
+        <div className="mb-2">
           {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label
-            className="mb-2 block text-base font-bold text-primary"
+            className="px-1 block text-base font-bold text-primary"
             htmlFor="robot-model"
           >
-            Roboter
+            Robotermodell
           </label>
           <input
-            className="w-full appearance-none rounded border px-3 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full appearance-none rounded border border-gray-400 px-2 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
             id="robot-model"
             type="text"
             value={robotModel}
@@ -181,16 +180,16 @@ const CSVUploadForm: React.FC = () => {
             required
           />
         </div>
-        <div className="mb-4">
+        <div className="mb-2">
           {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label
-            className="mb-2 block text-base font-bold text-primary"
+            className="px-1 block text-base font-bold text-primary"
             htmlFor="bahnplanung-input"
           >
             Bahnplanung
           </label>
           <input
-            className="w-full appearance-none rounded border px-3 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full appearance-none rounded border border-gray-400 px-2 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
             id="bahnplanung-input"
             type="text"
             value={bahnplanung}
@@ -201,16 +200,16 @@ const CSVUploadForm: React.FC = () => {
             required
           />
         </div>
-        <div className="mb-4">
+        <div className="mb-2">
           {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label
-            className="mb-2 block text-base font-bold text-primary"
+            className="px-1 block text-base font-bold text-primary"
             htmlFor="source-data-ist"
           >
             Quelle der Ist-Daten
           </label>
           <input
-            className="w-full appearance-none rounded border px-3 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full appearance-none rounded border border-gray-400 px-2 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
             id="source-data-ist"
             type="text"
             value={sourceDataIst}
@@ -221,16 +220,16 @@ const CSVUploadForm: React.FC = () => {
             required
           />
         </div>
-        <div className="mb-4">
+        <div className="mb-2">
           {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label
-            className="mb-2 block text-base font-bold text-primary"
+            className="px-1 block text-base font-bold text-primary"
             htmlFor="source-data-soll"
           >
             Quelle der Soll-Daten
           </label>
           <input
-            className="w-full appearance-none rounded border px-3 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full appearance-none rounded border border-gray-400 px-2 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
             id="source-data-soll"
             type="text"
             value={sourceDataSoll}
@@ -241,7 +240,7 @@ const CSVUploadForm: React.FC = () => {
             required
           />
         </div>
-        <div className="mb-6">
+        <div className="mb-2">
           <label className="flex items-center" htmlFor="upload-database">
             <input
               id="upload-database"
@@ -252,18 +251,18 @@ const CSVUploadForm: React.FC = () => {
                 setUploadDatabase(e.target.checked)
               }
             />
-            <span className="ml-2 text-base font-bold text-primary">
+            <span className="ml-2 text-base font-light text-sm text-primary">
               auf PostgreSQL hochladen
             </span>
           </label>
         </div>
 
         {/* New Segmentation Method Selection */}
-        <div className="mb-4">
+        <div className="mb-2">
           <label className="mb-2 block text-base font-bold text-primary">
             Segmentierungsmethode
             <div className="mt-2">
-              <label className="mr-4 inline-flex items-center">
+              <label className="mr-4 inline-flex font-light items-center">
                 <input
                   type="radio"
                   className="form-radio"
@@ -276,7 +275,7 @@ const CSVUploadForm: React.FC = () => {
                 />
                 <span className="ml-2">Nach Home-Position</span>
               </label>
-              <label className="inline-flex items-center">
+              <label className="inline-flex font-light items-center">
                 <input
                   type="radio"
                   className="form-radio"
@@ -302,7 +301,7 @@ const CSVUploadForm: React.FC = () => {
             >
               Anzahl der Segmente pro Gruppe
               <input
-                className="mt-2 w-full appearance-none rounded border px-3 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-2 w-full appearance-none rounded border px-2 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
                 id="num-segments"
                 type="number"
                 min="1"
@@ -316,8 +315,8 @@ const CSVUploadForm: React.FC = () => {
 
         {/* Processing Results */}
         {processingResults.length > 0 && (
-          <div className="mb-4 rounded border border-gray-200 p-4">
-            <h3 className="mb-2 font-bold text-primary">Status:</h3>
+          <div className="mb-4 rounded border bg-white border-gray-400 p-4">
+            <h3 className="mb-2 font-semibold text-primary">Status:</h3>
             {processingResults.map((result) => (
               <div
                 key={`${result.filename}-${Date.now()}`}
@@ -356,13 +355,13 @@ const CSVUploadForm: React.FC = () => {
           </div>
         )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-end">
           <button
             className="rounded bg-primary px-4 py-2 font-bold text-white transition duration-300 ease-in-out hover:bg-primary/80 focus:outline-none focus:ring-2 focus:ring-blue-500"
             type="submit"
             disabled={isLoading}
           >
-            {isLoading ? 'Wird verarbeitet...' : 'Dateien hochladen'}
+            {isLoading ? 'Wird verarbeitet...' : 'Start'}
           </button>
         </div>
       </form>

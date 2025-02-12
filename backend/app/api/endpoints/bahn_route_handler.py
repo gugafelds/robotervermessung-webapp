@@ -229,7 +229,7 @@ async def get_bahn_orientation_soll_by_id(bahn_id: str, conn = Depends(get_db)):
 @cache(expire=2400)
 async def get_bahn_twist_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM bewegungsdaten.bahn_twist_soll WHERE bahn_id = $1 ORDER BY timestamp ASC",
+        "SELECT timestamp, tcp_speed_soll FROM bewegungsdaten.bahn_twist_soll WHERE bahn_id = $1 ORDER BY timestamp ASC",
         bahn_id
     )
     return [dict(row) for row in rows]
@@ -248,6 +248,15 @@ async def get_bahn_joint_states_by_id(bahn_id: str, conn = Depends(get_db)):
 async def get_bahn_events_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_events WHERE bahn_id = $1 ORDER BY timestamp ASC",
+        bahn_id
+    )
+    return [dict(row) for row in rows]
+
+@router.get("/bahn_imu/{bahn_id}")
+@cache(expire=2400)
+async def get_bahn_imu_by_id(bahn_id: str, conn = Depends(get_db)):
+    rows = await conn.fetch(
+        "SELECT * FROM bewegungsdaten.bahn_imu WHERE bahn_id = $1 ORDER BY timestamp ASC",
         bahn_id
     )
     return [dict(row) for row in rows]

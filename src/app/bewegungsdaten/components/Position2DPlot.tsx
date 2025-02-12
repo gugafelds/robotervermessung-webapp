@@ -147,7 +147,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
         name: 'X-Sollposition',
         x: positionSollData.map((d) => d.x),
         y: positionSollData.map((d) => d.xPos),
-        line: { color: 'blue', width: 2 },
+        line: { color: 'red', width: 2 },
       },
       {
         type: 'scatter',
@@ -155,7 +155,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
         name: 'X-Istposition',
         x: positionIstData.map((d) => d.x),
         y: positionIstData.map((d) => d.xPos),
-        line: { color: 'darkblue', width: 2 },
+        line: { color: 'darkred', width: 2 },
       },
       {
         type: 'scatter',
@@ -163,7 +163,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
         name: 'X-Zielpunkte',
         x: xAchievedData.x,
         y: xAchievedData.y,
-        line: { color: 'lightblue', width: 2, shape: 'hv' },
+        line: { color: 'pink', width: 2, shape: 'hv' },
         showlegend: false,
       },
       {
@@ -174,7 +174,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
           (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
         ),
         y: currentBahnEvents.map((b) => b.xReached),
-        marker: { color: 'blue', size: 8, symbol: 'circle' },
+        marker: { color: 'red', size: 8, symbol: 'circle' },
       },
       // Y Position
       {
@@ -219,7 +219,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
         name: 'Z-Sollposition',
         x: positionSollData.map((d) => d.x),
         y: positionSollData.map((d) => d.zPos),
-        line: { color: 'red', width: 2 },
+        line: { color: 'blue', width: 2 },
       },
       {
         type: 'scatter',
@@ -227,7 +227,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
         name: 'Z-Istposition',
         x: positionIstData.map((d) => d.x),
         y: positionIstData.map((d) => d.zPos),
-        line: { color: 'darkred', width: 2 },
+        line: { color: 'darkblue', width: 2 },
       },
       {
         type: 'scatter',
@@ -235,7 +235,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
         name: 'Z-Zielpunkte',
         x: zAchievedData.x,
         y: zAchievedData.y,
-        line: { color: 'pink', width: 2, shape: 'hv' },
+        line: { color: 'lightblue', width: 2, shape: 'hv' },
         showlegend: false,
       },
       {
@@ -246,7 +246,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
           (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
         ),
         y: currentBahnEvents.map((b) => b.zReached),
-        marker: { color: 'red', size: 8, symbol: 'circle' },
+        marker: { color: 'blue', size: 8, symbol: 'circle' },
       },
     ];
 

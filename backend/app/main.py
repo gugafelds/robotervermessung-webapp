@@ -49,7 +49,7 @@ init_db(app)
 async def startup_event():
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
     try:
-        redis_client = aioredis.from_url(redis_url, encoding="utf8", decode_responses=True)
+        redis_client = aioredis.from_url(redis_url, encoding="utf8")
         await redis_client.ping()
         FastAPICache.init(RedisBackend(redis_client), prefix="fastapi-cache:")
         print("Successfully connected to Redis")

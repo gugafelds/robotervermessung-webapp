@@ -6,7 +6,7 @@ import CSVUploadForm from './components/CSVUploadForm';
 
 const Hochladen: React.FC = () => {
   return (
-    <div className="flex-row justify-center">
+    <div className="flex h-fullscreen justify-center overflow-scroll">
       <CSVUploadForm />
       <ROSBAGProcessorForm />
     </div>

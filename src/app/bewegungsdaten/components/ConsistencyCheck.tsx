@@ -177,10 +177,8 @@ export const ConsistencyCheck: React.FC<ConsistencyCheckProps> = ({
   if (error) {
     return (
       <div className="mb-4 rounded-md border bg-red-100 p-4">
-        <h2 className="mb-2 text-lg font-semibold">
-          Fehler bei der Konsistenzprüfung
-        </h2>
-        <p className="text-red-600">{error}</p>
+        <h2 className="mb-2 text-lg font-semibold">Die Daten laden noch...</h2>
+        <p className="text-primary">{error}</p>
       </div>
     );
   }

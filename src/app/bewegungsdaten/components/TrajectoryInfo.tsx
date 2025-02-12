@@ -180,6 +180,10 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = ({
                 formatNumber(currentBahnInfo.numberPointsJointStates) || 'n. a.'
               }
             />
+            <InfoRow
+              label="IMU"
+              value={formatNumber(currentBahnInfo.numberPointsIMU) || 'n. a.'}
+            />
           </InfoSection>
 
           <InfoSection title="Abtastraten">
@@ -210,6 +214,10 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = ({
             <InfoRow
               label="Joint States"
               value={`${formatNumber(currentBahnInfo.frequencyJointStates) || 'n. a.'} Hz`}
+            />
+            <InfoRow
+              label="IMU"
+              value={`${formatNumber(currentBahnInfo.frequencyIMU) || 'n. a.'}Hz`}
             />
           </InfoSection>
         </>

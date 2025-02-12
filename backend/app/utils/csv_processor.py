@@ -24,9 +24,10 @@ class CSVProcessor:
         if is_calibration:
             return self.create_calibration_segment(rows)
         elif is_pickplace:
-            return self.create_pickplace_segments(rows)
-        elif segmentation_method == 'fixed':
-            return self.create_fixed_segments(rows, num_segments)
+            segments, modified_rows = self.create_pickplace_segments(rows)
+            # Store modified rows for later use
+            self.rows = modified_rows  # Add this line
+            return segments
         else:
             return self.create_home_position_segments(rows)
     
@@ -194,82 +195,169 @@ class CSVProcessor:
         return segments
 
     def create_pickplace_segments(self, rows):
-        """
-        Creates segments for pick and place operations based on DO_Signal transitions.
-        Similar to create_home_position_segments but specifically for pick and place operations.
+        total_rows = len(rows)
+        modified_rows = rows.copy()
 
-        Args:
-            rows (list): List of dictionaries containing CSV data
+        print("\n=== Starting Pick & Place Segment Analysis ===")
+        print(f"Total rows: {total_rows}")
 
-        Returns:
-            list: List of tuples containing (start_index, end_index) for each segment
-        """
+        # Find all 1.0 signal positions but group consecutive ones
+        one_signal_groups = []
+        current_group = []
+        print("\n--- Finding Signal Groups ---")
+        for i, row in enumerate(rows):
+            if row.get('DO_Signal', '').strip() == '1.0':
+                if not current_group or i - current_group[-1] < 30:
+                    current_group.append(i)
+                else:
+                    if current_group:
+                        print(f"Found signal group at indices: {current_group}")
+                        one_signal_groups.append(current_group)
+                    current_group = [i]
+        if current_group:
+            one_signal_groups.append(current_group)
+            print(f"Found final signal group at indices: {current_group}")
+
+        print(f"\nTotal signal groups found: {len(one_signal_groups)}")
+
+        # Process only the first 1.0 signal of each group
+        print("\n--- Processing AP/AQ Values ---")
+        for group in one_signal_groups:
+            first_index = group[0]
+            print(f"\nProcessing group starting at index {first_index}")
+
+            # Look backwards for last AP/AQ values
+            last_ap_aq = None
+            for i in range(first_index - 1, -1, -1):
+                row = rows[i]
+                if all(row.get(col, '').strip() for col in
+                       ['ap_x', 'ap_y', 'ap_z', 'aq_x', 'aq_y', 'aq_z', 'aq_w']):
+                    last_ap_aq = {
+                        'ap_x': row['ap_x'],
+                        'ap_y': row['ap_y'],
+                        'ap_z': row['ap_z'],
+                        'aq_x': row['aq_x'],
+                        'aq_y': row['aq_y'],
+                        'aq_z': row['aq_z'],
+                        'aq_w': row['aq_w']
+                    }
+                    print(f"Found AP/AQ values at index {i}:")
+                    print(last_ap_aq)
+                    break
+
+            if last_ap_aq:
+                print(f"Updating modified_rows at index {first_index} with AP/AQ values")
+                modified_rows[first_index].update(last_ap_aq)
+            else:
+                print(f"WARNING: No AP/AQ values found before index {first_index}")
+
+        # Create segments
+        print("\n--- Creating Segments ---")
         segments = []
         current_position = 0
-        total_rows = len(rows)
 
-        # Find the last valid index by looking for the last '1.0' signal
-        # and then finding the next '0.0' signal after it
-        last_one_index = next((i for i, row in enumerate(reversed(rows))
-                               if row.get('DO_Signal', '').strip() == '1.0'), None)
+        while current_position < total_rows:
+            print(f"\nLooking for next segment starting at position {current_position}")
 
-        if last_one_index is not None:
-            last_one_index = total_rows - 1 - last_one_index
-            final_end_index = next((i for i, row in enumerate(rows[last_one_index:], last_one_index)
-                                    if row.get('DO_Signal', '').strip() == '0.0'), None)
-            if final_end_index:
-                final_end_index += 1
-        else:
-            final_end_index = total_rows - 1
-
-        while current_position < final_end_index:
-            # Find next segment start (where DO_Signal becomes '1.0')
-            bahn_start = None
-            for i in range(current_position, total_rows):
-                if rows[i].get('DO_Signal', '').strip() == '1.0':
-                    # Add a small buffer before the start
-                    bahn_start = max(0, i - 2)
-                    break
-
-            if bahn_start is None:
+            # Find next 1.0 signal
+            close_idx = next((i for i in range(current_position, total_rows)
+                              if modified_rows[i].get('DO_Signal', '').strip() == '1.0'), None)
+            if close_idx is None:
+                print("No more 1.0 signals found")
                 break
 
-            # Find segment end (where DO_Signal becomes '0.0')
-            bahn_end = None
-            for i in range(bahn_start + 1, total_rows):
-                if rows[i].get('DO_Signal', '').strip() == '0.0':
-                    # Add a small buffer after the end
-                    bahn_end = min(total_rows - 1, i + 2)
-                    break
+            # Find next 0.0 signal
+            open_idx = next((i for i in range(close_idx + 1, total_rows)
+                             if modified_rows[i].get('DO_Signal', '').strip() == '0.0'), None)
+            if open_idx is None:
+                print(f"No matching 0.0 signal found after 1.0 signal at {close_idx}")
+                break
 
-            if bahn_end is None:
-                # If no end found, use the final_end_index
-                bahn_end = final_end_index
+            print(f"Found potential segment: 1.0 at {close_idx} to 0.0 at {open_idx}")
 
-            # Add time-based buffer around the segment
-            start_time = self.convert_timestamp(rows[bahn_start]['timestamp'])
-            end_time = self.convert_timestamp(rows[bahn_end]['timestamp'])
+            # Calculate segment with buffers
+            start_time = self.convert_timestamp(modified_rows[close_idx]['timestamp'])
+            end_time = self.convert_timestamp(modified_rows[open_idx]['timestamp'])
 
             buffer_start = start_time - timedelta(seconds=0.02)
             buffer_end = end_time + timedelta(seconds=0.02)
 
-            # Find actual start index with buffer
+            search_range_start = max(0, close_idx - int(1.0 * 1000))
+            search_range_end = min(total_rows, open_idx + int(1.0 * 1000))
+
             actual_start = next(
-                (j for j in range(max(0, bahn_start - 1000), bahn_start + 1)
+                (j for j in range(search_range_start, close_idx + 1)
                  if self.convert_timestamp(rows[j]['timestamp']) >= buffer_start),
-                bahn_start
+                close_idx
             )
 
-            # Find actual end index with buffer
             actual_end = next(
-                (j for j in range(bahn_end, min(total_rows, bahn_end + 1000))
+                (j for j in range(open_idx, search_range_end)
                  if self.convert_timestamp(rows[j]['timestamp']) > buffer_end),
-                min(total_rows, bahn_end + 1000) - 1
+                min(total_rows, open_idx + 1000) - 1
             )
+
+            print(f"Final segment boundaries: {actual_start} to {actual_end}")
+
+            # Check for AP coordinates in segment
+            ap_coords = []
+            for i in range(actual_start, actual_end + 1):
+                if all(modified_rows[i].get(f'ap_{coord}', '').strip() for coord in ['x', 'y', 'z']):
+                    ap_coords.append(i)
+            print(f"AP coordinates found at indices: {ap_coords}")
 
             segments.append((actual_start, actual_end))
-            current_position = bahn_end + 1
+            current_position = open_idx + 1
 
+        print("\n=== Segment Analysis Complete ===")
+        print(f"Total segments created: {len(segments)}")
+        if len(segments) != 4:
+            print("WARNING: Number of segments is not 4!")
+            print(f"Found {len(segments)} segments: {segments}")
+
+        return segments, modified_rows
+
+    def create_pickplace_segments_MAYBE(self, rows): # NEUE IDEE: einfach ap_x von letztem 0.0 DO_Signal kopieren!
+        segments = []
+        current_position = 0
+        total_rows = len(rows)
+
+        while current_position < total_rows:
+            close_idx = next((i for i in range(current_position, total_rows)
+                              if rows[i].get('DO_Signal', '').strip() == '1.0'), None)
+
+            if close_idx is None:
+                break
+
+            start_idx = next((i for i in range(close_idx - 1, -1, -1)
+                              if rows[i].get('ap_x', '').strip()), None)
+
+            if start_idx is not None:
+                start_time = self.convert_timestamp(rows[start_idx]['timestamp'])
+                buffer_start = start_time - timedelta(seconds=0.02)
+
+                actual_start = next(
+                    (j for j in range(max(0, start_idx - 1000), start_idx + 1)
+                     if self.convert_timestamp(rows[j]['timestamp']) >= buffer_start),
+                    start_idx
+                )
+
+                end_idx = next((i for i in range(close_idx + 1, total_rows)
+                                if rows[i].get('DO_Signal', '').strip() == '0.0'),
+                               total_rows - 1)
+
+                end_time = self.convert_timestamp(rows[end_idx]['timestamp'])
+                buffer_end = end_time + timedelta(seconds=0.02)
+
+                actual_end = next(
+                    (j for j in range(end_idx, min(total_rows, end_idx + 1000))
+                     if self.convert_timestamp(rows[j]['timestamp']) > buffer_end),
+                    min(total_rows, end_idx + 1000) - 1
+                )
+
+                segments.append((actual_start, actual_end))
+
+            current_position = end_idx + 1
 
         return segments
 
@@ -359,7 +447,7 @@ class CSVProcessor:
                         qz_end = None
                         qw_end = None
 
-                    filtered_rows = rows[start_index:end_index + 1]
+                    filtered_rows = self.rows[start_index:end_index + 1] if hasattr(self, 'rows') else rows[start_index:end_index + 1]
                     movement_types = {}
 
 
@@ -390,20 +478,26 @@ class CSVProcessor:
                                 segment_id = f"{bahn_id}_{segment_counter}"
 
                                 # Determine movement type based on segment position
-                                if segment_counter % 3 == 1:  # First segment (picking)
+                                if segment_counter % 4 == 0:  # Approach
                                     movement_types[segment_id] = "linear"
-                                    print(f"Segment {segment_id}: Setting linear (picking)")
-                                elif segment_counter % 3 == 2:  # Second segment (transfer)
+                                    print(f"Segment {segment_id}: Setting linear (approach)")
+                                elif segment_counter % 4 == 1:  # Pick
+                                    movement_types[segment_id] = "linear"
+                                    print(f"Segment {segment_id}: Setting linear (pick)")
+                                elif segment_counter % 4 == 2:  # Handling movement
                                     try:
+                                        # This segment represents the movement between points 2 and 3
+                                        # where z-height is constant (1046.7 in your example)
                                         movement_type = self.calculate_direction(filtered_rows)
                                         movement_types[segment_id] = movement_type
-                                        print(f"Segment {segment_id}: Calculated {movement_type} (transfer)")
+                                        print(f"Segment {segment_id}: Calculated {movement_type} (handling)")
                                     except Exception as e:
                                         print(f"Error calculating direction for segment {segment_id}: {e}")
                                         movement_types[segment_id] = None
-                                elif segment_counter % 3 == 0:  # Third segment (placing)
+                                else:  # Place (segment_counter % 4 == 0)
                                     movement_types[segment_id] = "linear"
-                                    print(f"Segment {segment_id}: Setting linear (placing)")
+                                    print(f"Segment {segment_id}: Setting linear (place)")
+
 
                     # Reset segment counter again for the main processing
                     segment_counter = 0
@@ -571,6 +665,7 @@ class CSVProcessor:
                 rows_processed += 1
                 print(data_list)
 
+
         else:  # ACCEL_MAPPING, TWIST_IST_MAPPING, etc.
             if all(row.get(csv_col, '').strip() for csv_col in mapping):
                 data_row = [bahn_id, current_segment_id, timestamp]
@@ -662,30 +757,50 @@ class CSVProcessor:
         :param bahn_rows: Liste von Dictionaries mit den Schlüsseln 'ps_x' und 'ps_y'
         :return: 'linear', 'circularleft' oder 'circularright'
         """
-        # Schritt 1: Erster Punkt (ps_x, ps_y) mit Zahlenwert finden
+        # Schritt 1: Finde die maximale Z-Höhe (Handling-Höhe)
+        handling_height = None
+        for row in bahn_rows:
+            ap_z = self.convert_to_float(row['ap_z'])
+            if ap_z is not None:
+                if handling_height is None or ap_z > handling_height:
+                    handling_height = ap_z
+
+        if handling_height is None:
+            raise ValueError("Keine Z-Höhe gefunden.")
+
+        print(f"Found handling height: {handling_height}")
+
+        # Schritt 2: Zweiter Punkt (ap_x, ap_y) mit maximaler Z-Höhe finden
         first_point = None
         start = None
         for index, row in enumerate(bahn_rows):
             ap_x = self.convert_to_float(row['ap_x'])
             ap_y = self.convert_to_float(row['ap_y'])
-            if ap_x is not None and ap_y is not None:
-                first_point = (ap_x, ap_y)
-                start = index + 2
-                break
+            ap_z = self.convert_to_float(row['ap_z'])
+            if ap_x is not None and ap_y is not None and ap_z is not None:
+                if abs(ap_z - handling_height) < 0.1:
+                    first_point = (ap_x, ap_y)
+                    start = index + 2
+                    print(f"Found first point: ({ap_x}, {ap_y}) at z={ap_z}")
+                    break
 
         if not first_point:
-            raise ValueError("Kein gültiger erster Punkt gefunden.")
+            raise ValueError("Kein Punkt mit Handling-Höhe gefunden.")
 
-        # Schritt 2: Letzter Punkt (ps_x, ps_y) mit Zahlenwert finden
+        # Schritt 3: Dritter Punkt (ap_x, ap_y) mit gleicher Z-Höhe finden
         last_point = None
         end = None
         for index, row in enumerate(bahn_rows[start:]):
             ap_x = self.convert_to_float(row['ap_x'])
             ap_y = self.convert_to_float(row['ap_y'])
-            if ap_x is not None and ap_y is not None:
-                last_point = (ap_x, ap_y)
-                end = index + start
-                break
+            ap_z = self.convert_to_float(row['ap_z'])
+            if ap_x is not None and ap_y is not None and ap_z is not None:
+                if abs(ap_z - handling_height) < 0.1:
+                    if (ap_x, ap_y) != first_point:  # Ensure it's a different point
+                        last_point = (ap_x, ap_y)
+                        end = index + start
+                        print(f"Found last point: ({ap_x}, {ap_y}) at z={ap_z}")
+                        break
 
         if not last_point:
             raise ValueError("Kein gültiger letzter Punkt gefunden.")
@@ -704,6 +819,9 @@ class CSVProcessor:
         # Berechnung der Distanz zwischen dem ersten und letzten Punkt (Referenzgerade)
         x1, y1 = first_point  # Erster Punkt
         x2, y2 = last_point  # Letzter Punkt
+
+        print(x1,y1)
+        print(x2,y2)
 
         # Berechne die Distanz zwischen dem ersten und letzten Punkt
         p1p2_distance = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
