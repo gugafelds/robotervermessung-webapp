@@ -316,9 +316,10 @@ export interface BahnPoseTrans {
   xTrans: number;
   yTrans: number;
   zTrans: number;
-  rollTrans: number;
-  pitchTrans: number;
-  yawTrans: number;
+  qxTrans: number;
+  qyTrans: number;
+  qzTrans: number;
+  qwTrans: number;
   calibrationID: string;
 }
 
@@ -329,8 +330,9 @@ export interface BahnPoseTransRaw {
   x_trans: number;
   y_trans: number;
   z_trans: number;
-  roll_trans: number;
-  pitch_trans: number;
-  yaw_trans: number;
+  qx_trans: number;
+  qy_trans: number;
+  qz_trans: number;
+  qw_trans: number;
   calibration_id: string;
 }

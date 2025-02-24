@@ -163,9 +163,10 @@ export const transformBahnPoseTransResult = (
       xTrans: bahn.x_trans,
       yTrans: bahn.y_trans,
       zTrans: bahn.z_trans,
-      rollTrans: bahn.roll_trans,
-      pitchTrans: bahn.pitch_trans,
-      yawTrans: bahn.yaw_trans,
+      qxTrans: bahn.qx_trans,
+      qyTrans: bahn.qy_trans,
+      qzTrans: bahn.qz_trans,
+      qwTrans: bahn.qw_trans,
       calibrationID: bahn.calibration_id,
     }),
   );

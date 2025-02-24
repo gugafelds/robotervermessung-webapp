@@ -96,6 +96,22 @@ export const Sidebar = () => {
                           ? formatDate(bahn.recordingDate)
                           : 'n. a.'}
                       </Typography>
+                      <div className="flex">
+                        {bahn.pickAndPlaceRun ? (
+                          <div className="mx-1 w-fit rounded bg-green-200 px-1">
+                            <Typography as="small" className="text-green-950">
+                              Pick&Place
+                            </Typography>
+                          </div>
+                        ) : null}
+                        {bahn.calibrationRun ? (
+                          <div className="w-fit rounded bg-red-200 px-1">
+                            <Typography as="small" className="text-red-950">
+                              Kalibrierung
+                            </Typography>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   </Link>
                 </div>

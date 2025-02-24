@@ -66,6 +66,26 @@ export interface SIDTWInfo {
   evaluation: string;
 }
 
+export interface DTWInfoRaw {
+  bahn_id: string;
+  segment_id: string;
+  dtw_min_distance: number;
+  dtw_max_distance: number;
+  dtw_average_distance: number;
+  dtw_standard_deviation: number;
+  evaluation: string;
+}
+
+export interface DTWInfo {
+  bahnID: string;
+  segmentID: string;
+  DTWMinDistance: number;
+  DTWMaxDistance: number;
+  DTWAvgDistance: number;
+  DTWStdDeviation: number;
+  evaluation: string;
+}
+
 export interface SIDTWPositionRaw {
   bahn_id: string;
   segment_id: string;
@@ -89,6 +109,32 @@ export interface SIDTWPosition {
   SIDTWIstX: number;
   SIDTWIstY: number;
   SIDTWIstZ: number;
+  pointsOrder: number;
+}
+
+export interface DTWPositionRaw {
+  bahn_id: string;
+  segment_id: string;
+  dtw_distances: number;
+  dtw_soll_x: number;
+  dtw_soll_y: number;
+  dtw_soll_z: number;
+  dtw_ist_x: number;
+  dtw_ist_y: number;
+  dtw_ist_z: number;
+  points_order: number;
+}
+
+export interface DTWPosition {
+  bahnID: string;
+  segmentID: string;
+  DTWDistances: number;
+  DTWSollX: number;
+  DTWSollY: number;
+  DTWSollZ: number;
+  DTWIstX: number;
+  DTWIstY: number;
+  DTWIstZ: number;
   pointsOrder: number;
 }
 
@@ -116,6 +162,12 @@ export interface EAPositionRaw {
   bahn_id: string;
   segment_id: string;
   euclidean_distances: number;
+  ea_soll_x: number;
+  ea_soll_y: number;
+  ea_soll_z: number;
+  ea_ist_x: number;
+  ea_ist_y: number;
+  ea_ist_z: number;
   points_order: number;
 }
 
@@ -123,6 +175,12 @@ export interface EAPosition {
   bahnID: string;
   segmentID: string;
   EADistances: number;
+  EASollX: number;
+  EASollY: number;
+  EASollZ: number;
+  EAIstX: number;
+  EAIstY: number;
+  EAIstZ: number;
   pointsOrder: number;
 }
 
@@ -131,6 +189,7 @@ export interface AuswertungInfo {
   auswertung_info: {
     info_dfd: DFDInfo[];
     info_sidtw: SIDTWInfo[];
+    info_dtw: DTWInfo[];
     info_euclidean: EAInfo[];
   };
 }

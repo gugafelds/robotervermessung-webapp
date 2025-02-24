@@ -5,6 +5,8 @@
 import {
   transformDFDDeviationResult,
   transformDFDInfoResult,
+  transformDTWDeviationResult,
+  transformDTWInfoResult,
   transformEADeviationResult,
   transformEAInfoResult,
   transformSIDTWDeviationResult,
@@ -15,6 +17,8 @@ import type {
   AuswertungInfo,
   DFDPosition,
   DFDPositionRaw,
+  DTWPosition,
+  DTWPositionRaw,
   EAPosition,
   EAPositionRaw,
   SIDTWPosition,
@@ -28,7 +32,8 @@ interface ApiResponse {
   bahn_info: any[]; // oder spezifischer Type
   auswertung_info: {
     info_dfd: any[]; // oder spezifischer Type
-    info_sidtw: any[]; // oder spezifischer Type
+    info_sidtw: any[];
+    info_dtw: any[]; // oder spezifischer Type
     info_euclidean: any[]; // oder spezifischer Type
   };
 }
@@ -88,6 +93,9 @@ export const getAllAuswertungInfo = async (): Promise<AuswertungInfo> => {
         info_sidtw: transformSIDTWInfoResult(
           result.auswertung_info?.info_sidtw || [],
         ),
+        info_dtw: transformDTWInfoResult(
+          result.auswertung_info?.info_dtw || [],
+        ),
         info_euclidean: transformEAInfoResult(
           result.auswertung_info?.info_euclidean || [],
         ),
@@ -135,6 +143,20 @@ export const getSIDTWPositionById = async (
     return transformSIDTWDeviationResult(result.position_sidtw);
   } catch (error) {
     console.error('Error fetching SIDTW deviation data:', error);
+    throw error;
+  }
+};
+
+export const getDTWPositionById = async (
+  id: string,
+): Promise<DTWPosition[]> => {
+  try {
+    const result = await fetchFromAPI<{ position_dtw: DTWPositionRaw[] }>(
+      `/auswertung/position_dtw/${id}`,
+    );
+    return transformDTWDeviationResult(result.position_dtw);
+  } catch (error) {
+    console.error('Error fetching DTW deviation data:', error);
     throw error;
   }
 };

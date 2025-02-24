@@ -49,7 +49,6 @@ export const Sidebar = () => {
         return bahn.pickAndPlaceRun;
       }
 
-      // Check for event search pattern (e.g., 'p=5' or 'np=3')
       const eventMatch = filter.match(/^(n?p)=(\d+)$/i);
       if (eventMatch) {
         const [, eventType, count] = eventMatch;
@@ -61,6 +60,18 @@ export const Sidebar = () => {
         if (eventType.toLowerCase() === 'np') {
           return bahn.numberPointsEvents === searchCount;
         }
+      }
+
+      const weightMatch = filter.match(/^(w|weight)=(\d*\.?\d+)$/i);
+      if (weightMatch) {
+        const [, , weight] = weightMatch; // Erstes und zweites Element überspringen
+        return bahn.weight === parseFloat(weight);
+      }
+
+      const velPPMatch = filter.match(/^(v|vp)=(\d+)$/i);
+      if (velPPMatch) {
+        const [, , velPP] = velPPMatch; // Erstes und zweites Element überspringen
+        return bahn.velocityHandling === velPP;
       }
 
       return filterBy(filter, [

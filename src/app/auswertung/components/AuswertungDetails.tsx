@@ -4,7 +4,6 @@ import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import React, { useEffect, useState } from 'react';
 
 import { checkPositionDataAvailability } from '@/src/actions/auswertung.service';
-import { AuswertungInfoPlot } from '@/src/app/auswertung/components/AuswertungInfoPlot';
 import { DeviationsPlot } from '@/src/app/auswertung/components/DeviationsPlot';
 import { MetrikenPanel } from '@/src/app/auswertung/components/MetrikenPanel';
 import { Typography } from '@/src/components/Typography';
@@ -48,6 +47,10 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
   );
 
   const DFDInfo = auswertungInfo.auswertung_info.info_dfd.filter(
+    (info) => info.bahnID === bahnId,
+  );
+
+  const DTWInfo = auswertungInfo.auswertung_info.info_dtw.filter(
     (info) => info.bahnID === bahnId,
   );
 
@@ -109,7 +112,7 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
                 label="Bahndauer"
                 value={
                   currentBahn.startTime && currentBahn.endTime
-                    ? `${Math.round((new Date(currentBahn.endTime).getTime() - new Date(currentBahn.startTime).getTime()) / 1000)}s`
+                    ? `${((new Date(currentBahn.endTime).getTime() - new Date(currentBahn.startTime).getTime()) / 1000).toFixed(1)}s`
                     : 'n. a.'
                 }
               />
@@ -179,24 +182,12 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
         <MetrikenPanel
           EAInfo={EAInfo}
           DFDInfo={DFDInfo}
+          DTWInfo={DTWInfo}
           SIDTWInfo={SIDTWInfo}
         />
 
-        {/* Analysis Plots */}
-        {EAInfo.length > 0 ? (
-          <AuswertungInfoPlot
-            EAInfo={EAInfo}
-            DFDInfo={DFDInfo}
-            SIDTWInfo={SIDTWInfo}
-          />
-        ) : (
-          <p className="text-gray-500">Keine Euclidean Analysen verfügbar</p>
-        )}
-      </div>
-
-      <div className="mb-6 rounded-lg border p-4">
         <Typography as="h3" className="mb-3 font-semibold">
-          Abweichungen nach aufgezeichneten Punkten
+          Position (Visualisierung)
         </Typography>
         <DeviationsPlot hasDeviationData={hasDeviationData} bahnId={bahnId} />
       </div>

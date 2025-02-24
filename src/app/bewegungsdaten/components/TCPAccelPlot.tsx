@@ -85,8 +85,8 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
         x: timestampsIMU,
         y: currentBahnIMU.map((bahn) => Math.abs(bahn.tcpAccelPi)),
         line: {
-          color: 'green',
-          width: 3,
+          color: 'darkred',
+          width: 4,
         },
         name: 'Beschleunigung-Sensehat',
       };

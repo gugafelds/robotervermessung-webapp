@@ -13,6 +13,8 @@ import type {
   AuswertungInfo,
   DFDInfo,
   DFDPosition,
+  DTWInfo,
+  DTWPosition,
   EAInfo,
   EAPosition,
   SIDTWInfo,
@@ -23,6 +25,8 @@ export interface AuswertungState {
   auswertungInfo: AuswertungInfo;
   currentSIDTWInfo: SIDTWInfo[];
   setCurrentSIDTWInfo: React.Dispatch<React.SetStateAction<SIDTWInfo[]>>;
+  currentDTWInfo: DTWInfo[];
+  setCurrentDTWInfo: React.Dispatch<React.SetStateAction<DTWInfo[]>>;
   currentDiscreteFrechetInfo: DFDInfo[];
   setCurrentDiscreteFrechetInfo: React.Dispatch<
     React.SetStateAction<DFDInfo[]>
@@ -33,6 +37,8 @@ export interface AuswertungState {
   setCurrentSIDTWDeviation: React.Dispatch<
     React.SetStateAction<SIDTWPosition[]>
   >;
+  currentDTWDeviation: DTWPosition[];
+  setCurrentDTWDeviation: React.Dispatch<React.SetStateAction<DTWPosition[]>>;
   currentEuclideanDeviation: EAPosition[];
   setCurrentEuclideanDeviation: React.Dispatch<
     React.SetStateAction<EAPosition[]>
@@ -61,6 +67,7 @@ export const AuswertungProvider = ({
 
   // Info Zustände
   const [currentSIDTWInfo, setCurrentSIDTWInfo] = useState<SIDTWInfo[]>([]);
+  const [currentDTWInfo, setCurrentDTWInfo] = useState<DTWInfo[]>([]);
   const [currentDiscreteFrechetInfo, setCurrentDiscreteFrechetInfo] = useState<
     DFDInfo[]
   >([]);
@@ -72,6 +79,9 @@ export const AuswertungProvider = ({
   const [currentSIDTWDeviation, setCurrentSIDTWDeviation] = useState<
     SIDTWPosition[]
   >([]);
+  const [currentDTWDeviation, setCurrentDTWDeviation] = useState<DTWPosition[]>(
+    [],
+  );
   const [currentDiscreteFrechetDeviation, setCurrentDiscreteFrechetDeviation] =
     useState<DFDPosition[]>([]);
   const [currentEuclideanDeviation, setCurrentEuclideanDeviation] = useState<
@@ -88,12 +98,16 @@ export const AuswertungProvider = ({
       auswertungInfo,
       currentSIDTWInfo,
       setCurrentSIDTWInfo,
+      currentDTWInfo,
+      setCurrentDTWInfo,
       currentDiscreteFrechetInfo,
       setCurrentDiscreteFrechetInfo,
       currentEuclideanInfo,
       setCurrentEuclideanInfo,
       currentSIDTWDeviation,
       setCurrentSIDTWDeviation,
+      currentDTWDeviation,
+      setCurrentDTWDeviation,
       currentDiscreteFrechetDeviation,
       setCurrentDiscreteFrechetDeviation,
       currentEuclideanDeviation,
@@ -102,9 +116,11 @@ export const AuswertungProvider = ({
     [
       auswertungInfo,
       currentSIDTWInfo,
+      currentDTWInfo,
       currentDiscreteFrechetInfo,
       currentEuclideanInfo,
       currentSIDTWDeviation,
+      currentDTWDeviation,
       currentDiscreteFrechetDeviation,
       currentEuclideanDeviation,
     ],

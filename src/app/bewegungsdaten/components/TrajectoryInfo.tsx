@@ -72,7 +72,7 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = ({
       <span className="inline-flex">
         <InfoIcon className="w-8 text-primary" />
         <span className="mx-2 my-4 flex text-2xl font-semibold text-primary">
-          bahn info
+          Bahn Info
         </span>
       </span>
 
@@ -115,6 +115,11 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = ({
             <InfoRow
               label="Datenquelle (Soll)"
               value={currentBahnInfo.sourceDataSoll || 'n. a.'}
+              singleColumn
+            />
+            <InfoRow
+              label="Last am TCP"
+              value={`${formatNumber(currentBahnInfo.weight) || 'n. a.'} kg`}
               singleColumn
             />
             <InfoRow

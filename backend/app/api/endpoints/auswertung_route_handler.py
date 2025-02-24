@@ -89,6 +89,12 @@ async def get_position_euclidean_by_id(bahn_id: str, conn=Depends(get_db)):
             bahn_id,
             segment_id,
             euclidean_distances,
+            ea_soll_x,
+            ea_soll_y,
+            ea_soll_z,
+            ea_ist_x,
+            ea_ist_y,
+            ea_ist_z,
             points_order
         FROM auswertung.position_euclidean 
         WHERE bahn_id = $1
@@ -178,6 +184,40 @@ async def get_position_sidtw_by_id(bahn_id: str, conn=Depends(get_db)):
         logger.error(f"Error fetching SIDTW deviation data: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
+@router.get("/position_dtw/{bahn_id}")
+@cache(expire=2400)
+async def get_position_dtw_by_id(bahn_id: str, conn=Depends(get_db)):
+    try:
+        query = """
+        SELECT 
+            bahn_id,
+            segment_id,
+            dtw_distances,
+            dtw_soll_x,
+            dtw_soll_y,
+            dtw_soll_z,
+            dtw_ist_x,
+            dtw_ist_y,
+            dtw_ist_z,
+            points_order
+        FROM auswertung.position_dtw 
+        WHERE bahn_id = $1
+        ORDER BY points_order ASC
+        """
+
+        rows = await conn.fetch(query, bahn_id)
+
+        if not rows:
+            raise HTTPException(status_code=404, detail=f"No DTW deviation data found for bahn_id {bahn_id}")
+
+        return {
+            "position_dtw": [dict(row) for row in rows]
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching DTW deviation data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
 
 @router.get("/has_deviation_data/{bahn_id}")
 @cache(expire=2400)
@@ -188,7 +228,8 @@ async def check_deviation_data(bahn_id: str, conn=Depends(get_db)):
             CASE 
                 WHEN EXISTS (SELECT 1 FROM auswertung.position_euclidean WHERE bahn_id = $1) OR
                      EXISTS (SELECT 1 FROM auswertung.position_dfd WHERE bahn_id = $1) OR
-                     EXISTS (SELECT 1 FROM auswertung.position_sidtw WHERE bahn_id = $1)
+                     EXISTS (SELECT 1 FROM auswertung.position_sidtw WHERE bahn_id = $1) OR 
+                     EXISTS (SELECT 1 FROM auswertung.position_dtw WHERE bahn_id = $1)
                 THEN true
                 ELSE false
             END as has_data

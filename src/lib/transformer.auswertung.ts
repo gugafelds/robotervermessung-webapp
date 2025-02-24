@@ -3,6 +3,10 @@ import type {
   DFDInfoRaw,
   DFDPosition,
   DFDPositionRaw,
+  DTWInfo,
+  DTWInfoRaw,
+  DTWPosition,
+  DTWPositionRaw,
   EAInfo,
   EAInfoRaw,
   EAPosition,
@@ -63,6 +67,20 @@ export const transformSIDTWInfoResult = (
   );
 };
 
+export const transformDTWInfoResult = (bahnenRaw: DTWInfoRaw[]): DTWInfo[] => {
+  return bahnenRaw.map(
+    (bahn): DTWInfo => ({
+      bahnID: bahn.bahn_id,
+      segmentID: bahn.segment_id,
+      DTWMinDistance: bahn.dtw_min_distance,
+      DTWMaxDistance: bahn.dtw_max_distance,
+      DTWAvgDistance: bahn.dtw_average_distance,
+      DTWStdDeviation: bahn.dtw_standard_deviation,
+      evaluation: bahn.evaluation,
+    }),
+  );
+};
+
 export const transformEADeviationResult = (
   data: EAPositionRaw[],
 ): EAPosition[] => {
@@ -70,6 +88,12 @@ export const transformEADeviationResult = (
     bahnID: item.bahn_id,
     segmentID: item.segment_id,
     EADistances: item.euclidean_distances,
+    EASollX: item.ea_soll_x,
+    EASollY: item.ea_soll_y,
+    EASollZ: item.ea_soll_z,
+    EAIstX: item.ea_ist_x,
+    EAIstY: item.ea_ist_y,
+    EAIstZ: item.ea_ist_z,
     pointsOrder: item.points_order,
   }));
 };
@@ -104,6 +128,23 @@ export const transformSIDTWDeviationResult = (
     SIDTWIstX: item.sidtw_ist_x,
     SIDTWIstY: item.sidtw_ist_y,
     SIDTWIstZ: item.sidtw_ist_z,
+    pointsOrder: item.points_order,
+  }));
+};
+
+export const transformDTWDeviationResult = (
+  data: DTWPositionRaw[],
+): DTWPosition[] => {
+  return data.map((item) => ({
+    bahnID: item.bahn_id,
+    segmentID: item.segment_id,
+    DTWDistances: item.dtw_distances,
+    DTWSollX: item.dtw_soll_x,
+    DTWSollY: item.dtw_soll_y,
+    DTWSollZ: item.dtw_soll_z,
+    DTWIstX: item.dtw_ist_x,
+    DTWIstY: item.dtw_ist_y,
+    DTWIstZ: item.dtw_ist_z,
     pointsOrder: item.points_order,
   }));
 };

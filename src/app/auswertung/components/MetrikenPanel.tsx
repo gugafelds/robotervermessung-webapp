@@ -1,62 +1,69 @@
+/* eslint-disable */
 'use client';
 
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
-import * as Slider from '@radix-ui/react-slider';
 import React, { useEffect, useState } from 'react';
 
 import { formatNumber } from '@/src/lib/functions';
-import type { DFDInfo, EAInfo, SIDTWInfo } from '@/types/auswertung.types';
+import type { DFDInfo, EAInfo, DTWInfo, SIDTWInfo } from '@/types/auswertung.types';
+import { Typography } from '@/src/components/Typography';
 
-interface SegmentRange {
-  min: number;
-  max: number;
+interface SegmentOption {
+  label: string;
+  value: string;
 }
 
 export const MetrikenPanel: React.FC<{
   EAInfo: EAInfo[];
   DFDInfo: DFDInfo[];
+  DTWInfo: DTWInfo[];
   SIDTWInfo: SIDTWInfo[];
-}> = ({ EAInfo, DFDInfo, SIDTWInfo }) => {
-  // Finde das Minimum und Maximum der verfügbaren Segmente
-  const getAllSegmentNumbers = (analyses: any[]) => {
-    return analyses
-      .filter((a) => a.bahnID !== a.segmentID) // Filtere zuerst die Zeilen mit gleicher ID
-      .map((a) => parseInt(a.segmentID.split('_')[1], 10));
-  };
+}> = ({ EAInfo, DFDInfo, DTWInfo, SIDTWInfo }) => {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedSegment, setSelectedSegment] = useState<string>('total');
+  const [segmentOptions, setSegmentOptions] = useState<SegmentOption[]>([]);
 
-  const [segmentRange, setSegmentRange] = useState<SegmentRange>({
-    min: 0,
-    max: 0,
-  });
-  const [selectedRange, setSelectedRange] = useState<SegmentRange>({
-    min: 0,
-    max: 0,
-  });
-  const [showSelector, setShowSelector] = useState(false);
-
-  // Initialisiere den Bereich der verfügbaren Segmente
+  // Get all available segments and create dropdown options
   useEffect(() => {
+    const getAllSegmentNumbers = (analyses: any[]) => {
+      return Array.from(
+        analyses
+          .filter((a) => a.bahnID !== a.segmentID)
+          .map((a) => parseInt(a.segmentID.split('_')[1], 10))
+          .reduce((acc, curr) => acc.add(curr), new Set<number>()),
+      ).sort((a, b) => a - b);
+    };
+
     const allSegments = [
       ...getAllSegmentNumbers(EAInfo),
       ...getAllSegmentNumbers(DFDInfo),
+      ...getAllSegmentNumbers(DTWInfo),
       ...getAllSegmentNumbers(SIDTWInfo),
     ];
 
-    if (allSegments.length > 0) {
-      const minSegment = Math.min(...allSegments);
-      const maxSegment = Math.max(...allSegments);
-      setSegmentRange({ min: minSegment, max: maxSegment });
-      setSelectedRange({ min: minSegment, max: maxSegment });
-    }
-  }, [EAInfo, DFDInfo, SIDTWInfo]);
+    const options: SegmentOption[] = [
+      { label: 'Gesamtmessung', value: 'total' },
+      ...allSegments
+        .filter((value, index, self) => self.indexOf(value) === index)
+        .map((segNum) => ({
+          label: `Segment ${segNum}`,
+          value: `segment_${segNum}`,
+        })),
+    ];
 
-  // Funktion zum Berechnen der Durchschnittswerte pro Metrik im ausgewählten Bereich
-  const calculateMetricAverages = (analyses: any[], prefix: string) => {
+    setSegmentOptions(options);
+  }, [EAInfo, DFDInfo, DTWInfo, SIDTWInfo]);
+
+  // Calculate metrics for selected segment
+  const calculateMetrics = (analyses: any[], prefix: string) => {
     if (analyses.length === 0) return null;
 
     const filteredAnalyses = analyses.filter((analysis) => {
-      const segmentNum = parseInt(analysis.segmentID.split('_')[1], 10);
-      return segmentNum >= selectedRange.min && segmentNum <= selectedRange.max;
+      if (selectedSegment === 'total') {
+        return analysis.bahnID === analysis.segmentID;
+      }
+      const segmentNum = selectedSegment.split('_')[1];
+      return analysis.segmentID === `${analysis.bahnID}_${segmentNum}`;
     });
 
     if (filteredAnalyses.length === 0) return null;
@@ -87,81 +94,40 @@ export const MetrikenPanel: React.FC<{
     };
   };
 
-  const eaMetrics = calculateMetricAverages(EAInfo, 'EA');
-  const dfdMetrics = calculateMetricAverages(DFDInfo, 'DFD');
-  const sidtwMetrics = calculateMetricAverages(SIDTWInfo, 'SIDTW');
+  const eaMetrics = calculateMetrics(EAInfo, 'EA');
+  const dfdMetrics = calculateMetrics(DFDInfo, 'DFD');
+  const dtwMetrics = calculateMetrics(DTWInfo, 'DTW');
+  const sidtwMetrics = calculateMetrics(SIDTWInfo, 'SIDTW');
 
   return (
-    <div className="mb-6 rounded-lg border bg-white p-6 shadow-sm">
+    <div className="mb-6 rounded-lg border w-1/2 bg-white p-6 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-semibold text-primary">
-          Auswertungsmetriken (segmentweise)
-        </h3>
+        <Typography as="h2">Position</Typography>
 
         <div className="relative">
-          {/* eslint-disable-next-line react/button-has-type */}
           <button
-            onClick={() => setShowSelector(!showSelector)}
+            onClick={() => setShowDropdown(!showDropdown)}
             className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
           >
-            {selectedRange.min === segmentRange.min &&
-            selectedRange.max === segmentRange.max
-              ? 'Alle Segmente'
-              : `Segment ${selectedRange.min} - ${selectedRange.max}`}
+            {segmentOptions.find((opt) => opt.value === selectedSegment)
+              ?.label || 'Auswählen'}
             <ChevronDownIcon className="size-4" />
           </button>
 
-          {showSelector && (
-            <div className="absolute right-0 top-10 z-10 w-80 rounded-md border bg-white p-4 shadow-lg">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
-                  <label className="text-sm font-medium text-gray-600">
-                    Segmentbereich:
-                  </label>
-                  <div className="px-2">
-                    <Slider.Root
-                      className="relative flex h-5 w-full touch-none items-center"
-                      value={[selectedRange.min, selectedRange.max]}
-                      max={segmentRange.max}
-                      min={segmentRange.min}
-                      step={1}
-                      onValueChange={([min, max]) => {
-                        setSelectedRange({ min, max });
-                      }}
-                    >
-                      <Slider.Track className="relative h-1 w-full grow rounded-full bg-gray-200">
-                        <Slider.Range className="absolute h-full rounded-full bg-primary" />
-                      </Slider.Track>
-                      <Slider.Thumb
-                        /* eslint-disable-next-line tailwindcss/migration-from-tailwind-2 */
-                        className="block size-4 rounded-full border border-primary bg-white focus:outline-none focus-visible:ring focus-visible:ring-primary focus-visible:ring-opacity-75"
-                        aria-label="Minimum segment"
-                      />
-                      <Slider.Thumb
-                        /* eslint-disable-next-line tailwindcss/migration-from-tailwind-2 */
-                        className="block size-4 rounded-full border border-primary bg-white focus:outline-none focus-visible:ring focus-visible:ring-primary focus-visible:ring-opacity-75"
-                        aria-label="Maximum segment"
-                      />
-                    </Slider.Root>
-                  </div>
-                  <div className="flex justify-between text-sm text-gray-500">
-                    <span>{selectedRange.min}</span>
-                    <span>{selectedRange.max}</span>
-                  </div>
-                </div>
-
-                {/* eslint-disable-next-line react/button-has-type */}
+          {showDropdown && (
+            <div className="absolute right-0 top-10 z-10 w-48 rounded-md border bg-white shadow-lg">
+              {segmentOptions.map((option) => (
                 <button
+                  key={option.value}
                   onClick={() => {
-                    setSelectedRange(segmentRange);
-                    setShowSelector(false);
+                    setSelectedSegment(option.value);
+                    setShowDropdown(false);
                   }}
-                  className="w-full rounded-md bg-gray-100 px-3 py-1 text-sm text-gray-600 hover:bg-gray-200"
+                  className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
                 >
-                  Alle Segmente
+                  {option.label}
                 </button>
-              </div>
+              ))}
             </div>
           )}
         </div>
@@ -186,15 +152,13 @@ export const MetrikenPanel: React.FC<{
               <th className="pb-2 text-center font-semibold text-primary">
                 Std. Abw.
               </th>
-              <th className="pb-2 text-left font-semibold text-primary">
-                Metriken
-              </th>
+
             </tr>
           </thead>
           <tbody>
             {eaMetrics && (
               <tr className="border-b">
-                <td className="py-3 text-primary">Euklidischer Abstand</td>
+                <td className="py-3 text-primary">EA</td>
                 <td className="py-3 text-center text-primary">
                   {formatNumber(eaMetrics.min)}
                 </td>
@@ -207,7 +171,6 @@ export const MetrikenPanel: React.FC<{
                 <td className="py-3 text-center text-primary">
                   {formatNumber(eaMetrics.std)}
                 </td>
-                <td className="py-3 text-primary">{eaMetrics.evaluation}</td>
               </tr>
             )}
             {sidtwMetrics && (
@@ -225,7 +188,23 @@ export const MetrikenPanel: React.FC<{
                 <td className="py-3 text-center text-primary">
                   {formatNumber(sidtwMetrics.std)}
                 </td>
-                <td className="py-3 text-primary">{sidtwMetrics.evaluation}</td>
+              </tr>
+            )}
+            {dtwMetrics && (
+              <tr className="border-b">
+                <td className="py-3 text-primary">DTW</td>
+                <td className="py-3 text-center text-primary">
+                  {formatNumber(dtwMetrics.min)}
+                </td>
+                <td className="py-3 text-center text-primary">
+                  {formatNumber(dtwMetrics.avg)}
+                </td>
+                <td className="py-3 text-center text-primary">
+                  {formatNumber(dtwMetrics.max)}
+                </td>
+                <td className="py-3 text-center text-primary">
+                  {formatNumber(dtwMetrics.std)}
+                </td>
               </tr>
             )}
             {dfdMetrics && (
@@ -243,7 +222,7 @@ export const MetrikenPanel: React.FC<{
                 <td className="py-3 text-center text-primary">
                   {formatNumber(dfdMetrics.std)}
                 </td>
-                <td className="py-3 text-primary">{dfdMetrics.evaluation}</td>
+
               </tr>
             )}
           </tbody>

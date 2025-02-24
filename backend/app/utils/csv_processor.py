@@ -137,7 +137,6 @@ class CSVProcessor:
                 if first_ap_idx is None:
                     first_ap_idx = i
                     first_ap_time = self.convert_timestamp(row['timestamp'])
-                    print(f"First AP coordinates found at timestamp {row['timestamp']}")
                 last_ap_idx = i
                 last_ap_time = self.convert_timestamp(row['timestamp'])
 
@@ -198,33 +197,33 @@ class CSVProcessor:
         total_rows = len(rows)
         modified_rows = rows.copy()
 
-        print("\n=== Starting Pick & Place Segment Analysis ===")
-        print(f"Total rows: {total_rows}")
+        #print("\n=== Starting Pick & Place Segment Analysis ===")
+        #print(f"Total rows: {total_rows}")
 
         # Find all 1.0 signal positions but group consecutive ones
         one_signal_groups = []
         current_group = []
-        print("\n--- Finding Signal Groups ---")
+        #print("\n--- Finding Signal Groups ---")
         for i, row in enumerate(rows):
             if row.get('DO_Signal', '').strip() == '1.0':
                 if not current_group or i - current_group[-1] < 30:
                     current_group.append(i)
                 else:
                     if current_group:
-                        print(f"Found signal group at indices: {current_group}")
+                        #print(f"Found signal group at indices: {current_group}")
                         one_signal_groups.append(current_group)
                     current_group = [i]
         if current_group:
             one_signal_groups.append(current_group)
-            print(f"Found final signal group at indices: {current_group}")
+            #print(f"Found final signal group at indices: {current_group}")
 
-        print(f"\nTotal signal groups found: {len(one_signal_groups)}")
+        #print(f"\nTotal signal groups found: {len(one_signal_groups)}")
 
         # Process only the first 1.0 signal of each group
-        print("\n--- Processing AP/AQ Values ---")
+        #print("\n--- Processing AP/AQ Values ---")
         for group in one_signal_groups:
             first_index = group[0]
-            print(f"\nProcessing group starting at index {first_index}")
+            #print(f"\nProcessing group starting at index {first_index}")
 
             # Look backwards for last AP/AQ values
             last_ap_aq = None
@@ -241,39 +240,39 @@ class CSVProcessor:
                         'aq_z': row['aq_z'],
                         'aq_w': row['aq_w']
                     }
-                    print(f"Found AP/AQ values at index {i}:")
-                    print(last_ap_aq)
+                    #print(f"Found AP/AQ values at index {i}:")
+                    #print(last_ap_aq)
                     break
 
             if last_ap_aq:
-                print(f"Updating modified_rows at index {first_index} with AP/AQ values")
+                #print(f"Updating modified_rows at index {first_index} with AP/AQ values")
                 modified_rows[first_index].update(last_ap_aq)
             else:
                 print(f"WARNING: No AP/AQ values found before index {first_index}")
 
         # Create segments
-        print("\n--- Creating Segments ---")
+        # print("\n--- Creating Segments ---")
         segments = []
         current_position = 0
 
         while current_position < total_rows:
-            print(f"\nLooking for next segment starting at position {current_position}")
+            #print(f"\nLooking for next segment starting at position {current_position}")
 
             # Find next 1.0 signal
             close_idx = next((i for i in range(current_position, total_rows)
                               if modified_rows[i].get('DO_Signal', '').strip() == '1.0'), None)
             if close_idx is None:
-                print("No more 1.0 signals found")
+                #print("No more 1.0 signals found")
                 break
 
             # Find next 0.0 signal
             open_idx = next((i for i in range(close_idx + 1, total_rows)
                              if modified_rows[i].get('DO_Signal', '').strip() == '0.0'), None)
             if open_idx is None:
-                print(f"No matching 0.0 signal found after 1.0 signal at {close_idx}")
+                #print(f"No matching 0.0 signal found after 1.0 signal at {close_idx}")
                 break
 
-            print(f"Found potential segment: 1.0 at {close_idx} to 0.0 at {open_idx}")
+            #print(f"Found potential segment: 1.0 at {close_idx} to 0.0 at {open_idx}")
 
             # Calculate segment with buffers
             start_time = self.convert_timestamp(modified_rows[close_idx]['timestamp'])
@@ -297,73 +296,31 @@ class CSVProcessor:
                 min(total_rows, open_idx + 1000) - 1
             )
 
-            print(f"Final segment boundaries: {actual_start} to {actual_end}")
+            #print(f"Final segment boundaries: {actual_start} to {actual_end}")
 
             # Check for AP coordinates in segment
             ap_coords = []
             for i in range(actual_start, actual_end + 1):
                 if all(modified_rows[i].get(f'ap_{coord}', '').strip() for coord in ['x', 'y', 'z']):
                     ap_coords.append(i)
-            print(f"AP coordinates found at indices: {ap_coords}")
+            #print(f"AP coordinates found at indices: {ap_coords}")
 
             segments.append((actual_start, actual_end))
             current_position = open_idx + 1
 
-        print("\n=== Segment Analysis Complete ===")
-        print(f"Total segments created: {len(segments)}")
+        #print("\n=== Segment Analysis Complete ===")
+        #print(f"Total segments created: {len(segments)}")
         if len(segments) != 4:
             print("WARNING: Number of segments is not 4!")
             print(f"Found {len(segments)} segments: {segments}")
 
         return segments, modified_rows
 
-    def create_pickplace_segments_MAYBE(self, rows): # NEUE IDEE: einfach ap_x von letztem 0.0 DO_Signal kopieren!
-        segments = []
-        current_position = 0
-        total_rows = len(rows)
-
-        while current_position < total_rows:
-            close_idx = next((i for i in range(current_position, total_rows)
-                              if rows[i].get('DO_Signal', '').strip() == '1.0'), None)
-
-            if close_idx is None:
-                break
-
-            start_idx = next((i for i in range(close_idx - 1, -1, -1)
-                              if rows[i].get('ap_x', '').strip()), None)
-
-            if start_idx is not None:
-                start_time = self.convert_timestamp(rows[start_idx]['timestamp'])
-                buffer_start = start_time - timedelta(seconds=0.02)
-
-                actual_start = next(
-                    (j for j in range(max(0, start_idx - 1000), start_idx + 1)
-                     if self.convert_timestamp(rows[j]['timestamp']) >= buffer_start),
-                    start_idx
-                )
-
-                end_idx = next((i for i in range(close_idx + 1, total_rows)
-                                if rows[i].get('DO_Signal', '').strip() == '0.0'),
-                               total_rows - 1)
-
-                end_time = self.convert_timestamp(rows[end_idx]['timestamp'])
-                buffer_end = end_time + timedelta(seconds=0.02)
-
-                actual_end = next(
-                    (j for j in range(end_idx, min(total_rows, end_idx + 1000))
-                     if self.convert_timestamp(rows[j]['timestamp']) > buffer_end),
-                    min(total_rows, end_idx + 1000) - 1
-                )
-
-                segments.append((actual_start, actual_end))
-
-            current_position = end_idx + 1
-
-        return segments
-
     def process_csv(self, upload_database, robot_model, bahnplanung, source_data_ist,
                     source_data_soll, record_filename, segmentation_method='home', num_segments=1):
         """Process the CSV file and prepare data for database insertion."""
+
+        print('Processing CSV file: ' + record_filename + '!')
         try:
             with open(self.file_path, 'r') as csvfile:
                 reader = csv.DictReader(csvfile)
@@ -419,8 +376,8 @@ class CSVProcessor:
                             break
 
                     # Debug output to verify values
-                    print(f"Found values: velocity_picking={velocity_picking}, "
-                          f"velocity_handling={velocity_handling}, weight={weight}")
+                    # print(f"Found values: velocity_picking={velocity_picking}, "
+                    #      f"velocity_handling={velocity_handling}, weight={weight}")
 
                 # Find path cycles based on reference coordinates
                 paths = self.find_path_cycles(rows, record_filename,
@@ -480,23 +437,23 @@ class CSVProcessor:
                                 # Determine movement type based on segment position
                                 if segment_counter % 4 == 0:  # Approach
                                     movement_types[segment_id] = "linear"
-                                    print(f"Segment {segment_id}: Setting linear (approach)")
+                                    #print(f"Segment {segment_id}: Setting linear (approach)")
                                 elif segment_counter % 4 == 1:  # Pick
                                     movement_types[segment_id] = "linear"
-                                    print(f"Segment {segment_id}: Setting linear (pick)")
+                                    #print(f"Segment {segment_id}: Setting linear (pick)")
                                 elif segment_counter % 4 == 2:  # Handling movement
                                     try:
                                         # This segment represents the movement between points 2 and 3
                                         # where z-height is constant (1046.7 in your example)
                                         movement_type = self.calculate_direction(filtered_rows)
                                         movement_types[segment_id] = movement_type
-                                        print(f"Segment {segment_id}: Calculated {movement_type} (handling)")
+                                        #print(f"Segment {segment_id}: Calculated {movement_type} (handling)")
                                     except Exception as e:
                                         print(f"Error calculating direction for segment {segment_id}: {e}")
                                         movement_types[segment_id] = None
                                 else:  # Place (segment_counter % 4 == 0)
                                     movement_types[segment_id] = "linear"
-                                    print(f"Segment {segment_id}: Setting linear (place)")
+                                    #print(f"Segment {segment_id}: Setting linear (place)")
 
 
                     # Reset segment counter again for the main processing
@@ -623,10 +580,10 @@ class CSVProcessor:
                         bahn_info_data = tuple(base_info)
 
                     processed_data['bahn_info_data'] = bahn_info_data
-                    print(bahn_info_data)
+                    #print(bahn_info_data)
                     all_processed_data.append(processed_data)
 
-                    self.print_processing_stats(len(filtered_rows), rows_processed, point_counts)
+                    #self.print_processing_stats(len(filtered_rows), rows_processed, point_counts)
 
                 return all_processed_data
 
@@ -637,6 +594,18 @@ class CSVProcessor:
     def process_mapping(self, row, mapping, bahn_id, current_segment_id, timestamp, source_data, data_list,
                         rows_processed, mapping_name, point_counts, movement_types=None):
 
+        def convert_value(value):
+            """Helper function to convert values, properly handling zeros"""
+            if value.strip() == '0' or value.strip() == '0.0':
+                return 0.0
+            elif value.strip():
+                try:
+                    return float(value)
+                except ValueError:
+                    print(f"Warning: Could not convert value: {value}")
+                    return None
+            return None
+
         if mapping_name == 'RAPID_EVENTS_MAPPING':
             if any(row.get(csv_col, '').strip() for csv_col in mapping):
                 data_row = [bahn_id, current_segment_id, timestamp]
@@ -644,12 +613,12 @@ class CSVProcessor:
 
                 # Process normal values (positions and orientations)
                 for csv_col in mapping:
-                    value = row.get(csv_col, '').strip()
-                    if value:
-                        if any(x in csv_col for x in ['x_reached', 'y_reached', 'z_reached',
-                                                      'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached']):
-                            value = float(value)
-                    values.append(value if value else None)
+                    value = row.get(csv_col, '')
+                    if any(x in csv_col for x in ['x_reached', 'y_reached', 'z_reached',
+                                                  'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached']):
+                        values.append(convert_value(value))
+                    else:
+                        values.append(value.strip() if value.strip() else None)
 
                 data_row.extend(values)  # Add position values
                 data_row.append(source_data)  # Add source_data before movement_type
@@ -663,21 +632,15 @@ class CSVProcessor:
 
                 data_list.append(data_row)
                 rows_processed += 1
-                print(data_list)
-
 
         else:  # ACCEL_MAPPING, TWIST_IST_MAPPING, etc.
             if all(row.get(csv_col, '').strip() for csv_col in mapping):
                 data_row = [bahn_id, current_segment_id, timestamp]
                 values = []
                 for csv_col in mapping:
-                    value = row.get(csv_col, '').strip()
-                    try:
-                        if value:
-                            value = float(value)
-                    except ValueError:
-                        print(f"Warning: Could not convert {csv_col} value: {value}")
-                    values.append(value if value else None)
+                    value = row.get(csv_col, '')
+                    converted_value = convert_value(value)
+                    values.append(converted_value)
 
                 data_row.extend(values)
                 # Use 'sensehat' as source for IMU data
@@ -768,7 +731,7 @@ class CSVProcessor:
         if handling_height is None:
             raise ValueError("Keine Z-Höhe gefunden.")
 
-        print(f"Found handling height: {handling_height}")
+        #print(f"Found handling height: {handling_height}")
 
         # Schritt 2: Zweiter Punkt (ap_x, ap_y) mit maximaler Z-Höhe finden
         first_point = None
@@ -781,7 +744,7 @@ class CSVProcessor:
                 if abs(ap_z - handling_height) < 0.1:
                     first_point = (ap_x, ap_y)
                     start = index + 2
-                    print(f"Found first point: ({ap_x}, {ap_y}) at z={ap_z}")
+                    #print(f"Found first point: ({ap_x}, {ap_y}) at z={ap_z}")
                     break
 
         if not first_point:
@@ -799,7 +762,7 @@ class CSVProcessor:
                     if (ap_x, ap_y) != first_point:  # Ensure it's a different point
                         last_point = (ap_x, ap_y)
                         end = index + start
-                        print(f"Found last point: ({ap_x}, {ap_y}) at z={ap_z}")
+                        #print(f"Found last point: ({ap_x}, {ap_y}) at z={ap_z}")
                         break
 
         if not last_point:
@@ -819,9 +782,6 @@ class CSVProcessor:
         # Berechnung der Distanz zwischen dem ersten und letzten Punkt (Referenzgerade)
         x1, y1 = first_point  # Erster Punkt
         x2, y2 = last_point  # Letzter Punkt
-
-        print(x1,y1)
-        print(x2,y2)
 
         # Berechne die Distanz zwischen dem ersten und letzten Punkt
         p1p2_distance = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
