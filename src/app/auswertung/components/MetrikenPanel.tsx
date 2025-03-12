@@ -1,12 +1,19 @@
-/* eslint-disable */
+/* eslint-disable react/button-has-type,no-console */
+
 'use client';
 
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import React, { useEffect, useState } from 'react';
 
-import { formatNumber } from '@/src/lib/functions';
-import type { DFDInfo, EAInfo, DTWInfo, SIDTWInfo } from '@/types/auswertung.types';
+import { getAuswertungInfoById } from '@/src/actions/auswertung.service';
 import { Typography } from '@/src/components/Typography';
+import { formatNumber } from '@/src/lib/functions';
+import type {
+  DFDInfo,
+  DTWInfo,
+  EAInfo,
+  SIDTWInfo,
+} from '@/types/auswertung.types';
 
 interface SegmentOption {
   label: string;
@@ -14,14 +21,40 @@ interface SegmentOption {
 }
 
 export const MetrikenPanel: React.FC<{
-  EAInfo: EAInfo[];
-  DFDInfo: DFDInfo[];
-  DTWInfo: DTWInfo[];
-  SIDTWInfo: SIDTWInfo[];
-}> = ({ EAInfo, DFDInfo, DTWInfo, SIDTWInfo }) => {
+  bahnId: string;
+}> = ({ bahnId }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedSegment, setSelectedSegment] = useState<string>('total');
   const [segmentOptions, setSegmentOptions] = useState<SegmentOption[]>([]);
+
+  const [eaInfo, setEaInfo] = useState<EAInfo[]>([]);
+  const [dfdInfo, setDfdInfo] = useState<DFDInfo[]>([]);
+  const [dtwInfo, setDtwInfo] = useState<DTWInfo[]>([]);
+  const [sidtwInfo, setSidtwInfo] = useState<SIDTWInfo[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch Auswertung info when component mounts or bahnId changes
+  useEffect(() => {
+    const fetchAuswertungInfo = async () => {
+      if (!bahnId) return;
+
+      setIsLoading(true);
+      try {
+        const infoResult = await getAuswertungInfoById(bahnId);
+
+        setEaInfo(infoResult.info_euclidean || []);
+        setDfdInfo(infoResult.info_dfd || []);
+        setDtwInfo(infoResult.info_dtw || []);
+        setSidtwInfo(infoResult.info_sidtw || []);
+      } catch (error) {
+        console.error('Fehler beim Laden der Auswertungsinformationen:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAuswertungInfo();
+  }, [bahnId]);
 
   // Get all available segments and create dropdown options
   useEffect(() => {
@@ -35,10 +68,10 @@ export const MetrikenPanel: React.FC<{
     };
 
     const allSegments = [
-      ...getAllSegmentNumbers(EAInfo),
-      ...getAllSegmentNumbers(DFDInfo),
-      ...getAllSegmentNumbers(DTWInfo),
-      ...getAllSegmentNumbers(SIDTWInfo),
+      ...getAllSegmentNumbers(eaInfo),
+      ...getAllSegmentNumbers(dfdInfo),
+      ...getAllSegmentNumbers(dtwInfo),
+      ...getAllSegmentNumbers(sidtwInfo),
     ];
 
     const options: SegmentOption[] = [
@@ -52,7 +85,7 @@ export const MetrikenPanel: React.FC<{
     ];
 
     setSegmentOptions(options);
-  }, [EAInfo, DFDInfo, DTWInfo, SIDTWInfo]);
+  }, [eaInfo, dfdInfo, dtwInfo, sidtwInfo]);
 
   // Calculate metrics for selected segment
   const calculateMetrics = (analyses: any[], prefix: string) => {
@@ -94,13 +127,34 @@ export const MetrikenPanel: React.FC<{
     };
   };
 
-  const eaMetrics = calculateMetrics(EAInfo, 'EA');
-  const dfdMetrics = calculateMetrics(DFDInfo, 'DFD');
-  const dtwMetrics = calculateMetrics(DTWInfo, 'DTW');
-  const sidtwMetrics = calculateMetrics(SIDTWInfo, 'SIDTW');
+  const eaMetrics = calculateMetrics(eaInfo, 'EA');
+  const dfdMetrics = calculateMetrics(dfdInfo, 'DFD');
+  const dtwMetrics = calculateMetrics(dtwInfo, 'DTW');
+  const sidtwMetrics = calculateMetrics(sidtwInfo, 'SIDTW');
+
+  if (isLoading) {
+    return (
+      <div className="mb-6 w-1/2 rounded-lg border bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-center">
+          <div className="size-5 animate-spin rounded-full border-b-2 border-gray-900" />
+          <span className="ml-2">Lade Metriken...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!eaMetrics && !dfdMetrics && !dtwMetrics && !sidtwMetrics) {
+    return (
+      <div className="mb-6 w-1/2 rounded-lg border bg-white p-6 shadow-sm">
+        <Typography as="p" className="text-center text-gray-500">
+          Keine Metriken verfügbar
+        </Typography>
+      </div>
+    );
+  }
 
   return (
-    <div className="mb-6 rounded-lg border w-1/2 bg-white p-6 shadow-sm">
+    <div className="mb-6 w-1/2 rounded-lg border bg-white p-6 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <Typography as="h2">Position</Typography>
 
@@ -152,7 +206,6 @@ export const MetrikenPanel: React.FC<{
               <th className="pb-2 text-center font-semibold text-primary">
                 Std. Abw.
               </th>
-
             </tr>
           </thead>
           <tbody>
@@ -222,7 +275,6 @@ export const MetrikenPanel: React.FC<{
                 <td className="py-3 text-center text-primary">
                   {formatNumber(dfdMetrics.std)}
                 </td>
-
               </tr>
             )}
           </tbody>

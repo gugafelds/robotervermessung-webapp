@@ -10,7 +10,7 @@ class CSVProcessor:
         self.file_path = file_path
         self.mappings = MAPPINGS
 
-    def find_path_cycles(self, rows, filename, segmentation_method='home', num_segments=1):
+    def find_path_cycles(self, rows, filename, segmentation_method, num_segments):
         """
         Find segments based on the specified method:
         - 'home': Home position detection
@@ -28,6 +28,8 @@ class CSVProcessor:
             # Store modified rows for later use
             self.rows = modified_rows  # Add this line
             return segments
+        elif segmentation_method == 'fixed':
+            return self.create_fixed_segments(rows, segments_per_group=num_segments)
         else:
             return self.create_home_position_segments(rows)
     
@@ -121,7 +123,6 @@ class CSVProcessor:
             )
             
             segments.append((actual_start, actual_end))
-
         return segments
 
     def create_home_position_segments(self, rows):

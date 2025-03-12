@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+
 'use server';
 
 import {
@@ -5,7 +7,7 @@ import {
   transformBahnEventsResult,
   transformBahnIMUResult,
   transformBahnInfobyIDResult,
-  transformBahnInfoResult,
+  transformBahnInfoResponse,
   transformBahnJointStatesResult,
   transformBahnOrientationSollResult,
   transformBahnPoseIstResult,
@@ -27,6 +29,10 @@ import type {
   BahnTwistIst,
   BahnTwistSoll,
 } from '@/types/bewegungsdaten.types';
+import type {
+  BahnInfoResponse,
+  PaginationParams,
+} from '@/types/pagination.types';
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000/api';
 
@@ -67,13 +73,79 @@ async function fetchFromAPI(endpoint: string, useStream = false) {
   return response.json();
 }
 
-export const getAllBahnInfo = async (): Promise<BahnInfo[]> => {
+export const getBahnInfo = async (
+  params: PaginationParams = { page: 1, pageSize: 20 },
+): Promise<BahnInfoResponse> => {
   try {
-    const result = await fetchFromAPI('/bahn/bahn_info');
-    return transformBahnInfoResult(result.bahn_info);
+    // URL-Parameter für die Paginierung erstellen
+    // Konvertiere camelCase zu snake_case für die API-Anfrage
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.pageSize)
+      queryParams.append('page_size', params.pageSize.toString());
+
+    // API-Anfrage mit Paginierungsparametern
+    const result = await fetchFromAPI(
+      `/bahn/bahn_info?${queryParams.toString()}`,
+    );
+
+    // Transformiere die Antwort von snake_case zu camelCase
+    return transformBahnInfoResponse(result);
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error('Error fetching all Bahn info:', error);
+    console.error('Error fetching Bahn info:', error);
+    throw error;
+  }
+};
+
+export interface SearchBahnParams extends PaginationParams {
+  query?: string;
+  calibration?: boolean;
+  pickPlace?: boolean;
+  pointsEvents?: number;
+  weight?: number;
+  velocity?: string;
+}
+
+export const searchBahnInfo = async (
+  searchParams: SearchBahnParams = { page: 1, pageSize: 20 },
+): Promise<BahnInfoResponse> => {
+  try {
+    // URL-Parameter für die Suche erstellen
+    const queryParams = new URLSearchParams();
+
+    // Parameter hinzufügen und snake_case für API verwenden
+    if (searchParams.query) {
+      queryParams.append('query', searchParams.query);
+      console.log('Suche mit Query:', searchParams.query);
+    }
+    if (searchParams.calibration !== undefined)
+      queryParams.append('calibration', searchParams.calibration.toString());
+    if (searchParams.pickPlace !== undefined)
+      queryParams.append('pick_place', searchParams.pickPlace.toString());
+    if (searchParams.pointsEvents)
+      queryParams.append('points_events', searchParams.pointsEvents.toString());
+    if (searchParams.weight)
+      queryParams.append('weight', searchParams.weight.toString());
+    if (searchParams.velocity)
+      queryParams.append('velocity', searchParams.velocity);
+    if (searchParams.page)
+      queryParams.append('page', searchParams.page.toString());
+    if (searchParams.pageSize)
+      queryParams.append('page_size', searchParams.pageSize.toString());
+
+    const apiUrl = `/bahn/bahn_search?${queryParams.toString()}`;
+    console.log('API-Anfrage:', apiUrl);
+
+    // API-Anfrage mit Suchparametern
+    const result = await fetchFromAPI(apiUrl);
+    console.log('API-Ergebnis erhalten:', result.bahn_info?.length, 'Einträge');
+
+    // Transformiere die Antwort
+    return transformBahnInfoResponse(result);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error searching Bahn info:', error);
     throw error;
   }
 };

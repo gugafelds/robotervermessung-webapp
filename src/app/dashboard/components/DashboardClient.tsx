@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+
 'use client';
 
 import React from 'react';
@@ -5,14 +7,13 @@ import React from 'react';
 import { DataCard } from '@/src/app/dashboard/components/DataCard';
 import { Typography } from '@/src/components/Typography';
 
-import { FrequencyPanel } from './FrequencyPanel';
-
 interface DashboardClientProps {
   filenamesCount: number;
   bahnenCount: number;
   componentCounts: {
     bahnPoseIst: number;
     bahnTwistIst: number;
+    bahnTwistSoll: number;
     bahnAccelIst: number;
     bahnPositionSoll: number;
     bahnOrientationSoll: number;
@@ -20,16 +21,12 @@ interface DashboardClientProps {
     bahnEvents: number;
     bahnPoseTrans: number;
   };
-  frequencyData: Record<string, string[]>;
-  collectionSizes: {
-    bahnPoseIst: number;
-    bahnTwistIst: number;
-    bahnAccelIst: number;
-    bahnPositionSoll: number;
-    bahnOrientationSoll: number;
-    bahnJointStates: number;
-    bahnEvents: number;
-    bahnPoseTrans: number;
+  analysisCounts?: {
+    infoDFD: number;
+    infoDTW: number;
+    infoEA: number;
+    infoLCSS: number;
+    infoSIDTW: number;
   };
 }
 
@@ -37,80 +34,91 @@ export default function DashboardClient({
   filenamesCount,
   bahnenCount,
   componentCounts,
-  frequencyData,
-  collectionSizes,
+  analysisCounts,
 }: DashboardClientProps) {
-  const totalSize = Object.values(collectionSizes).reduce(
-    (sum, size) => sum + size,
-    0,
-  );
-
+  console.log(analysisCounts);
   return (
-    <div className="flex">
-      <div className="flex-1 p-6">
-        <Typography as="h2">Bewegungsdaten</Typography>
+    <div className="justify-center p-6">
+      <Typography as="h2">Bewegungsdaten</Typography>
 
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <DataCard componentName="Roboterbahnen insgesamt" value={bahnenCount} />
+        <DataCard
+          componentName="Aufnahmendateien insgesamt"
+          value={filenamesCount}
+        />
+      </div>
+
+      <div className="mb-8">
+        <Typography as="h4">Bahndaten</Typography>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DataCard
-            componentName="Roboterbahnen insgesamt"
-            value={bahnenCount}
-            size={totalSize}
+            componentName="Roboterpose (Ist)"
+            value={componentCounts.bahnPoseIst}
           />
           <DataCard
-            componentName="Aufnahmendateien insgesamt"
-            value={filenamesCount}
-            size={totalSize}
+            componentName="Roboterpose (Transf.)"
+            value={componentCounts.bahnPoseTrans}
           />
-        </div>
-
-        <div className="mb-8">
-          <Typography as="h4">Collections</Typography>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <DataCard
-              componentName="Roboterpose (Ist)"
-              value={componentCounts.bahnPoseIst}
-              size={collectionSizes?.bahnPoseIst}
-            />
-            <DataCard
-              componentName="Roboterpose (Transf.)"
-              value={componentCounts.bahnPoseTrans}
-              size={collectionSizes?.bahnPoseTrans}
-            />
-            <DataCard
-              componentName="Robotergeschwindigkeit (Ist)"
-              value={componentCounts.bahnTwistIst}
-              size={collectionSizes?.bahnTwistIst}
-            />
-            <DataCard
-              componentName="Roboterbeschleunigung (Ist)"
-              value={componentCounts.bahnAccelIst}
-              size={collectionSizes?.bahnAccelIst}
-            />
-            <DataCard
-              componentName="Roboterposition (Soll)"
-              value={componentCounts.bahnPositionSoll}
-              size={collectionSizes?.bahnPositionSoll}
-            />
-            <DataCard
-              componentName="Roboterorientierung (Soll)"
-              value={componentCounts.bahnOrientationSoll}
-              size={collectionSizes?.bahnOrientationSoll}
-            />
-            <DataCard
-              componentName="Gelenkzustände"
-              value={componentCounts.bahnJointStates}
-              size={collectionSizes?.bahnJointStates}
-            />
-            <DataCard
-              componentName="Bahn-Zielpunkte"
-              value={componentCounts.bahnEvents}
-              size={collectionSizes?.bahnEvents}
-            />
-          </div>
+          <DataCard
+            componentName="Robotergeschwindigkeit (Ist)"
+            value={componentCounts.bahnTwistIst}
+          />
+          <DataCard
+            componentName="Robotergeschwindigkeit (Soll)"
+            value={componentCounts.bahnTwistSoll}
+          />
+          <DataCard
+            componentName="Roboterbeschleunigung (Ist)"
+            value={componentCounts.bahnAccelIst}
+          />
+          <DataCard
+            componentName="Roboterposition (Soll)"
+            value={componentCounts.bahnPositionSoll}
+          />
+          <DataCard
+            componentName="Roboterorientierung (Soll)"
+            value={componentCounts.bahnOrientationSoll}
+          />
+          <DataCard
+            componentName="Gelenkzustände"
+            value={componentCounts.bahnJointStates}
+          />
+          <DataCard
+            componentName="Bahn-Zielpunkte"
+            value={componentCounts.bahnEvents}
+          />
         </div>
       </div>
 
-      <FrequencyPanel frequencyData={frequencyData} />
+      {analysisCounts && (
+        <div className="mb-8">
+          <Typography as="h4">Auswertungsdaten</Typography>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <DataCard
+              componentName="Euklidischer Abstand"
+              value={analysisCounts.infoEA}
+            />
+            <DataCard
+              componentName="SIDTW-Analyse"
+              value={analysisCounts.infoSIDTW}
+            />
+            <DataCard
+              componentName="DTW-Analyse"
+              value={analysisCounts.infoDTW}
+            />
+            <DataCard
+              componentName="DFD-Analyse"
+              value={analysisCounts.infoDFD}
+            />
+
+            <DataCard
+              componentName="LCSS-Analyse"
+              value={analysisCounts.infoLCSS}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

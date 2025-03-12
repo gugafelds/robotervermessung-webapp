@@ -184,6 +184,10 @@ export interface EAPosition {
   pointsOrder: number;
 }
 
+export interface AuswertungBahnIDs {
+  bahn_info: BahnInfo[];
+}
+
 export interface AuswertungInfo {
   bahn_info: BahnInfo[];
   auswertung_info: {

@@ -1,14 +1,18 @@
+/* eslint-disable no-console */
+
 'use client';
 
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
-import React, { useEffect, useState } from 'react';
+import { Loader } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 import { checkPositionDataAvailability } from '@/src/actions/auswertung.service';
+import { getBahnInfoById } from '@/src/actions/bewegungsdaten.service';
 import { DeviationsPlot } from '@/src/app/auswertung/components/DeviationsPlot';
 import { MetrikenPanel } from '@/src/app/auswertung/components/MetrikenPanel';
 import { Typography } from '@/src/components/Typography';
 import { formatDate, formatNumber } from '@/src/lib/functions';
-import { useAuswertung } from '@/src/providers/auswertung.provider';
+import type { BahnInfo } from '@/types/bewegungsdaten.types';
 
 interface InfoGridItemProps {
   label: string;
@@ -28,36 +32,47 @@ interface AuswertungDetailsProps {
 
 export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
   const [hasDeviationData, setHasDeviationData] = useState(false);
-  const { auswertungInfo } = useAuswertung();
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentBahn, setCurrentBahn] = useState<BahnInfo | null>(null);
 
-  useEffect(() => {
-    const checkData = async () => {
+  // Lade die Details-Daten für die ausgewählte Bahn
+  const loadBahnDetails = useCallback(async () => {
+    if (!bahnId) return;
+
+    setIsLoading(true);
+    try {
+      // Lade Bahn-Info direkt für diese ID
+      const foundBahn = await getBahnInfoById(bahnId);
+
+      setCurrentBahn(foundBahn);
+
+      // Prüfe, ob Abweichungsdaten verfügbar sind
       const hasData = await checkPositionDataAvailability(bahnId);
       setHasDeviationData(hasData);
-    };
-    checkData();
+    } catch (error) {
+      console.error('Fehler beim Laden der Bahndaten:', error);
+    } finally {
+      setIsLoading(false);
+    }
   }, [bahnId]);
 
-  const currentBahn = auswertungInfo.bahn_info.find(
-    (bahn) => bahn.bahnID === bahnId,
-  );
+  // Lade beim ersten Rendern und wenn sich die Bahn-ID ändert
+  useEffect(() => {
+    loadBahnDetails();
+  }, [loadBahnDetails]);
 
-  const EAInfo = auswertungInfo.auswertung_info.info_euclidean.filter(
-    (info) => info.bahnID === bahnId,
-  );
-
-  const DFDInfo = auswertungInfo.auswertung_info.info_dfd.filter(
-    (info) => info.bahnID === bahnId,
-  );
-
-  const DTWInfo = auswertungInfo.auswertung_info.info_dtw.filter(
-    (info) => info.bahnID === bahnId,
-  );
-
-  const SIDTWInfo = auswertungInfo.auswertung_info.info_sidtw.filter(
-    (info) => info.bahnID === bahnId,
-  );
-
+  if (isLoading) {
+    return (
+      <div className="flex h-fullscreen w-full flex-wrap justify-center overflow-scroll p-4">
+        <div className="my-10 flex size-fit flex-col items-center justify-center rounded-xl bg-gray-200 p-2 shadow-sm">
+          <div className="animate-spin">
+            <Loader className="mx-auto w-10" color="#003560" />
+          </div>
+          <Typography as="h5">Es lädt...</Typography>
+        </div>
+      </div>
+    );
+  }
   if (!currentBahn) {
     return (
       <div className="m-10 flex h-full flex-col justify-normal overflow-hidden rounded-md bg-gray-50 p-5 align-middle">
@@ -179,12 +194,7 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
       </div>
 
       <div className="mb-6 rounded-lg border p-4">
-        <MetrikenPanel
-          EAInfo={EAInfo}
-          DFDInfo={DFDInfo}
-          DTWInfo={DTWInfo}
-          SIDTWInfo={SIDTWInfo}
-        />
+        <MetrikenPanel bahnId={bahnId} />
 
         <Typography as="h3" className="mb-3 font-semibold">
           Position (Visualisierung)

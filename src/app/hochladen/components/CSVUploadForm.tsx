@@ -26,8 +26,9 @@ const CSVUploadForm: React.FC = () => {
   const [processingResults, setProcessingResults] = useState<
     ProcessingResult[]
   >([]);
+  const [useBatchUpload, setUseBatchUpload] = useState<boolean>(true); // New state for batch upload toggle
 
-  // New state for segmentation method
+  // State for segmentation method
   const [segmentationMethod, setSegmentationMethod] = useState<
     'home' | 'fixed'
   >('home');
@@ -46,55 +47,98 @@ const CSVUploadForm: React.FC = () => {
     setProgress(0);
     setProcessingResults([]);
 
-    const totalFiles = files.length;
-    let processedFiles = 0;
-    const results: ProcessingResult[] = [];
-
-    for (let i = 0; i < totalFiles; i += 1) {
-      const file = files[i];
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('robot_model', robotModel);
-      formData.append('bahnplanung', bahnplanung);
-      formData.append('source_data_ist', sourceDataIst);
-      formData.append('source_data_soll', sourceDataSoll);
-      formData.append('upload_database', uploadDatabase.toString());
-      // Add new segmentation parameters
-      formData.append('segmentation_method', segmentationMethod);
-      formData.append('num_segments', numSegments.toString());
-
+    // If batch upload is selected and there are multiple files, use batch endpoint
+    if (useBatchUpload && files.length > 0) {
       try {
-        const response = await fetch('/api/bahn/process-csv', {
+        const formData = new FormData();
+
+        // Add all files to the FormData
+        for (let i = 0; i < files.length; i++) {
+          formData.append('files', files[i]);
+        }
+
+        // Add other parameters
+        formData.append('robot_model', robotModel);
+        formData.append('bahnplanung', bahnplanung);
+        formData.append('source_data_ist', sourceDataIst);
+        formData.append('source_data_soll', sourceDataSoll);
+        formData.append('upload_database', uploadDatabase.toString());
+        formData.append('segmentation_method', segmentationMethod);
+        formData.append('num_segments', numSegments.toString());
+
+        // Send all files in one request
+        const response = await fetch('/api/bahn/process-csv-batch', {
           method: 'POST',
           body: formData,
         });
 
         if (!response.ok) {
-          if (uploadDatabase) {
-            results.push({
-              filename: file.name,
-              segmentsFound: 1,
-              success: true,
-            });
-          } else {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        setProcessingResults(result.file_results);
+
+        // Generate summary message
+        const totalSegments = result.file_results.reduce((sum: number, r: ProcessingResult) =>
+          sum + r.segmentsFound, 0);
+        const successfulFiles = result.file_results.filter((r: ProcessingResult) => r.success);
+        const failedFiles = result.file_results.filter((r: ProcessingResult) => !r.success);
+
+        let summaryMessage = '';
+        if (successfulFiles.length > 0) {
+          summaryMessage += `${successfulFiles.length} Datei(en) verarbeitet in ${result.processing_time_seconds.toFixed(2)} Sekunden.\n`;
+          summaryMessage += `Insgesamt ${totalSegments} Bahnen gefunden.\n`;
+        }
+
+        if (failedFiles.length > 0) {
+          setError(failedFiles.map((f: ProcessingResult) => `${f.filename}: ${f.error}`).join('\n'));
+        }
+
+        if (summaryMessage) {
+          setSuccess(summaryMessage);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setIsLoading(false);
+        setProgress(100);
+      }
+    } else {
+      // Original individual file upload logic
+      const totalFiles = files.length;
+      let processedFiles = 0;
+      const results: ProcessingResult[] = [];
+
+      for (let i = 0; i < totalFiles; i += 1) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('robot_model', robotModel);
+        formData.append('bahnplanung', bahnplanung);
+        formData.append('source_data_ist', sourceDataIst);
+        formData.append('source_data_soll', sourceDataSoll);
+        formData.append('upload_database', uploadDatabase.toString());
+        formData.append('segmentation_method', segmentationMethod);
+        formData.append('num_segments', numSegments.toString());
+
+        try {
+          const response = await fetch('/api/bahn/process-csv', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
-        } else {
+
           const result = await response.json();
           results.push({
             filename: file.name,
             segmentsFound: result.segments_found || result.data?.length || 0,
             success: true,
           });
-        }
-      } catch (err) {
-        if (uploadDatabase) {
-          results.push({
-            filename: file.name,
-            segmentsFound: 1,
-            success: true,
-          });
-        } else {
+        } catch (err) {
           results.push({
             filename: file.name,
             segmentsFound: 0,
@@ -102,34 +146,32 @@ const CSVUploadForm: React.FC = () => {
             error: err instanceof Error ? err.message : 'Unknown error',
           });
         }
+
+        processedFiles += 1;
+        setProgress((processedFiles / totalFiles) * 100);
+        setProcessingResults([...results]);
       }
 
-      processedFiles += 1;
-      setProgress((processedFiles / totalFiles) * 100);
-      setProcessingResults([...results]);
-    }
+      setIsLoading(false);
 
-    setIsLoading(false);
+      // Generate summary message
+      const totalSegments = results.reduce((sum, r) => sum + r.segmentsFound, 0);
+      const successfulFiles = results.filter((r) => r.success);
+      const failedFiles = results.filter((r) => !r.success);
 
-    // Generate summary message
-    const totalSegments = results.reduce((sum, r) => sum + r.segmentsFound, 0);
-    const successfulFiles = results.filter((r) => r.success);
-    const failedFiles = results.filter((r) => !r.success);
+      let summaryMessage = '';
+      if (successfulFiles.length > 0) {
+        summaryMessage += `${successfulFiles.length} Datei(en) verarbeitet.\n`;
+        summaryMessage += `Insgesamt ${totalSegments} Bahnen gefunden.\n`;
+      }
 
-    let summaryMessage = '';
-    if (successfulFiles.length > 0) {
-      summaryMessage += `${successfulFiles.length} Datei(en) verarbeitet.\n`;
-      successfulFiles.forEach((r) => {
-        summaryMessage += `\n${r.filename.substring(0, 22)}: ${r.segmentsFound} Bahn(en)`;
-      });
-    }
+      if (failedFiles.length > 0) {
+        setError(failedFiles.map((f) => `${f.filename}: ${f.error}`).join('\n'));
+      }
 
-    if (failedFiles.length > 0) {
-      setError(failedFiles.map((f) => `${f.filename}: ${f.error}`).join('\n'));
-    }
-
-    if (summaryMessage) {
-      setSuccess(summaryMessage);
+      if (summaryMessage) {
+        setSuccess(summaryMessage);
+      }
     }
   };
 
@@ -160,6 +202,25 @@ const CSVUploadForm: React.FC = () => {
             />
           </label>
         </div></div>
+
+        {/* Batch Upload Toggle */}
+        <div className="mb-2">
+          <label className="flex items-center" htmlFor="batch-upload">
+            <input
+              id="batch-upload"
+              type="checkbox"
+              className="size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              checked={useBatchUpload}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setUseBatchUpload(e.target.checked)
+              }
+            />
+            <span className="ml-2 text-base font-light text-sm text-primary">
+              Batch-Upload verwenden (schneller für mehrere Dateien)
+            </span>
+          </label>
+        </div>
+
         <div className="mb-2">
           {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label
@@ -257,7 +318,7 @@ const CSVUploadForm: React.FC = () => {
           </label>
         </div>
 
-        {/* New Segmentation Method Selection */}
+        {/* Segmentation Method Selection */}
         <div className="mb-2">
           <label className="mb-2 block text-base font-bold text-primary">
             Segmentierungsmethode

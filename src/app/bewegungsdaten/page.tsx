@@ -1,10 +1,12 @@
 import { redirect } from 'next/navigation';
 
-import { getAllBahnInfo } from '@/src/actions/bewegungsdaten.service';
+import { getBahnInfo } from '@/src/actions/bewegungsdaten.service';
 
 export default async function BewegungsdatenPage() {
-  const bahnInfo = await getAllBahnInfo();
+  // Lade nur die erste Seite mit Standard-Seitengröße
+  const { bahnInfo } = await getBahnInfo({ page: 1, pageSize: 20 });
 
+  // Wenn Daten vorhanden sind, leite zum ersten Eintrag weiter
   if (bahnInfo.length > 0) {
     redirect(`/bewegungsdaten/${bahnInfo[0].bahnID}`);
   }

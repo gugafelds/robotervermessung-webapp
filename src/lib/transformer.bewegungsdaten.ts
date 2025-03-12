@@ -22,6 +22,12 @@ import type {
   BahnTwistSoll,
   BahnTwistSollRaw,
 } from '@/types/bewegungsdaten.types';
+import type {
+  BahnInfoResponse,
+  BahnInfoResponseRaw,
+  PaginationResult,
+  PaginationResultRaw,
+} from '@/types/pagination.types';
 
 export const transformBahnInfoResult = (
   bahnenRaw: BahnInfoRaw[],
@@ -150,6 +156,28 @@ export const transformBahnPoseIstResult = (
       sourceDataIst: bahn.source_data_ist,
     }),
   );
+};
+
+export const transformPaginationResult = (
+  paginationRaw: PaginationResultRaw,
+): PaginationResult => {
+  return {
+    total: paginationRaw.total,
+    page: paginationRaw.page,
+    pageSize: paginationRaw.page_size,
+    totalPages: paginationRaw.total_pages,
+    hasNext: paginationRaw.has_next,
+    hasPrevious: paginationRaw.has_previous,
+  };
+};
+// Transformiere die gesamte API-Antwort
+export const transformBahnInfoResponse = (
+  response: BahnInfoResponseRaw,
+): BahnInfoResponse => {
+  return {
+    bahnInfo: transformBahnInfoResult(response.bahn_info),
+    pagination: transformPaginationResult(response.pagination),
+  };
 };
 
 export const transformBahnPoseTransResult = (

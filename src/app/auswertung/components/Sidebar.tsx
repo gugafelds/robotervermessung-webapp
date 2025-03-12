@@ -1,52 +1,180 @@
+/* eslint-disable react/button-has-type,no-console */
+
 'use client';
 
 import LogoIcon from '@heroicons/react/20/solid/ListBulletIcon';
 import classNames from 'classnames';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import { getAuswertungBahnIDs } from '@/src/actions/auswertung.service';
 import SearchFilter from '@/src/components/SearchFilter';
 import { Typography } from '@/src/components/Typography';
 import { filterBy, formatDate } from '@/src/lib/functions';
 import { useAuswertung } from '@/src/providers/auswertung.provider';
 import type { BahnInfo } from '@/types/bewegungsdaten.types';
+import type {
+  PaginationParams,
+  PaginationResult,
+} from '@/types/pagination.types';
 
 export const Sidebar = () => {
-  const { auswertungInfo } = useAuswertung();
-  const [filteredBahnen, setFilteredBahnen] = useState<BahnInfo[]>([]);
+  // Lokaler Zustand für Bahndaten, genau wie bei Bewegungsdaten
+  const [bahnInfo, setBahnInfo] = useState<BahnInfo[]>([]);
+  const [pagination, setPagination] = useState<PaginationResult | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchParams, setSearchParams] = useState<PaginationParams>({
+    page: 1,
+    pageSize: 20,
+  });
+
+  const { auswertungBahnIDs } = useAuswertung();
   const pathname = usePathname();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedItemRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const isLoadingNextPageRef = useRef(false); // Ref to track loading state between renders
 
-  useEffect(() => {
-    if (auswertungInfo?.bahn_info) {
-      setFilteredBahnen(auswertungInfo.bahn_info);
+  // Direkte Datenladung mit getAuswertungBahnIDs
+  const loadBahnen = useCallback(async (params: PaginationParams) => {
+    if (params.page && params.page > 1) {
+      isLoadingNextPageRef.current = true;
     }
-  }, [auswertungInfo]);
 
+    setIsLoading(true);
+    try {
+      const result = await getAuswertungBahnIDs(params);
+      const newBahnInfo = result.auswertungBahnIDs.bahn_info;
+
+      // Wenn page > 1, dann zur bestehenden Liste hinzufügen, sonst ersetzen
+      if (params.page && params.page > 1) {
+        // Prüfe auf Duplikate
+        setBahnInfo((prev) => {
+          const existingIds = new Set(
+            prev.map((bahn) => bahn.bahnID?.toString()),
+          );
+          const uniqueNewBahnen = newBahnInfo.filter(
+            (bahn) => !existingIds.has(bahn.bahnID?.toString()),
+          );
+          return [...prev, ...uniqueNewBahnen];
+        });
+      } else {
+        setBahnInfo(newBahnInfo);
+      }
+
+      setPagination(result.pagination);
+      setCurrentPage(params.page || 1);
+    } catch (error) {
+      console.error('Failed to load auswertung data:', error);
+    } finally {
+      setIsLoading(false);
+      isLoadingNextPageRef.current = false;
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    loadBahnen(searchParams);
+    // We want this to run only once, so we're ignoring the dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load next page for infinite scroll
+  const loadNextPage = useCallback(() => {
+    // Use ref to prevent multiple simultaneous calls
+    if (pagination?.hasNext && !isLoading && !isLoadingNextPageRef.current) {
+      const nextPageParams = { ...searchParams, page: currentPage + 1 };
+      setSearchParams(nextPageParams);
+      loadBahnen(nextPageParams);
+    }
+  }, [pagination, isLoading, currentPage, searchParams, loadBahnen]);
+
+  // Ausgewählte Bahn-ID aus dem Pfad extrahieren
   useEffect(() => {
     const pathParts = pathname.split('/');
     const currentId = pathParts[pathParts.length - 1];
     setSelectedId(currentId);
+
+    // Scroll zur ausgewählten Bahn nach kurzem Delay
+    setTimeout(() => {
+      if (selectedItemRef.current && scrollContainerRef.current) {
+        selectedItemRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }
+    }, 100);
   }, [pathname]);
 
-  const handleFilterChange = (filter: string) => {
-    if (!auswertungInfo?.bahn_info) return;
+  // Intersection Observer für Infinite Scrolling
+  useEffect(() => {
+    // Only set up observer if there's more to load and we're not already loading
+    if (!pagination?.hasNext || isLoading) {
+      return undefined; // Explicit return for consistent-return rule
+    }
 
-    const filtered = auswertungInfo.bahn_info.filter((bahn) =>
-      filterBy(filter, [
-        bahn.recordFilename || '',
-        bahn.bahnID?.toString() || '',
-        formatDate(bahn.recordingDate || ''),
-      ]),
-    );
-    setFilteredBahnen(filtered);
-  };
+    const handleIntersection = (entries: any) => {
+      const [entry] = entries;
+      if (
+        entry.isIntersecting &&
+        pagination?.hasNext &&
+        !isLoadingNextPageRef.current
+      ) {
+        // Add a small delay to prevent accidental double-triggering
+        setTimeout(() => {
+          loadNextPage();
+        }, 100);
+      }
+    };
+
+    const observer = new IntersectionObserver(handleIntersection, {
+      threshold: 0.1,
+      rootMargin: '0px 0px 200px 0px', // Trigger a bit before reaching the bottom
+    });
+
+    const currentLoadMoreRef = loadMoreRef.current;
+    if (currentLoadMoreRef) {
+      observer.observe(currentLoadMoreRef);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [pagination?.hasNext, isLoading, loadNextPage]);
+
+  const handleFilterChange = useCallback(
+    (filter: string) => {
+      if (filter.trim() === '') {
+        // Wenn der Filter leer ist, lade die erste Seite neu
+        const defaultParams = { page: 1, pageSize: 20 };
+        setSearchParams(defaultParams);
+        setBahnInfo([]); // Liste zurücksetzen
+        loadBahnen(defaultParams);
+        return;
+      }
+
+      // Ansonsten client-seitiges Filtern
+      if (auswertungBahnIDs && auswertungBahnIDs.bahn_info) {
+        const filteredBahnen = auswertungBahnIDs.bahn_info.filter((bahn) =>
+          filterBy(filter, [
+            bahn.recordFilename || '',
+            bahn.bahnID?.toString() || '',
+            formatDate(bahn.recordingDate || ''),
+          ]),
+        );
+        setBahnInfo(filteredBahnen);
+      }
+    },
+    [auswertungBahnIDs, loadBahnen],
+  );
 
   return (
     <div className="flex h-80 w-full flex-col bg-gray-100 px-4 py-2 lg:h-fullscreen lg:max-w-80">
-      <div className="flex flex-col align-middle">
-        <div className="relative flex items-center justify-between">
+      <div className="flex-col align-middle">
+        <div className="relative items-center justify-between">
           <div className={classNames('flex items-end gap-4 pl-1')}>
             <LogoIcon width={30} color="#003560" />
             <span className="mt-2 text-2xl font-semibold text-primary">
@@ -55,18 +183,41 @@ export const Sidebar = () => {
           </div>
         </div>
         <SearchFilter onFilterChange={handleFilterChange} />
+        <div className="mt-2 pl-1 text-sm text-gray-600">
+          {`${bahnInfo.length} ${
+            bahnInfo.length === 1 ? 'Bahn' : 'Bahnen'
+          }${pagination ? ` von ${pagination.total}` : ''}`}
+        </div>
       </div>
 
-      <div className="mt-4 overflow-scroll">
-        {filteredBahnen.length === 0 ? (
-          <div>loading...</div>
-        ) : (
-          filteredBahnen.map((bahn) => {
-            return (
+      <div ref={scrollContainerRef} className="mt-4 overflow-scroll">
+        {/* Zustand: Lädt initial */}
+        {bahnInfo.length === 0 && isLoading && (
+          <div className="flex justify-center py-4">
+            <div className="size-6 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          </div>
+        )}
+
+        {/* Zustand: Keine Daten gefunden */}
+        {bahnInfo.length === 0 && !isLoading && (
+          <div className="py-4 text-center text-gray-500">
+            Keine Bahnen gefunden
+          </div>
+        )}
+
+        {/* Zustand: Daten anzeigen */}
+        {bahnInfo.length > 0 && (
+          <>
+            {bahnInfo.map((bahn) => (
               <div
                 key={bahn.bahnID?.toString()}
+                ref={
+                  selectedId === bahn.bahnID?.toString()
+                    ? selectedItemRef
+                    : null
+                }
                 className={classNames(
-                  'mt-1 rounded-xl p-3 transition-colors duration-200 ease-in',
+                  'mt-1 rounded-xl p-1 transition-colors duration-200 ease-in',
                   {
                     'bg-gray-300': selectedId === bahn.bahnID?.toString(),
                     'hover:bg-gray-200': selectedId !== bahn.bahnID?.toString(),
@@ -76,7 +227,7 @@ export const Sidebar = () => {
                 <div className="flex items-center justify-between">
                   <Link
                     href={`/auswertung/${bahn.bahnID?.toString()}`}
-                    className="ml-2 flex-1"
+                    className="ml-1 block w-full"
                   >
                     <div>
                       <Typography
@@ -116,8 +267,19 @@ export const Sidebar = () => {
                   </Link>
                 </div>
               </div>
-            );
-          })
+            ))}
+
+            {/* Invisible loader element at the bottom for infinite scroll */}
+            {pagination?.hasNext && (
+              <div ref={loadMoreRef} className="py-4">
+                {isLoading && (
+                  <div className="flex justify-center">
+                    <div className="size-6 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

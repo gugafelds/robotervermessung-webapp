@@ -8,10 +8,10 @@ import aioredis
 import os
 from dotenv import load_dotenv
 import logging
-from .api.endpoints.transformation_route_handler import MatlabEngine
+#from .api.endpoints.transformation_route_handler import MatlabEngine
 
 # Global config
-USE_MATLAB = False  # Hier direkt definiert
+#USE_MATLAB = False  # Hier direkt definiert
 
 # Load environment variables
 load_dotenv()
@@ -45,11 +45,11 @@ app.include_router(bahn_route_handler.router, prefix="/api/bahn", tags=["bahn"])
 app.include_router(auswertung_route_handler.router, prefix="/api/auswertung", tags=["auswertung"])
 app.include_router(rosbag_route_handler.router, prefix="/api/rosbag", tags=["rosbag"])
 # Transformation Router nur einbinden wenn MATLAB aktiv ist
-if USE_MATLAB:
-    app.include_router(transformation_route_handler.router, prefix="/api/transform", tags=["transform"])
-    logger.info("MATLAB transformation routes enabled")
-else:
-    logger.info("MATLAB transformation routes disabled")
+#if USE_MATLAB:
+#    app.include_router(transformation_route_handler.router, prefix="/api/transform", tags=["transform"])
+#    logger.info("MATLAB transformation routes enabled")
+#else:
+#    logger.info("MATLAB transformation routes disabled")
 
 # Initialize the database
 init_db(app)
@@ -68,21 +68,21 @@ async def startup_event():
         logger.error(f"Failed to connect to Redis: {e}")
 
     # Matlab initialization nur wenn USE_MATLAB true ist
-    if USE_MATLAB:
-        try:
-            MatlabEngine.get_instance()
-            logger.info("Successfully initialized MATLAB engine")
-        except Exception as e:
-            logger.error(f"Failed to initialize MATLAB engine: {e}")
-    else:
-        logger.info("MATLAB engine initialization skipped (USE_MATLAB=false)")
+    #if USE_MATLAB:
+    #    try:
+    #        MatlabEngine.get_instance()
+    #        logger.info("Successfully initialized MATLAB engine")
+    #    except Exception as e:
+    #        logger.error(f"Failed to initialize MATLAB engine: {e}")
+    #else:
+    #    logger.info("MATLAB engine initialization skipped (USE_MATLAB=false)")
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    # Clean up MATLAB engine only if it was used
-    if USE_MATLAB and MatlabEngine._instance is not None:
-        MatlabEngine._instance.quit()
-        logger.info("Successfully shut down MATLAB engine")
+#@app.on_event("shutdown")
+#async def shutdown_event():
+#    # Clean up MATLAB engine only if it was used
+#    if USE_MATLAB and MatlabEngine._instance is not None:
+#        MatlabEngine._instance.quit()
+#        logger.info("Successfully shut down MATLAB engine")
 
 @app.get("/")
 async def root():

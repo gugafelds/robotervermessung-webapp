@@ -24,6 +24,11 @@ import type {
   SIDTWPosition,
   SIDTWPositionRaw,
 } from '@/types/auswertung.types';
+import type {
+  AuswertungIDsResponse,
+  AuswertungInfoResponse,
+  PaginationParams,
+} from '@/types/pagination.types';
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000/api';
 
@@ -35,6 +40,14 @@ interface ApiResponse {
     info_sidtw: any[];
     info_dtw: any[]; // oder spezifischer Type
     info_euclidean: any[]; // oder spezifischer Type
+  };
+  pagination: {
+    total: number;
+    page: number;
+    page_size: number;
+    total_pages: number;
+    has_next: boolean;
+    has_previous: boolean;
   };
 }
 
@@ -78,13 +91,65 @@ async function fetchFromAPI<T>(
   return response.json();
 }
 
-export const getAllAuswertungInfo = async (): Promise<AuswertungInfo> => {
+export const getAuswertungBahnIDs = async (
+  params: PaginationParams = { page: 1, pageSize: 20 },
+): Promise<AuswertungIDsResponse> => {
   try {
+    // URL-Parameter für die Paginierung erstellen
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.pageSize)
+      queryParams.append('page_size', params.pageSize.toString());
+
+    const result = await fetchFromAPI<{
+      bahn_info: any[];
+      pagination: {
+        total: number;
+        page: number;
+        page_size: number;
+        total_pages: number;
+        has_next: boolean;
+        has_previous: boolean;
+      };
+    }>(`/auswertung/auswertung_info_overview?${queryParams.toString()}`);
+
+    // Paginierung in camelCase transformieren
+    return {
+      auswertungBahnIDs: {
+        bahn_info: transformBahnInfoResult(result.bahn_info || []),
+      },
+      pagination: {
+        total: result.pagination.total,
+        page: result.pagination.page,
+        pageSize: result.pagination.page_size,
+        totalPages: result.pagination.total_pages,
+        hasNext: result.pagination.has_next,
+        hasPrevious: result.pagination.has_previous,
+      },
+    };
+  } catch (error) {
+    console.error('Error fetching Auswertung Bahn IDs:', error);
+    throw error;
+  }
+};
+
+// Angepasste Funktion zur Unterstützung von Paginierung
+export const getAllAuswertungInfo = async (
+  params: PaginationParams = { page: 1, pageSize: 20 },
+): Promise<AuswertungInfoResponse> => {
+  try {
+    // URL-Parameter für die Paginierung erstellen
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.pageSize)
+      queryParams.append('page_size', params.pageSize.toString());
+
     const result = await fetchFromAPI<ApiResponse>(
-      '/auswertung/auswertung_info',
+      `/auswertung/auswertung_info?${queryParams.toString()}`,
     );
 
-    return {
+    // Daten transformieren
+    const transformedData: AuswertungInfo = {
       bahn_info: transformBahnInfoResult(result.bahn_info || []),
       auswertung_info: {
         info_dfd: transformDFDInfoResult(
@@ -101,9 +166,52 @@ export const getAllAuswertungInfo = async (): Promise<AuswertungInfo> => {
         ),
       },
     };
+
+    // Paginierung in camelCase transformieren
+    return {
+      auswertungInfo: transformedData,
+      pagination: {
+        total: result.pagination.total,
+        page: result.pagination.page,
+        pageSize: result.pagination.page_size,
+        totalPages: result.pagination.total_pages,
+        hasNext: result.pagination.has_next,
+        hasPrevious: result.pagination.has_previous,
+      },
+    };
   } catch (error) {
     console.error('Error fetching all Auswertung info:', error);
     throw error;
+  }
+};
+
+export const getAuswertungInfoById = async (
+  id: string,
+): Promise<{
+  info_dfd: any[];
+  info_sidtw: any[];
+  info_dtw: any[];
+  info_euclidean: any[];
+}> => {
+  try {
+    const result = await fetchFromAPI<{
+      [key: string]: any[];
+    }>(`/auswertung/auswertung_info/${id}`);
+
+    return {
+      info_dfd: transformDFDInfoResult(result.info_dfd || []),
+      info_sidtw: transformSIDTWInfoResult(result.info_sidtw || []),
+      info_dtw: transformDTWInfoResult(result.info_dtw || []),
+      info_euclidean: transformEAInfoResult(result.info_euclidean || []),
+    };
+  } catch (error) {
+    console.error(`Error fetching Auswertung info for ${id}:`, error);
+    return {
+      info_dfd: [],
+      info_sidtw: [],
+      info_dtw: [],
+      info_euclidean: [],
+    };
   }
 };
 

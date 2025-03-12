@@ -1,4 +1,4 @@
-/* eslint-disable */
+/* eslint-disable react/button-has-type,no-console */
 
 'use client';
 
@@ -6,15 +6,16 @@ import { ChevronDownIcon, ViewColumnsIcon } from '@heroicons/react/24/outline';
 import { Loader2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { Layout, PlotData } from 'plotly.js';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 import {
+  getAuswertungInfoById,
   getDFDPositionById,
   getDTWPositionById,
   getEAPositionById,
   getSIDTWPositionById,
 } from '@/src/actions/auswertung.service';
-import { useAuswertung } from '@/src/providers/auswertung.provider';
+import { getBahnInfoById } from '@/src/actions/bewegungsdaten.service';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
@@ -32,7 +33,6 @@ const methodColors = {
     line: '#e63946',
   },
   DTW: {
-    // Neue Farben für DTW
     soll: '#774936',
     ist: '#a47551',
     connection: 'rgba(119, 73, 54, 0.7)',
@@ -49,7 +49,7 @@ const methodColors = {
 interface MetricState {
   isLoaded: boolean;
   isLoading: boolean;
-  visible: boolean; // Neu
+  visible: boolean;
 }
 
 interface SegmentOption {
@@ -82,75 +82,104 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
     dtw: { isLoaded: false, isLoading: false, visible: false },
   });
 
-  const {
-    currentEuclideanDeviation,
-    currentDiscreteFrechetDeviation,
-    currentSIDTWDeviation,
-    currentDTWDeviation,
-    setCurrentEuclideanDeviation,
-    setCurrentDiscreteFrechetDeviation,
-    setCurrentSIDTWDeviation,
-    setCurrentDTWDeviation,
-    auswertungInfo,
-  } = useAuswertung();
+  const [currentEuclideanDeviation, setCurrentEuclideanDeviation] = useState<
+    any[]
+  >([]);
+  const [currentDiscreteFrechetDeviation, setCurrentDiscreteFrechetDeviation] =
+    useState<any[]>([]);
+  const [currentSIDTWDeviation, setCurrentSIDTWDeviation] = useState<any[]>([]);
+  const [currentDTWDeviation, setCurrentDTWDeviation] = useState<any[]>([]);
+  const [currentBahnInfo, setCurrentBahnInfo] = useState<any>(null);
+  const [currentAuswertungInfo, setCurrentAuswertungInfo] = useState<any>({
+    info_euclidean: [],
+    info_dfd: [],
+    info_sidtw: [],
+    info_dtw: [],
+  });
 
-  const loadMetricData = async (metricType: 'ea' | 'dfd' | 'sidtw' | 'dtw') => {
-    if (!bahnId) return;
-
-    // Wenn bereits geladen, dann Toggle-Verhalten
-    if (metrics[metricType].isLoaded) {
-      setMetrics((prev) => ({
-        ...prev,
-        [metricType]: {
-          ...prev[metricType],
-          visible: !prev[metricType].visible,
-        },
-      }));
-      return;
-    }
-
-    setMetrics((prev) => ({
-      ...prev,
-      [metricType]: { ...prev[metricType], isLoading: true },
-    }));
-
+  const loadBahnInfo = useCallback(async () => {
     try {
-      let data;
-      switch (metricType) {
-        case 'ea':
-          data = await getEAPositionById(bahnId);
-          setCurrentEuclideanDeviation(data);
-          break;
-        case 'dfd':
-          data = await getDFDPositionById(bahnId);
-          setCurrentDiscreteFrechetDeviation(data);
-          break;
-        case 'sidtw':
-          data = await getSIDTWPositionById(bahnId);
-          setCurrentSIDTWDeviation(data);
-          break;
-        case 'dtw':
-          data = await getDTWPositionById(bahnId);
-          setCurrentDTWDeviation(data);
-          break;
-        default: {
-          const exhaustiveCheck: never = metricType;
-          throw new Error(`Unhandled metric type: ${exhaustiveCheck}`);
-        }
+      const bahnInfo = await getBahnInfoById(bahnId);
+      setCurrentBahnInfo(bahnInfo);
+    } catch (error) {
+      console.error('Error loading Bahn info:', error);
+    }
+  }, [bahnId]);
+
+  const loadAuswertungInfo = useCallback(async () => {
+    try {
+      const auswertungInfo = await getAuswertungInfoById(bahnId);
+      setCurrentAuswertungInfo(auswertungInfo);
+    } catch (error) {
+      console.error('Error loading Auswertung info:', error);
+    }
+  }, [bahnId]);
+
+  useEffect(() => {
+    if (bahnId) {
+      loadBahnInfo();
+      loadAuswertungInfo();
+    }
+  }, [bahnId, loadBahnInfo, loadAuswertungInfo]); // Fixed: Added all required dependencies
+
+  const loadMetricData = useCallback(
+    async (metricType: 'ea' | 'dfd' | 'sidtw' | 'dtw') => {
+      if (!bahnId) return;
+
+      // Wenn bereits geladen, dann Toggle-Verhalten
+      if (metrics[metricType].isLoaded) {
+        setMetrics((prev) => ({
+          ...prev,
+          [metricType]: {
+            ...prev[metricType],
+            visible: !prev[metricType].visible,
+          },
+        }));
+        return;
       }
 
       setMetrics((prev) => ({
         ...prev,
-        [metricType]: { isLoaded: true, isLoading: false, visible: true },
+        [metricType]: { ...prev[metricType], isLoading: true },
       }));
-    } catch (error) {
-      console.error(`Error loading ${metricType} data:`, error);
-      setMetrics((prev) => ({
-        ...prev,
-        [metricType]: { ...prev[metricType], isLoading: false },
-      }));
-    }
-  };
+
+      try {
+        let data;
+        switch (metricType) {
+          case 'ea':
+            data = await getEAPositionById(bahnId);
+            setCurrentEuclideanDeviation(data);
+            break;
+          case 'dfd':
+            data = await getDFDPositionById(bahnId);
+            setCurrentDiscreteFrechetDeviation(data);
+            break;
+          case 'sidtw':
+            data = await getSIDTWPositionById(bahnId);
+            setCurrentSIDTWDeviation(data);
+            break;
+          case 'dtw':
+            data = await getDTWPositionById(bahnId);
+            setCurrentDTWDeviation(data);
+            break;
+          default:
+            throw new Error(`Unhandled metric type: ${metricType}`);
+        }
+
+        setMetrics((prev) => ({
+          ...prev,
+          [metricType]: { isLoaded: true, isLoading: false, visible: true },
+        }));
+      } catch (error) {
+        console.error(`Error loading ${metricType} data:`, error);
+        setMetrics((prev) => ({
+          ...prev,
+          [metricType]: { ...prev[metricType], isLoading: false },
+        }));
+      }
+    },
+    [bahnId, metrics],
+  );
 
   // Verfügbare Segmente ermitteln
   useEffect(() => {
@@ -174,7 +203,6 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
       ...getAllSegmentNumbers(currentSIDTWDeviation),
     ];
 
-    // Neue Version
     const uniqueSegments = Array.from(new Set(allSegments));
 
     const options: SegmentOption[] = [
@@ -193,25 +221,17 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   ]);
 
   // Verfügbare Methoden prüfen
-  const hasEAData = auswertungInfo.auswertung_info.info_euclidean.some(
-    (info) => info.bahnID === bahnId,
-  );
-  const hasDFDData = auswertungInfo.auswertung_info.info_dfd.some(
-    (info) => info.bahnID === bahnId,
-  );
-  const hasSIDTWData = auswertungInfo.auswertung_info.info_sidtw.some(
-    (info) => info.bahnID === bahnId,
-  );
-  const hasDTWData = auswertungInfo.auswertung_info.info_dtw.some(
-    (info) => info.bahnID === bahnId,
-  );
+  const hasEAData = currentAuswertungInfo.info_euclidean.length > 0;
+  const hasDFDData = currentAuswertungInfo.info_dfd.length > 0;
+  const hasSIDTWData = currentAuswertungInfo.info_sidtw.length > 0;
+  const hasDTWData = currentAuswertungInfo.info_dtw.length > 0;
 
   // Automatisch EA laden, wenn verfügbar
   useEffect(() => {
     if (hasEAData && !metrics.ea.isLoaded && !metrics.ea.isLoading) {
       loadMetricData('ea');
     }
-  }, [hasEAData, loadMetricData, metrics.ea.isLoaded, metrics.ea.isLoading]);
+  }, [hasEAData, metrics.ea.isLoaded, metrics.ea.isLoading, loadMetricData]);
 
   const filterDataBySegment = (data: any[]) => {
     if (!data?.length) return [];
@@ -233,16 +253,12 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
     const getTimeArray = (data: any[]) => {
       if (!data.length) return [];
 
-      const bahnInfo = auswertungInfo.bahn_info.find(
-        (info) => info.bahnID === bahnId,
-      );
-
-      if (!bahnInfo?.startTime || !bahnInfo?.endTime) {
+      if (!currentBahnInfo?.startTime || !currentBahnInfo?.endTime) {
         return data.map((_, i) => i);
       }
 
-      const startTime = new Date(bahnInfo.startTime).getTime();
-      const endTime = new Date(bahnInfo.endTime).getTime();
+      const startTime = new Date(currentBahnInfo.startTime).getTime();
+      const endTime = new Date(currentBahnInfo.endTime).getTime();
       const duration = endTime - startTime;
       const points = data.length;
 
