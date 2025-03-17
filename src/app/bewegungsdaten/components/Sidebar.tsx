@@ -165,7 +165,7 @@ export const Sidebar = () => {
       return params;
     }
 
-    const eventMatch = filter.match(/^(n?p)=(\d+)$/i);
+    const eventMatch = filter.match(/^(n|np)=(\d+)$/i);
     if (eventMatch) {
       const [, , count] = eventMatch;
       params.pointsEvents = parseInt(count, 10);
@@ -182,7 +182,7 @@ export const Sidebar = () => {
     const velPPMatch = filter.match(/^(v|vp)=(\d+)$/i);
     if (velPPMatch) {
       const [, , velPP] = velPPMatch;
-      params.velocity = velPP;
+      params.velocity = parseInt(velPP, 10);
       return params;
     }
 

@@ -8,29 +8,24 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { SearchAuswertungParams } from '@/src/actions/auswertung.service';
 import { getAuswertungBahnIDs } from '@/src/actions/auswertung.service';
 import SearchFilter from '@/src/components/SearchFilter';
 import { Typography } from '@/src/components/Typography';
-import { filterBy, formatDate } from '@/src/lib/functions';
-import { useAuswertung } from '@/src/providers/auswertung.provider';
+import { formatDate } from '@/src/lib/functions';
 import type { BahnInfo } from '@/types/bewegungsdaten.types';
-import type {
-  PaginationParams,
-  PaginationResult,
-} from '@/types/pagination.types';
+import type { PaginationResult } from '@/types/pagination.types';
 
 export const Sidebar = () => {
-  // Lokaler Zustand für Bahndaten, genau wie bei Bewegungsdaten
   const [bahnInfo, setBahnInfo] = useState<BahnInfo[]>([]);
   const [pagination, setPagination] = useState<PaginationResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [searchParams, setSearchParams] = useState<PaginationParams>({
+  const [searchParams, setSearchParams] = useState<SearchAuswertungParams>({
     page: 1,
     pageSize: 20,
   });
 
-  const { auswertungBahnIDs } = useAuswertung();
   const pathname = usePathname();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedItemRef = useRef<HTMLDivElement>(null);
@@ -38,8 +33,8 @@ export const Sidebar = () => {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const isLoadingNextPageRef = useRef(false); // Ref to track loading state between renders
 
-  // Direkte Datenladung mit getAuswertungBahnIDs
-  const loadBahnen = useCallback(async (params: PaginationParams) => {
+  // Load bahnen with current search parameters
+  const loadBahnen = useCallback(async (params: SearchAuswertungParams) => {
     if (params.page && params.page > 1) {
       isLoadingNextPageRef.current = true;
     }
@@ -145,30 +140,71 @@ export const Sidebar = () => {
     };
   }, [pagination?.hasNext, isLoading, loadNextPage]);
 
+  // Parse filter string to search parameters
+  const parseFilterToSearchParams = (
+    filter: string,
+  ): SearchAuswertungParams => {
+    const params: SearchAuswertungParams = { page: 1, pageSize: 20 };
+
+    if (!filter.trim()) {
+      return params;
+    }
+
+    // Überprüfe, ob es eine numerische ID ist
+    if (/^\d+$/.test(filter.trim())) {
+      params.query = filter.trim();
+      console.log('Suche nach ID:', params.query);
+      return params;
+    }
+
+    if (filter.toLowerCase() === 'kalibrierung') {
+      params.calibration = true;
+      return params;
+    }
+
+    if (['pick', 'place', 'pick&place'].includes(filter.toLowerCase())) {
+      params.pickPlace = true;
+      return params;
+    }
+
+    const eventMatch = filter.match(/^(n|np)=(\d+)$/i);
+    if (eventMatch) {
+      const [, , count] = eventMatch;
+      params.pointsEvents = parseInt(count, 10);
+      return params;
+    }
+
+    const weightMatch = filter.match(/^(w|weight)=(\d*\.?\d+)$/i);
+    if (weightMatch) {
+      const [, , weight] = weightMatch;
+      params.weight = parseFloat(weight);
+      return params;
+    }
+
+    const velPPMatch = filter.match(/^(v|vp)=(\d+)$/i);
+    if (velPPMatch) {
+      const [, , velPP] = velPPMatch;
+      params.velocity = parseInt(velPP, 10);
+      return params;
+    }
+
+    // Default: Freitext-Suche
+    params.query = filter.trim();
+    console.log('Freitext-Suche:', params.query);
+    return params;
+  };
+
   const handleFilterChange = useCallback(
     (filter: string) => {
-      if (filter.trim() === '') {
-        // Wenn der Filter leer ist, lade die erste Seite neu
-        const defaultParams = { page: 1, pageSize: 20 };
-        setSearchParams(defaultParams);
-        setBahnInfo([]); // Liste zurücksetzen
-        loadBahnen(defaultParams);
-        return;
-      }
+      // Filter in Suchparameter umwandeln
+      const newSearchParams = parseFilterToSearchParams(filter);
+      setSearchParams(newSearchParams);
 
-      // Ansonsten client-seitiges Filtern
-      if (auswertungBahnIDs && auswertungBahnIDs.bahn_info) {
-        const filteredBahnen = auswertungBahnIDs.bahn_info.filter((bahn) =>
-          filterBy(filter, [
-            bahn.recordFilename || '',
-            bahn.bahnID?.toString() || '',
-            formatDate(bahn.recordingDate || ''),
-          ]),
-        );
-        setBahnInfo(filteredBahnen);
-      }
+      // Erste Seite mit neuen Suchparametern laden
+      setBahnInfo([]); // Liste zurücksetzen
+      loadBahnen(newSearchParams);
     },
-    [auswertungBahnIDs, loadBahnen],
+    [loadBahnen],
   );
 
   return (

@@ -177,7 +177,7 @@ async def search_bahn_info(
         pick_place: bool = Query(None, description="Nur Pick-and-Place-Läufe"),
         points_events: int = Query(None, description="Anzahl der Punktereignisse"),
         weight: float = Query(None, description="Gewicht"),
-        velocity: str = Query(None, description="Geschwindigkeit"),
+        velocity: int = Query(None, description="Geschwindigkeit"),
         page: int = Query(1, ge=1, description="Seitennummer"),
         page_size: int = Query(20, ge=1, le=100, description="Einträge pro Seite"),
         conn=Depends(get_db)
@@ -232,7 +232,7 @@ async def search_bahn_info(
             param_index += 1
 
         if velocity is not None:
-            base_query += f" AND velocity_handling = ${param_index}"
+            base_query += f" AND velocity_picking = ${param_index}"
             params.append(velocity)
             param_index += 1
 

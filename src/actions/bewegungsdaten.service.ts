@@ -104,7 +104,7 @@ export interface SearchBahnParams extends PaginationParams {
   pickPlace?: boolean;
   pointsEvents?: number;
   weight?: number;
-  velocity?: string;
+  velocity?: number;
 }
 
 export const searchBahnInfo = async (
@@ -128,7 +128,7 @@ export const searchBahnInfo = async (
     if (searchParams.weight)
       queryParams.append('weight', searchParams.weight.toString());
     if (searchParams.velocity)
-      queryParams.append('velocity', searchParams.velocity);
+      queryParams.append('velocity', searchParams.velocity.toString());
     if (searchParams.page)
       queryParams.append('page', searchParams.page.toString());
     if (searchParams.pageSize)

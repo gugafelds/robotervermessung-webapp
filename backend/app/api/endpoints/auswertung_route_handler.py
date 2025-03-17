@@ -416,3 +416,110 @@ async def check_deviation_data(bahn_id: str, conn=Depends(get_db)):
         logger.error(f"Error checking deviation data: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.get("/search")
+async def search_auswertung_bahn_ids(
+        query: str = Query(None, description="Suchbegriff für Freitext-Suche (Filename, ID, Datum)"),
+        calibration: bool = Query(None, description="Nur Kalibrierungsläufe"),
+        pick_place: bool = Query(None, description="Nur Pick-and-Place-Läufe"),
+        points_events: int = Query(None, description="Anzahl der Punktereignisse"),
+        weight: float = Query(None, description="Gewicht"),
+        velocity: int = Query(None, description="Geschwindigkeit"),
+        page: int = Query(1, ge=1, description="Seitennummer"),
+        page_size: int = Query(20, ge=1, le=100, description="Einträge pro Seite"),
+        conn=Depends(get_db)
+):
+    try:
+        # Der entscheidende Unterschied: Wir verbinden die bahn_info mit auswertung_info_euclidean
+        # Wir selektieren nur die Bahnen, für die auch Auswertungsdaten existieren
+        base_query = """
+        SELECT DISTINCT bi.* 
+        FROM bewegungsdaten.bahn_info bi
+        JOIN auswertung.info_euclidean ie ON bi.bahn_id = ie.bahn_id
+        WHERE 1=1
+        """
+
+        params = []
+        param_index = 1
+
+        # Filter hinzufügen basierend auf Parametern
+        if query:
+            # Da bahn_id ein varchar ist, behandeln wir alle Suchen als Text
+            search_conditions = []
+
+            # bahn_id (teilweise Übereinstimmung)
+            search_conditions.append(f"bi.bahn_id ILIKE ${param_index}")
+            params.append(f"%{query}%")
+            param_index += 1
+
+            # Dateiname (teilweise Übereinstimmung)
+            search_conditions.append(f"bi.record_filename ILIKE ${param_index}")
+            params.append(f"%{query}%")
+            param_index += 1
+
+            # Datum
+            search_conditions.append(f"bi.recording_date ILIKE ${param_index}")
+            params.append(f"%{query}%")
+            param_index += 1
+
+            # Alle Bedingungen mit OR verbinden
+            base_query += f" AND ({' OR '.join(search_conditions)})"
+
+        if calibration is not None:
+            base_query += f" AND bi.calibration_run = ${param_index}"
+            params.append(calibration)
+            param_index += 1
+
+        if pick_place is not None:
+            base_query += f" AND bi.pick_and_place_run = ${param_index}"
+            params.append(pick_place)
+            param_index += 1
+
+        if points_events is not None:
+            base_query += f" AND bi.np_ereignisse = ${param_index}"
+            params.append(points_events)
+            param_index += 1
+
+        if weight is not None:
+            base_query += f" AND bi.weight = ${param_index}"
+            params.append(weight)
+            param_index += 1
+
+        if velocity is not None:
+            base_query += f" AND bi.velocity_picking = ${param_index}"
+            params.append(velocity)
+            param_index += 1
+
+        # Zähle Gesamtanzahl für Pagination
+        count_query = f"SELECT COUNT(*) FROM ({base_query}) AS filtered_data"
+        total_count = await conn.fetchval(count_query, *params)
+
+        # Füge Sortierung und Pagination hinzu
+        query = base_query + f" ORDER BY bi.recording_date DESC LIMIT ${param_index} OFFSET ${param_index + 1}"
+        params.extend([page_size, (page - 1) * page_size])
+
+        rows = await conn.fetch(query, *params)
+        bahn_info_list = [dict(row) for row in rows]
+
+        # Keine Ergebnisse und Seite > 1
+        if not bahn_info_list and page > 1:
+            raise HTTPException(status_code=404, detail="Page number exceeds available pages")
+
+        total_pages = (total_count + page_size - 1) // page_size
+
+        return {
+            "bahn_info": bahn_info_list,
+            "pagination": {
+                "total": total_count,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages,
+                "has_next": page < total_pages,
+                "has_previous": page > 1
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error searching Auswertung bahn info: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+

@@ -151,6 +151,10 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
                 label="Kalibrierungsdatei"
                 value={currentBahn.calibrationRun ? 'Ja' : 'Nein'}
               />
+              <InfoGridItem
+                label="Last am TCP"
+                value={`${formatNumber(currentBahn.weight) || '-'} kg`}
+              />
             </div>
           </div>
 
@@ -162,31 +166,31 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               <InfoGridItem
                 label="Pose Ist"
-                value={`${formatNumber(currentBahn.frequencyPoseIst) || 'n. a.'} Hz`}
+                value={`${formatNumber(currentBahn.frequencyPoseIst) || '-'} Hz`}
               />
               <InfoGridItem
                 label="Twist Ist"
-                value={`${formatNumber(currentBahn.frequencyTwistIst) || 'n. a.'} Hz`}
+                value={`${formatNumber(currentBahn.frequencyTwistIst) || '-'} Hz`}
               />
               <InfoGridItem
                 label="Accel Ist"
-                value={`${formatNumber(currentBahn.frequencyAccelIst) || 'n. a.'} Hz`}
+                value={`${formatNumber(currentBahn.frequencyAccelIst) || '-'} Hz`}
               />
               <InfoGridItem
                 label="Position Soll"
-                value={`${formatNumber(currentBahn.frequencyPositionSoll) || 'n. a.'} Hz`}
+                value={`${formatNumber(currentBahn.frequencyPositionSoll) || '-'} Hz`}
               />
               <InfoGridItem
                 label="Orientierung Soll"
-                value={`${formatNumber(currentBahn.frequencyOrientationSoll) || 'n. a.'} Hz`}
+                value={`${formatNumber(currentBahn.frequencyOrientationSoll) || '-'} Hz`}
               />
               <InfoGridItem
                 label="Twist Soll"
-                value={`${formatNumber(currentBahn.frequencyTwistSoll) || 'n. a.'} Hz`}
+                value={`${formatNumber(currentBahn.frequencyTwistSoll) || '-'} Hz`}
               />
               <InfoGridItem
                 label="Joint States"
-                value={`${formatNumber(currentBahn.frequencyJointStates) || 'n. a.'} Hz`}
+                value={`${formatNumber(currentBahn.frequencyJointStates) || '-'} Hz`}
               />
             </div>
           </div>

@@ -14,7 +14,6 @@ import {
 } from '@/src/lib/transformer.auswertung';
 import { transformBahnInfoResult } from '@/src/lib/transformer.bewegungsdaten';
 import type {
-  AuswertungInfo,
   DFDPosition,
   DFDPositionRaw,
   DTWPosition,
@@ -26,29 +25,19 @@ import type {
 } from '@/types/auswertung.types';
 import type {
   AuswertungIDsResponse,
-  AuswertungInfoResponse,
   PaginationParams,
 } from '@/types/pagination.types';
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000/api';
 
-// API Response Types
-interface ApiResponse {
-  bahn_info: any[]; // oder spezifischer Type
-  auswertung_info: {
-    info_dfd: any[]; // oder spezifischer Type
-    info_sidtw: any[];
-    info_dtw: any[]; // oder spezifischer Type
-    info_euclidean: any[]; // oder spezifischer Type
-  };
-  pagination: {
-    total: number;
-    page: number;
-    page_size: number;
-    total_pages: number;
-    has_next: boolean;
-    has_previous: boolean;
-  };
+// Erweiterte Parameter für die Suche/Pagination
+export interface SearchAuswertungParams extends PaginationParams {
+  query?: string;
+  calibration?: boolean;
+  pickPlace?: boolean;
+  pointsEvents?: number;
+  weight?: number;
+  velocity?: number;
 }
 
 /* eslint-disable no-await-in-loop */
@@ -91,15 +80,39 @@ async function fetchFromAPI<T>(
   return response.json();
 }
 
+// Erweiterte Funktion, die nun auch Suchparameter akzeptiert und nur Bahnen mit Auswertungsdaten zurückgibt
 export const getAuswertungBahnIDs = async (
-  params: PaginationParams = { page: 1, pageSize: 20 },
+  params: SearchAuswertungParams = { page: 1, pageSize: 20 },
 ): Promise<AuswertungIDsResponse> => {
   try {
-    // URL-Parameter für die Paginierung erstellen
+    // URL-Parameter für die Suche/Paginierung erstellen
     const queryParams = new URLSearchParams();
+
+    // Suchparameter hinzufügen
+    if (params.query) {
+      queryParams.append('query', params.query);
+      console.log('Auswertung-Suche mit Query:', params.query);
+    }
+    if (params.calibration !== undefined)
+      queryParams.append('calibration', params.calibration.toString());
+    if (params.pickPlace !== undefined)
+      queryParams.append('pick_place', params.pickPlace.toString());
+    if (params.pointsEvents)
+      queryParams.append('points_events', params.pointsEvents.toString());
+    if (params.weight) queryParams.append('weight', params.weight.toString());
+    if (params.velocity)
+      queryParams.append('velocity', params.velocity.toString());
+
+    // Pagination-Parameter
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.pageSize)
       queryParams.append('page_size', params.pageSize.toString());
+
+    // API-Endpunkt mit Parametern - entweder Search oder Regular basierend auf Parametern
+    // Wir verwenden jetzt immer den Such-Endpunkt, da dieser die Filterung nach Auswertungsdaten enthält
+    const endpoint = `/auswertung/search?${queryParams.toString()}`;
+
+    console.log('Auswertung API-Anfrage:', endpoint);
 
     const result = await fetchFromAPI<{
       bahn_info: any[];
@@ -111,7 +124,7 @@ export const getAuswertungBahnIDs = async (
         has_next: boolean;
         has_previous: boolean;
       };
-    }>(`/auswertung/auswertung_info_overview?${queryParams.toString()}`);
+    }>(endpoint);
 
     // Paginierung in camelCase transformieren
     return {
@@ -134,6 +147,7 @@ export const getAuswertungBahnIDs = async (
 };
 
 // Angepasste Funktion zur Unterstützung von Paginierung
+/*
 export const getAllAuswertungInfo = async (
   params: PaginationParams = { page: 1, pageSize: 20 },
 ): Promise<AuswertungInfoResponse> => {
@@ -184,6 +198,7 @@ export const getAllAuswertungInfo = async (
     throw error;
   }
 };
+*/
 
 export const getAuswertungInfoById = async (
   id: string,
