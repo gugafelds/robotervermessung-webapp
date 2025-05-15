@@ -66,5 +66,14 @@ MAPPINGS = {
     'IMU_MAPPING': {
         'tcp_accel_pi': 'tcp_accel_pi',
         'tcp_angular_vel_pi': 'tcp_angular_vel_pi',
+    },
+    'TRANSFORM_MAPPING': {
+        'pt_x': 'x_trans',
+        'pt_y': 'y_trans',
+        'pt_z': 'z_trans',
+        'ot_x': 'qx_trans',
+        'ot_y': 'qy_trans',
+        'ot_z': 'qz_trans',
+        'ot_w': 'qw_trans'
     }
 }

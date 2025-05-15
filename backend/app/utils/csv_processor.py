@@ -1,618 +1,777 @@
 # csv_processor.py
 import csv
-import math
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from .db_config import MAPPINGS
 
 class CSVProcessor:
     def __init__(self, file_path):
+        self.ist_segments = None
+        self.soll_segments = None
+        self.soll_segments_with_ap = None
+        self.ist_segments_with_ap = None
         self.file_path = file_path
         self.mappings = MAPPINGS
 
-    def find_path_cycles(self, rows, filename, segmentation_method, num_segments):
-        """
-        Find segments based on the specified method:
-        - 'home': Home position detection
-        - 'fixed': Fixed number of segments
-        - 'pickplace': Pick and place operation segments
-        """
-        # First check if this is a special type of run
-        is_calibration = "calibration_run" in filename
-        is_pickplace = "pickplace" in filename
+    def process_csv(self, robot_model, bahnplanung, source_data_ist,
+                    source_data_soll, record_filename, segmentation_method="fixed_segments",
+                    num_segments=3, reference_position=None):
+        """Verarbeitet die CSV-Datei und bereitet Daten für den Datenbankupload vor."""
 
-        if is_calibration:
-            return self.create_calibration_segment(rows)
-        elif is_pickplace:
-            segments, modified_rows = self.create_pickplace_segments(rows)
-            # Store modified rows for later use
-            self.rows = modified_rows  # Add this line
-            return segments
-        elif segmentation_method == 'fixed':
-            return self.create_fixed_segments(rows, segments_per_group=num_segments)
-        else:
-            return self.create_home_position_segments(rows)
-    
-    def create_calibration_segment(self, rows):
-        """Creates a single segment for calibration runs."""
-        # Find first and last AP coordinates
-        first_ap_idx = None
-        first_ap_time = None
-        last_ap_idx = None
-        last_ap_time = None
-
-        for i, row in enumerate(rows):
-            if all(row.get(f'ap_{coord}', '').strip() for coord in ['x', 'y', 'z']):
-                if first_ap_idx is None:
-                    first_ap_idx = i
-                    first_ap_time = self.convert_timestamp(row['timestamp'])
-                last_ap_idx = i
-                last_ap_time = self.convert_timestamp(row['timestamp'])
-
-        if first_ap_idx is None:
-            return [(0, len(rows)-1)]
-
-        # Add buffer
-        buffer_start = first_ap_time - timedelta(seconds=0.02)
-        buffer_end = last_ap_time + timedelta(seconds=0.02)
-
-        actual_start = next(
-            (j for j in range(max(0, first_ap_idx-1000), first_ap_idx + 1)
-            if self.convert_timestamp(rows[j]['timestamp']) >= buffer_start),
-            first_ap_idx
-        )
-        
-        actual_end = next(
-            (j for j in range(last_ap_idx, min(len(rows), last_ap_idx + 1000))
-            if self.convert_timestamp(rows[j]['timestamp']) > buffer_end),
-            min(len(rows), last_ap_idx + 1000) - 1
-        )
-
-        return [(actual_start, actual_end)]
-
-    def create_fixed_segments(self, rows, segments_per_group):
-        """Creates fixed-size groups of segments."""
-        # First, find all AP coordinates
-        ap_indices = []
-        for i, row in enumerate(rows):
-            if all(row.get(f'ap_{coord}', '').strip() for coord in ['x', 'y', 'z']):
-                ap_indices.append(i)
-
-        if not ap_indices:
-            return [(0, len(rows)-1)]
-
-        # Create groups of segments
-        groups = []
-        current_group = []
-        
-        for i, idx in enumerate(ap_indices):
-            current_group.append(idx)
-            
-            # When we reach the desired size or it's the last element
-            if len(current_group) == segments_per_group or i == len(ap_indices) - 1:
-                # If this is the last group and it only has one segment
-                if i == len(ap_indices) - 1 and len(current_group) == 1 and groups:
-                    # Add it to the previous group
-                    groups[-1].extend(current_group)
-                else:
-                    groups.append(current_group)
-                current_group = []
-
-        # Convert groups to segments with buffers
-        segments = []
-        for group in groups:
-            start_idx = group[0]
-            end_idx = group[-1]
-            
-            start_time = self.convert_timestamp(rows[start_idx]['timestamp'])
-            end_time = self.convert_timestamp(rows[end_idx]['timestamp'])
-            
-            buffer_start = start_time - timedelta(seconds=0.02)
-            buffer_end = end_time + timedelta(seconds=0.02)
-            
-            actual_start = next(
-                (j for j in range(max(0, start_idx-1000), start_idx + 1)
-                if self.convert_timestamp(rows[j]['timestamp']) >= buffer_start),
-                start_idx
-            )
-            
-            actual_end = next(
-                (j for j in range(end_idx, min(len(rows), end_idx + 1000))
-                if self.convert_timestamp(rows[j]['timestamp']) > buffer_end),
-                min(len(rows), end_idx + 1000) - 1
-            )
-            
-            segments.append((actual_start, actual_end))
-        return segments
-
-    def create_home_position_segments(self, rows):
-        """Original method that creates segments based on home position detection."""
-        first_ap_idx = None
-        first_ap_time = None
-        last_ap_idx = None
-        last_ap_time = None
-
-        # Find first AP coordinates
-        for i, row in enumerate(rows):
-            if all(row.get(f'ap_{coord}', '').strip() for coord in ['x', 'y', 'z']):
-                if first_ap_idx is None:
-                    first_ap_idx = i
-                    first_ap_time = self.convert_timestamp(row['timestamp'])
-                last_ap_idx = i
-                last_ap_time = self.convert_timestamp(row['timestamp'])
-
-        if first_ap_idx is None:
-            return [(0, len(rows)-1)]
-
-        # Find all occurrences of home position
-        reference_coords = (
-            float(rows[first_ap_idx]['ap_x']),
-            float(rows[first_ap_idx]['ap_y']),
-            float(rows[first_ap_idx]['ap_z'])
-        )
-        segment_starts = [(first_ap_idx, first_ap_time)]
-        
-        for i in range(first_ap_idx + 1, len(rows)):
-            row = rows[i]
-            if all(row.get(f'ap_{coord}', '').strip() for coord in ['x', 'y', 'z']):
-                current_coords = (
-                    float(row['ap_x']),
-                    float(row['ap_y']),
-                    float(row['ap_z'])
-                )
-                if current_coords == reference_coords:
-                    segment_starts.append((i, self.convert_timestamp(row['timestamp'])))
-
-        # Create segments
-        segments = []
-        for i in range(len(segment_starts)):
-            start_idx, start_time = segment_starts[i]
-            
-            if i < len(segment_starts) - 1:
-                end_idx = segment_starts[i + 1][0]
-                end_time = self.convert_timestamp(rows[end_idx]['timestamp'])
-            else:
-                end_idx = last_ap_idx
-                end_time = last_ap_time
-
-            buffer_start = start_time - timedelta(seconds=0.02)
-            buffer_end = end_time + timedelta(seconds=0.02)
-
-            actual_start = next(
-                (j for j in range(max(0, start_idx-1000), start_idx + 1)
-                if self.convert_timestamp(rows[j]['timestamp']) >= buffer_start),
-                start_idx
-            )
-            
-            actual_end = next(
-                (j for j in range(end_idx, min(len(rows), end_idx + 1000))
-                if self.convert_timestamp(rows[j]['timestamp']) > buffer_end),
-                min(len(rows), end_idx + 1000) - 1
-            )
-
-            segments.append((actual_start, actual_end))
-
-        return segments
-
-    def create_pickplace_segments(self, rows):
-        total_rows = len(rows)
-        modified_rows = rows.copy()
-
-        #print("\n=== Starting Pick & Place Segment Analysis ===")
-        #print(f"Total rows: {total_rows}")
-
-        # Find all 1.0 signal positions but group consecutive ones
-        one_signal_groups = []
-        current_group = []
-        #print("\n--- Finding Signal Groups ---")
-        for i, row in enumerate(rows):
-            if row.get('DO_Signal', '').strip() == '1.0':
-                if not current_group or i - current_group[-1] < 30:
-                    current_group.append(i)
-                else:
-                    if current_group:
-                        #print(f"Found signal group at indices: {current_group}")
-                        one_signal_groups.append(current_group)
-                    current_group = [i]
-        if current_group:
-            one_signal_groups.append(current_group)
-            #print(f"Found final signal group at indices: {current_group}")
-
-        #print(f"\nTotal signal groups found: {len(one_signal_groups)}")
-
-        # Process only the first 1.0 signal of each group
-        #print("\n--- Processing AP/AQ Values ---")
-        for group in one_signal_groups:
-            first_index = group[0]
-            #print(f"\nProcessing group starting at index {first_index}")
-
-            # Look backwards for last AP/AQ values
-            last_ap_aq = None
-            for i in range(first_index - 1, -1, -1):
-                row = rows[i]
-                if all(row.get(col, '').strip() for col in
-                       ['ap_x', 'ap_y', 'ap_z', 'aq_x', 'aq_y', 'aq_z', 'aq_w']):
-                    last_ap_aq = {
-                        'ap_x': row['ap_x'],
-                        'ap_y': row['ap_y'],
-                        'ap_z': row['ap_z'],
-                        'aq_x': row['aq_x'],
-                        'aq_y': row['aq_y'],
-                        'aq_z': row['aq_z'],
-                        'aq_w': row['aq_w']
-                    }
-                    #print(f"Found AP/AQ values at index {i}:")
-                    #print(last_ap_aq)
-                    break
-
-            if last_ap_aq:
-                #print(f"Updating modified_rows at index {first_index} with AP/AQ values")
-                modified_rows[first_index].update(last_ap_aq)
-            else:
-                print(f"WARNING: No AP/AQ values found before index {first_index}")
-
-        # Create segments
-        # print("\n--- Creating Segments ---")
-        segments = []
-        current_position = 0
-
-        while current_position < total_rows:
-            #print(f"\nLooking for next segment starting at position {current_position}")
-
-            # Find next 1.0 signal
-            close_idx = next((i for i in range(current_position, total_rows)
-                              if modified_rows[i].get('DO_Signal', '').strip() == '1.0'), None)
-            if close_idx is None:
-                #print("No more 1.0 signals found")
-                break
-
-            # Find next 0.0 signal
-            open_idx = next((i for i in range(close_idx + 1, total_rows)
-                             if modified_rows[i].get('DO_Signal', '').strip() == '0.0'), None)
-            if open_idx is None:
-                #print(f"No matching 0.0 signal found after 1.0 signal at {close_idx}")
-                break
-
-            #print(f"Found potential segment: 1.0 at {close_idx} to 0.0 at {open_idx}")
-
-            # Calculate segment with buffers
-            start_time = self.convert_timestamp(modified_rows[close_idx]['timestamp'])
-            end_time = self.convert_timestamp(modified_rows[open_idx]['timestamp'])
-
-            buffer_start = start_time - timedelta(seconds=0.02)
-            buffer_end = end_time + timedelta(seconds=0.02)
-
-            search_range_start = max(0, close_idx - int(1.0 * 1000))
-            search_range_end = min(total_rows, open_idx + int(1.0 * 1000))
-
-            actual_start = next(
-                (j for j in range(search_range_start, close_idx + 1)
-                 if self.convert_timestamp(rows[j]['timestamp']) >= buffer_start),
-                close_idx
-            )
-
-            actual_end = next(
-                (j for j in range(open_idx, search_range_end)
-                 if self.convert_timestamp(rows[j]['timestamp']) > buffer_end),
-                min(total_rows, open_idx + 1000) - 1
-            )
-
-            #print(f"Final segment boundaries: {actual_start} to {actual_end}")
-
-            # Check for AP coordinates in segment
-            ap_coords = []
-            for i in range(actual_start, actual_end + 1):
-                if all(modified_rows[i].get(f'ap_{coord}', '').strip() for coord in ['x', 'y', 'z']):
-                    ap_coords.append(i)
-            #print(f"AP coordinates found at indices: {ap_coords}")
-
-            segments.append((actual_start, actual_end))
-            current_position = open_idx + 1
-
-        #print("\n=== Segment Analysis Complete ===")
-        #print(f"Total segments created: {len(segments)}")
-        if len(segments) != 4:
-            print("WARNING: Number of segments is not 4!")
-            print(f"Found {len(segments)} segments: {segments}")
-
-        return segments, modified_rows
-
-    def process_csv(self, upload_database, robot_model, bahnplanung, source_data_ist,
-                    source_data_soll, record_filename, segmentation_method='home', num_segments=1):
-        """Process the CSV file and prepare data for database insertion."""
-
-        print('Processing CSV file: ' + record_filename + '!')
+        print(f'Verarbeite CSV-Datei: {record_filename}')
         try:
             with open(self.file_path, 'r') as csvfile:
                 reader = csv.DictReader(csvfile)
                 rows = list(reader)
 
-                # Initialize pick and place specific variables
-                weight = None
-                velocity_picking = None
-                velocity_handling = None
-                is_pickplace = "pickplace" in record_filename
-                self.record_filename = record_filename
+            print(str(reference_position) + 'LSKASAKSPAOKSOAPKS')
+            print(segmentation_method + 'SASJAOISJAOISJAIOSJAOIJ')
 
-                # Pick and place position variables
-                x_start_pos = None
-                y_start_pos = None
-                z_start_pos = None
-                x_end_pos = None
-                y_end_pos = None
-                z_end_pos = None
-                handling_height = None
-                # Quaternion variables
-                qx_start = None
-                qy_start = None
-                qz_start = None
-                qw_start = None
-                qx_end = None
-                qy_end = None
-                qz_end = None
-                qw_end = None
+            # Pick&Place Metadaten extrahieren
+            is_pickplace = "pickplace" in record_filename
+            self.record_filename = record_filename
+            weight, velocity_picking, velocity_handling = None, None, None
+            handling_height = None
+
+            if is_pickplace:
+                # Extrahiere Pick&Place Metadaten
+                for row in rows:
+                    if velocity_picking is None and row.get('Velocity Picking', '').strip():
+                        try:
+                            velocity_picking = float(row['Velocity Picking'])
+                        except ValueError:
+                            print(f"Warnung: Ungültiger Wert für Velocity Picking: {row['Velocity Picking']}")
+
+                    if velocity_handling is None and row.get('Velocity Handling', '').strip():
+                        try:
+                            velocity_handling = float(row['Velocity Handling'])
+                        except ValueError:
+                            print(f"Warnung: Ungültiger Wert für Velocity Handling: {row['Velocity Handling']}")
+
+                    if weight is None and row.get('Weight', '').strip():
+                        try:
+                            weight = float(row['Weight'])
+                        except ValueError:
+                            print(f"Warnung: Ungültiger Wert für Weight: {row['Weight']}")
+
+                    if all(v is not None for v in [velocity_picking, velocity_handling, weight]):
+                        break
+
+            # NEU: Teile die Daten in IST und SOLL Zeilen auf basierend auf den Spalten
+            # IST-Spalten: timestamp, pv_x, pv_y, pv_z, ov_x, ov_y, ov_z, ov_w, pt_x, pt_y, pt_z, ot_x, ot_y, ot_z, ot_w,
+            # tcp_speedv, tcp_angularv, tcp_accelv, tcp_accelv_angular, tcp_accel_pi, tcp_angular_vel_pi, segment_id_ist
+            ist_spalten = ['timestamp', 'pv_x', 'pv_y', 'pv_z', 'ov_x', 'ov_y', 'ov_z', 'ov_w',
+                           'pt_x', 'pt_y', 'pt_z', 'ot_x', 'ot_y', 'ot_z', 'ot_w', 'tcp_speedv',
+                           'tcp_angularv', 'tcp_accelv', 'tcp_accelv_angular', 'tcp_accel_pi',
+                           'tcp_angular_vel_pi', 'segment_id_ist']
+
+            # SOLL-Spalten: ps_x, ps_y, ps_z, os_x, os_y, os_z, os_w, tcp_speeds, joint_1, joint_2,
+            # joint_3, joint_4, joint_5, joint_6, ap_x, ap_y, ap_z, aq_x, aq_y, aq_z, aq_w, DO_Signal,
+            # Movement Type, Weight, Velocity Picking, Velocity Handling, segment_soll_id
+            soll_spalten = ['ps_x', 'ps_y', 'ps_z', 'os_x', 'os_y', 'os_z', 'os_w', 'tcp_speeds',
+                            'joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6',
+                            'ap_x', 'ap_y', 'ap_z', 'aq_x', 'aq_y', 'aq_z', 'aq_w', 'DO_Signal',
+                            'Movement Type', 'Weight', 'Velocity Picking', 'Velocity Handling',
+                            'segment_id_soll']
+
+            # Filtere Zeilen für IST-Daten anhand der IST-Spalten
+            rows_ist = []
+            for row in rows:
+                # Prüfe, ob die Zeile gültige IST-Daten enthält
+                if row.get('segment_id_ist') is not None and row.get('segment_id_ist') != '' and row.get(
+                        'segment_id_ist') != 'NaN':
+                    # Prüfe, ob die erforderlichen IST-Spalten Werte enthalten
+                    if any(row.get(spalte) not in [None, '', 'NaN'] for spalte in ist_spalten if spalte in row):
+                        rows_ist.append(row)
+
+            # Filtere Zeilen für SOLL-Daten anhand der SOLL-Spalten
+            rows_soll = []
+            for row in rows:
+                # Prüfe, ob die Zeile gültige SOLL-Daten enthält
+                if row.get('segment_id_soll') is not None and row.get('segment_id_soll') != '' and row.get(
+                        'segment_id_soll') != 'NaN':
+                    # Prüfe, ob die erforderlichen SOLL-Spalten Werte enthalten
+                    if any(row.get(spalte) not in [None, '', 'NaN'] for spalte in soll_spalten if
+                           spalte in row):
+                        rows_soll.append(row)
+
+            # Wenn reference_position definiert ist, führe die positionsbasierte Segmentierung durch
+            if segmentation_method == "reference_position":
+                ref_x = float(reference_position[0])
+                ref_y = float(reference_position[1])
+                ref_z = float(reference_position[2])
+                threshold = 0.2  # 0.2 mm Schwellenwert
+
+                # print(f"Suche nach AP-Positionen nahe der Referenzposition: x={ref_x}, y={ref_y}, z={ref_z} mit Schwellenwert {threshold}mm")
+
+                # Finde alle Zeilen mit AP-Positionen nahe der Referenzposition
+                matching_rows = []
+
+                for row in rows_soll:
+                    # Überprüfe, ob die AP-Werte vorhanden und gültig sind
+                    ap_x = row.get('ap_x', '')
+                    ap_y = row.get('ap_y', '')
+                    ap_z = row.get('ap_z', '')
+
+                    if ap_x and ap_y and ap_z and ap_x != 'NaN' and ap_y != 'NaN' and ap_z != 'NaN':
+                        try:
+                            ap_x = float(ap_x)
+                            ap_y = float(ap_y)
+                            ap_z = float(ap_z)
+
+                            # Berechne den Abstand zur Referenzposition
+                            distance = self.calculate_distance(ap_x, ap_y, ap_z, ref_x, ref_y, ref_z)
+
+                            # Wenn der Abstand unter dem Schwellenwert liegt, speichere diese Zeile
+                            if distance <= threshold:
+                                matching_rows.append({
+                                    'segment_id': row.get('segment_id_soll'),
+                                    'timestamp': row.get('timestamp'),
+                                    'distance': distance,
+                                    'ap_x': ap_x,
+                                    'ap_y': ap_y,
+                                    'ap_z': ap_z
+                                })
+                        except ValueError:
+                            # Ignoriere Zeilen mit ungültigen AP-Werten
+                            continue
+
+                # Gruppiere die Treffer nach Segment-ID
+                segments_with_matches = {}
+                for match in matching_rows:
+                    segment_id = match['segment_id']
+                    if segment_id not in segments_with_matches:
+                        segments_with_matches[segment_id] = []
+                    segments_with_matches[segment_id].append(match)
+
+                # print(f"Gefunden: {len(matching_rows)} Zeilen mit AP-Positionen nahe der Referenzposition")
+                # print(f"Verteilt auf {len(segments_with_matches)} Segmente:")
+
+                # for segment_id, matches in segments_with_matches.items():
+                #     print(f"  Segment {segment_id}: {len(matches)} Referenzpunkte gefunden")
+                #     # Zeige den ersten und letzten gefundenen Punkt für dieses Segment
+                #     if matches:
+                #         first = matches[0]
+                #         last = matches[-1]
+                #         print(f"    Erster Punkt: AP=({first['ap_x']:.3f}, {first['ap_y']:.3f}, {first['ap_z']:.3f}), Abstand={first['distance']:.3f}mm")
+                #         print(f"    Letzter Punkt: AP=({last['ap_x']:.3f}, {last['ap_y']:.3f}, {last['ap_z']:.3f}), Abstand={last['distance']:.3f}mm")
+
+                # Sammle alle eindeutigen Segment-IDs (alle, nicht nur die mit Matches)
+                all_segment_ids = []
+                for row in rows_soll:
+                    segment_id = row.get('segment_id_soll')
+                    if segment_id and segment_id not in all_segment_ids:
+                        all_segment_ids.append(segment_id)
+
+                # Sortiere alle Segment-IDs numerisch
+                all_segment_ids.sort(key=lambda x: int(x) if x.isdigit() else float('inf'))
+
+                # Entferne das erste und letzte Segment, wie bei der ursprünglichen Methode
+                if len(all_segment_ids) >= 2:
+                    first_segment = all_segment_ids[0]
+                    last_segment = all_segment_ids[-1]
+                    all_segment_ids = all_segment_ids[1:-1]
+                    # print(f"\nEntferne erstes Segment {first_segment} und letztes Segment {last_segment}")
+
+                # Sortiere die Segmente mit Matches (Referenzpunkte)
+                ref_segment_ids = sorted([s for s in segments_with_matches.keys() if s in all_segment_ids],
+                                         key=lambda x: int(x) if x.isdigit() else float('inf'))
+
+                # Definiere Bahnen als Bereiche zwischen Referenzpunkten
+                bahnen = []
+
+                # Für jedes Referenzsegment (außer dem letzten) finden wir alle Segmente bis zum nächsten Referenzsegment
+                for i in range(len(ref_segment_ids)):
+                    start_idx = all_segment_ids.index(ref_segment_ids[i])
+
+                    # Für das letzte Referenzsegment nehmen wir alle verbleibenden Segmente
+                    if i == len(ref_segment_ids) - 1:
+                        end_idx = len(all_segment_ids)
+                    else:
+                        # Für alle anderen nehmen wir bis zum nächsten Referenzsegment (exklusiv)
+                        next_ref_idx = all_segment_ids.index(ref_segment_ids[i + 1])
+                        end_idx = next_ref_idx
+
+                    # Sammle alle Segmente für diese Bahn
+                    bahn_segments = all_segment_ids[start_idx:end_idx]
+                    bahnen.append(bahn_segments)
+
+                # Filtere Bahnen, die zu wenige Segmente haben (≤ 2)
+                min_segments_per_bahn = 2
+                valid_bahnen = []
+                removed_bahnen = []
+
+                for i, bahn_segments in enumerate(bahnen):
+                    if len(bahn_segments) > min_segments_per_bahn:
+                        valid_bahnen.append(bahn_segments)
+                    else:
+                        removed_bahnen.append((i, bahn_segments))
+
+                # print(f"\nDefiniere {len(bahnen)} Bahnen basierend auf Referenzpunkten:")
+                # for i, bahn_segments in enumerate(bahnen):
+                #     start_segment = bahn_segments[0]
+                #     end_segment = bahn_segments[-1]
+                #
+                #     print(f"  Bahn {i}: Segment {start_segment} bis {end_segment} ({len(bahn_segments)} Segmente)")
+                #     if start_segment in segments_with_matches:
+                #         ref_matches = segments_with_matches[start_segment]
+                #         ref_count = len(ref_matches)
+                #         avg_distance = sum(match['distance'] for match in ref_matches) / ref_count if ref_count > 0 else 0
+                #         print(f"    Beginnt mit Referenzpunkt: {ref_count} Punkte, Ø Abstand: {avg_distance:.3f}mm")
+                #     print(f"    Enthaltene Segmente: {', '.join(bahn_segments)}")
+
+                # print(f"\nNach Filterung: {len(valid_bahnen)} gültige Bahnen (mehr als {min_segments_per_bahn} Segmente):")
+
+                # Entfernte Bahnen ausgeben
+                # if removed_bahnen:
+                #     print(f"Entfernte Bahnen (≤ {min_segments_per_bahn} Segmente):")
+                #     for bahn_idx, segments in removed_bahnen:
+                #         print(f"  Bahn {bahn_idx}: {', '.join(segments)}")
+
+                # Neue Bahn-Indizes zuweisen
+                new_bahnen = {}
+                for new_idx, bahn_segments in enumerate(valid_bahnen):
+                    original_idx = bahnen.index(bahn_segments)
+                    new_bahnen[new_idx] = {"segments": bahn_segments, "original_idx": original_idx}
+
+                    # start_segment = bahn_segments[0]
+                    # end_segment = bahn_segments[-1]
+                    #
+                    # print(f"  Bahn {new_idx} (ursprünglich Bahn {original_idx}): Segment {start_segment} bis {end_segment} ({len(bahn_segments)} Segmente)")
+                    # print(f"    Enthaltene Segmente: {', '.join(bahn_segments)}")
+
+                # Segment zu Bahn Mapping mit neuen Indizes
+                segment_to_bahn = {}
+
+                # Initialisiere alle Segmente mit "?"
+                for segment_id in all_segment_ids:
+                    segment_to_bahn[segment_id] = "?"
+
+                # Weise Bahn-IDs zu
+                for new_bahn_idx, bahn_info in new_bahnen.items():
+                    for segment_id in bahn_info["segments"]:
+                        segment_to_bahn[segment_id] = str(new_bahn_idx)
+
+                # print("\nSegment zu Bahn Mapping (nach Filterung):")
+                # for segment_id in all_segment_ids:
+                #     bahn_id = segment_to_bahn.get(segment_id, "?")
+                #     print(f"  Segment {segment_id} → Bahn {bahn_id}")
+
+                # print("\nZusammenfassung der finalen Bahnen:")
+                # for bahn_idx, bahn_info in new_bahnen.items():
+                #     segments = bahn_info["segments"]
+                #     print(f"  Bahn {bahn_idx}: {len(segments)} Segmente - {', '.join(segments)}")
+
+                # Sammle alle Segmente aus den validen Bahnen
+                valid_segments = []
+                for bahn_info in new_bahnen.values():
+                    valid_segments.extend(bahn_info["segments"])
+
+                # print(f"\nVerwende {len(valid_segments)} Segmente für die weitere Verarbeitung:")
+                # print(f"  {', '.join(valid_segments)}")
+
+                # Filtere Zeilen für IST-Daten basierend auf den gültigen Segmenten
+                rows_ist_filtered = []
+                for row in rows_ist:
+                    segment_id = row.get('segment_id_ist')
+                    if segment_id in valid_segments:
+                        rows_ist_filtered.append(row)
+
+                # Filtere Zeilen für SOLL-Daten basierend auf den gültigen Segmenten
+                rows_soll_filtered = []
+                for row in rows_soll:
+                    segment_id = row.get('segment_id_soll')
+                    if segment_id in valid_segments:
+                        rows_soll_filtered.append(row)
+
+                # print(f"IST: Originale Anzahl Zeilen: {len(rows_ist)}, Nach Segment-Filterung: {len(rows_ist_filtered)}")
+                # print(f"SOLL: Originale Anzahl Zeilen: {len(rows_soll)}, Nach Segment-Filterung: {len(rows_soll_filtered)}")
+
+                # Bereite ein Mapping von Segment zu Bahn vor, das an process_data übergeben wird
+                reference_segment_to_bahn = {}
+                for segment_id in all_segment_ids:
+                    bahn_id = segment_to_bahn.get(segment_id, None)
+                    if bahn_id != "?" and bahn_id is not None:
+                        reference_segment_to_bahn[segment_id] = bahn_id
+
+                # Verarbeite die Daten mit der reference_position Methode
+                ist_rows_processed, ist_processed_data, ist_point_counts, ist_max_bahn, ist_bahn_ids = self.process_data(
+                    rows_ist_filtered, source_data_ist, "ist", "reference_position",
+                    segment_to_bahn_mapping=reference_segment_to_bahn
+                )
+
+                soll_rows_processed, soll_processed_data, soll_point_counts, soll_max_bahn, soll_bahn_ids = self.process_data(
+                    rows_soll_filtered, source_data_soll, "soll", "reference_position",
+                    segment_to_bahn_mapping=reference_segment_to_bahn
+                )
+
+            else:  # Bei allen anderen Methoden (z.B. fixed_segments) den ursprünglichen Code verwenden
+                # Sammle alle eindeutigen IST-Segmente
+                ist_segments = []
+                for row in rows_ist:
+                    segment_id = row.get('segment_id_ist')
+                    if segment_id not in ist_segments:
+                        ist_segments.append(segment_id)
+
+                # Sammle alle eindeutigen SOLL-Segmente
+                soll_segments = []
+                for row in rows_soll:
+                    segment_id = row.get('segment_id_soll')
+                    if segment_id not in soll_segments:
+                        soll_segments.append(segment_id)
+
+                # Bestimme, welche IST-Segmente zu entfernen sind
+                ist_segments_to_remove = []
+                if len(ist_segments) >= 3:
+                    ist_segments_to_remove = [ist_segments[0], ist_segments[-1]]
+                    # print(f"IST: Entferne erstes Segment {ist_segments_to_remove[0]} und letztes Segment {ist_segments_to_remove[-1]}")
+                else:
+                    print(f"Warnung: Nur {len(ist_segments)} IST-Segmente gefunden, entferne keine")
+
+                # Bestimme, welche SOLL-Segmente zu entfernen sind
+                soll_segments_to_remove = []
+                if len(soll_segments) >= 3:
+                    soll_segments_to_remove = [soll_segments[0], soll_segments[-1]]
+                    # print(f"SOLL: Entferne erstes Segment {soll_segments_to_remove[0]} und letztes Segment {soll_segments_to_remove[-1]}")
+                else:
+                    print(f"Warnung: Nur {len(soll_segments)} SOLL-Segmente gefunden, entferne keine")
+
+                # Filtere IST-Zeilen
+                rows_ist_filtered = []
+                for row in rows_ist:
+                    segment_id = row.get('segment_id_ist')
+                    if segment_id not in ist_segments_to_remove:
+                        rows_ist_filtered.append(row)
+
+                # Filtere SOLL-Zeilen
+                rows_soll_filtered = []
+                for row in rows_soll:
+                    segment_id = row.get('segment_id_soll')
+                    if segment_id not in soll_segments_to_remove:
+                        rows_soll_filtered.append(row)
+
+                # print(f"IST: Originale Anzahl Zeilen: {len(rows_ist)}, Nach Filterung: {len(rows_ist_filtered)}")
+                # print(f"SOLL: Originale Anzahl Zeilen: {len(rows_soll)}, Nach Filterung: {len(rows_soll_filtered)}")
+
+                # Verwende:
+                ist_rows_processed, ist_processed_data, ist_point_counts, ist_max_bahn, ist_bahn_ids = self.process_data(
+                    rows_ist_filtered, source_data_ist, "ist", segmentation_method, num_segments
+                )
+
+                soll_rows_processed, soll_processed_data, soll_point_counts, soll_max_bahn, soll_bahn_ids = self.process_data(
+                    rows_soll_filtered, source_data_soll, "soll", segmentation_method, num_segments
+                )
+
+            # Bestimme die maximale Anzahl von Bahnen
+            max_bahnen = max(ist_max_bahn, soll_max_bahn)
+
+            print(f"Gefunden: {ist_max_bahn + 1} IST-Bahnen, {soll_max_bahn + 1} SOLL-Bahnen")
+
+            # Kombiniere IST- und SOLL-Daten zu einer Liste von Bahnen pro Bahn-ID
+            all_processed_data = []
+
+            for bahn_idx in range(max_bahnen + 1):
+                # Nehme die entsprechenden Daten für diese Bahn
+                bahndaten = {
+                    key: [] for key in self.mappings.keys()
+                }
+
+                # Sammle IST-Daten für diese Bahn
+                for mapping_name in ist_processed_data.keys():
+                    bahn_key = f"{bahn_idx}"
+                    if bahn_key in ist_processed_data[mapping_name]:
+                        bahndaten[mapping_name] = ist_processed_data[mapping_name][bahn_key]
+
+                # Sammle SOLL-Daten für diese Bahn
+                for mapping_name in soll_processed_data.keys():
+                    bahn_key = f"{bahn_idx}"
+                    if bahn_key in soll_processed_data[mapping_name]:
+                        bahndaten[mapping_name] = soll_processed_data[mapping_name][bahn_key]
+
+                # Wenn keine Daten für diese Bahn vorhanden sind, überspringe sie
+                has_data = any(len(bahndaten[key]) > 0 for key in bahndaten.keys())
+                if not has_data:
+                    continue
+
+                calibration_run = "calibration_run" in record_filename
+
+                # Bestimme Zeitstempel der Bahn
+                all_timestamps = []
+                for key, data in bahndaten.items():
+                    for row in data:
+                        if len(row) > 2:  # Prüfe, ob Zeitstempel vorhanden
+                            all_timestamps.append(row[2])  # Zeitstempel ist an Position 2
+
+                if all_timestamps:
+                    all_timestamps.sort()
+                    start_time = str(self.convert_timestamp(all_timestamps[0]))
+                    end_time = str(self.convert_timestamp(all_timestamps[-1]))
+                    recording_date = start_time
+                else:
+                    # Fallback auf globale Zeitstempel
+                    start_time = str(self.convert_timestamp(rows[0]['timestamp']))
+                    end_time = str(self.convert_timestamp(rows[-1]['timestamp']))
+                    recording_date = start_time
+
+                bahn_id = None
+                for key, data in bahndaten.items():
+                    if data and len(data) > 0 and len(data[0]) > 0:
+                        bahn_id = data[0][0]  # Nehme die erste Komponente der ersten Zeile
+                        break
+
+                # Berechne Punktzahlen für diese Bahn
+                bahn_point_counts = {
+                    'np_ereignisse': 0,
+                    'np_pose_ist': len(bahndaten.get('POSE_MAPPING', [])),
+                    'np_twist_ist': len(bahndaten.get('TWIST_IST_MAPPING', [])),
+                    'np_accel_ist': len(bahndaten.get('ACCEL_MAPPING', [])),
+                    'np_pos_soll': len(bahndaten.get('POSITION_SOLL_MAPPING', [])),
+                    'np_orient_soll': len(bahndaten.get('ORIENTATION_SOLL_MAPPING', [])),
+                    'np_twist_soll': len(bahndaten.get('TWIST_SOLL_MAPPING', [])),
+                    'np_jointstates': len(bahndaten.get('JOINT_MAPPING', [])),
+                    'np_imu': len(bahndaten.get('IMU_MAPPING', [])),
+                }
+
+                # Berechne AP-Ereignisse basierend auf RAPID_EVENTS
+                bahn_point_counts['np_ereignisse'] = len(bahndaten.get('RAPID_EVENTS_MAPPING', []))
+
+                # Berechne Frequenzen basierend auf den Zeitstempeln
+                bahn_frequencies = {
+                    'frequency_pose': self.calculate_frequency_from_data(bahndaten.get('POSE_MAPPING', [])),
+                    'frequency_position_soll': self.calculate_frequency_from_data(
+                        bahndaten.get('POSITION_SOLL_MAPPING', [])),
+                    'frequency_orientation_soll': self.calculate_frequency_from_data(
+                        bahndaten.get('ORIENTATION_SOLL_MAPPING', [])),
+                    'frequency_twist_ist': self.calculate_frequency_from_data(bahndaten.get('TWIST_IST_MAPPING', [])),
+                    'frequency_twist_soll': self.calculate_frequency_from_data(bahndaten.get('TWIST_SOLL_MAPPING', [])),
+                    'frequency_accel': self.calculate_frequency_from_data(bahndaten.get('ACCEL_MAPPING', [])),
+                    'frequency_joint': self.calculate_frequency_from_data(bahndaten.get('JOINT_MAPPING', [])),
+                    'frequency_imu': self.calculate_frequency_from_data(bahndaten.get('IMU_MAPPING', []))
+                }
+
+                # Erstelle Basis-Bahn-Info
+                base_info = [
+                    bahn_id,
+                    robot_model,
+                    bahnplanung,
+                    recording_date,
+                    start_time,
+                    end_time,
+                    source_data_ist,
+                    source_data_soll,
+                    self.extract_record_part(record_filename),
+                    bahn_point_counts['np_ereignisse'],
+                    bahn_frequencies['frequency_pose'],
+                    bahn_frequencies['frequency_position_soll'],
+                    bahn_frequencies['frequency_orientation_soll'],
+                    bahn_frequencies['frequency_twist_ist'],
+                    bahn_frequencies['frequency_twist_soll'],
+                    bahn_frequencies['frequency_accel'],
+                    bahn_frequencies['frequency_joint'],
+                    calibration_run,
+                    bahn_point_counts['np_pose_ist'],
+                    bahn_point_counts['np_twist_ist'],
+                    bahn_point_counts['np_accel_ist'],
+                    bahn_point_counts['np_pos_soll'],
+                    bahn_point_counts['np_orient_soll'],
+                    bahn_point_counts['np_twist_soll'],
+                    bahn_point_counts['np_jointstates'],
+                ]
 
                 if is_pickplace:
-                    for row in rows:
-                        if velocity_picking is None and row.get('Velocity Picking', '').strip():
-                            try:
-                                velocity_picking = float(row['Velocity Picking'])
-                            except ValueError:
-                                print(f"Warning: Could not convert Velocity Picking value: {row['Velocity Picking']}")
+                    bahn_info_data = tuple(base_info + [
+                        weight,
+                        handling_height,
+                        velocity_handling,
+                        velocity_picking,
+                        bahn_frequencies['frequency_imu'],
+                        is_pickplace,
+                        bahn_point_counts['np_imu'],
+                    ])
+                else:
+                    bahn_info_data = tuple(base_info)
 
-                        if velocity_handling is None and row.get('Velocity Handling', '').strip():
-                            try:
-                                velocity_handling = float(row['Velocity Handling'])
-                            except ValueError:
-                                print(f"Warning: Could not convert Velocity Handling value: {row['Velocity Handling']}")
+                bahndaten['bahn_info_data'] = bahn_info_data
 
-                        if weight is None and row.get('Weight', '').strip():
-                            try:
-                                weight = float(row['Weight'])
-                            except ValueError:
-                                print(f"Warning: Could not convert weight value: {row['Weight']}")
+                all_processed_data.append(bahndaten)
 
-                        # Break if we found all values
-                        if all(v is not None for v in [velocity_picking, velocity_handling, weight]):
-                            break
-
-                    # Debug output to verify values
-                    # print(f"Found values: velocity_picking={velocity_picking}, "
-                    #      f"velocity_handling={velocity_handling}, weight={weight}")
-
-                # Find path cycles based on reference coordinates
-                paths = self.find_path_cycles(rows, record_filename,
-                                              segmentation_method, num_segments)
-                all_processed_data = []
-
-                for path_idx, (start_index, end_index) in enumerate(paths):
-                    # Reset position tracking for each path when doing pick and place
-                    if is_pickplace:
-                        segment_state = 0  # Track which segment we're in (0, 1, or 2)
-                        x_start_pos = None
-                        y_start_pos = None
-                        z_start_pos = None
-                        x_end_pos = None
-                        y_end_pos = None
-                        z_end_pos = None
-                        handling_height = None
-                        qx_start = None
-                        qy_start = None
-                        qz_start = None
-                        qw_start = None
-                        qx_end = None
-                        qy_end = None
-                        qz_end = None
-                        qw_end = None
-
-                    filtered_rows = self.rows[start_index:end_index + 1] if hasattr(self, 'rows') else rows[start_index:end_index + 1]
-                    movement_types = {}
-
-
-                    first_ap_timestamp = next(
-                        (row['timestamp'] for row in filtered_rows if row.get('ap_x', '').strip()),
-                        filtered_rows[0]['timestamp']
-                    )
-                    bahn_id = str(first_ap_timestamp[:10])
-
-                    recording_date = str(self.convert_timestamp(filtered_rows[0]['timestamp']))
-                    start_time = str(self.convert_timestamp(filtered_rows[0]['timestamp']))
-                    end_time = str(self.convert_timestamp(filtered_rows[-1]['timestamp']))
-
-                    processed_data = {key: [] for key in self.mappings.keys()}
-                    processed_data['bahn_info_data'] = []
-
-                    segment_counter = 0
-                    current_segment_id = f"{bahn_id}_{segment_counter}"
-
-                    rows_processed = {key: 0 for key in self.mappings.keys()}
-                    calibration_run = "calibration_run" in record_filename
-
-                    if "pickplace" in record_filename:
-                        segment_counter = 0
-                        for row in filtered_rows:
-                            if row.get('ap_x', '').strip():
-                                segment_counter += 1
-                                segment_id = f"{bahn_id}_{segment_counter}"
-
-                                # Determine movement type based on segment position
-                                if segment_counter % 4 == 0:  # Approach
-                                    movement_types[segment_id] = "linear"
-                                    #print(f"Segment {segment_id}: Setting linear (approach)")
-                                elif segment_counter % 4 == 1:  # Pick
-                                    movement_types[segment_id] = "linear"
-                                    #print(f"Segment {segment_id}: Setting linear (pick)")
-                                elif segment_counter % 4 == 2:  # Handling movement
-                                    try:
-                                        # This segment represents the movement between points 2 and 3
-                                        # where z-height is constant (1046.7 in your example)
-                                        movement_type = self.calculate_direction(filtered_rows)
-                                        movement_types[segment_id] = movement_type
-                                        #print(f"Segment {segment_id}: Calculated {movement_type} (handling)")
-                                    except Exception as e:
-                                        print(f"Error calculating direction for segment {segment_id}: {e}")
-                                        movement_types[segment_id] = None
-                                else:  # Place (segment_counter % 4 == 0)
-                                    movement_types[segment_id] = "linear"
-                                    #print(f"Segment {segment_id}: Setting linear (place)")
-
-
-                    # Reset segment counter again for the main processing
-                    segment_counter = 0
-
-                    point_counts = {
-                        'np_ereignisse': 0,
-                        'np_pose_ist': 0,
-                        'np_twist_ist': 0,
-                        'np_accel_ist': 0,
-                        'np_pos_soll': 0,
-                        'np_orient_soll': 0,
-                        'np_twist_soll': 0,
-                        'np_jointstates': 0,
-                        'np_imu': 0
-                    }
-
-                    # Process each row
-                    for row in filtered_rows:
-                        timestamp = row['timestamp']
-
-                        if row.get('ap_x', '').strip():
-                            if is_pickplace:
-                                # Track positions for pick and place operations
-                                if segment_state == 0:  # First position
-                                    x_start_pos = float(row['ap_x'])
-                                    y_start_pos = float(row['ap_y'])
-                                    qx_start = float(row['aq_x'])
-                                    qy_start = float(row['aq_y'])
-                                    qz_start = float(row['aq_z'])
-                                    qw_start = float(row['aq_w'])
-                                elif segment_state == 1:  # Handling height
-                                    handling_height = float(row['ap_z'])
-                                    z_start_pos = float(row['ap_z'])
-                                elif segment_state == 2:  # End position
-                                    x_end_pos = float(row['ap_x'])
-                                    y_end_pos = float(row['ap_y'])
-                                    z_end_pos = float(row['ap_z'])
-                                    qx_end = float(row['aq_x'])
-                                    qy_end = float(row['aq_y'])
-                                    qz_end = float(row['aq_z'])
-                                    qw_end = float(row['aq_w'])
-                                segment_state += 1
-
-                            point_counts['np_ereignisse'] += 1
-                            segment_counter += 1
-                            current_segment_id = f"{bahn_id}_{segment_counter}"
-
-                        for mapping_name, mapping in self.mappings.items():
-                            processed_data[mapping_name], rows_processed[
-                                mapping_name], point_counts = self.process_mapping(
-                                row, mapping, bahn_id, current_segment_id, timestamp,
-                                source_data_ist if mapping_name in ['ACCEL_MAPPING', 'POSE_MAPPING',
-                                                                    'TWIST_IST_MAPPING'] else source_data_soll,
-                                processed_data[mapping_name], rows_processed[mapping_name],
-                                mapping_name, point_counts, movement_types  # Add movement_types here
-                            )
-
-
-                    frequencies = {
-                        f"frequency_{key.lower().replace('_mapping', '')}": self.calculate_frequencies(filtered_rows,
-                                                                                                       mapping)
-                        for key, mapping in self.mappings.items()
-                    }
-
-                    if frequencies['frequency_pose'] == 0 or rows_processed['POSE_MAPPING'] == 0:
-                        source_data_ist = "abb_websocket"
-
-                    # Create base bahn_info_data tuple
-                    base_info = [
-                        bahn_id,
-                        robot_model,
-                        bahnplanung,
-                        recording_date,
-                        start_time,
-                        end_time,
-                        source_data_ist,
-                        source_data_soll,
-                        self.extract_record_part(record_filename),
-                        point_counts['np_ereignisse'],
-                        frequencies['frequency_pose'],
-                        frequencies['frequency_position_soll'],
-                        frequencies['frequency_orientation_soll'],
-                        frequencies['frequency_twist_ist'],
-                        frequencies['frequency_twist_soll'],
-                        frequencies['frequency_accel'],
-                        frequencies['frequency_joint'],
-                        calibration_run,
-                        point_counts['np_pose_ist'],
-                        point_counts['np_twist_ist'],
-                        point_counts['np_accel_ist'],
-                        point_counts['np_pos_soll'],
-                        point_counts['np_orient_soll'],
-                        point_counts['np_twist_soll'],
-                        point_counts['np_jointstates'],
-                    ]
-
-                    # Add pick and place specific data if applicable
-                    if is_pickplace:
-                        bahn_info_data = tuple(base_info + [
-                            weight,
-                            x_start_pos,
-                            y_start_pos,
-                            z_start_pos,
-                            x_end_pos,
-                            y_end_pos,
-                            z_end_pos,
-                            handling_height,
-                            qx_start,
-                            qy_start,
-                            qz_start,
-                            qw_start,
-                            qx_end,
-                            qy_end,
-                            qz_end,
-                            qw_end,
-                            velocity_handling,
-                            velocity_picking,
-                            frequencies['frequency_imu'],
-                            is_pickplace,
-                            point_counts['np_imu'],
-                        ])
-                    else:
-                        bahn_info_data = tuple(base_info)
-
-                    processed_data['bahn_info_data'] = bahn_info_data
-                    #print(bahn_info_data)
-                    all_processed_data.append(processed_data)
-
-                    #self.print_processing_stats(len(filtered_rows), rows_processed, point_counts)
-
-                return all_processed_data
+            print(f"CSV-Verarbeitung abgeschlossen: {len(all_processed_data)} Bahnen gefunden")
+            return all_processed_data
 
         except Exception as e:
-            print(f"An error occurred while processing the CSV: {e}")
+            import traceback
+            print(f"Fehler bei der CSV-Verarbeitung: {e}")
+            print(traceback.format_exc())
             return None
 
-    def process_mapping(self, row, mapping, bahn_id, current_segment_id, timestamp, source_data, data_list,
-                        rows_processed, mapping_name, point_counts, movement_types=None):
+    def process_data(self, rows, source_data, data_type, segmentation_method="fixed_segments", num_segments=3,
+                     segment_to_bahn_mapping=None):
+        """
+        Verarbeitet IST- oder SOLL-Daten aus den CSV-Zeilen.
+        Die ersten und letzten Segmente wurden bereits entfernt.
+        Bei reference_position werden die Bahnen anhand des übergebenen segment_to_bahn_mapping zugeordnet.
+        Bei fixed_segments enthält jede Bahn genau num_segments Segmente,
+        außer die letzte, die auch mehr enthalten kann, wenn Restsegmente vorhanden sind.
 
+        Args:
+            rows: Die CSV-Zeilen
+            source_data: Die Datenquelle (z.B. "ros" oder "rapid")
+            data_type: "ist" oder "soll"
+            segmentation_method: Die Segmentierungsmethode
+            num_segments: Anzahl der Segmente pro Bahn
+            segment_to_bahn_mapping: Mapping von Segment-ID zu Bahn-ID (nur für reference_position)
+
+        Returns:
+            Tuple mit (rows_processed, processed_data, point_counts, max_bahn, bahn_ids)
+        """
+        # Definiere, welche Mappings für den Datentyp verwendet werden
+        if data_type.lower() == "ist":
+            segment_id_field = 'segment_id_ist'
+            mappings_to_use = ['POSE_MAPPING', 'TWIST_IST_MAPPING', 'ACCEL_MAPPING', 'TRANSFORM_MAPPING', 'IMU_MAPPING']
+        elif data_type.lower() == "soll":
+            segment_id_field = 'segment_id_soll'
+            mappings_to_use = ['POSITION_SOLL_MAPPING', 'ORIENTATION_SOLL_MAPPING', 'TWIST_SOLL_MAPPING',
+                               'JOINT_MAPPING', 'RAPID_EVENTS_MAPPING']
+        else:
+            raise ValueError(f"Ungültiger Datentyp: {data_type}. Muss 'ist' oder 'soll' sein.")
+
+        # Zähler für die Verarbeitung
+        rows_processed = {key: 0 for key in mappings_to_use}
+
+        # Container für verarbeitete Daten, getrennt nach Bahn
+        processed_data = {key: {} for key in mappings_to_use}
+
+        # Punktzähler initialisieren
+        point_counts = {
+            'np_ereignisse': 0,
+            'np_pose_ist': 0,
+            'np_twist_ist': 0,
+            'np_accel_ist': 0,
+            'np_pos_soll': 0,
+            'np_orient_soll': 0,
+            'np_twist_soll': 0,
+            'np_jointstates': 0,
+            'np_imu': 0
+        }
+
+        # Sammle zuerst alle eindeutigen Segmente
+        all_segments = []
+        for row in rows:
+            segment_id = row.get(segment_id_field)
+            if segment_id is not None and segment_id != '' and segment_id not in all_segments:
+                all_segments.append(segment_id)
+
+        # print(f"{data_type.upper()}: Verarbeite {len(all_segments)} gefilterte Segmente: {', '.join(all_segments)}")
+
+        # Je nach Segmentierungsmethode unterschiedliche Verarbeitung
+        if segmentation_method == "reference_position" and segment_to_bahn_mapping:
+            # Bei reference_position wird das übergebene Mapping verwendet
+            # print(f"{data_type.upper()}: Verwende reference_position Segmentierung mit vorgegebenem Bahn-Mapping")
+
+            # Verwende das übergebene Mapping direkt
+            segment_to_bahn = segment_to_bahn_mapping
+
+            # Erstelle bahn_to_segments (umgekehrtes Mapping)
+            bahn_to_segments = {}
+            for segment_id, bahn_key in segment_to_bahn.items():
+                if bahn_key not in bahn_to_segments:
+                    bahn_to_segments[bahn_key] = []
+                bahn_to_segments[bahn_key].append(segment_id)
+
+            # Gib das verwendete Mapping aus
+            # print(f"{data_type.upper()}: Bahn-Segmente basierend auf reference_position:")
+            # for bahn_key, segments in sorted(bahn_to_segments.items(), key=lambda x: int(x[0])):
+            #     print(f"  Bahn {bahn_key}: {', '.join(segments)}")
+
+            # Bestimme maximale Bahn-ID
+            max_bahn = max([int(bahn) for bahn in bahn_to_segments.keys()]) if bahn_to_segments else 0
+
+        else:
+            # Bei fixed_segments die ursprüngliche Segmentierung verwenden
+            # Teile die Segmente in Bahnen mit je num_segments Segmenten ein,
+            # wobei die letzte Bahn mehr Segmente haben kann, wenn Restsegmente übrig bleiben
+            bahn_to_segments = {}
+
+            # Wenn wir weniger Segmente haben als in einer Bahn sein sollten
+            if len(all_segments) <= num_segments:
+                bahn_to_segments["0"] = all_segments
+                max_bahn = 0
+            else:
+                # Berechne, wie viele vollständige Bahnen wir haben werden
+                complete_bahnen = len(all_segments) // num_segments
+
+                # Berechne, wie viele Restsegmente übrig bleiben
+                remaining_segments = len(all_segments) % num_segments
+
+                # Wenn wir Restsegmente haben und es weniger als num_segments sind,
+                # fügen wir sie zur letzten Bahn hinzu
+                merge_with_last = 0 < remaining_segments < num_segments / 2
+
+                # Erstelle Bahnen
+                for i in range(complete_bahnen):
+                    start_idx = i * num_segments
+                    end_idx = (i + 1) * num_segments
+                    bahn_to_segments[str(i)] = all_segments[start_idx:end_idx]
+
+                # Behandle Restsegmente
+                if remaining_segments > 0:
+                    if merge_with_last and complete_bahnen > 0:
+                        # Füge die Restsegmente zur letzten Bahn hinzu
+                        last_bahn = str(complete_bahnen - 1)
+                        bahn_to_segments[last_bahn].extend(all_segments[complete_bahnen * num_segments:])
+                        max_bahn = complete_bahnen - 1
+                    else:
+                        # Erstelle eine neue Bahn für die Restsegmente
+                        bahn_to_segments[str(complete_bahnen)] = all_segments[complete_bahnen * num_segments:]
+                        max_bahn = complete_bahnen
+                else:
+                    max_bahn = complete_bahnen - 1
+
+            # Debug-Ausgabe
+            # print(f"{data_type.upper()}-Segmente pro Bahn:")
+            # for bahn, segments in sorted(bahn_to_segments.items(), key=lambda x: int(x[0])):
+            #     print(f"  Bahn {bahn}: {', '.join(segments)}")
+
+            # Erstelle ein Mapping von Segment-ID zu Bahn
+            segment_to_bahn = {}
+            for bahn_key, segments in bahn_to_segments.items():
+                for segment_id in segments:
+                    segment_to_bahn[segment_id] = bahn_key
+
+        # Erstelle ein Mapping für neu nummerierte Segment-IDs innerhalb jeder Bahn
+        segment_id_mapping = {}
+        for bahn_key, segments in bahn_to_segments.items():
+            for i, segment_id in enumerate(segments):
+                segment_id_mapping[(bahn_key, segment_id)] = i + 1  # Segment-IDs beginnen bei 1
+
+        # Neue Datenstruktur für Bahn-Zeitstempel
+        bahn_timestamps = {}
+
+        # Verarbeite jede Zeile
+        for i, row in enumerate(rows):
+            timestamp = row['timestamp']
+            segment_id = row.get(segment_id_field)
+
+            # Überspringen, wenn keine gültige Segment-ID
+            if segment_id is None or segment_id == '':
+                continue
+
+            # Bestimme die Bahn für dieses Segment
+            bahn_key = segment_to_bahn.get(segment_id)
+            if bahn_key is None:
+                continue  # Dieses Segment wurde keiner Bahn zugeordnet
+
+            # Initialisiere Bahn-Zeitstempel, falls noch nicht vorhanden
+            if bahn_key not in bahn_timestamps:
+                bahn_timestamps[bahn_key] = []
+            bahn_timestamps[bahn_key].append(timestamp)
+
+            # Verarbeite Mappings
+            for mapping_name in mappings_to_use:
+                if mapping_name not in self.mappings:
+                    continue
+
+                mapping = self.mappings[mapping_name]
+
+                # Verwende gemappte Segment-ID
+                bahn_segment_id = str(segment_id_mapping.get((bahn_key, segment_id), 0))
+                if bahn_segment_id == '0':
+                    continue  # Keine gültige Zuordnung gefunden
+
+                # Erstelle die Bahn-Schlüssel, falls noch nicht vorhanden
+                if bahn_key not in processed_data[mapping_name]:
+                    processed_data[mapping_name][bahn_key] = []
+
+                # Verarbeite die Daten und speichere sie nach Bahn gruppiert
+                result = self.process_mapping_row(
+                    row, mapping, bahn_key, bahn_segment_id, timestamp,
+                    source_data, point_counts, mapping_name
+                )
+
+                if result:
+                    processed_data[mapping_name][bahn_key].append(result)
+                    rows_processed[mapping_name] += 1
+
+        # Generiere für jede Bahn eine eindeutige ID basierend auf dem ersten Zeitstempel
+        bahn_ids = {}
+        for bahn_key, timestamps in bahn_timestamps.items():
+            if timestamps:
+                # Verwende den frühesten Zeitstempel
+                earliest_timestamp = min(timestamps)
+                bahn_ids[bahn_key] = str(earliest_timestamp[:10])
+
+        # Aktualisiere alle verarbeiteten Daten mit der richtigen Bahn-ID
+        for mapping_name in processed_data.keys():
+            for bahn_key in processed_data[mapping_name]:
+                if bahn_key in bahn_ids:
+                    bahn_id = bahn_ids[bahn_key]
+                    for i in range(len(processed_data[mapping_name][bahn_key])):
+                        # Ersetze die Bahn-ID und aktualisiere das segment_id Format
+                        if processed_data[mapping_name][bahn_key][i]:
+                            row_data = processed_data[mapping_name][bahn_key][i]
+                            processed_data[mapping_name][bahn_key][i] = [
+                                bahn_id,  # Bahn-ID an Position 0
+                                f"{bahn_id}_{row_data[1]}",  # Neue segment_id im Format [bahn_id]_[segmentzahl]
+                                *row_data[2:]  # Rest der Daten unverändert
+                            ]
+
+        # Gib am Ende die gefundenen Bahn-IDs und die zugehörigen Segment-IDs aus
+        # print(f"\n{data_type.upper()}-Bahnen und zugehörige Segmente:")
+        # for bahn_key, segments in sorted(bahn_to_segments.items(), key=lambda x: int(x[0])):
+        #     bahn_id = bahn_ids.get(bahn_key, "Unbekannt")
+        #     segment_list = []
+        #     for segment in segments:
+        #         mapped_id = segment_id_mapping.get((bahn_key, segment), "?")
+        #         segment_list.append(f"{segment} (ID: {mapped_id})")
+        #     print(f"  Bahn {bahn_key} (ID: {bahn_id}): Segmente = {', '.join(segment_list)}")
+
+        # Detaillierte Ausgabe der Bahn-ID-Zuordnungen
+        print(f"\n{data_type.upper()}-Bahn-ID-Zuordnungen:")
+        for bahn_key, bahn_id in sorted(bahn_ids.items(), key=lambda x: int(x[0])):
+            print(f"  Bahn {bahn_key} hat ID: {bahn_id}")
+            print(f"    Enthält Segmente: {', '.join(bahn_to_segments.get(bahn_key, []))}")
+            # Zeige die gemappten Segment-IDs
+            mapped_segments = []
+            for segment in bahn_to_segments.get(bahn_key, []):
+                mapped_id = segment_id_mapping.get((bahn_key, segment), "?")
+                mapped_segments.append(f"{segment} → {mapped_id}")
+            print(f"    Segment-Mapping: {', '.join(mapped_segments)}")
+
+        # print(f"{data_type.upper()}-Datenverarbeitung: {sum(rows_processed.values())} Zeilen, {max_bahn + 1} Bahnen")
+        return rows_processed, processed_data, point_counts, max_bahn, bahn_ids
+
+    def process_mapping_row(self, row, mapping, bahn_id, segment_id, timestamp, source_data,
+                            point_counts, mapping_name, movement_types=None):
+        """
+        Verarbeitet eine Zeile gemäß einem bestimmten Mapping und gibt die Datenzeile zurück.
+        """
+
+        # Hilfsfunktion zur Wertkonvertierung
         def convert_value(value):
-            """Helper function to convert values, properly handling zeros"""
-            if value.strip() == '0' or value.strip() == '0.0':
+            if value is None:
+                return None
+
+            if isinstance(value, str):
+                value = value.strip()
+
+            if value == '0' or value == '0.0':
                 return 0.0
-            elif value.strip():
+            elif value:
                 try:
                     return float(value)
-                except ValueError:
-                    print(f"Warning: Could not convert value: {value}")
+                except (ValueError, TypeError):
                     return None
             return None
 
+        # Für RAPID_EVENTS (AP-Punkte) - spezielle Behandlung
         if mapping_name == 'RAPID_EVENTS_MAPPING':
+            # Nur verarbeiten, wenn mindestens ein Wert vorhanden ist
             if any(row.get(csv_col, '').strip() for csv_col in mapping):
-                data_row = [bahn_id, current_segment_id, timestamp]
+                # Erstelle Datenzeile
+                data_row = [bahn_id, segment_id, timestamp]
                 values = []
 
-                # Process normal values (positions and orientations)
+                # Werte aus dem Mapping extrahieren
                 for csv_col in mapping:
                     value = row.get(csv_col, '')
                     if any(x in csv_col for x in ['x_reached', 'y_reached', 'z_reached',
@@ -621,38 +780,38 @@ class CSVProcessor:
                     else:
                         values.append(value.strip() if value.strip() else None)
 
-                data_row.extend(values)  # Add position values
-                data_row.append(source_data)  # Add source_data before movement_type
+                data_row.extend(values)
+                data_row.append(source_data)
 
-                # Add movement_type last
-                if "pickplace" in self.record_filename and movement_types:
-                    movement_type = movement_types.get(current_segment_id)
-                    data_row.append(movement_type)
+                # Bewegungstyp hinzufügen (falls verfügbar)
+                if movement_types and "pickplace" in getattr(self, 'record_filename', ''):
+                    data_row.append(movement_types.get(segment_id))
                 else:
                     data_row.append(None)
 
-                data_list.append(data_row)
-                rows_processed += 1
+                return data_row
 
-        else:  # ACCEL_MAPPING, TWIST_IST_MAPPING, etc.
+        # Für alle anderen Mappings
+        else:
+            # Nur verarbeiten, wenn alle erforderlichen Werte vorhanden sind
             if all(row.get(csv_col, '').strip() for csv_col in mapping):
-                data_row = [bahn_id, current_segment_id, timestamp]
+                data_row = [bahn_id, segment_id, timestamp]
                 values = []
+
+                # Werte aus dem Mapping extrahieren
                 for csv_col in mapping:
                     value = row.get(csv_col, '')
-                    converted_value = convert_value(value)
-                    values.append(converted_value)
+                    values.append(convert_value(value))
 
                 data_row.extend(values)
-                # Use 'sensehat' as source for IMU data
+
+                # Quelle hinzufügen (speziell für IMU-Daten)
                 if mapping_name == 'IMU_MAPPING':
                     data_row.append('sensehat')
                 else:
                     data_row.append(source_data)
-                data_list.append(data_row)
-                rows_processed += 1
 
-                # Update point counts
+                # Punktzähler aktualisieren
                 if mapping_name == 'POSE_MAPPING':
                     point_counts['np_pose_ist'] += 1
                 elif mapping_name == 'TWIST_IST_MAPPING':
@@ -670,8 +829,26 @@ class CSVProcessor:
                 elif mapping_name == 'IMU_MAPPING':
                     point_counts['np_imu'] += 1
 
-        # Make sure we always return these three values
-        return data_list, rows_processed, point_counts
+                return data_row
+
+        return None
+
+    def calculate_frequency_from_data(self, data_rows):
+        """Berechnet die Frequenz basierend auf Zeitstempeln in den Datenzeilen."""
+        if not data_rows or len(data_rows) < 2:
+            return 0.0
+
+        timestamps = [row[2] for row in data_rows if len(row) > 2]  # Zeitstempel an Position 2
+        if not timestamps or len(timestamps) < 2:
+            return 0.0
+
+        converted_timestamps = [self.convert_timestamp(ts) for ts in timestamps]
+        diffs = [(converted_timestamps[i + 1] - converted_timestamps[i]).total_seconds()
+                 for i in range(len(converted_timestamps) - 1)]
+
+        avg_diff = sum(diffs) / len(diffs) if diffs else 0
+        return 1 / avg_diff if avg_diff > 0 else 0.0
+
     @staticmethod
     def convert_timestamp(ts):
         try:
@@ -681,15 +858,8 @@ class CSVProcessor:
             print(f"Error converting timestamp {ts}: {e}")
             return None
 
-    def calculate_frequencies(self, rows, column_mapping):
-        timestamps = [self.convert_timestamp(row['timestamp']) for row in rows if row.get(list(column_mapping.keys())[0])]
-        if not timestamps:
-            return 0.0
-        diffs = [(timestamps[i + 1] - timestamps[i]).total_seconds() for i in range(len(timestamps) - 1)]
-        avg_diff = sum(diffs) / len(diffs) if diffs else 0
-        return 1 / avg_diff if avg_diff > 0 else 0.0
-
-    def extract_record_part(self, record_filename):
+    @staticmethod
+    def extract_record_part(record_filename):
         if 'record' in record_filename:
             match = re.search(r'(record_\d{8}_\d{6})', record_filename)
             if match:
@@ -697,125 +867,6 @@ class CSVProcessor:
         return None
 
     @staticmethod
-    def print_processing_stats(total_rows, rows_processed, point_counts):
-        print(f"\nTotal rows processed in range: {total_rows}")
-        for key, value in rows_processed.items():
-            print(f"Rows processed for {key}: {value}")
-            print(f"Rows skipped for {key}: {total_rows - value}")
-
-        print("\nPoint counts:")
-        for key, value in point_counts.items():
-            print(f"{key}: {value}")
-
-    # Funktion zur Berechnung der Richtung
-    def convert_to_float(self, value):
-        """Hilfsfunktion zur Umwandlung eines Strings in einen float."""
-        try:
-            return float(value)
-        except ValueError:
-            return None  # Falls der Wert nicht in einen float umgewandelt werden kann, None zurückgeben
-
-    def calculate_direction(self, bahn_rows):
-        """
-        Bestimmt die Richtung basierend auf allen Punkten zwischen Start und Ende in der Tabelle.
-        :param bahn_rows: Liste von Dictionaries mit den Schlüsseln 'ps_x' und 'ps_y'
-        :return: 'linear', 'circularleft' oder 'circularright'
-        """
-        # Schritt 1: Finde die maximale Z-Höhe (Handling-Höhe)
-        handling_height = None
-        for row in bahn_rows:
-            ap_z = self.convert_to_float(row['ap_z'])
-            if ap_z is not None:
-                if handling_height is None or ap_z > handling_height:
-                    handling_height = ap_z
-
-        if handling_height is None:
-            raise ValueError("Keine Z-Höhe gefunden.")
-
-        #print(f"Found handling height: {handling_height}")
-
-        # Schritt 2: Zweiter Punkt (ap_x, ap_y) mit maximaler Z-Höhe finden
-        first_point = None
-        start = None
-        for index, row in enumerate(bahn_rows):
-            ap_x = self.convert_to_float(row['ap_x'])
-            ap_y = self.convert_to_float(row['ap_y'])
-            ap_z = self.convert_to_float(row['ap_z'])
-            if ap_x is not None and ap_y is not None and ap_z is not None:
-                if abs(ap_z - handling_height) < 0.1:
-                    first_point = (ap_x, ap_y)
-                    start = index + 2
-                    #print(f"Found first point: ({ap_x}, {ap_y}) at z={ap_z}")
-                    break
-
-        if not first_point:
-            raise ValueError("Kein Punkt mit Handling-Höhe gefunden.")
-
-        # Schritt 3: Dritter Punkt (ap_x, ap_y) mit gleicher Z-Höhe finden
-        last_point = None
-        end = None
-        for index, row in enumerate(bahn_rows[start:]):
-            ap_x = self.convert_to_float(row['ap_x'])
-            ap_y = self.convert_to_float(row['ap_y'])
-            ap_z = self.convert_to_float(row['ap_z'])
-            if ap_x is not None and ap_y is not None and ap_z is not None:
-                if abs(ap_z - handling_height) < 0.1:
-                    if (ap_x, ap_y) != first_point:  # Ensure it's a different point
-                        last_point = (ap_x, ap_y)
-                        end = index + start
-                        #print(f"Found last point: ({ap_x}, {ap_y}) at z={ap_z}")
-                        break
-
-        if not last_point:
-            raise ValueError("Kein gültiger letzter Punkt gefunden.")
-
-        # Schritt 3: Alle gültigen ps_x, ps_y Punkte zwischen Start und Ende sammeln
-        points = []
-        for row in bahn_rows[start:end]:
-            ps_x = self.convert_to_float(row['ps_x'])
-            ps_y = self.convert_to_float(row['ps_y'])
-            if ps_x is not None and ps_y is not None:
-                points.append((ps_x, ps_y))
-
-        if not points:
-            raise ValueError("Keine gültigen Punkte für die Kurvenbestimmung gefunden.")
-
-        # Berechnung der Distanz zwischen dem ersten und letzten Punkt (Referenzgerade)
-        x1, y1 = first_point  # Erster Punkt
-        x2, y2 = last_point  # Letzter Punkt
-
-        # Berechne die Distanz zwischen dem ersten und letzten Punkt
-        p1p2_distance = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
-
-        # Funktion zur Bestimmung des kürzesten Abstands eines Punktes zur Linie
-        def get_shortest_distance(xm, ym):
-            # Geradengleichung: Ax + By + C = 0
-            A = y2 - y1
-            B = x1 - x2
-            C = x2 * y1 - x1 * y2
-            return abs(A * xm + B * ym + C) / math.sqrt(A ** 2 + B ** 2)
-
-        # Bestimmung des besten Fits (linear oder circular)
-        linear_points = []
-        circular_left_points = []
-        circular_right_points = []
-
-        for (ps_x, ps_y) in points:
-            shortest_distance = get_shortest_distance(ps_x, ps_y)
-            if shortest_distance <= 0.1 * p1p2_distance:
-                linear_points.append((ps_x, ps_y))
-            else:
-                # Bestimme, ob der Punkt links oder rechts der Linie liegt
-                side_test = (x2 - x1) * (ps_y - y1) - (y2 - y1) * (ps_x - x1)
-                if side_test > 0:
-                    circular_left_points.append((ps_x, ps_y))
-                else:
-                    circular_right_points.append((ps_x, ps_y))
-
-        # Entscheidung über die Kurve
-        if len(linear_points) > len(circular_left_points) and len(linear_points) > len(circular_right_points):
-            return "linear"
-        elif len(circular_left_points) > len(circular_right_points):
-            return "circularleft"
-        else:
-            return "circularright"
+    def calculate_distance(x1, y1, z1, x2, y2, z2):
+        """Berechnet den Abstand zwischen zwei 3D-Punkten."""
+        return ((x1 - x2) ** 2 + (y1 - y2) ** 2 + (z1 - z2) ** 2) ** 0.5

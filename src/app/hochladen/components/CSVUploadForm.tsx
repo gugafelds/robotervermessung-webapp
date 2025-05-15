@@ -1,4 +1,4 @@
-/* eslint-disable */
+/* eslint-disable jsx-a11y/label-has-associated-control,no-await-in-loop */
 
 'use client';
 
@@ -30,9 +30,15 @@ const CSVUploadForm: React.FC = () => {
 
   // State for segmentation method
   const [segmentationMethod, setSegmentationMethod] = useState<
-    'home' | 'fixed'
-  >('home');
-  const [numSegments, setNumSegments] = useState<number>(1);
+    'fixed_segments' | 'reference_position'
+  >('fixed_segments');
+
+  const [numSegments, setNumSegments] = useState<number>(3); // Standardwert auf 3 gesetzt
+
+  // Referenzposition Koordinaten
+  const [referenceX, setReferenceX] = useState<string>('750');
+  const [referenceY, setReferenceY] = useState<string>('-500');
+  const [referenceZ, setReferenceZ] = useState<string>('1630');
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -47,13 +53,16 @@ const CSVUploadForm: React.FC = () => {
     setProgress(0);
     setProcessingResults([]);
 
+    // Referenzposition als Array
+    const referencePosition = [referenceX, referenceY, referenceZ];
+
     // If batch upload is selected and there are multiple files, use batch endpoint
     if (useBatchUpload && files.length > 0) {
       try {
         const formData = new FormData();
 
         // Add all files to the FormData
-        for (let i = 0; i < files.length; i++) {
+        for (let i = 0; i < files.length; i += 1) {
           formData.append('files', files[i]);
         }
 
@@ -65,6 +74,14 @@ const CSVUploadForm: React.FC = () => {
         formData.append('upload_database', uploadDatabase.toString());
         formData.append('segmentation_method', segmentationMethod);
         formData.append('num_segments', numSegments.toString());
+
+        // Add reference position parameters
+        if (segmentationMethod === 'reference_position') {
+          formData.append(
+            'reference_position',
+            JSON.stringify(referencePosition),
+          );
+        }
 
         // Send all files in one request
         const response = await fetch('/api/bahn/process-csv-batch', {
@@ -80,10 +97,16 @@ const CSVUploadForm: React.FC = () => {
         setProcessingResults(result.file_results);
 
         // Generate summary message
-        const totalSegments = result.file_results.reduce((sum: number, r: ProcessingResult) =>
-          sum + r.segmentsFound, 0);
-        const successfulFiles = result.file_results.filter((r: ProcessingResult) => r.success);
-        const failedFiles = result.file_results.filter((r: ProcessingResult) => !r.success);
+        const totalSegments = result.file_results.reduce(
+          (sum: number, r: ProcessingResult) => sum + r.segmentsFound,
+          0,
+        );
+        const successfulFiles = result.file_results.filter(
+          (r: ProcessingResult) => r.success,
+        );
+        const failedFiles = result.file_results.filter(
+          (r: ProcessingResult) => !r.success,
+        );
 
         let summaryMessage = '';
         if (successfulFiles.length > 0) {
@@ -92,7 +115,11 @@ const CSVUploadForm: React.FC = () => {
         }
 
         if (failedFiles.length > 0) {
-          setError(failedFiles.map((f: ProcessingResult) => `${f.filename}: ${f.error}`).join('\n'));
+          setError(
+            failedFiles
+              .map((f: ProcessingResult) => `${f.filename}: ${f.error}`)
+              .join('\n'),
+          );
         }
 
         if (summaryMessage) {
@@ -121,6 +148,14 @@ const CSVUploadForm: React.FC = () => {
         formData.append('upload_database', uploadDatabase.toString());
         formData.append('segmentation_method', segmentationMethod);
         formData.append('num_segments', numSegments.toString());
+
+        // Add reference position parameters
+        if (segmentationMethod === 'reference_position') {
+          formData.append(
+            'reference_position',
+            JSON.stringify(referencePosition),
+          );
+        }
 
         try {
           const response = await fetch('/api/bahn/process-csv', {
@@ -155,7 +190,10 @@ const CSVUploadForm: React.FC = () => {
       setIsLoading(false);
 
       // Generate summary message
-      const totalSegments = results.reduce((sum, r) => sum + r.segmentsFound, 0);
+      const totalSegments = results.reduce(
+        (sum, r) => sum + r.segmentsFound,
+        0,
+      );
       const successfulFiles = results.filter((r) => r.success);
       const failedFiles = results.filter((r) => !r.success);
 
@@ -166,7 +204,9 @@ const CSVUploadForm: React.FC = () => {
       }
 
       if (failedFiles.length > 0) {
-        setError(failedFiles.map((f) => `${f.filename}: ${f.error}`).join('\n'));
+        setError(
+          failedFiles.map((f) => `${f.filename}: ${f.error}`).join('\n'),
+        );
       }
 
       if (summaryMessage) {
@@ -183,25 +223,27 @@ const CSVUploadForm: React.FC = () => {
       >
         {/* File Input */}
         <div className="mb-2">
-          <div className="text-xl font-bold text-primary">CSV-Uploader
-          <label
-            className="mb-2 block text-base font-bold text-primary"
-            htmlFor="file-input"
-          >
-            <input
-              className="w-full rounded py-1 font-light leading-tight text-primary focus:outline-none focus:ring-2"
-              id="file-input"
-              type="file"
-              accept=".csv"
-              multiple
-              onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                if (e.target.files) setFiles(e.target.files);
-                setProcessingResults([]);
-              }}
-              required
-            />
-          </label>
-        </div></div>
+          <div className="text-xl font-bold text-primary">
+            CSV-Uploader
+            <label
+              className="mb-2 block text-base font-bold text-primary"
+              htmlFor="file-input"
+            >
+              <input
+                className="w-full rounded py-1 font-light leading-tight text-primary focus:outline-none focus:ring-2"
+                id="file-input"
+                type="file"
+                accept=".csv"
+                multiple
+                onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                  if (e.target.files) setFiles(e.target.files);
+                  setProcessingResults([]);
+                }}
+                required
+              />
+            </label>
+          </div>
+        </div>
 
         {/* Batch Upload Toggle */}
         <div className="mb-2">
@@ -215,22 +257,21 @@ const CSVUploadForm: React.FC = () => {
                 setUseBatchUpload(e.target.checked)
               }
             />
-            <span className="ml-2 text-base font-light text-sm text-primary">
+            <span className="ml-2 text-sm font-light text-primary">
               Batch-Upload verwenden (schneller für mehrere Dateien)
             </span>
           </label>
         </div>
 
         <div className="mb-2">
-          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label
-            className="px-1 block text-base font-bold text-primary"
+            className="block px-1 text-base font-bold text-primary"
             htmlFor="robot-model"
           >
             Robotermodell
           </label>
           <input
-            className="w-full appearance-none rounded border border-gray-400 px-2 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full appearance-none rounded border border-gray-400 p-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
             id="robot-model"
             type="text"
             value={robotModel}
@@ -242,15 +283,14 @@ const CSVUploadForm: React.FC = () => {
           />
         </div>
         <div className="mb-2">
-          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label
-            className="px-1 block text-base font-bold text-primary"
+            className="block px-1 text-base font-bold text-primary"
             htmlFor="bahnplanung-input"
           >
             Bahnplanung
           </label>
           <input
-            className="w-full appearance-none rounded border border-gray-400 px-2 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full appearance-none rounded border border-gray-400 p-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
             id="bahnplanung-input"
             type="text"
             value={bahnplanung}
@@ -262,35 +302,33 @@ const CSVUploadForm: React.FC = () => {
           />
         </div>
         <div className="mb-2">
-          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label
-            className="px-1 block text-base font-bold text-primary"
+            className="block px-1 text-base font-bold text-primary"
             htmlFor="source-data-ist"
           >
             Quelle der Ist-Daten
           </label>
           <input
-            className="w-full appearance-none rounded border border-gray-400 px-2 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full appearance-none rounded border border-gray-400 p-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
             id="source-data-ist"
             type="text"
             value={sourceDataIst}
             onChange={(e: ChangeEvent<HTMLInputElement>) =>
               setSourceDataIst(e.target.value)
             }
-            placeholder="vicon"
+            placeholder="leica_at960"
             required
           />
         </div>
         <div className="mb-2">
-          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label
-            className="px-1 block text-base font-bold text-primary"
+            className="block px-1 text-base font-bold text-primary"
             htmlFor="source-data-soll"
           >
             Quelle der Soll-Daten
           </label>
           <input
-            className="w-full appearance-none rounded border border-gray-400 px-2 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full appearance-none rounded border border-gray-400 p-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
             id="source-data-soll"
             type="text"
             value={sourceDataSoll}
@@ -312,57 +350,122 @@ const CSVUploadForm: React.FC = () => {
                 setUploadDatabase(e.target.checked)
               }
             />
-            <span className="ml-2 text-base font-light text-sm text-primary">
+            <span className="ml-2 text-sm font-light text-primary">
               auf PostgreSQL hochladen
             </span>
           </label>
         </div>
 
-        {/* Segmentation Method Selection */}
+        {/* Segmentation Method Selection (umbenannt) */}
         <div className="mb-2">
           <label className="mb-2 block text-base font-bold text-primary">
             Segmentierungsmethode
             <div className="mt-2">
-              <label className="mr-4 inline-flex font-light items-center">
+              <label className="mr-4 inline-flex items-center font-light">
                 <input
                   type="radio"
-                  className="form-radio"
+                  className="border-gray-300 text-blue-600 focus:ring-blue-500"
                   name="segmentationMethod"
-                  value="home"
-                  checked={segmentationMethod === 'home'}
+                  value="fixed_segments"
+                  checked={segmentationMethod === 'fixed_segments'}
                   onChange={(e) =>
-                    setSegmentationMethod(e.target.value as 'home' | 'fixed')
+                    setSegmentationMethod(
+                      e.target.value as 'fixed_segments' | 'reference_position',
+                    )
                   }
                 />
-                <span className="ml-2">Nach Home-Position</span>
+                <span className="ml-2">
+                  Feste Anzahl von Segmenten pro Bahn
+                </span>
               </label>
-              <label className="inline-flex font-light items-center">
+              <label className="inline-flex items-center font-light">
                 <input
                   type="radio"
-                  className="form-radio"
+                  className="border-gray-300 text-blue-600 focus:ring-blue-500"
                   name="segmentationMethod"
-                  value="fixed"
-                  checked={segmentationMethod === 'fixed'}
+                  value="reference_position"
+                  checked={segmentationMethod === 'reference_position'}
                   onChange={(e) =>
-                    setSegmentationMethod(e.target.value as 'home' | 'fixed')
+                    setSegmentationMethod(
+                      e.target.value as 'fixed_segments' | 'reference_position',
+                    )
                   }
                 />
-                <span className="ml-2">Feste Anzahl</span>
+                <span className="ml-2">Nach Referenzposition teilen</span>
               </label>
             </div>
           </label>
         </div>
 
-        {/* Number of Segments Input (only shown when fixed segmentation is selected) */}
-        {segmentationMethod === 'fixed' && (
+        {/* Referenzposition-Felder nur anzeigen, wenn 'reference_position' ausgewählt ist */}
+        {segmentationMethod === 'reference_position' && (
+          <div className="mb-4 rounded-md border border-gray-300 p-3">
+            <label className="mb-2 block text-base font-bold text-primary">
+              Referenzposition Koordinaten
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <div>
+                  <label
+                    className="block text-sm font-light text-primary"
+                    htmlFor="reference-x"
+                  >
+                    X-Koordinate
+                  </label>
+                  <input
+                    id="reference-x"
+                    type="number"
+                    step="0.1"
+                    className="w-full appearance-none rounded border border-gray-400 px-2 py-1 text-sm leading-tight text-primary focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    value={referenceX}
+                    onChange={(e) => setReferenceX(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="block text-sm font-light text-primary"
+                    htmlFor="reference-y"
+                  >
+                    Y-Koordinate
+                  </label>
+                  <input
+                    id="reference-y"
+                    type="number"
+                    step="0.1"
+                    className="w-full appearance-none rounded border border-gray-400 px-2 py-1 text-sm leading-tight text-primary focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    value={referenceY}
+                    onChange={(e) => setReferenceY(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="block text-sm font-light text-primary"
+                    htmlFor="reference-z"
+                  >
+                    Z-Koordinate
+                  </label>
+                  <input
+                    id="reference-z"
+                    type="number"
+                    step="0.1"
+                    className="w-full appearance-none rounded border border-gray-400 px-2 py-1 text-sm leading-tight text-primary focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    value={referenceZ}
+                    onChange={(e) => setReferenceZ(e.target.value)}
+                  />
+                </div>
+              </div>
+            </label>
+          </div>
+        )}
+
+        {/* Number of Segments Input (nur angezeigt, wenn fixed_segments ausgewählt ist) */}
+        {segmentationMethod === 'fixed_segments' && (
           <div className="mb-4">
             <label
               className="mb-2 block text-base font-bold text-primary"
               htmlFor="num-segments"
             >
-              Anzahl der Segmente pro Gruppe
+              Anzahl der Segmente pro Bahn
               <input
-                className="mt-2 w-full appearance-none rounded border px-2 py-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-2 w-full appearance-none rounded border p-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
                 id="num-segments"
                 type="number"
                 min="1"
@@ -376,7 +479,7 @@ const CSVUploadForm: React.FC = () => {
 
         {/* Processing Results */}
         {processingResults.length > 0 && (
-          <div className="mb-4 rounded border bg-white border-gray-400 p-4">
+          <div className="mb-4 rounded border border-gray-400 bg-white p-4">
             <h3 className="mb-2 font-semibold text-primary">Status:</h3>
             {processingResults.map((result) => (
               <div

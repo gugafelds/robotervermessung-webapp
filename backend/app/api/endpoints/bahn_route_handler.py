@@ -1,6 +1,8 @@
 # File: backend/app/api/endpoints/bahn.py
+import json
 import os
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from ...database import get_db
@@ -397,98 +399,6 @@ async def get_bahn_imu_by_id(bahn_id: str, conn = Depends(get_db)):
 
 ######################### CSV HOCHLADEN ##################################################
 
-@router.post("/process-csv")
-async def process_csv(
-        file: UploadFile = File(...),
-        robot_model: str = Form(...),
-        bahnplanung: str = Form(...),
-        source_data_ist: str = Form(...),
-        source_data_soll: str = Form(...),
-        upload_database: bool = Form(...),
-        segmentation_method: str = Form(default="home"),  # Neue Parameter
-        num_segments: int = Form(default=1),  # Neue Parameter
-        conn=Depends(get_db)
-):
-    try:
-        with NamedTemporaryFile(delete=False) as temp_file:
-            shutil.copyfileobj(file.file, temp_file)
-            temp_file_path = temp_file.name
-
-        record_filename = file.filename
-
-        csv_processor = CSVProcessor(temp_file_path)
-        processed_data_list = csv_processor.process_csv(
-            upload_database,
-            robot_model,
-            bahnplanung,
-            source_data_ist,
-            source_data_soll,
-            record_filename,
-            segmentation_method,  # Neue Parameter weitergeben
-            num_segments  # Neue Parameter weitergeben
-        )
-
-        if upload_database and processed_data_list:
-            segments_processed = len(processed_data_list)
-            for segment_data in processed_data_list:
-                await save_processed_data_to_db(segment_data, conn)
-                logger.info(f"Processed segment with bahn_id {segment_data['bahn_info_data'][0]}")
-
-        os.unlink(temp_file_path)
-
-        return {
-            "message": f"CSV processed successfully. Found {len(processed_data_list)} segments",
-            "segments_found": len(processed_data_list),
-            "data": processed_data_list
-        }
-    except Exception as e:
-        logger.error(f"Error processing CSV: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing CSV: {str(e)}")
-
-
-async def save_processed_data_to_db(processed_data, conn):
-    if not isinstance(processed_data, dict):
-        raise ValueError(f"Expected dict but got {type(processed_data)}")
-
-    try:
-        db_ops = DatabaseOperations(DB_PARAMS)
-
-        if 'bahn_info_data' not in processed_data:
-            raise ValueError("No bahn_info_data found in processed data")
-
-        # Insert bahn_info
-        await db_ops.insert_bahn_info(conn, processed_data['bahn_info_data'])
-
-        # Define mapping of data types to their insertion functions
-        data_mappings = [
-            ('RAPID_EVENTS_MAPPING', db_ops.insert_rapid_events_data),
-            ('POSE_MAPPING', db_ops.insert_pose_data),
-            ('POSITION_SOLL_MAPPING', db_ops.insert_position_soll_data),
-            ('ORIENTATION_SOLL_MAPPING', db_ops.insert_orientation_soll_data),
-            ('TWIST_IST_MAPPING', db_ops.insert_twist_ist_data),
-            ('TWIST_SOLL_MAPPING', db_ops.insert_twist_soll_data),
-            ('ACCEL_MAPPING', db_ops.insert_accel_data),
-            ('JOINT_MAPPING', db_ops.insert_joint_data),
-            ('IMU_MAPPING', db_ops.insert_imu_data)
-        ]
-
-        # Insert each type of data
-        bahn_id = processed_data['bahn_info_data'][0]
-        for mapping_key, insert_func in data_mappings:
-            if mapping_key in processed_data and processed_data[mapping_key]:
-                try:
-                    await insert_func(conn, processed_data[mapping_key])
-                    logger.info(f"Inserted {mapping_key} data for bahn_id {bahn_id}")
-                except Exception as e:
-                    logger.error(f"Error inserting {mapping_key} for bahn_id {bahn_id}: {str(e)}")
-                    raise
-
-        logger.info(f"All data for bahn_id {bahn_id} inserted successfully")
-    except Exception as e:
-        logger.error(f"Database error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-
-
 @router.post("/process-csv-batch")
 async def process_csv_batch(
         files: list[UploadFile] = File(...),
@@ -497,14 +407,39 @@ async def process_csv_batch(
         source_data_ist: str = Form(...),
         source_data_soll: str = Form(...),
         upload_database: bool = Form(...),
-        segmentation_method: str = Form(default="home"),
-        num_segments: int = Form(default=1),
+        segmentation_method: str = Form(default="fixed_segments"),  # Geändert zu fixed_segments als Standard
+        num_segments: int = Form(default=3),  # Standardwert auf 3 erhöht
+        reference_position: Optional[str] = Form(default=None),  # JSON-String für [x, y, z]
         conn=Depends(get_db)
 ):
     """Process multiple CSV files in a single batch upload"""
     try:
         start_time = datetime.now()
         logger.info(f"Starting batch processing of {len(files)} files at {start_time}")
+        logger.info(f"Segmentation method: {segmentation_method}")
+
+        # Parse reference_position aus JSON-String, wenn vorhanden
+        ref_pos_tuple = None
+        if reference_position:
+            try:
+                ref_pos_array = json.loads(reference_position)
+                # Sicherstellen, dass es 3 Werte gibt und alle in Float umgewandelt werden können
+                if len(ref_pos_array) == 3:
+                    ref_pos_tuple = (float(ref_pos_array[0]), float(ref_pos_array[1]), float(ref_pos_array[2]))
+                    logger.info(f"Reference position: {ref_pos_tuple}")
+                else:
+                    logger.warning(f"Invalid reference_position format: {reference_position}. Expected array with 3 elements.")
+            except json.JSONDecodeError:
+                logger.warning(f"Invalid JSON in reference_position: {reference_position}")
+            except ValueError:
+                logger.warning(f"Could not convert reference_position values to float: {reference_position}")
+
+        # Validiere, dass Referenzpositionskoordinaten für reference_position-Methode bereitgestellt sind
+        if segmentation_method == "reference_position" and ref_pos_tuple is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Reference position coordinates as JSON array [x, y, z] are required for 'reference_position' segmentation method"
+            )
 
         # Create temporary files for each uploaded file
         temp_files = []
@@ -532,7 +467,8 @@ async def process_csv_batch(
             upload_database,
             segmentation_method,
             num_segments,
-            conn
+            conn,
+            ref_pos_tuple  # Übergabe als Tuple, nicht als separate Parameter
         )
 
         # Clean up temporary files

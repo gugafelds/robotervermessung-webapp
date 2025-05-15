@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import logging
 
@@ -18,20 +18,27 @@ class BatchProcessor:
 
     async def process_csv_batch(
             self,
-            files_and_paths: List[Dict[str, str]],
-            robot_model: str,
-            bahnplanung: str,
-            source_data_ist: str,
-            source_data_soll: str,
-            upload_database: bool,
-            segmentation_method: str = "home",
-            num_segments: int = 1,
-            conn=None
+            files_and_paths,
+            robot_model,
+            bahnplanung,
+            source_data_ist,
+            source_data_soll,
+            upload_database,
+            segmentation_method,
+            num_segments,
+            conn,
+            reference_position=None  # Tuple mit (x, y, z)
     ):
         """Process multiple CSV files in a batch and upload them at once"""
 
         start_time = datetime.now()
         logger.info(f"Starting batch processing of {len(files_and_paths)} files at {start_time}")
+
+        # Log segmentation parameters
+        logger.info(f"Segmentation method: {segmentation_method}")
+        if segmentation_method == "reference_position" and reference_position is not None:
+            logger.info(
+                f"Using reference position: x={reference_position[0]}, y={reference_position[1]}, z={reference_position[2]}")
 
         # Collect all data
         all_processed_data = []
@@ -41,15 +48,16 @@ class BatchProcessor:
             try:
                 csv_processor = CSVProcessor(file_info['path'])
                 processed_data_list = csv_processor.process_csv(
-                    False,  # Force upload_database to False temporarily
                     robot_model,
                     bahnplanung,
                     source_data_ist,
                     source_data_soll,
                     file_info['filename'],
                     segmentation_method,
-                    num_segments
+                    num_segments,
+                    reference_position
                 )
+
 
                 if processed_data_list:
                     all_processed_data.extend(processed_data_list)
@@ -59,7 +67,7 @@ class BatchProcessor:
                         "success": True
                     })
                     logger.info(
-                        f"Processed {file_info['filename']} successfully, found {len(processed_data_list)} segments")
+                        f"Processed {file_info['filename']} successfully, found {len(processed_data_list)} trajectories")
                 else:
                     file_results.append({
                         "filename": file_info['filename'],
@@ -297,11 +305,10 @@ class BatchProcessor:
 
         return file_results
 
-    # Batch insertion methods that call the appropriate db_ops methods
-    # These methods optimize by using COPY for bulk insertion
-
+    # Die übrigen Methoden bleiben unverändert
     async def batch_insert_bahn_info(self, db_ops, conn, data_list):
         """Insert multiple bahn_info records at once"""
+        # Methode bleibt unverändert
         try:
             # Filter out records that already exist
             new_records = []
@@ -348,6 +355,7 @@ class BatchProcessor:
     # Helper methods for each data type insertion
     async def batch_insert_data(self, db_ops, conn, table_name, data, columns=None):
         """Generic batch insert for any table with uniqueness check on bahn_id"""
+        # Methode bleibt unverändert
         if not data:
             logger.info(f"No {table_name} data to insert")
             return
@@ -383,7 +391,7 @@ class BatchProcessor:
             logger.error(f"Error in batch_insert_data for {table_name}: {str(e)}")
             raise
 
-    # Specific batch insert methods for each data type
+    # Specific batch insert methods for each data type - bleiben alle unverändert
     async def batch_insert_pose_data(self, db_ops, conn, data):
         columns = ['bahn_id', 'segment_id', 'timestamp', 'x_ist', 'y_ist', 'z_ist',
                    'qx_ist', 'qy_ist', 'qz_ist', 'qw_ist', 'source_data_ist']

@@ -140,7 +140,13 @@ class DatabaseOperations:
                         'types': ['varchar', 'varchar', 'varchar', 'double precision',
                                   'double precision', 'varchar']
                     },
-                }
+
+                },
+                'bahn_pose_trans': {
+                    'columns': ['bahn_id', 'segment_id', 'timestamp', 'x_trans', 'y_trans', 'z_trans',
+                                'qx_trans', 'qy_trans', 'qz_trans', 'qw_trans', 'calibration_id'],
+                    'types': ['varchar', 'varchar', 'varchar', 'double precision', 'varchar']
+                },
             }
 
             if table_name in table_schemas:
@@ -199,6 +205,9 @@ class DatabaseOperations:
     async def insert_imu_data(self, conn, data):
         await self.insert_data(conn, 'bahn_imu', data)
 
+    async def insert_bahn_pose_trans_data(self, conn, data):
+        await self.insert_data(conn, 'bahn_pose_trans_data', data)
+
 async def batch_insert_bahn_info(self, conn, data_list):
     """Insert multiple bahn_info records at once"""
     if not data_list:
@@ -229,7 +238,7 @@ async def batch_insert_bahn_info(self, conn, data_list):
             'z_start_pos', 'x_end_pos', 'y_end_pos', 'z_end_pos', 'handling_height',
             'qx_start', 'qy_start', 'qz_start', 'qw_start', 'qx_end', 'qy_end',
             'qz_end', 'qw_end', 'velocity_picking', 'velocity_handling', 'frequency_imu',
-            'pick_and_place', 'np_imu'
+            'pick_and_place', 'np_imu', 'transformation_matrix'
         ]
 
         # Ensure all records have proper length
@@ -247,7 +256,6 @@ async def batch_insert_bahn_info(self, conn, data_list):
     except Exception as e:
         logger.error(f"Error in batch_insert_bahn_info: {str(e)}")
         raise
-
 
 async def batch_insert_data(self, conn, table_name, data, columns=None):
     """Generic batch insert method for any table with uniqueness check on bahn_id"""
@@ -335,7 +343,12 @@ async def batch_insert_imu_data(self, conn, data):
     columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_pi', 'tcp_angular_vel_pi', 'source_data_ist']
     await self.batch_insert_data(conn, 'bahn_imu', data, columns)
 
-async def check_bahn_ids_exist(self, conn, table_name, bahn_ids):
+async def batch_insert_trans_data(self, conn, data):
+    columns = ['bahn_id', 'segment_id', 'timestamp', 'x_trans', 'y_trans', 'z_trans',
+               'qx_trans', 'qy_trans', 'qz_trans', 'qw_trans', 'calibration_id']
+    await self.batch_insert_data(conn, 'bahn_pose_trans', data, columns)
+
+async def check_bahn_ids_exist(conn, table_name, bahn_ids):
     """
     Check which bahn_ids already exist in the given table.
 
