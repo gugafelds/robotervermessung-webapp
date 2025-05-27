@@ -16,31 +16,19 @@ export interface BahnInfo {
   frequencyTwistIst: number;
   frequencyTwistSoll: number;
   frequencyAccelIst: number;
+  frequencyAccelSoll: number;
   frequencyJointStates: number;
   calibrationRun: boolean;
   numberPointsPoseIst: number;
   numberPointsTwistIst: number;
   numberPointsAccelIst: number;
+  numberPointsAccelSoll: number;
   numberPointsPosSoll: number;
   numberPointsOrientSoll: number;
   numberPointsTwistSoll: number;
   numberPointsJointStates: number;
   weight: number;
-  xStartPos: string;
-  yStartPos: string;
-  zStartPos: string;
-  xEndPos: string;
-  yEndPos: string;
-  zEndPos: string;
   handlingHeight: string;
-  qxStart: string;
-  qyStart: string;
-  qzStart: string;
-  qwStart: string;
-  qxEnd: string;
-  qyEnd: string;
-  qzEnd: string;
-  qwEnd: string;
   velocityPicking: string;
   velocityHandling: string;
   frequencyIMU: number;
@@ -71,31 +59,19 @@ export interface BahnInfoRaw {
   np_pose_ist: number;
   np_twist_ist: number;
   np_accel_ist: number;
+  np_accel_soll: number;
   np_pos_soll: number;
   np_orient_soll: number;
   np_twist_soll: number;
   np_jointstates: number;
   weight: number;
-  x_start_pos: string;
-  y_start_pos: string;
-  z_start_pos: string;
-  x_end_pos: string;
-  y_end_pos: string;
-  z_end_pos: string;
   handling_height: string;
-  qx_start: string;
-  qy_start: string;
-  qz_start: string;
-  qw_start: string;
-  qx_end: string;
-  qy_end: string;
-  qz_end: string;
-  qw_end: string;
   velocity_picking: string;
   velocity_handling: string;
   frequency_imu: number;
   pick_and_place: boolean;
   np_imu: number;
+  frequency_accel_soll: number;
 }
 
 export interface BahnPoseIst {
@@ -103,9 +79,9 @@ export interface BahnPoseIst {
   bahnID: string;
   segmentID: string;
   timestamp: string;
-  xIst: string;
-  yIst: string;
-  zIst: string;
+  xIst: number;
+  yIst: number;
+  zIst: number;
   qxIst: number;
   qyIst: number;
   qzIst: number;
@@ -118,9 +94,9 @@ export interface BahnPoseIstRaw {
   bahn_id: string;
   segment_id: string;
   timestamp: string;
-  x_ist: string;
-  y_ist: string;
-  z_ist: string;
+  x_ist: number;
+  y_ist: number;
+  z_ist: number;
   qx_ist: number;
   qy_ist: number;
   qz_ist: number;
@@ -134,8 +110,6 @@ export interface BahnTwistIst {
   segmentId: string;
   timestamp: string;
   tcpSpeedIst: number;
-  tcpAngularIst: number;
-  sourceDataIst: string;
 }
 
 export interface BahnTwistIstRaw {
@@ -144,8 +118,6 @@ export interface BahnTwistIstRaw {
   segment_id: string;
   timestamp: string;
   tcp_speed_ist: number;
-  tcp_angular_ist: number;
-  source_data_ist: string;
 }
 
 export interface BahnAccelIst {
@@ -154,8 +126,6 @@ export interface BahnAccelIst {
   segmentId: string;
   timestamp: string;
   tcpAccelIst: number;
-  tcpAngularAccelIst: number;
-  sourceDataIst: string;
 }
 
 export interface BahnAccelIstRaw {
@@ -164,8 +134,22 @@ export interface BahnAccelIstRaw {
   segment_id: string;
   timestamp: string;
   tcp_accel_ist: number;
-  tcp_angular_accel_ist: number;
-  source_data_ist: string;
+}
+
+export interface BahnAccelSoll {
+  id: number;
+  bahnId: string;
+  segmentId: string;
+  timestamp: string;
+  tcpAccelSoll: number;
+}
+
+export interface BahnAccelSollRaw {
+  id: number;
+  bahn_id: string;
+  segment_id: string;
+  timestamp: string;
+  tcp_accel_soll: number;
 }
 
 export interface BahnIMU {

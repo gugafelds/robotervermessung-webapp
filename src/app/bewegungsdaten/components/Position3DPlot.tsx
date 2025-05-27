@@ -16,7 +16,7 @@ interface Position3DPlotProps {
   currentBahnPoseIst: BahnPoseIst[];
   currentBahnPoseTrans: BahnPoseTrans[];
   idealTrajectory: BahnPositionSoll[];
-  currentBahnEvents: BahnEvents[]; // Neue Prop
+  currentBahnEvents: BahnEvents[];
   isTransformed: boolean;
 }
 
@@ -24,7 +24,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
   currentBahnPoseTrans,
   currentBahnPoseIst,
   idealTrajectory,
-  currentBahnEvents, // Neue Prop
+  currentBahnEvents,
   isTransformed,
 }) => {
   const realTrajectory = isTransformed
@@ -53,7 +53,47 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     name: 'Sollbahn',
   };
 
-  // Neue Daten für die Zielpunkte
+  // Startpunkt für Ist-Daten
+  const getStartPointCoordinate = (coordinate: 'x' | 'y' | 'z'): number => {
+    if (realTrajectory.length === 0) return 0;
+
+    const firstPoint = realTrajectory[0];
+    if (isTransformed) {
+      const transPoint = firstPoint as BahnPoseTrans;
+      if (coordinate === 'x') return transPoint.xTrans;
+      if (coordinate === 'y') return transPoint.yTrans;
+      return transPoint.zTrans;
+    }
+    const istPoint = firstPoint as BahnPoseIst;
+    if (coordinate === 'x') return istPoint.xIst;
+    if (coordinate === 'y') return istPoint.yIst;
+    return istPoint.zIst;
+  };
+
+  const startPointData: Partial<PlotData> = {
+    type: 'scatter3d',
+    mode: 'markers',
+    name: 'Startpunkt',
+    x: [getStartPointCoordinate('x')],
+    y: [getStartPointCoordinate('y')],
+    z: [getStartPointCoordinate('z')],
+    marker: {
+      size: 4,
+      color: 'green',
+      symbol: 'diamond', // Andere verfügbare Symbole: 'square', 'diamond', 'cross', 'x', 'triangle-up', 'triangle-down', 'pentagon', 'hexagon', 'star'
+      opacity: 1,
+      line: {
+        color: 'darkgreen',
+        width: 2,
+      },
+    },
+    hoverlabel: {
+      bgcolor: 'green',
+    },
+    visible: true,
+  };
+
+  // Zielpunkte
   const targetPointsData: Partial<PlotData> = {
     type: 'scatter3d',
     mode: 'markers',
@@ -74,7 +114,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     visible: true,
   };
 
-  // Optional: Verbindungslinien zwischen den Zielpunkten
+  // Verbindungslinien zwischen den Zielpunkten
   const targetLinesData: Partial<PlotData> = {
     type: 'scatter3d',
     mode: 'lines',
@@ -83,7 +123,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     y: currentBahnEvents.map((row) => row.yReached),
     z: currentBahnEvents.map((row) => row.zReached),
     line: {
-      color: 'rgba(255, 0, 0, 0.3)', // Halbtransparentes Rot
+      color: 'rgba(255, 0, 0, 0.3)',
       width: 2,
     },
     showlegend: false,
@@ -109,6 +149,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
         idealTrajectoryData,
         targetLinesData,
         targetPointsData,
+        startPointData, // Startpunkt hinzugefügt
       ]}
       layout={layout}
       useResizeHandler

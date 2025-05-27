@@ -15,9 +15,8 @@ DB_PARAMS = {
 
 # Mappings of CSV columns to database columns
 MAPPINGS = {
-    'ACCEL_MAPPING': {
+    'ACCEL_IST_MAPPING': {
         'tcp_accelv': 'tcp_accel_ist',
-        'tcp_accelv_angular': 'tcp_angular_accel_ist',
     },
     'JOINT_MAPPING': {
         'joint_1': 'joint_1',
@@ -58,10 +57,12 @@ MAPPINGS = {
     },
     'TWIST_IST_MAPPING': {
         'tcp_speedv': 'tcp_speed_ist',
-        'tcp_angularv': 'tcp_angular_ist',
     },
     'TWIST_SOLL_MAPPING': {
-        'tcp_speeds': 'tcp_speed_soll'
+        'tcp_speedbs': 'tcp_speed_soll'
+    },
+    'ACCEL_SOLL_MAPPING': {
+        'tcp_accelbs': 'tcp_accel_soll'
     },
     'IMU_MAPPING': {
         'tcp_accel_pi': 'tcp_accel_pi',

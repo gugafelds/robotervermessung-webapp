@@ -9,7 +9,6 @@ import React, { useState } from 'react';
 import { Typography } from '@/src/components/Typography';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 
-import { ConsistencyCheck } from './ConsistencyCheck';
 import { JointStatesPlot } from './JointStatesPlot';
 import { OrientationPlot } from './OrientationPlot';
 import { Position2DPlot } from './Position2DPlot';
@@ -29,7 +28,7 @@ interface PlotAvailability {
   position: boolean; // position_soll + pose_ist/trans + events
   orientation: boolean; // orientation_soll + pose_ist/trans + events
   twist: boolean; // twist_ist + twist_soll
-  acceleration: boolean; // accel_ist + twist_soll
+  acceleration: boolean; // accel_ist + accel_soll
   joints: boolean; // joint_states
 }
 
@@ -48,6 +47,7 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
     currentBahnPoseTrans,
     currentBahnTwistIst,
     currentBahnAccelIst,
+    currentBahnAccelSoll,
     currentBahnPositionSoll,
     currentBahnOrientationSoll,
     currentBahnJointStates,
@@ -121,6 +121,7 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
       {plotAvailability.acceleration && (
         <TCPAccelPlot
           currentBahnAccelIst={currentBahnAccelIst}
+          currentBahnAccelSoll={currentBahnAccelSoll}
           currentBahnIMU={currentBahnIMU}
         />
       )}
@@ -151,21 +152,6 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
           </Link>
         )}
       </div>
-
-      {hasAnyPlotAvailable && (
-        <ConsistencyCheck
-          currentBahnTwistIst={currentBahnTwistIst}
-          currentBahnTwistSoll={currentBahnTwistSoll}
-          currentBahnPoseIst={currentBahnPoseIst}
-          idealTrajectory={currentBahnPositionSoll}
-          currentBahnEvents={currentBahnEvents}
-          currentBahnOrientationSoll={currentBahnOrientationSoll}
-          currentBahnAccelIst={currentBahnAccelIst}
-          currentBahnJointStates={currentBahnJointStates}
-          currentBahnPoseTrans={currentBahnPoseTrans}
-          isTransformed={isTransformed}
-        />
-      )}
     </div>
   );
 };

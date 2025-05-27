@@ -4,6 +4,7 @@
 
 import {
   transformBahnAccelIstResult,
+  transformBahnAccelSollResult,
   transformBahnEventsResult,
   transformBahnIMUResult,
   transformBahnInfobyIDResult,
@@ -18,6 +19,7 @@ import {
 } from '@/src/lib/transformer.bewegungsdaten';
 import type {
   BahnAccelIst,
+  BahnAccelSoll,
   BahnEvents,
   BahnIMU,
   BahnInfo,
@@ -209,6 +211,19 @@ export const getBahnAccelIstById = async (
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error fetching Bahn accel ist by ID:', error);
+    throw error;
+  }
+};
+
+export const getBahnAccelSollById = async (
+  id: string,
+): Promise<BahnAccelSoll[]> => {
+  try {
+    const result = await fetchFromAPI(`/bahn/bahn_accel_soll/${id}`, true);
+    return transformBahnAccelSollResult(result);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching Bahn accel soll by ID:', error);
     throw error;
   }
 };

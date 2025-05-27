@@ -1,7 +1,6 @@
 'use client';
 
 import ErrorIcon from '@heroicons/react/24/outline/FaceFrownIcon';
-import InfoIcon from '@heroicons/react/24/outline/InformationCircleIcon';
 import React from 'react';
 
 import { Typography } from '@/src/components/Typography';
@@ -52,9 +51,7 @@ const InfoSection: React.FC<InfoSectionProps> = ({ title, children }) => (
 export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = ({
   isTransformed,
 }) => {
-  const { currentBahnInfo, currentBahnPoseTrans } = useTrajectory();
-
-  const calibrationId = currentBahnPoseTrans?.[0]?.calibrationID;
+  const { currentBahnInfo } = useTrajectory();
 
   if (currentBahnInfo === null) {
     return (
@@ -68,162 +65,186 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = ({
   }
 
   return (
-    <div className="flex h-full w-auto flex-col bg-gray-50 p-4 lg:h-fullscreen lg:w-3/12 lg:overflow-scroll">
-      <span className="inline-flex">
-        <InfoIcon className="w-8 text-primary" />
-        <span className="mx-2 my-4 flex text-2xl font-semibold text-primary">
-          Bahn Info
-        </span>
-      </span>
-
+    <div className="flex h-full min-w-80 flex-col bg-gray-50 p-4 lg:h-fullscreen lg:overflow-scroll">
       {currentBahnInfo && Object.keys(currentBahnInfo).length !== 0 && (
         <>
+          {/* Bahn-ID und Dateiname prominent anzeigen */}
+          <div className="rounded-xl p-4 text-primary ">
+            <div className="text-sm font-medium">Bahn-ID</div>
+            <div className="text-2xl font-bold">
+              {currentBahnInfo.bahnID || '-'}
+            </div>
+            <div className="pt-2">
+              <div className="text-sm font-medium">Datei</div>
+              <div className="text-xl font-semibold">
+                {currentBahnInfo.recordFilename || '-'}
+              </div>
+            </div>
+          </div>
+
           <InfoSection title="Allgemein">
             <InfoRow
-              label="Datei"
-              value={currentBahnInfo.recordFilename || 'n. a.'}
-              singleColumn
-            />
-            <InfoRow
               label="Roboter"
-              value={currentBahnInfo.robotModel || 'n. a.'}
-              singleColumn
+              value={currentBahnInfo.robotModel || '-'}
             />
             <InfoRow
-              label="Startzeitpunkt"
+              label="Start"
               value={
                 currentBahnInfo.startTime
                   ? formatDate(currentBahnInfo.startTime)
-                  : 'n. a.'
+                  : '-'
               }
-              singleColumn
             />
             <InfoRow
-              label="Endzeitpunkt"
+              label="Ende"
               value={
                 currentBahnInfo.endTime
                   ? formatDate(currentBahnInfo.endTime)
+                  : '-'
+              }
+            />
+            <InfoRow
+              label="Bahndauer"
+              value={
+                currentBahnInfo.startTime && currentBahnInfo.endTime
+                  ? `${((new Date(currentBahnInfo.endTime).getTime() - new Date(currentBahnInfo.startTime).getTime()) / 1000).toFixed(1)} s`
                   : 'n. a.'
               }
-              singleColumn
             />
             <InfoRow
-              label="Datenquelle (Ist)"
-              value={currentBahnInfo.sourceDataIst || 'n. a.'}
-              singleColumn
+              label="Quelle-Ist"
+              value={currentBahnInfo.sourceDataIst || '-'}
             />
             <InfoRow
-              label="Datenquelle (Soll)"
-              value={currentBahnInfo.sourceDataSoll || 'n. a.'}
-              singleColumn
+              label="Quelle-Soll"
+              value={currentBahnInfo.sourceDataSoll || '-'}
             />
             <InfoRow
-              label="Last am TCP"
-              value={`${formatNumber(currentBahnInfo.weight) || 'n. a.'} kg`}
-              singleColumn
+              label="Last"
+              value={`${formatNumber(currentBahnInfo.weight) || '-'} kg`}
             />
             <InfoRow
               label="Transformiert"
               value={isTransformed ? 'Ja' : 'Nein'}
-              singleColumn
             />
-            {isTransformed && calibrationId && (
-              <InfoRow
-                label="Kalibrierungsdatei-ID"
-                value={calibrationId}
-                singleColumn
-              />
-            )}
           </InfoSection>
 
           <InfoSection title="Punkteanzahl">
-            <InfoRow
-              label="Ereignisse"
-              value={
-                formatNumber(currentBahnInfo.numberPointsEvents) || 'n. a.'
-              }
-            />
-            <InfoRow
-              label="Pose Ist"
-              value={
-                formatNumber(currentBahnInfo.numberPointsPoseIst) || 'n. a.'
-              }
-            />
-            <InfoRow
-              label="Twist Ist"
-              value={
-                formatNumber(currentBahnInfo.numberPointsTwistIst) || 'n. a.'
-              }
-            />
-            <InfoRow
-              label="Accel Ist"
-              value={
-                formatNumber(currentBahnInfo.numberPointsAccelIst) || 'n. a.'
-              }
-            />
-            <InfoRow
-              label="Pos. Soll"
-              value={
-                formatNumber(currentBahnInfo.numberPointsPosSoll) || 'n. a.'
-              }
-            />
-            <InfoRow
-              label="Orient. Soll"
-              value={
-                formatNumber(currentBahnInfo.numberPointsOrientSoll) || 'n. a.'
-              }
-            />
-            <InfoRow
-              label="Twist Soll"
-              value={
-                formatNumber(currentBahnInfo.numberPointsTwistSoll) || 'n. a.'
-              }
-            />
-            <InfoRow
-              label="Joint States"
-              value={
-                formatNumber(currentBahnInfo.numberPointsJointStates) || 'n. a.'
-              }
-            />
-            <InfoRow
-              label="IMU"
-              value={formatNumber(currentBahnInfo.numberPointsIMU) || 'n. a.'}
-            />
+            {/* IST Daten Gruppe */}
+            <div className="mb-2 border-gray-200">
+              <div className="text-lg font-semibold text-gray-600">
+                Ist-Daten:
+              </div>
+              <InfoRow
+                label="Pose"
+                value={formatNumber(currentBahnInfo.numberPointsPoseIst) || '-'}
+              />
+              <InfoRow
+                label="Geschwindigkeit"
+                value={
+                  formatNumber(currentBahnInfo.numberPointsTwistIst) || '-'
+                }
+              />
+              <InfoRow
+                label="Beschleunigung"
+                value={
+                  formatNumber(currentBahnInfo.numberPointsAccelIst) || '-'
+                }
+              />
+            </div>
+
+            {/* SOLL Daten Gruppe */}
+            <div className="border-gray-200">
+              <div className="text-lg font-semibold text-gray-600">
+                Soll-Daten:
+              </div>
+              <InfoRow
+                label="Position"
+                value={formatNumber(currentBahnInfo.numberPointsPosSoll) || '-'}
+              />
+              <InfoRow
+                label="Orientierung"
+                value={
+                  formatNumber(currentBahnInfo.numberPointsOrientSoll) || '-'
+                }
+              />
+              <InfoRow
+                label="Geschwindigkeit"
+                value={
+                  formatNumber(currentBahnInfo.numberPointsTwistSoll) || '-'
+                }
+              />
+              <InfoRow
+                label="Beschleunigung"
+                value={
+                  formatNumber(currentBahnInfo.numberPointsAccelSoll) || '-'
+                }
+              />
+              <InfoRow
+                label="Gelenkzustände"
+                value={
+                  formatNumber(currentBahnInfo.numberPointsJointStates) || '-'
+                }
+              />
+              <InfoRow
+                label="Ereignisse"
+                value={formatNumber(currentBahnInfo.numberPointsEvents) || '-'}
+              />
+            </div>
           </InfoSection>
 
-          <InfoSection title="Abtastraten">
-            <InfoRow
-              label="Pose Ist"
-              value={`${formatNumber(currentBahnInfo.frequencyPoseIst) || 'n. a.'} Hz`}
-            />
-            <InfoRow
-              label="Twist Ist"
-              value={`${formatNumber(currentBahnInfo.frequencyTwistIst) || 'n. a.'} Hz`}
-            />
-            <InfoRow
-              label="Accel Ist"
-              value={`${formatNumber(currentBahnInfo.frequencyAccelIst) || 'n. a.'} Hz`}
-            />
-            <InfoRow
-              label="Position Soll"
-              value={`${formatNumber(currentBahnInfo.frequencyPositionSoll) || 'n. a.'} Hz`}
-            />
-            <InfoRow
-              label="Orient. Soll"
-              value={`${formatNumber(currentBahnInfo.frequencyOrientationSoll) || 'n. a.'} Hz`}
-            />
-            <InfoRow
-              label="Twist Soll"
-              value={`${formatNumber(currentBahnInfo.frequencyTwistSoll) || 'n. a.'} Hz`}
-            />
-            <InfoRow
-              label="Joint States"
-              value={`${formatNumber(currentBahnInfo.frequencyJointStates) || 'n. a.'} Hz`}
-            />
-            <InfoRow
-              label="IMU"
-              value={`${formatNumber(currentBahnInfo.frequencyIMU) || 'n. a.'}Hz`}
-            />
+          <InfoSection title="Abtastraten (Hz)">
+            {/* IST Daten Gruppe */}
+            <div className="mb-2 border-gray-200">
+              <div className="text-lg font-semibold text-gray-600">
+                Ist-Daten:
+              </div>
+              <InfoRow
+                label="Pose"
+                value={formatNumber(currentBahnInfo.frequencyPoseIst) || '-'}
+              />
+              <InfoRow
+                label="Geschwindigkeit"
+                value={formatNumber(currentBahnInfo.frequencyTwistIst) || '-'}
+              />
+              <InfoRow
+                label="Beschleunigung"
+                value={formatNumber(currentBahnInfo.frequencyAccelIst) || '-'}
+              />
+            </div>
+
+            {/* SOLL Daten Gruppe */}
+            <div className="border-gray-200">
+              <div className="text-lg font-semibold text-gray-600">
+                Soll-Daten:
+              </div>
+              <InfoRow
+                label="Position"
+                value={
+                  formatNumber(currentBahnInfo.frequencyPositionSoll) || '-'
+                }
+              />
+              <InfoRow
+                label="Orientierung"
+                value={
+                  formatNumber(currentBahnInfo.frequencyOrientationSoll) || '-'
+                }
+              />
+              <InfoRow
+                label="Geschwindigkeit"
+                value={formatNumber(currentBahnInfo.frequencyTwistSoll) || '-'}
+              />
+              <InfoRow
+                label="Beschleunigung"
+                value={formatNumber(currentBahnInfo.frequencyAccelSoll) || '-'}
+              />
+              <InfoRow
+                label="Gelenkzustände"
+                value={
+                  formatNumber(currentBahnInfo.frequencyJointStates) || '-'
+                }
+              />
+            </div>
           </InfoSection>
         </>
       )}

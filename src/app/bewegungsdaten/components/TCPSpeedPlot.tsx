@@ -62,7 +62,7 @@ export const TCPSpeedPlot: React.FC<TCPSpeedPlotProps> = ({
         color: 'blue',
         width: 3,
       },
-      name: 'TCP-Geschwindigkeit (Ist)',
+      name: 'Ist-Geschwindigkeit',
     };
 
     const sollPlot: Partial<PlotData> = {
@@ -74,7 +74,7 @@ export const TCPSpeedPlot: React.FC<TCPSpeedPlotProps> = ({
         color: 'lightblue',
         width: 3,
       },
-      name: 'TCP-Geschwindigkeit (Soll)',
+      name: 'Soll-Geschwindigkeit',
     };
 
     return {

@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   checkTransformedDataExists,
   getBahnAccelIstById,
+  getBahnAccelSollById,
   getBahnEventsById,
   getBahnIMUById,
   getBahnInfoById,
@@ -58,6 +59,7 @@ interface DataLoadingState {
   pose: boolean;
   twist: boolean;
   accel: boolean;
+  accelSoll: boolean;
   positionSoll: boolean;
   orientationSoll: boolean;
   twistSoll: boolean;
@@ -74,6 +76,7 @@ export function TrajectoryWrapper() {
     pose: false,
     twist: false,
     accel: false,
+    accelSoll: false,
     positionSoll: false,
     orientationSoll: false,
     twistSoll: false,
@@ -92,7 +95,7 @@ export function TrajectoryWrapper() {
       loadingStates.orientationSoll &&
       loadingStates.events,
     twist: loadingStates.twist && loadingStates.twistSoll,
-    acceleration: loadingStates.accel && loadingStates.imu,
+    acceleration: loadingStates.accel && loadingStates.accelSoll,
     joints: loadingStates.jointStates,
   };
 
@@ -103,6 +106,7 @@ export function TrajectoryWrapper() {
     setCurrentBahnPoseTrans,
     setCurrentBahnTwistIst,
     setCurrentBahnAccelIst,
+    setCurrentBahnAccelSoll,
     setCurrentBahnPositionSoll,
     setCurrentBahnOrientationSoll,
     setCurrentBahnTwistSoll,
@@ -208,6 +212,11 @@ export function TrajectoryWrapper() {
           'accel_ist',
         ).then(() => updateLoadingState('accel', true)),
         fetchDataWithCache(
+          () => getBahnAccelSollById(id),
+          setCurrentBahnAccelSoll,
+          'accel_soll',
+        ).then(() => updateLoadingState('accelSoll', true)),
+        fetchDataWithCache(
           () => getBahnTwistSollById(id),
           setCurrentBahnTwistSoll,
           'twist_soll',
@@ -234,6 +243,7 @@ export function TrajectoryWrapper() {
   }, [
     id,
     setCurrentBahnPoseTrans,
+    setCurrentBahnAccelSoll,
     setCurrentBahnPoseIst,
     setCurrentBahnEvents,
     setCurrentBahnPositionSoll,

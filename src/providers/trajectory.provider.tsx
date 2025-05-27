@@ -13,6 +13,7 @@ import React, {
 import { getBahnInfo } from '@/src/actions/bewegungsdaten.service';
 import type {
   BahnAccelIst,
+  BahnAccelSoll,
   BahnEvents,
   BahnIMU,
   BahnInfo,
@@ -41,6 +42,10 @@ export interface TrajectoryState {
   setCurrentBahnTwistIst: React.Dispatch<React.SetStateAction<BahnTwistIst[]>>;
   currentBahnAccelIst: BahnAccelIst[];
   setCurrentBahnAccelIst: React.Dispatch<React.SetStateAction<BahnAccelIst[]>>;
+  currentBahnAccelSoll: BahnAccelSoll[];
+  setCurrentBahnAccelSoll: React.Dispatch<
+    React.SetStateAction<BahnAccelSoll[]>
+  >;
   currentBahnPositionSoll: BahnPositionSoll[];
   setCurrentBahnPositionSoll: React.Dispatch<
     React.SetStateAction<BahnPositionSoll[]>
@@ -94,6 +99,9 @@ export const TrajectoryProvider = ({
   >([]);
   const [currentBahnAccelIst, setCurrentBahnAccelIst] = useState<
     BahnAccelIst[]
+  >([]);
+  const [currentBahnAccelSoll, setCurrentBahnAccelSoll] = useState<
+    BahnAccelSoll[]
   >([]);
   const [currentBahnPositionSoll, setCurrentBahnPositionSoll] = useState<
     BahnPositionSoll[]
@@ -172,6 +180,8 @@ export const TrajectoryProvider = ({
       setCurrentBahnTwistIst,
       currentBahnAccelIst,
       setCurrentBahnAccelIst,
+      currentBahnAccelSoll,
+      setCurrentBahnAccelSoll,
       currentBahnPositionSoll,
       setCurrentBahnPositionSoll,
       currentBahnOrientationSoll,
@@ -198,6 +208,7 @@ export const TrajectoryProvider = ({
       currentBahnPoseIst,
       currentBahnTwistIst,
       currentBahnAccelIst,
+      currentBahnAccelSoll,
       currentBahnPositionSoll,
       currentBahnOrientationSoll,
       currentBahnTwistSoll,

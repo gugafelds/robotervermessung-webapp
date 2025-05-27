@@ -107,10 +107,12 @@ class BatchProcessor:
                 orientation_soll_data = []
                 twist_ist_data = []
                 twist_soll_data = []
-                accel_data = []
+                accel_ist_data = []
+                accel_soll_data = []
                 rapid_events_data = []
                 joint_data = []
                 imu_data = []
+                transf_data = []
 
                 all_bahn_ids = []
 
@@ -125,10 +127,12 @@ class BatchProcessor:
                     orientation_soll_data.extend(data_set.get('ORIENTATION_SOLL_MAPPING', []))
                     twist_ist_data.extend(data_set.get('TWIST_IST_MAPPING', []))
                     twist_soll_data.extend(data_set.get('TWIST_SOLL_MAPPING', []))
-                    accel_data.extend(data_set.get('ACCEL_MAPPING', []))
+                    accel_ist_data.extend(data_set.get('ACCEL_IST_MAPPING', []))
+                    accel_soll_data.extend(data_set.get('ACCEL_SOLL_MAPPING', []))
                     rapid_events_data.extend(data_set.get('RAPID_EVENTS_MAPPING', []))
                     joint_data.extend(data_set.get('JOINT_MAPPING', []))
                     imu_data.extend(data_set.get('IMU_MAPPING', []))
+                    transf_data.extend(data_set.get('TRANSFORM_MAPPING', []))
 
                 # First check which bahn_ids already exist in each table
                 # This avoids checking each record individually
@@ -140,9 +144,11 @@ class BatchProcessor:
                     'bahn_twist_ist',
                     'bahn_twist_soll',
                     'bahn_accel_ist',
+                    'bahn_accel_soll',
                     'bahn_events',
                     'bahn_joint_states',
-                    'bahn_imu'
+                    'bahn_imu',
+                    'bahn_pose_trans',
                 ]
 
                 existing_bahn_ids = {}
@@ -170,6 +176,11 @@ class BatchProcessor:
                     if record[0] not in existing_bahn_ids['bahn_pose_ist']
                 ]
 
+                filtered_transf = [
+                    record for record in transf_data
+                    if record[0] not in existing_bahn_ids['bahn_pose_trans']
+                ]
+
                 filtered_position_soll = [
                     record for record in position_soll_data
                     if record[0] not in existing_bahn_ids['bahn_position_soll']
@@ -190,9 +201,14 @@ class BatchProcessor:
                     if record[0] not in existing_bahn_ids['bahn_twist_soll']
                 ]
 
-                filtered_accel = [
-                    record for record in accel_data
+                filtered_accel_ist = [
+                    record for record in accel_ist_data
                     if record[0] not in existing_bahn_ids['bahn_accel_ist']
+                ]
+
+                filtered_accel_soll = [
+                    record for record in accel_soll_data
+                    if record[0] not in existing_bahn_ids['bahn_accel_soll']
                 ]
 
                 filtered_events = [
@@ -222,11 +238,9 @@ class BatchProcessor:
                                 'frequency_orientation_soll', 'frequency_twist_ist', 'frequency_twist_soll',
                                 'frequency_accel_ist', 'frequency_joint_states', 'calibration_run',
                                 'np_pose_ist', 'np_twist_ist', 'np_accel_ist', 'np_pos_soll', 'np_orient_soll',
-                                'np_twist_soll', 'np_jointstates', 'weight', 'x_start_pos', 'y_start_pos',
-                                'z_start_pos', 'x_end_pos', 'y_end_pos', 'z_end_pos', 'handling_height',
-                                'qx_start', 'qy_start', 'qz_start', 'qw_start', 'qx_end', 'qy_end',
-                                'qz_end', 'qw_end', 'velocity_picking', 'velocity_handling', 'frequency_imu',
-                                'pick_and_place', 'np_imu'
+                                'np_twist_soll', 'np_jointstates', 'weight', 'handling_height',
+                                'velocity_handling', 'velocity_picking', 'pick_and_place', 'transformation_matrix',
+                                'np_accel_soll', 'frequency_accel_soll'
                             ]
 
                             # Ensure all records have proper length
@@ -249,19 +263,22 @@ class BatchProcessor:
                             (filtered_pose, 'bahn_pose_ist',
                              ['bahn_id', 'segment_id', 'timestamp', 'x_ist', 'y_ist', 'z_ist', 'qx_ist', 'qy_ist',
                               'qz_ist', 'qw_ist', 'source_data_ist']),
+                            (filtered_transf, 'bahn_pose_trans',
+                             ['bahn_id', 'segment_id', 'timestamp', 'x_trans', 'y_trans', 'z_trans', 'qx_trans', 'qy_trans',
+                              'qz_trans', 'qw_trans']),
                             (filtered_position_soll, 'bahn_position_soll',
                              ['bahn_id', 'segment_id', 'timestamp', 'x_soll', 'y_soll', 'z_soll', 'source_data_soll']),
                             (filtered_orientation_soll, 'bahn_orientation_soll',
                              ['bahn_id', 'segment_id', 'timestamp', 'qx_soll', 'qy_soll', 'qz_soll', 'qw_soll',
                               'source_data_soll']),
                             (filtered_twist_ist, 'bahn_twist_ist',
-                             ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_ist', 'tcp_angular_ist',
-                              'source_data_ist']),
+                             ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_ist']),
                             (filtered_twist_soll, 'bahn_twist_soll',
                              ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_soll', 'source_data_soll']),
-                            (filtered_accel, 'bahn_accel_ist',
-                             ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_ist', 'tcp_angular_accel_ist',
-                              'source_data_ist']),
+                            (filtered_accel_ist, 'bahn_accel_ist',
+                             ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_ist']),
+                            (filtered_accel_soll, 'bahn_accel_soll',
+                             ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_soll']),
                             (filtered_events, 'bahn_events',
                              ['bahn_id', 'segment_id', 'timestamp', 'x_reached', 'y_reached', 'z_reached', 'qx_reached',
                               'qy_reached', 'qz_reached', 'qw_reached', 'source_data_soll', 'movement_type']),
@@ -329,11 +346,9 @@ class BatchProcessor:
                 'frequency_orientation_soll', 'frequency_twist_ist', 'frequency_twist_soll',
                 'frequency_accel_ist', 'frequency_joint_states', 'calibration_run',
                 'np_pose_ist', 'np_twist_ist', 'np_accel_ist', 'np_pos_soll', 'np_orient_soll',
-                'np_twist_soll', 'np_jointstates', 'weight', 'x_start_pos', 'y_start_pos',
-                'z_start_pos', 'x_end_pos', 'y_end_pos', 'z_end_pos', 'handling_height',
-                'qx_start', 'qy_start', 'qz_start', 'qw_start', 'qx_end', 'qy_end',
-                'qz_end', 'qw_end', 'velocity_picking', 'velocity_handling', 'frequency_imu',
-                'pick_and_place', 'np_imu'
+                'np_twist_soll', 'np_jointstates', 'weight', 'handling_height',
+                'velocity_handling', 'velocity_picking', 'pick_and_place', 'transformation_matrix',
+                'np_accel_soll', 'frequency_accel_soll'
             ]
 
             # Ensure all records have proper length
@@ -406,16 +421,20 @@ class BatchProcessor:
         await self.batch_insert_data(db_ops, conn, 'bahn_orientation_soll', data, columns)
 
     async def batch_insert_twist_ist_data(self, db_ops, conn, data):
-        columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_ist', 'tcp_angular_ist', 'source_data_ist']
+        columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_ist']
         await self.batch_insert_data(db_ops, conn, 'bahn_twist_ist', data, columns)
 
     async def batch_insert_twist_soll_data(self, db_ops, conn, data):
         columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_soll', 'source_data_soll']
         await self.batch_insert_data(db_ops, conn, 'bahn_twist_soll', data, columns)
 
-    async def batch_insert_accel_data(self, db_ops, conn, data):
-        columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_ist', 'tcp_angular_accel_ist', 'source_data_ist']
+    async def batch_insert_accel_ist_data(self, db_ops, conn, data):
+        columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_ist']
         await self.batch_insert_data(db_ops, conn, 'bahn_accel_ist', data, columns)
+
+    async def batch_insert_accel_soll_data(self, db_ops, conn, data):
+        columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_soll']
+        await self.batch_insert_data(db_ops, conn, 'bahn_accel_soll', data, columns)
 
     async def batch_insert_rapid_events_data(self, db_ops, conn, data):
         columns = ['bahn_id', 'segment_id', 'timestamp', 'x_reached', 'y_reached', 'z_reached',
@@ -430,3 +449,8 @@ class BatchProcessor:
     async def batch_insert_imu_data(self, db_ops, conn, data):
         columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_pi', 'tcp_angular_vel_pi', 'source_data_ist']
         await self.batch_insert_data(db_ops, conn, 'bahn_imu', data, columns)
+
+    async def batch_insert_transf_data(self, db_ops, conn, data):
+        columns = ['bahn_id', 'segment_id', 'timestamp', 'x_trans', 'y_trans', 'z_trans',
+                   'qx_trans', 'qy_trans', 'qz_trans', 'qw_trans', 'calibration_id']
+        await self.batch_insert_data(db_ops, conn, 'bahn_pose_trans', data, columns)

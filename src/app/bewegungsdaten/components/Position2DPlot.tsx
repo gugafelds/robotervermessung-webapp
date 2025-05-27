@@ -159,22 +159,13 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       },
       {
         type: 'scatter',
-        mode: 'lines',
-        name: 'X-Zielpunkte',
-        x: xAchievedData.x,
-        y: xAchievedData.y,
-        line: { color: 'pink', width: 2, shape: 'hv' },
-        showlegend: false,
-      },
-      {
-        type: 'scatter',
         mode: 'markers',
         name: 'X-Zielpunkte',
         x: currentBahnEvents.map(
           (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
         ),
         y: currentBahnEvents.map((b) => b.xReached),
-        marker: { color: 'red', size: 8, symbol: 'circle' },
+        marker: { color: 'red', size: 12, symbol: 'circle' },
       },
       // Y Position
       {
@@ -195,22 +186,13 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       },
       {
         type: 'scatter',
-        mode: 'lines',
-        name: 'Y-Zielpunkte',
-        x: yAchievedData.x,
-        y: yAchievedData.y,
-        line: { color: 'lightgreen', width: 2, shape: 'hv' },
-        showlegend: false,
-      },
-      {
-        type: 'scatter',
         mode: 'markers',
         name: 'Y-Zielpunkte',
         x: currentBahnEvents.map(
           (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
         ),
         y: currentBahnEvents.map((b) => b.yReached),
-        marker: { color: 'green', size: 8, symbol: 'circle' },
+        marker: { color: 'green', size: 12, symbol: 'circle' },
       },
       // Z Position
       {
@@ -231,22 +213,13 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       },
       {
         type: 'scatter',
-        mode: 'lines',
-        name: 'Z-Zielpunkte',
-        x: zAchievedData.x,
-        y: zAchievedData.y,
-        line: { color: 'lightblue', width: 2, shape: 'hv' },
-        showlegend: false,
-      },
-      {
-        type: 'scatter',
         mode: 'markers',
         name: 'Z-Zielpunkte',
         x: currentBahnEvents.map(
           (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
         ),
         y: currentBahnEvents.map((b) => b.zReached),
-        marker: { color: 'blue', size: 8, symbol: 'circle' },
+        marker: { color: 'blue', size: 12, symbol: 'circle' },
       },
     ];
 

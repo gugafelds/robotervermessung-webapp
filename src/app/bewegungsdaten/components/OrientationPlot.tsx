@@ -180,20 +180,11 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       },
       {
         type: 'scatter',
-        mode: 'lines',
-        name: 'Roll-Zielpunkte',
-        x: eventEulerAngles.map((e) => e.time),
-        y: eventEulerAngles.map((e) => e.angles[0]),
-        line: { color: 'lightblue', width: 2, shape: 'hv' },
-        showlegend: false,
-      },
-      {
-        type: 'scatter',
         mode: 'markers',
         name: 'Roll-Zielpunkte',
         x: eventEulerAngles.map((e) => e.time),
         y: eventEulerAngles.map((e) => e.angles[0]),
-        marker: { color: 'blue', size: 8, symbol: 'circle' },
+        marker: { color: 'blue', size: 12, symbol: 'circle' },
       },
 
       // Pitch (Y-Rotation) - Grün-Töne wie Y-Position
@@ -215,20 +206,11 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       },
       {
         type: 'scatter',
-        mode: 'lines',
-        name: 'Pitch-Zielpunkte',
-        x: eventEulerAngles.map((e) => e.time),
-        y: eventEulerAngles.map((e) => e.angles[1]),
-        line: { color: 'lightgreen', width: 2, shape: 'hv' },
-        showlegend: false,
-      },
-      {
-        type: 'scatter',
         mode: 'markers',
         name: 'Pitch-Zielpunkte',
         x: eventEulerAngles.map((e) => e.time),
         y: eventEulerAngles.map((e) => e.angles[1]),
-        marker: { color: 'green', size: 8, symbol: 'circle' },
+        marker: { color: 'green', size: 12, symbol: 'circle' },
       },
 
       // Yaw (Z-Rotation) - Rot-Töne wie Z-Position
@@ -250,20 +232,11 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       },
       {
         type: 'scatter',
-        mode: 'lines',
-        name: 'Gier-Zielpunkte',
-        x: eventEulerAngles.map((e) => e.time),
-        y: eventEulerAngles.map((e) => e.angles[2]),
-        line: { color: 'pink', width: 2, shape: 'hv' },
-        showlegend: false,
-      },
-      {
-        type: 'scatter',
         mode: 'markers',
         name: 'Gier-Zielpunkte',
         x: eventEulerAngles.map((e) => e.time),
         y: eventEulerAngles.map((e) => e.angles[2]),
-        marker: { color: 'red', size: 8, symbol: 'circle' },
+        marker: { color: 'red', size: 12, symbol: 'circle' },
       },
     ];
     return { plotData, maxTimeOrientation };

@@ -94,9 +94,12 @@ class DatabaseOperations:
                               'double precision', 'double precision', 'double precision', 'double precision', 'varchar']
                 },
                 'bahn_accel_ist': {
-                    'columns': ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_ist', 'tcp_angular_accel_ist',
-                                'source_data_ist'],
-                    'types': ['varchar', 'varchar', 'varchar', 'double precision', 'double precision', 'varchar']
+                    'columns': ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_ist'],
+                    'types': ['varchar', 'varchar', 'varchar', 'double precision']
+                },
+                'bahn_accel_soll': {
+                    'columns': ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_soll'],
+                    'types': ['varchar', 'varchar', 'varchar', 'double precision']
                 },
                 'bahn_orientation_soll': {
                     'columns': ['bahn_id', 'segment_id', 'timestamp', 'qx_soll', 'qy_soll', 'qz_soll',
@@ -118,10 +121,8 @@ class DatabaseOperations:
                               'double precision', 'varchar']
                 },
                 'bahn_twist_ist': {
-                    'columns': ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_ist', 'tcp_angular_ist',
-                                'source_data_ist'],
-                    'types': ['varchar', 'varchar', 'varchar', 'double precision',
-                              'double precision', 'varchar']
+                    'columns': ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_ist'],
+                    'types': ['varchar', 'varchar', 'varchar', 'double precision']
                 },
                 'bahn_twist_soll': {
                     'columns': ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_soll', 'source_data_soll'],
@@ -133,14 +134,13 @@ class DatabaseOperations:
                                 'movement_type'],
                     'types': ['varchar', 'varchar', 'varchar', 'double precision', 'double precision',
                               'double precision', 'double precision', 'double precision', 'double precision',
-                              'double precision', 'varchar', 'varchar'],
-                    'bahn_imu': {
-                        'columns': ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_pi', 'tcp_angular_vel_pi',
-                                    'source_data_ist'],
-                        'types': ['varchar', 'varchar', 'varchar', 'double precision',
-                                  'double precision', 'varchar']
-                    },
-
+                              'double precision', 'varchar', 'varchar']
+                },
+                'bahn_imu': {
+                    'columns': ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_pi', 'tcp_angular_vel_pi',
+                                'source_data_ist'],
+                    'types': ['varchar', 'varchar', 'varchar', 'double precision',
+                              'double precision', 'varchar']
                 },
                 'bahn_pose_trans': {
                     'columns': ['bahn_id', 'segment_id', 'timestamp', 'x_trans', 'y_trans', 'z_trans',
@@ -301,43 +301,39 @@ async def batch_insert_pose_data(self, conn, data):
                'qx_ist', 'qy_ist', 'qz_ist', 'qw_ist', 'source_data_ist']
     await self.batch_insert_data(conn, 'bahn_pose_ist', data, columns)
 
-
 async def batch_insert_position_soll_data(self, conn, data):
     columns = ['bahn_id', 'segment_id', 'timestamp', 'x_soll', 'y_soll', 'z_soll', 'source_data_soll']
     await self.batch_insert_data(conn, 'bahn_position_soll', data, columns)
-
 
 async def batch_insert_orientation_soll_data(self, conn, data):
     columns = ['bahn_id', 'segment_id', 'timestamp', 'qx_soll', 'qy_soll', 'qz_soll', 'qw_soll', 'source_data_soll']
     await self.batch_insert_data(conn, 'bahn_orientation_soll', data, columns)
 
-
 async def batch_insert_twist_ist_data(self, conn, data):
-    columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_ist', 'tcp_angular_ist', 'source_data_ist']
+    columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_ist']
     await self.batch_insert_data(conn, 'bahn_twist_ist', data, columns)
-
 
 async def batch_insert_twist_soll_data(self, conn, data):
     columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_soll', 'source_data_soll']
     await self.batch_insert_data(conn, 'bahn_twist_soll', data, columns)
 
-
-async def batch_insert_accel_data(self, conn, data):
-    columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_ist', 'tcp_angular_accel_ist', 'source_data_ist']
+async def batch_insert_accel_ist_data(self, conn, data):
+    columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_ist']
     await self.batch_insert_data(conn, 'bahn_accel_ist', data, columns)
 
+async def batch_insert_accel_soll_data(self, conn, data):
+    columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_soll']
+    await self.batch_insert_data(conn, 'bahn_accel_soll', data, columns)
 
 async def batch_insert_rapid_events_data(self, conn, data):
     columns = ['bahn_id', 'segment_id', 'timestamp', 'x_reached', 'y_reached', 'z_reached',
                'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached', 'source_data_soll', 'movement_type']
     await self.batch_insert_data(conn, 'bahn_events', data, columns)
 
-
 async def batch_insert_joint_data(self, conn, data):
     columns = ['bahn_id', 'segment_id', 'timestamp', 'joint_1', 'joint_2', 'joint_3',
                'joint_4', 'joint_5', 'joint_6', 'source_data_soll']
     await self.batch_insert_data(conn, 'bahn_joint_states', data, columns)
-
 
 async def batch_insert_imu_data(self, conn, data):
     columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_pi', 'tcp_angular_vel_pi', 'source_data_ist']

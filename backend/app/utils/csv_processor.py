@@ -20,12 +20,19 @@ class CSVProcessor:
 
         print(f'Verarbeite CSV-Datei: {record_filename}')
         try:
+            matrix_info = None
+            with open(self.file_path, 'r') as matrixfile:
+                for line in matrixfile:
+                    if line.strip().startswith('# transformation_matrix:'):
+                        matrix_info = line.strip().split(':', 1)[1].strip()
+                        break
+
             with open(self.file_path, 'r') as csvfile:
                 reader = csv.DictReader(csvfile)
                 rows = list(reader)
 
-            print(str(reference_position) + 'LSKASAKSPAOKSOAPKS')
-            print(segmentation_method + 'SASJAOISJAOISJAIOSJAOIJ')
+            #print(str(reference_position))
+            #print(segmentation_method)
 
             # Pick&Place Metadaten extrahieren
             is_pickplace = "pickplace" in record_filename
@@ -62,13 +69,13 @@ class CSVProcessor:
             # tcp_speedv, tcp_angularv, tcp_accelv, tcp_accelv_angular, tcp_accel_pi, tcp_angular_vel_pi, segment_id_ist
             ist_spalten = ['timestamp', 'pv_x', 'pv_y', 'pv_z', 'ov_x', 'ov_y', 'ov_z', 'ov_w',
                            'pt_x', 'pt_y', 'pt_z', 'ot_x', 'ot_y', 'ot_z', 'ot_w', 'tcp_speedv',
-                           'tcp_angularv', 'tcp_accelv', 'tcp_accelv_angular', 'tcp_accel_pi',
+                           'tcp_angularv', 'tcp_accelv', 'tcp_accel_pi',
                            'tcp_angular_vel_pi', 'segment_id_ist']
 
             # SOLL-Spalten: ps_x, ps_y, ps_z, os_x, os_y, os_z, os_w, tcp_speeds, joint_1, joint_2,
             # joint_3, joint_4, joint_5, joint_6, ap_x, ap_y, ap_z, aq_x, aq_y, aq_z, aq_w, DO_Signal,
             # Movement Type, Weight, Velocity Picking, Velocity Handling, segment_soll_id
-            soll_spalten = ['ps_x', 'ps_y', 'ps_z', 'os_x', 'os_y', 'os_z', 'os_w', 'tcp_speeds',
+            soll_spalten = ['ps_x', 'ps_y', 'ps_z', 'os_x', 'os_y', 'os_z', 'os_w', 'tcp_speedbs', 'tcp_accelbs',
                             'joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6',
                             'ap_x', 'ap_y', 'ap_z', 'aq_x', 'aq_y', 'aq_z', 'aq_w', 'DO_Signal',
                             'Movement Type', 'Weight', 'Velocity Picking', 'Velocity Handling',
@@ -144,17 +151,17 @@ class CSVProcessor:
                         segments_with_matches[segment_id] = []
                     segments_with_matches[segment_id].append(match)
 
-                # print(f"Gefunden: {len(matching_rows)} Zeilen mit AP-Positionen nahe der Referenzposition")
-                # print(f"Verteilt auf {len(segments_with_matches)} Segmente:")
+                print(f"Gefunden: {len(matching_rows)} Zeilen mit AP-Positionen nahe der Referenzposition")
+                print(f"Verteilt auf {len(segments_with_matches)} Segmente:")
 
-                # for segment_id, matches in segments_with_matches.items():
-                #     print(f"  Segment {segment_id}: {len(matches)} Referenzpunkte gefunden")
-                #     # Zeige den ersten und letzten gefundenen Punkt für dieses Segment
-                #     if matches:
-                #         first = matches[0]
-                #         last = matches[-1]
-                #         print(f"    Erster Punkt: AP=({first['ap_x']:.3f}, {first['ap_y']:.3f}, {first['ap_z']:.3f}), Abstand={first['distance']:.3f}mm")
-                #         print(f"    Letzter Punkt: AP=({last['ap_x']:.3f}, {last['ap_y']:.3f}, {last['ap_z']:.3f}), Abstand={last['distance']:.3f}mm")
+                #for segment_id, matches in segments_with_matches.items():
+                #    print(f"  Segment {segment_id}: {len(matches)} Referenzpunkte gefunden")
+                #    # Zeige den ersten und letzten gefundenen Punkt für dieses Segment
+                #    if matches:
+                #        first = matches[0]
+                #        last = matches[-1]
+                #        print(f"    Erster Punkt: AP=({first['ap_x']:.3f}, {first['ap_y']:.3f}, {first['ap_z']:.3f}), Abstand={first['distance']:.3f}mm")
+                #        print(f"    Letzter Punkt: AP=({last['ap_x']:.3f}, {last['ap_y']:.3f}, {last['ap_z']:.3f}), Abstand={last['distance']:.3f}mm")
 
                 # Sammle alle eindeutigen Segment-IDs (alle, nicht nur die mit Matches)
                 all_segment_ids = []
@@ -168,10 +175,7 @@ class CSVProcessor:
 
                 # Entferne das erste und letzte Segment, wie bei der ursprünglichen Methode
                 if len(all_segment_ids) >= 2:
-                    first_segment = all_segment_ids[0]
-                    last_segment = all_segment_ids[-1]
                     all_segment_ids = all_segment_ids[1:-1]
-                    # print(f"\nEntferne erstes Segment {first_segment} und letztes Segment {last_segment}")
 
                 # Sortiere die Segmente mit Matches (Referenzpunkte)
                 ref_segment_ids = sorted([s for s in segments_with_matches.keys() if s in all_segment_ids],
@@ -182,22 +186,26 @@ class CSVProcessor:
 
                 # Für jedes Referenzsegment (außer dem letzten) finden wir alle Segmente bis zum nächsten Referenzsegment
                 for i in range(len(ref_segment_ids)):
-                    start_idx = all_segment_ids.index(ref_segment_ids[i])
+                    # GEÄNDERT: Überspringe Home-Segment UND das nächste Segment (Bewegung von Home zum nächsten Zielpunkt)
+                    home_segment_idx = all_segment_ids.index(ref_segment_ids[i])
+                    start_idx = home_segment_idx + 2  # <- +2: Überspringe Home-Segment und Bewegung zum nächsten Zielpunkt
 
                     # Für das letzte Referenzsegment nehmen wir alle verbleibenden Segmente
                     if i == len(ref_segment_ids) - 1:
                         end_idx = len(all_segment_ids)
                     else:
-                        # Für alle anderen nehmen wir bis zum nächsten Referenzsegment (exklusiv)
-                        next_ref_idx = all_segment_ids.index(ref_segment_ids[i + 1])
-                        end_idx = next_ref_idx
+                        # Für alle anderen nehmen wir bis zum nächsten Home-Segment (exklusiv)
+                        # aber schließen das Segment VOR dem nächsten Home-Punkt mit ein
+                        next_home_idx = all_segment_ids.index(ref_segment_ids[i + 1])
+                        end_idx = next_home_idx  # Stoppe VOR dem nächsten Home-Segment
 
-                    # Sammle alle Segmente für diese Bahn
-                    bahn_segments = all_segment_ids[start_idx:end_idx]
-                    bahnen.append(bahn_segments)
+                    # Sammle alle Segmente für diese Bahn (nur wenn start_idx < end_idx)
+                    if start_idx < end_idx:
+                        bahn_segments = all_segment_ids[start_idx:end_idx]
+                        bahnen.append(bahn_segments)
 
                 # Filtere Bahnen, die zu wenige Segmente haben (≤ 2)
-                min_segments_per_bahn = 2
+                min_segments_per_bahn = 1
                 valid_bahnen = []
                 removed_bahnen = []
 
@@ -252,10 +260,10 @@ class CSVProcessor:
                     for segment_id in bahn_info["segments"]:
                         segment_to_bahn[segment_id] = str(new_bahn_idx)
 
-                # print("\nSegment zu Bahn Mapping (nach Filterung):")
-                # for segment_id in all_segment_ids:
-                #     bahn_id = segment_to_bahn.get(segment_id, "?")
-                #     print(f"  Segment {segment_id} → Bahn {bahn_id}")
+                #print("\nSegment zu Bahn Mapping (nach Filterung):")
+                #for segment_id in all_segment_ids:
+                #    bahn_id = segment_to_bahn.get(segment_id, "?")
+                #    print(f"  Segment {segment_id} → Bahn {bahn_id}")
 
                 # print("\nZusammenfassung der finalen Bahnen:")
                 # for bahn_idx, bahn_info in new_bahnen.items():
@@ -267,8 +275,8 @@ class CSVProcessor:
                 for bahn_info in new_bahnen.values():
                     valid_segments.extend(bahn_info["segments"])
 
-                # print(f"\nVerwende {len(valid_segments)} Segmente für die weitere Verarbeitung:")
-                # print(f"  {', '.join(valid_segments)}")
+                #print(f"\nVerwende {len(valid_segments)} Segmente für die weitere Verarbeitung:")
+                #print(f"  {', '.join(valid_segments)}")
 
                 # Filtere Zeilen für IST-Daten basierend auf den gültigen Segmenten
                 rows_ist_filtered = []
@@ -365,6 +373,53 @@ class CSVProcessor:
             # Bestimme die maximale Anzahl von Bahnen
             max_bahnen = max(ist_max_bahn, soll_max_bahn)
 
+            print("\nSynchronisiere IST- und SOLL-Bahn-IDs...")
+
+            for bahn_idx in range(max_bahnen + 1):
+                bahn_key = str(bahn_idx)
+
+                # Hole IST- und SOLL-Bahn-IDs für diese Bahn
+                ist_bahn_id = ist_bahn_ids.get(bahn_key, None)
+                soll_bahn_id = soll_bahn_ids.get(bahn_key, None)
+
+                # Prüfe, ob beide Bahn-IDs existieren
+                if ist_bahn_id is not None and soll_bahn_id is not None:
+                    # Prüfe, ob sie unterschiedlich sind
+                    if ist_bahn_id != soll_bahn_id:
+                        print(
+                            f"  Bahn {bahn_idx}: IST-ID '{ist_bahn_id}' ≠ SOLL-ID '{soll_bahn_id}' -> Verwende IST-ID")
+
+                        # Ersetze alle SOLL-Bahn-IDs mit der IST-Bahn-ID
+                        for mapping_name in soll_processed_data.keys():
+                            if bahn_key in soll_processed_data[mapping_name]:
+                                for i in range(len(soll_processed_data[mapping_name][bahn_key])):
+                                    row_data = soll_processed_data[mapping_name][bahn_key][i]
+                                    if row_data and len(row_data) > 1:
+                                        # Ersetze Bahn-ID an Position 0 und segment_id an Position 1
+                                        old_segment_parts = row_data[1].split('_', 1)  # Format: [bahn_id]_[segment_nr]
+                                        if len(old_segment_parts) == 2:
+                                            new_segment_id = f"{ist_bahn_id}_{old_segment_parts[1]}"
+                                        else:
+                                            new_segment_id = f"{ist_bahn_id}_{old_segment_parts[0]}"
+
+                                        soll_processed_data[mapping_name][bahn_key][i] = [
+                                            ist_bahn_id,  # Neue Bahn-ID an Position 0
+                                            new_segment_id,  # Neue segment_id an Position 1
+                                            *row_data[2:]  # Rest der Daten unverändert
+                                        ]
+
+                        # Aktualisiere auch das soll_bahn_ids Dictionary
+                        soll_bahn_ids[bahn_key] = ist_bahn_id
+
+                    else:
+                        print(f"  Bahn {bahn_idx}: IST-ID '{ist_bahn_id}' = SOLL-ID '{soll_bahn_id}' -> OK")
+                elif ist_bahn_id is not None:
+                    print(f"  Bahn {bahn_idx}: Nur IST-ID '{ist_bahn_id}' vorhanden")
+                elif soll_bahn_id is not None:
+                    print(f"  Bahn {bahn_idx}: Nur SOLL-ID '{soll_bahn_id}' vorhanden")
+
+            print("Bahn-ID Synchronisation abgeschlossen.")
+
             print(f"Gefunden: {ist_max_bahn + 1} IST-Bahnen, {soll_max_bahn + 1} SOLL-Bahnen")
 
             # Kombiniere IST- und SOLL-Daten zu einer Liste von Bahnen pro Bahn-ID
@@ -424,12 +479,12 @@ class CSVProcessor:
                     'np_ereignisse': 0,
                     'np_pose_ist': len(bahndaten.get('POSE_MAPPING', [])),
                     'np_twist_ist': len(bahndaten.get('TWIST_IST_MAPPING', [])),
-                    'np_accel_ist': len(bahndaten.get('ACCEL_MAPPING', [])),
+                    'np_accel_ist': len(bahndaten.get('ACCEL_IST_MAPPING', [])),
+                    'np_accel_soll': len(bahndaten.get('ACCEL_SOLL_MAPPING', [])),
                     'np_pos_soll': len(bahndaten.get('POSITION_SOLL_MAPPING', [])),
                     'np_orient_soll': len(bahndaten.get('ORIENTATION_SOLL_MAPPING', [])),
                     'np_twist_soll': len(bahndaten.get('TWIST_SOLL_MAPPING', [])),
                     'np_jointstates': len(bahndaten.get('JOINT_MAPPING', [])),
-                    'np_imu': len(bahndaten.get('IMU_MAPPING', [])),
                 }
 
                 # Berechne AP-Ereignisse basierend auf RAPID_EVENTS
@@ -444,7 +499,8 @@ class CSVProcessor:
                         bahndaten.get('ORIENTATION_SOLL_MAPPING', [])),
                     'frequency_twist_ist': self.calculate_frequency_from_data(bahndaten.get('TWIST_IST_MAPPING', [])),
                     'frequency_twist_soll': self.calculate_frequency_from_data(bahndaten.get('TWIST_SOLL_MAPPING', [])),
-                    'frequency_accel': self.calculate_frequency_from_data(bahndaten.get('ACCEL_MAPPING', [])),
+                    'frequency_accel_ist': self.calculate_frequency_from_data(bahndaten.get('ACCEL_IST_MAPPING', [])),
+                    'frequency_accel_soll': self.calculate_frequency_from_data(bahndaten.get('ACCEL_SOLL_MAPPING', [])),
                     'frequency_joint': self.calculate_frequency_from_data(bahndaten.get('JOINT_MAPPING', [])),
                     'frequency_imu': self.calculate_frequency_from_data(bahndaten.get('IMU_MAPPING', []))
                 }
@@ -466,7 +522,7 @@ class CSVProcessor:
                     bahn_frequencies['frequency_orientation_soll'],
                     bahn_frequencies['frequency_twist_ist'],
                     bahn_frequencies['frequency_twist_soll'],
-                    bahn_frequencies['frequency_accel'],
+                    bahn_frequencies['frequency_accel_ist'],
                     bahn_frequencies['frequency_joint'],
                     calibration_run,
                     bahn_point_counts['np_pose_ist'],
@@ -476,6 +532,14 @@ class CSVProcessor:
                     bahn_point_counts['np_orient_soll'],
                     bahn_point_counts['np_twist_soll'],
                     bahn_point_counts['np_jointstates'],
+                    weight,
+                    handling_height,
+                    velocity_handling,
+                    velocity_picking,
+                    is_pickplace,
+                    matrix_info,
+                    bahn_point_counts['np_accel_soll'],
+                    bahn_frequencies['frequency_accel_soll']
                 ]
 
                 if is_pickplace:
@@ -484,9 +548,7 @@ class CSVProcessor:
                         handling_height,
                         velocity_handling,
                         velocity_picking,
-                        bahn_frequencies['frequency_imu'],
                         is_pickplace,
-                        bahn_point_counts['np_imu'],
                     ])
                 else:
                     bahn_info_data = tuple(base_info)
@@ -527,10 +589,10 @@ class CSVProcessor:
         # Definiere, welche Mappings für den Datentyp verwendet werden
         if data_type.lower() == "ist":
             segment_id_field = 'segment_id_ist'
-            mappings_to_use = ['POSE_MAPPING', 'TWIST_IST_MAPPING', 'ACCEL_MAPPING', 'TRANSFORM_MAPPING', 'IMU_MAPPING']
+            mappings_to_use = ['POSE_MAPPING', 'TWIST_IST_MAPPING', 'ACCEL_IST_MAPPING', 'TRANSFORM_MAPPING', 'IMU_MAPPING']
         elif data_type.lower() == "soll":
             segment_id_field = 'segment_id_soll'
-            mappings_to_use = ['POSITION_SOLL_MAPPING', 'ORIENTATION_SOLL_MAPPING', 'TWIST_SOLL_MAPPING',
+            mappings_to_use = ['POSITION_SOLL_MAPPING', 'ORIENTATION_SOLL_MAPPING', 'TWIST_SOLL_MAPPING', 'ACCEL_SOLL_MAPPING',
                                'JOINT_MAPPING', 'RAPID_EVENTS_MAPPING']
         else:
             raise ValueError(f"Ungültiger Datentyp: {data_type}. Muss 'ist' oder 'soll' sein.")
@@ -547,11 +609,11 @@ class CSVProcessor:
             'np_pose_ist': 0,
             'np_twist_ist': 0,
             'np_accel_ist': 0,
+            'np_accel_soll': 0,
             'np_pos_soll': 0,
             'np_orient_soll': 0,
             'np_twist_soll': 0,
             'np_jointstates': 0,
-            'np_imu': 0
         }
 
         # Sammle zuerst alle eindeutigen Segmente
@@ -562,7 +624,7 @@ class CSVProcessor:
                 all_segments.append(segment_id)
 
         # print(f"{data_type.upper()}: Verarbeite {len(all_segments)} gefilterte Segmente: {', '.join(all_segments)}")
-
+        #print('Segment to Bahn Mapping:', segment_to_bahn_mapping)
         # Je nach Segmentierungsmethode unterschiedliche Verarbeitung
         if segmentation_method == "reference_position" and segment_to_bahn_mapping:
             # Bei reference_position wird das übergebene Mapping verwendet
@@ -593,9 +655,12 @@ class CSVProcessor:
             bahn_to_segments = {}
 
             # Wenn wir weniger Segmente haben als in einer Bahn sein sollten
-            if len(all_segments) <= num_segments:
-                bahn_to_segments["0"] = all_segments
-                max_bahn = 0
+            if len(all_segments) < num_segments:
+                # Keine Bahnen erstellen, da nicht genug Segmente vorhanden
+                bahn_to_segments = {}
+                max_bahn = -1  # Keine Bahnen
+                print(
+                    f"Warnung: Nur {len(all_segments)} Segmente vorhanden, benötigt werden {num_segments}. Keine Bahnen erstellt.")
             else:
                 # Berechne, wie viele vollständige Bahnen wir haben werden
                 complete_bahnen = len(all_segments) // num_segments
@@ -603,29 +668,19 @@ class CSVProcessor:
                 # Berechne, wie viele Restsegmente übrig bleiben
                 remaining_segments = len(all_segments) % num_segments
 
-                # Wenn wir Restsegmente haben und es weniger als num_segments sind,
-                # fügen wir sie zur letzten Bahn hinzu
-                merge_with_last = 0 < remaining_segments < num_segments / 2
-
-                # Erstelle Bahnen
+                # Erstelle nur vollständige Bahnen mit exakt num_segments Segmenten
                 for i in range(complete_bahnen):
                     start_idx = i * num_segments
                     end_idx = (i + 1) * num_segments
                     bahn_to_segments[str(i)] = all_segments[start_idx:end_idx]
 
-                # Behandle Restsegmente
+                # Restsegmente werden NICHT verarbeitet (weggelassen)
                 if remaining_segments > 0:
-                    if merge_with_last and complete_bahnen > 0:
-                        # Füge die Restsegmente zur letzten Bahn hinzu
-                        last_bahn = str(complete_bahnen - 1)
-                        bahn_to_segments[last_bahn].extend(all_segments[complete_bahnen * num_segments:])
-                        max_bahn = complete_bahnen - 1
-                    else:
-                        # Erstelle eine neue Bahn für die Restsegmente
-                        bahn_to_segments[str(complete_bahnen)] = all_segments[complete_bahnen * num_segments:]
-                        max_bahn = complete_bahnen
-                else:
-                    max_bahn = complete_bahnen - 1
+                    remaining_segment_list = all_segments[complete_bahnen * num_segments:]
+                    print(
+                        f"Info: {remaining_segments} Restsegmente werden weggelassen: {', '.join(remaining_segment_list)}")
+
+                max_bahn = complete_bahnen - 1 if complete_bahnen > 0 else -1
 
             # Debug-Ausgabe
             # print(f"{data_type.upper()}-Segmente pro Bahn:")
@@ -816,7 +871,7 @@ class CSVProcessor:
                     point_counts['np_pose_ist'] += 1
                 elif mapping_name == 'TWIST_IST_MAPPING':
                     point_counts['np_twist_ist'] += 1
-                elif mapping_name == 'ACCEL_MAPPING':
+                elif mapping_name == 'ACCEL_IST_MAPPING':
                     point_counts['np_accel_ist'] += 1
                 elif mapping_name == 'POSITION_SOLL_MAPPING':
                     point_counts['np_pos_soll'] += 1
@@ -826,6 +881,8 @@ class CSVProcessor:
                     point_counts['np_twist_soll'] += 1
                 elif mapping_name == 'JOINT_MAPPING':
                     point_counts['np_jointstates'] += 1
+                elif mapping_name == 'ACCEL_SOLL_MAPPING':
+                    point_counts['np_accel_soll'] += 1
                 elif mapping_name == 'IMU_MAPPING':
                     point_counts['np_imu'] += 1
 

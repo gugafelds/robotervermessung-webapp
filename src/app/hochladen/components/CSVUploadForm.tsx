@@ -84,7 +84,7 @@ const CSVUploadForm: React.FC = () => {
         }
 
         // Send all files in one request
-        const response = await fetch('/api/bahn/process-csv-batch', {
+        const response = await fetch('/api/hochladen/process-csv-batch', {
           method: 'POST',
           body: formData,
         });
@@ -158,7 +158,7 @@ const CSVUploadForm: React.FC = () => {
         }
 
         try {
-          const response = await fetch('/api/bahn/process-csv', {
+          const response = await fetch('/api/hochladen/process-csv', {
             method: 'POST',
             body: formData,
           });
