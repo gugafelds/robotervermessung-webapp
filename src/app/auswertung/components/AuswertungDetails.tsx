@@ -96,7 +96,7 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
             {currentBahn.recordFilename || 'Keine Datei'}
           </Typography>
           <Typography as="p" className="text-gray-500">
-            Aufnahmedatum: {formatDate(currentBahn.recordingDate)}
+            {formatDate(currentBahn.recordingDate)}
           </Typography>
         </div>
 
@@ -116,11 +116,11 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
                 value={currentBahn.robotModel || 'n. a.'}
               />
               <InfoGridItem
-                label="Datenquelle (Ist)"
+                label="Quelle-Ist"
                 value={currentBahn.sourceDataIst || 'n. a.'}
               />
               <InfoGridItem
-                label="Datenquelle (Soll)"
+                label="Quelle-Soll"
                 value={currentBahn.sourceDataSoll || 'n. a.'}
               />
               <InfoGridItem
@@ -148,11 +148,7 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
                 }
               />
               <InfoGridItem
-                label="Kalibrierungsdatei"
-                value={currentBahn.calibrationRun ? 'Ja' : 'Nein'}
-              />
-              <InfoGridItem
-                label="Last am TCP"
+                label="Last"
                 value={`${formatNumber(currentBahn.weight) || '-'} kg`}
               />
             </div>
@@ -163,35 +159,55 @@ export const AuswertungDetails = ({ bahnId }: AuswertungDetailsProps) => {
             <div className="mb-1 flex items-center gap-2">
               <h3 className="font-semibold text-primary">Abtastraten</h3>
             </div>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              <InfoGridItem
-                label="Pose Ist"
-                value={`${formatNumber(currentBahn.frequencyPoseIst) || '-'} Hz`}
-              />
-              <InfoGridItem
-                label="Twist Ist"
-                value={`${formatNumber(currentBahn.frequencyTwistIst) || '-'} Hz`}
-              />
-              <InfoGridItem
-                label="Accel Ist"
-                value={`${formatNumber(currentBahn.frequencyAccelIst) || '-'} Hz`}
-              />
-              <InfoGridItem
-                label="Position Soll"
-                value={`${formatNumber(currentBahn.frequencyPositionSoll) || '-'} Hz`}
-              />
-              <InfoGridItem
-                label="Orientierung Soll"
-                value={`${formatNumber(currentBahn.frequencyOrientationSoll) || '-'} Hz`}
-              />
-              <InfoGridItem
-                label="Twist Soll"
-                value={`${formatNumber(currentBahn.frequencyTwistSoll) || '-'} Hz`}
-              />
-              <InfoGridItem
-                label="Joint States"
-                value={`${formatNumber(currentBahn.frequencyJointStates) || '-'} Hz`}
-              />
+
+            {/* Ist-Daten Gruppe */}
+            <div className="mb-4">
+              <div className="mb-2 text-lg font-semibold text-gray-600">
+                Ist-Daten:
+              </div>
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                <InfoGridItem
+                  label="Pose"
+                  value={`${formatNumber(currentBahn.frequencyPoseIst) || '-'} Hz`}
+                />
+                <InfoGridItem
+                  label="Geschwindigkeit"
+                  value={`${formatNumber(currentBahn.frequencyTwistIst) || '-'} Hz`}
+                />
+                <InfoGridItem
+                  label="Beschleunigung"
+                  value={`${formatNumber(currentBahn.frequencyAccelIst) || '-'} Hz`}
+                />
+              </div>
+            </div>
+
+            {/* Soll-Daten Gruppe */}
+            <div>
+              <div className="mb-2 text-lg font-semibold text-gray-600">
+                Soll-Daten:
+              </div>
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+                <InfoGridItem
+                  label="Position"
+                  value={`${formatNumber(currentBahn.frequencyPositionSoll) || '-'} Hz`}
+                />
+                <InfoGridItem
+                  label="Orientierung"
+                  value={`${formatNumber(currentBahn.frequencyOrientationSoll) || '-'} Hz`}
+                />
+                <InfoGridItem
+                  label="Geschwindigkeit"
+                  value={`${formatNumber(currentBahn.frequencyTwistSoll) || '-'} Hz`}
+                />
+                <InfoGridItem
+                  label="Beschleunigung"
+                  value={`${formatNumber(currentBahn.frequencyAccelSoll) || '-'} Hz`}
+                />
+                <InfoGridItem
+                  label="Gelenkzustände"
+                  value={`${formatNumber(currentBahn.frequencyJointStates) || '-'} Hz`}
+                />
+              </div>
             </div>
           </div>
         </div>

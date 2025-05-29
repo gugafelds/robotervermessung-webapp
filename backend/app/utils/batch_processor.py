@@ -240,7 +240,7 @@ class BatchProcessor:
                                 'np_pose_ist', 'np_twist_ist', 'np_accel_ist', 'np_pos_soll', 'np_orient_soll',
                                 'np_twist_soll', 'np_jointstates', 'weight', 'handling_height',
                                 'velocity_handling', 'velocity_picking', 'pick_and_place', 'transformation_matrix',
-                                'np_accel_soll', 'frequency_accel_soll'
+                                'np_accel_soll', 'frequency_accel_soll', 'setted_velocity'
                             ]
 
                             # Ensure all records have proper length
@@ -348,7 +348,7 @@ class BatchProcessor:
                 'np_pose_ist', 'np_twist_ist', 'np_accel_ist', 'np_pos_soll', 'np_orient_soll',
                 'np_twist_soll', 'np_jointstates', 'weight', 'handling_height',
                 'velocity_handling', 'velocity_picking', 'pick_and_place', 'transformation_matrix',
-                'np_accel_soll', 'frequency_accel_soll'
+                'np_accel_soll', 'frequency_accel_soll', 'setted_velocity'
             ]
 
             # Ensure all records have proper length

@@ -60,11 +60,9 @@ class DatabaseOperations:
             'frequency_orientation_soll', 'frequency_twist_ist', 'frequency_twist_soll',
             'frequency_accel_ist', 'frequency_joint_states', 'calibration_run',
             'np_pose_ist', 'np_twist_ist', 'np_accel_ist', 'np_pos_soll', 'np_orient_soll',
-            'np_twist_soll', 'np_jointstates', 'weight', 'x_start_pos', 'y_start_pos',
-            'z_start_pos', 'x_end_pos', 'y_end_pos', 'z_end_pos', 'handling_height',
-            'qx_start', 'qy_start', 'qz_start', 'qw_start', 'qx_end', 'qy_end',
-            'qz_end', 'qw_end', 'velocity_picking', 'velocity_handling', 'frequency_imu',
-            'pick_and_place', 'np_imu'
+            'np_twist_soll', 'np_jointstates', 'weight', 'handling_height',
+            'velocity_picking', 'velocity_handling', 'pick_and_place', 'transformation_matrix',
+            'np_accel_soll', 'frequency_accel_soll', 'setted_velocity'
         ]
 
         # Erweitere data auf die benötigte Länge mit None-Werten wenn nötig
@@ -234,11 +232,9 @@ async def batch_insert_bahn_info(self, conn, data_list):
             'frequency_orientation_soll', 'frequency_twist_ist', 'frequency_twist_soll',
             'frequency_accel_ist', 'frequency_joint_states', 'calibration_run',
             'np_pose_ist', 'np_twist_ist', 'np_accel_ist', 'np_pos_soll', 'np_orient_soll',
-            'np_twist_soll', 'np_jointstates', 'weight', 'x_start_pos', 'y_start_pos',
-            'z_start_pos', 'x_end_pos', 'y_end_pos', 'z_end_pos', 'handling_height',
-            'qx_start', 'qy_start', 'qz_start', 'qw_start', 'qx_end', 'qy_end',
-            'qz_end', 'qw_end', 'velocity_picking', 'velocity_handling', 'frequency_imu',
-            'pick_and_place', 'np_imu', 'transformation_matrix'
+            'np_twist_soll', 'np_jointstates', 'weight', 'handling_height',
+            'velocity_picking', 'velocity_handling', 'pick_and_place', 'transformation_matrix',
+            'np_accel_soll', 'frequency_accel_soll', 'setted_velocity'
         ]
 
         # Ensure all records have proper length

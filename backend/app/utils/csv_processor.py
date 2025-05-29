@@ -40,6 +40,9 @@ class CSVProcessor:
             weight, velocity_picking, velocity_handling = None, None, None
             handling_height = None
 
+            setted_velocity = self.extract_velocity_from_filename(record_filename)
+            tool_weight = self.extract_tool_weight_from_filename(record_filename)
+
             if is_pickplace:
                 # Extrahiere Pick&Place Metadaten
                 for row in rows:
@@ -54,12 +57,6 @@ class CSVProcessor:
                             velocity_handling = float(row['Velocity Handling'])
                         except ValueError:
                             print(f"Warnung: Ungültiger Wert für Velocity Handling: {row['Velocity Handling']}")
-
-                    if weight is None and row.get('Weight', '').strip():
-                        try:
-                            weight = float(row['Weight'])
-                        except ValueError:
-                            print(f"Warnung: Ungültiger Wert für Weight: {row['Weight']}")
 
                     if all(v is not None for v in [velocity_picking, velocity_handling, weight]):
                         break
@@ -532,14 +529,15 @@ class CSVProcessor:
                     bahn_point_counts['np_orient_soll'],
                     bahn_point_counts['np_twist_soll'],
                     bahn_point_counts['np_jointstates'],
-                    weight,
+                    self.extract_tool_weight_from_filename(record_filename),
                     handling_height,
                     velocity_handling,
                     velocity_picking,
                     is_pickplace,
                     matrix_info,
                     bahn_point_counts['np_accel_soll'],
-                    bahn_frequencies['frequency_accel_soll']
+                    bahn_frequencies['frequency_accel_soll'],
+                    self.extract_velocity_from_filename(record_filename)
                 ]
 
                 if is_pickplace:
@@ -921,6 +919,25 @@ class CSVProcessor:
             match = re.search(r'(record_\d{8}_\d{6})', record_filename)
             if match:
                 return match.group(1)
+        return None
+
+    @staticmethod
+    def extract_velocity_from_filename(filename):
+        """Extrahiert die Sollgeschwindigkeit aus dem Dateinamen (z.B. v800)."""
+        match = re.search(r'_v(\d+)_', filename)
+        if match:
+            return int(match.group(1))
+        return None
+
+    @staticmethod
+    def extract_tool_weight_from_filename(filename):
+        tool_weights = {
+            'TProbeZylWW': 3.7
+        }
+
+        for tool_name, weight in tool_weights.items():
+            if tool_name in filename:
+                return weight
         return None
 
     @staticmethod
