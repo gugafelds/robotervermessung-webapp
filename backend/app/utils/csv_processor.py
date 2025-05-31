@@ -104,7 +104,7 @@ class CSVProcessor:
                 ref_x = float(reference_position[0])
                 ref_y = float(reference_position[1])
                 ref_z = float(reference_position[2])
-                threshold = 0.2  # 0.2 mm Schwellenwert
+                threshold = 0.5  # 0.2 mm Schwellenwert
 
                 # print(f"Suche nach AP-Positionen nahe der Referenzposition: x={ref_x}, y={ref_y}, z={ref_z} mit Schwellenwert {threshold}mm")
 
