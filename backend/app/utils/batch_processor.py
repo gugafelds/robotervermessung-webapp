@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 from .csv_processor import CSVProcessor
 from .db_operations import DatabaseOperations
-from .db_config import DB_PARAMS, MAPPINGS
+from .db_config import DB_PARAMS
 
 
 class BatchProcessor:
@@ -240,7 +240,7 @@ class BatchProcessor:
                                 'np_pose_ist', 'np_twist_ist', 'np_accel_ist', 'np_pos_soll', 'np_orient_soll',
                                 'np_twist_soll', 'np_jointstates', 'weight', 'handling_height',
                                 'velocity_handling', 'velocity_picking', 'pick_and_place', 'transformation_matrix',
-                                'np_accel_soll', 'frequency_accel_soll', 'setted_velocity'
+                                'np_accel_soll', 'frequency_accel_soll', 'setted_velocity', 'stop_point', 'wait_time'
                             ]
 
                             # Ensure all records have proper length
@@ -348,7 +348,7 @@ class BatchProcessor:
                 'np_pose_ist', 'np_twist_ist', 'np_accel_ist', 'np_pos_soll', 'np_orient_soll',
                 'np_twist_soll', 'np_jointstates', 'weight', 'handling_height',
                 'velocity_handling', 'velocity_picking', 'pick_and_place', 'transformation_matrix',
-                'np_accel_soll', 'frequency_accel_soll', 'setted_velocity'
+                'np_accel_soll', 'frequency_accel_soll', 'setted_velocity', 'stop_point', 'wait_time'
             ]
 
             # Ensure all records have proper length

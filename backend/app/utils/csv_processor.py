@@ -104,7 +104,7 @@ class CSVProcessor:
                 ref_x = float(reference_position[0])
                 ref_y = float(reference_position[1])
                 ref_z = float(reference_position[2])
-                threshold = 0.5  # 0.2 mm Schwellenwert
+                threshold = 0.3
 
                 # print(f"Suche nach AP-Positionen nahe der Referenzposition: x={ref_x}, y={ref_y}, z={ref_z} mit Schwellenwert {threshold}mm")
 
@@ -537,7 +537,9 @@ class CSVProcessor:
                     matrix_info,
                     bahn_point_counts['np_accel_soll'],
                     bahn_frequencies['frequency_accel_soll'],
-                    self.extract_velocity_from_filename(record_filename)
+                    self.extract_velocity_from_filename(record_filename),
+                    self.extract_stop_point_from_filename(record_filename),
+                    self.extract_wait_time_from_filename(record_filename),
                 ]
 
                 if is_pickplace:
@@ -923,7 +925,6 @@ class CSVProcessor:
 
     @staticmethod
     def extract_velocity_from_filename(filename):
-        """Extrahiert die Sollgeschwindigkeit aus dem Dateinamen (z.B. v800)."""
         match = re.search(r'_v(\d+)_', filename)
         if match:
             return int(match.group(1))
@@ -938,6 +939,20 @@ class CSVProcessor:
         for tool_name, weight in tool_weights.items():
             if tool_name in filename:
                 return weight
+        return None
+
+    @staticmethod
+    def extract_stop_point_from_filename(filename):
+        match = re.search(r'_inpos(\d+(?:\.\d+)?)_', filename)
+        if match:
+            return float(match.group(1))
+        return None
+
+    @staticmethod
+    def extract_wait_time_from_filename(filename):
+        match = re.search(r'_wt(\d+(?:\.\d+)?)_', filename)
+        if match:
+            return float(match.group(1))
         return None
 
     @staticmethod

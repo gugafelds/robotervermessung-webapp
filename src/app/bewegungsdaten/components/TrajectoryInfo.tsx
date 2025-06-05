@@ -124,6 +124,14 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = ({
               value={`${formatNumber(currentBahnInfo.weight) || '-'} kg`}
             />
             <InfoRow
+              label="Stop-Point"
+              value={`${formatNumber(currentBahnInfo.stopPoint) || '-'} %`}
+            />
+            <InfoRow
+              label="Verweilzeit"
+              value={`${formatNumber(currentBahnInfo.waitTime) || '-'} s`}
+            />
+            <InfoRow
               label="Transformiert"
               value={isTransformed ? 'Ja' : 'Nein'}
             />

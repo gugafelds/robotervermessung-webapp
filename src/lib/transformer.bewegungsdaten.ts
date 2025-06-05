@@ -71,6 +71,8 @@ export const transformBahnInfoResult = (
       numberPointsIMU: bahn.np_imu,
       numberPointsAccelSoll: bahn.np_accel_soll,
       frequencyAccelSoll: bahn.frequency_accel_soll,
+      stopPoint: bahn.stop_point,
+      waitTime: bahn.wait_time,
     }),
   );
 };
@@ -113,6 +115,8 @@ export const transformBahnInfobyIDResult = (
   numberPointsIMU: bahnRaw.np_imu,
   numberPointsAccelSoll: bahnRaw.np_accel_soll,
   frequencyAccelSoll: bahnRaw.frequency_accel_soll,
+  stopPoint: bahnRaw.stop_point,
+  waitTime: bahnRaw.wait_time,
 });
 
 export const transformBahnPoseIstResult = (

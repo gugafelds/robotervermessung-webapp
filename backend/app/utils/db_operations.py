@@ -62,7 +62,7 @@ class DatabaseOperations:
             'np_pose_ist', 'np_twist_ist', 'np_accel_ist', 'np_pos_soll', 'np_orient_soll',
             'np_twist_soll', 'np_jointstates', 'weight', 'handling_height',
             'velocity_picking', 'velocity_handling', 'pick_and_place', 'transformation_matrix',
-            'np_accel_soll', 'frequency_accel_soll', 'setted_velocity'
+            'np_accel_soll', 'frequency_accel_soll', 'setted_velocity', 'stop_point', 'wait_time'
         ]
 
         # Erweitere data auf die benötigte Länge mit None-Werten wenn nötig
@@ -234,7 +234,7 @@ async def batch_insert_bahn_info(self, conn, data_list):
             'np_pose_ist', 'np_twist_ist', 'np_accel_ist', 'np_pos_soll', 'np_orient_soll',
             'np_twist_soll', 'np_jointstates', 'weight', 'handling_height',
             'velocity_picking', 'velocity_handling', 'pick_and_place', 'transformation_matrix',
-            'np_accel_soll', 'frequency_accel_soll', 'setted_velocity'
+            'np_accel_soll', 'frequency_accel_soll', 'setted_velocity', 'stop_point', 'wait_time'
         ]
 
         # Ensure all records have proper length

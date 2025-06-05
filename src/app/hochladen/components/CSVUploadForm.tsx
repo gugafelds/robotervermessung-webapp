@@ -36,9 +36,9 @@ const CSVUploadForm: React.FC = () => {
   const [numSegments, setNumSegments] = useState<number>(3); // Standardwert auf 3 gesetzt
 
   // Referenzposition Koordinaten
-  const [referenceX, setReferenceX] = useState<string>('750');
-  const [referenceY, setReferenceY] = useState<string>('-500');
-  const [referenceZ, setReferenceZ] = useState<string>('1630');
+  const [referenceX, setReferenceX] = useState<string>('1250');
+  const [referenceY, setReferenceY] = useState<string>('0');
+  const [referenceZ, setReferenceZ] = useState<string>('1250');
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
