@@ -106,18 +106,6 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
         pos: b.xReached,
       })),
     );
-    const yAchievedData = createStairStepData(
-      currentBahnEvents.map((b) => ({
-        x: (Number(b.timestamp) - globalStartTime) / 1e9,
-        pos: b.yReached,
-      })),
-    );
-    const zAchievedData = createStairStepData(
-      currentBahnEvents.map((b) => ({
-        x: (Number(b.timestamp) - globalStartTime) / 1e9,
-        pos: b.zReached,
-      })),
-    );
 
     const getMaxTimePos = () => {
       let maxTime = 0;
