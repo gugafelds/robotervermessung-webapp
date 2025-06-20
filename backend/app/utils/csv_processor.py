@@ -40,9 +40,6 @@ class CSVProcessor:
             weight, velocity_picking, velocity_handling = None, None, None
             handling_height = None
 
-            setted_velocity = self.extract_velocity_from_filename(record_filename)
-            tool_weight = self.extract_tool_weight_from_filename(record_filename)
-
             if is_pickplace:
                 # Extrahiere Pick&Place Metadaten
                 for row in rows:
@@ -151,6 +148,31 @@ class CSVProcessor:
                 print(f"Gefunden: {len(matching_rows)} Zeilen mit AP-Positionen nahe der Referenzposition")
                 print(f"Verteilt auf {len(segments_with_matches)} Segmente:")
 
+                robot_starts_at_ref = False
+                start_segment = None
+
+                for i, row in enumerate(rows_soll[:200]):
+                    ps_x = row.get('ps_x', '')
+                    ps_y = row.get('ps_y', '')
+                    ps_z = row.get('ps_z', '')
+                    segment_id = row.get('segment_id_soll', '')  # Hole segment_id hier
+                    
+                    if ps_x and ps_y and ps_z and ps_x != 'NaN' and ps_y != 'NaN' and ps_z != 'NaN':
+                        try:
+                            ps_x = float(ps_x)
+                            ps_y = float(ps_y)
+                            ps_z = float(ps_z)
+                            
+                            distance = self.calculate_distance(ps_x, ps_y, ps_z, ref_x, ref_y, ref_z)
+                            
+                            if distance <= threshold and segment_id and segment_id != 'NaN':  # Prüfe auch segment_id
+                                robot_starts_at_ref = True
+                                start_segment = segment_id  # Verwende die bereits geholte segment_id
+                                print(f"Roboter startet an Referenzposition in Segment {start_segment}")
+                                break
+                        except ValueError:
+                            continue
+
                 #for segment_id, matches in segments_with_matches.items():
                 #    print(f"  Segment {segment_id}: {len(matches)} Referenzpunkte gefunden")
                 #    # Zeige den ersten und letzten gefundenen Punkt für dieses Segment
@@ -179,13 +201,42 @@ class CSVProcessor:
                                          key=lambda x: int(x) if x.isdigit() else float('inf'))
 
                 # Definiere Bahnen als Bereiche zwischen Referenzpunkten
-                bahnen = []
+                if robot_starts_at_ref and start_segment == '0':
+                    # Segment 0 wurde entfernt, also beginnt die erste Bahn bei Segment 1
+                    # Aber wir wollen Segment 1 auch überspringen (Bewegung zum nächsten Punkt)
+                    # Also beginnen wir bei Segment 2
+                    
+                    bahnen = []
+                    
+                    # Erste Bahn: Von Segment 2 bis zum ersten AP-Referenzpunkt
+                    if '1' in all_segment_ids and ref_segment_ids:
+                        start_idx = all_segment_ids.index('1')  # Beginne bei Segment 2
+                        first_ap_ref = ref_segment_ids[0]  # Das ist '5'
+                        if first_ap_ref in all_segment_ids:
+                            end_idx = all_segment_ids.index(first_ap_ref)
+                            if start_idx < end_idx:
+                                bahnen.append(all_segment_ids[start_idx:end_idx])
+                                print(f"Erste Bahn (Start an Ref): Segmente {all_segment_ids[start_idx]} bis {all_segment_ids[end_idx-1]}")
+                else:
+                    bahnen = []
+
+                if robot_starts_at_ref and start_segment and start_segment in all_segment_ids:
+                    # Spezialbehandlung für Start an Referenzposition
+                    start_idx = all_segment_ids.index(start_segment) + 2  # +2 um Start und Bewegung zu überspringen
+                    
+                    # Finde das Ende dieser ersten Bahn
+                    if ref_segment_ids:  # ref_segment_ids enthält NUR AP-Referenzpunkte
+                        first_ap_ref = ref_segment_ids[0]
+                        if first_ap_ref in all_segment_ids:
+                            end_idx = all_segment_ids.index(first_ap_ref)
+                            if start_idx < end_idx:
+                                bahnen.append(all_segment_ids[start_idx:end_idx])
+                                print(f"Erste Bahn (Start an Ref): Segmente {all_segment_ids[start_idx]} bis {all_segment_ids[end_idx-1]}")
 
                 # Für jedes Referenzsegment (außer dem letzten) finden wir alle Segmente bis zum nächsten Referenzsegment
                 for i in range(len(ref_segment_ids)):
-                    # GEÄNDERT: Überspringe Home-Segment UND das nächste Segment (Bewegung von Home zum nächsten Zielpunkt)
                     home_segment_idx = all_segment_ids.index(ref_segment_ids[i])
-                    start_idx = home_segment_idx + 2  # <- +2: Überspringe Home-Segment und Bewegung zum nächsten Zielpunkt
+                    start_idx = home_segment_idx + 2  # Starte nach dem Home-Segment (2 Segmente weiter)
 
                     # Für das letzte Referenzsegment nehmen wir alle verbleibenden Segmente
                     if i == len(ref_segment_ids) - 1:
@@ -298,6 +349,14 @@ class CSVProcessor:
                     bahn_id = segment_to_bahn.get(segment_id, None)
                     if bahn_id != "?" and bahn_id is not None:
                         reference_segment_to_bahn[segment_id] = bahn_id
+
+                if robot_starts_at_ref:
+                    print(f"DEBUG: Start-Segment: {start_segment}")
+                    print(f"DEBUG: all_segment_ids: {all_segment_ids}")
+                    print(f"DEBUG: ref_segment_ids VOR Änderung: {ref_segment_ids}")
+
+                    print(f"DEBUG: ref_segment_ids NACH Änderung: {ref_segment_ids}")
+                    print(f"DEBUG: Erste Bahn sollte beginnen bei Index: {all_segment_ids.index(start_segment) + 2 if start_segment in all_segment_ids else 'NICHT GEFUNDEN'}")
 
                 # Verarbeite die Daten mit der reference_position Methode
                 ist_rows_processed, ist_processed_data, ist_point_counts, ist_max_bahn, ist_bahn_ids = self.process_data(
