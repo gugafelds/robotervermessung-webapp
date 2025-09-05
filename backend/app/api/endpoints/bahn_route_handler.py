@@ -162,13 +162,13 @@ async def get_bahn_info(
 @router.get("/bahn_search")
 async def search_bahn_info(
         query: str = Query(None, description="Suchbegriff für Freitext-Suche (Filename, ID, Datum)"),
-        calibration: bool = Query(None, description="Nur Kalibrierungsläufe"),
         pick_place: bool = Query(None, description="Nur Pick-and-Place-Läufe"),
         points_events: int = Query(None, description="Anzahl der Punktereignisse"),
         weight: float = Query(None, description="Gewicht"),
-        velocity: int = Query(None, description="Geschwindigkeit"),
+        setted_velocity: int = Query(None, description="Geschwindigkeit"),
         page: int = Query(1, ge=1, description="Seitennummer"),
         page_size: int = Query(20, ge=1, le=100, description="Einträge pro Seite"),
+        recording_date: str = Query(None, description="Datumsfilter"),
         conn=Depends(get_db)
 ):
     try:
@@ -200,11 +200,6 @@ async def search_bahn_info(
             # Alle Bedingungen mit OR verbinden
             base_query += f" AND ({' OR '.join(search_conditions)})"
 
-        if calibration is not None:
-            base_query += f" AND calibration_run = ${param_index}"
-            params.append(calibration)
-            param_index += 1
-
         if pick_place is not None:
             base_query += f" AND pick_and_place = ${param_index}"
             params.append(pick_place)
@@ -216,14 +211,53 @@ async def search_bahn_info(
             param_index += 1
 
         if weight is not None:
-            base_query += f" AND weight = ${param_index}"
-            params.append(weight)
+            tolerance = 0.5
+            base_query += f" AND weight BETWEEN ${param_index} AND ${param_index + 1}"
+            params.extend([weight - tolerance, weight + tolerance])
+            param_index += 2
+
+        if setted_velocity is not None:
+            base_query += f" AND setted_velocity = ${param_index} OR velocity_picking = ${param_index}"
+            params.append(setted_velocity)
             param_index += 1
 
-        if velocity is not None:
-            base_query += f" AND velocity_picking = ${param_index}"
-            params.append(velocity)
-            param_index += 1
+        if recording_date is not None:
+            # Jahr (4 Ziffern): 2024
+            if recording_date.isdigit() and len(recording_date) == 4:
+                base_query += f" AND recording_date LIKE ${param_index}"
+                params.append(f"{recording_date}-%")
+                param_index += 1
+
+            # DD.MM.YYYY Format: 09.07.2024
+            elif '.' in recording_date and ':' not in recording_date:
+                try:
+                    parts = recording_date.split('.')
+                    if len(parts) == 3:
+                        day, month, year = parts
+                        # Format: 2024-07-09
+                        postgres_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                        base_query += f" AND recording_date LIKE ${param_index}"
+                        params.append(f"{postgres_date}%")
+                        param_index += 1
+                except Exception as e:
+                    logger.warning(f"Invalid date format: {recording_date}")
+
+            # DD.MM.YYYY HH:MM Format: 09.07.2024 17:52
+            elif '.' in recording_date and ':' in recording_date:
+                try:
+                    date_time_parts = recording_date.split(' ')
+                    if len(date_time_parts) == 2:
+                        date_part, time_part = date_time_parts
+                        day, month, year = date_part.split('.')
+                        hour, minute = time_part.split(':')
+
+                        # Format: 2024-07-09 17:52
+                        datetime_pattern = f"{year}-{month.zfill(2)}-{day.zfill(2)} {hour.zfill(2)}:{minute.zfill(2)}"
+                        base_query += f" AND recording_date LIKE ${param_index}"
+                        params.append(f"{datetime_pattern}%")
+                        param_index += 1
+                except Exception as e:
+                    logger.warning(f"Invalid datetime format: {recording_date}")
 
         # Zähle Gesamtanzahl für Pagination
         count_query = f"SELECT COUNT(*) FROM ({base_query}) AS filtered_data"

@@ -132,8 +132,8 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = ({
               value={`${formatNumber(currentBahnInfo.waitTime) || '-'} s`}
             />
             <InfoRow
-              label="Transformiert"
-              value={isTransformed ? 'Ja' : 'Nein'}
+              label="Geschwindigkeit"
+              value={`${formatNumber(currentBahnInfo.settedVelocity) || '-'} mm/s`}
             />
           </InfoSection>
 

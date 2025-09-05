@@ -16,6 +16,8 @@ import { formatDate } from '@/src/lib/functions';
 import type { BahnInfo } from '@/types/bewegungsdaten.types';
 import type { PaginationResult } from '@/types/pagination.types';
 
+import SearchHelpTooltip from './SearchHelpTooltip';
+
 export const Sidebar = () => {
   const [bahnInfo, setBahnInfo] = useState<BahnInfo[]>([]);
   const [pagination, setPagination] = useState<PaginationResult | null>(null);
@@ -148,47 +150,39 @@ export const Sidebar = () => {
       return params;
     }
 
-    // Überprüfe, ob es eine numerische ID ist
-    if (/^\d+$/.test(filter.trim())) {
-      params.query = filter.trim();
-      console.log('Suche nach ID:', params.query);
-      return params;
+    const filterParts = filter.trim().split(/\s+/);
+
+    for (const part of filterParts) {
+      // Numerische ID
+      if (/^\d+$/.test(part)) {
+        params.query = part;
+      } else if (['pick', 'place', 'pick&place'].includes(part.toLowerCase())) {
+        params.pickPlace = true;
+      } else {
+        // Alle Pattern gleichzeitig prüfen
+        const eventMatch = part.match(/^(n|np)=(\d+)$/i);
+        const weightMatch = part.match(/^(w|weight)=(\d*\.?\d+)$/i);
+        const velMatch = part.match(/^(v|velocity)=(\d*\.?\d+)$/i);
+        const dateMatch = part.match(/^d=(.+)$/i);
+
+        if (eventMatch) {
+          const [, , count] = eventMatch;
+          params.pointsEvents = parseInt(count, 10);
+        } else if (weightMatch) {
+          const [, , weight] = weightMatch;
+          params.weight = parseFloat(weight);
+        } else if (velMatch) {
+          const [, , velocity] = velMatch;
+          params.settedVelocity = parseFloat(velocity);
+        } else if (dateMatch) {
+          const [, dateValue] = dateMatch;
+          params.recordingDate = dateValue;
+        } else if (!params.query) {
+          params.query = part;
+        }
+      }
     }
 
-    if (filter.toLowerCase() === 'kalibrierung') {
-      params.calibration = true;
-      return params;
-    }
-
-    if (['pick', 'place', 'pick&place'].includes(filter.toLowerCase())) {
-      params.pickPlace = true;
-      return params;
-    }
-
-    const eventMatch = filter.match(/^(n|np)=(\d+)$/i);
-    if (eventMatch) {
-      const [, , count] = eventMatch;
-      params.pointsEvents = parseInt(count, 10);
-      return params;
-    }
-
-    const weightMatch = filter.match(/^(w|weight)=(\d*\.?\d+)$/i);
-    if (weightMatch) {
-      const [, , weight] = weightMatch;
-      params.weight = parseFloat(weight);
-      return params;
-    }
-
-    const velPPMatch = filter.match(/^(v|vp)=(\d+)$/i);
-    if (velPPMatch) {
-      const [, , velPP] = velPPMatch;
-      params.velocity = parseInt(velPP, 10);
-      return params;
-    }
-
-    // Default: Freitext-Suche
-    params.query = filter.trim();
-    console.log('Freitext-Suche:', params.query);
     return params;
   };
 
@@ -216,7 +210,10 @@ export const Sidebar = () => {
             </span>
           </div>
         </div>
-        <SearchFilter onFilterChange={handleFilterChange} />
+        <div className="relative flex place-items-end">
+          <SearchFilter onFilterChange={handleFilterChange} />
+          <SearchHelpTooltip />
+        </div>
         <div className="mt-2 pl-1 text-sm text-gray-600">
           {`${bahnInfo.length} ${
             bahnInfo.length === 1 ? 'Bahn' : 'Bahnen'

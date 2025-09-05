@@ -17,53 +17,49 @@ export const ProjectInfo = () => {
       </div>
       <div className="mt-2">
         <Typography as="p" className="mt-4">
-          Das Ziel dieses Forschungsprojektes ist die Schaffung der Grundlagen
-          für eine Robotermessdatenbank, in der Bewegungsdaten von
-          Industrierobotern gespeichert werden können. Der Aufbau einer
-          umfassenden Datenbank, die kontinuierlich mit neuen Messdaten
-          angereichert werden kann, ermöglicht die Unterstützung verschiedener
-          Anwendungen und Szenarien.
+          Dieses Forschungsprojekt entwickelt die Grundlagen für eine umfassende
+          Robotermessdatenbank, die Bewegungsdaten von Industrierobotern
+          systematisch erfasst und bereitstellt. Durch den kontinuierlichen
+          Aufbau dieser Datenbank können verschiedene Anwendungen und Szenarien
+          effizient unterstützt werden.
         </Typography>
         <Typography as="p" className="mt-4">
-          Dadurch entfällt die Notwendigkeit von zeitaufwändigen und
-          kostenintensiven Einzelmessungen. Des Weiteren soll ein quantitativer
-          Vergleich verschiedener Robotersysteme für ein spezifisches
-          Anwendungsszenario möglich sein. Das Datenbanksystem soll
-          beispielsweise den Roboter mit der höchsten Genauigkeit für den
-          Prozess oder aber auch den Roboter mit der geringsten Zykluszeit
-          liefern.
+          Die Datenbank ersetzt zeitaufwändige und kostenintensive
+          Einzelmessungen durch einen zentralen Datenpool. Sie ermöglicht den
+          quantitativen Vergleich verschiedener Robotersysteme für spezifische
+          Anwendungsszenarien und liefert fundierte Entscheidungsgrundlagen -
+          beispielsweise zur Identifikation des präzisesten Roboters für einen
+          Prozess oder des Systems mit der geringsten Zykluszeit.
         </Typography>
         <Typography as="p" className="mt-4">
-          Das Projekt hat im September 2023 gestartet und umfasst vier
-          Meilensteine:
+          Das im September 2023 gestartete Projekt gliedert sich in vier
+          zentrale Arbeitspakete:
         </Typography>
         <div className="mx-6 font-light text-primary">
           <li>
-            Entwicklung einer Methode für den Vergleich von Robotertrajektorien
-            unter Berücksichtigung von Abweichungen in der Position, der
-            Orientierung, der Geschwindigkeit und der Beschleunigung bei
-            verschiedenen Konfigurationen von Roboterarmen und unterschiedlichen
-            Abtastraten.
+            Entwicklung von Verfahren zum Vergleich von Robotertrajektorien
+            unter Berücksichtigung von Abweichungen in Position, Orientierung,
+            Geschwindigkeit und Beschleunigung bei verschiedenen
+            Roboterkonfigurationen und Abtastraten.
           </li>
           <li>
-            Aufbau einer Datenbank zur Speicherung und Bereitstellung von
-            Transaktionsdaten mit Schwerpunkt auf schnellem Datenzugriff und der
-            Möglichkeit, nach Teilsequenzen zu suchen.
+            Aufbau einer leistungsfähigen Datenbank mit Fokus auf schnellem
+            Datenzugriff und erweiterten Suchfunktionen für Teilsequenzen.
           </li>
           <li>
-            Entwicklung einer Methode zur sequentiellen Versuchsplanung für
-            Roboterbahnmessungen, einschließlich der automatischen Generierung
-            von Roboterprogrammen für autonome Messungen.
+            Entwicklung einer Methodik zur sequentiellen Versuchsplanung für
+            Roboterbahnmessungen, einschließlich automatischer Generierung von
+            Roboterprogrammen.
           </li>
           <li>
-            Erfolgreiche Datengenerierung für die entwickelten Methoden und
-            Algorithmen zur autonomen Messung sowie Speicherung und
-            Bereitstellung der Messdaten
+            Datengenerierung und praktische Erprobung der entwickelten Methoden
+            sowie Aufbau der operativen Mess- und Speicherinfrastruktur.
           </li>
         </div>
         <Typography as="p" className="mt-5">
-          Diese Webseite dient als Remote-Anwendung mit direkter Visualisierung
-          der Daten, die in der PostgreSQL-Datenbank gespeichert sind.
+          Diese Plattform dient als Remote-Anwendung mit direkter Anbindung an
+          die PostgreSQL-Datenbank und bietet interaktive Visualisierung der
+          gespeicherten Messdaten.
         </Typography>
       </div>
 

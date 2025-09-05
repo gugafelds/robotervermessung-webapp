@@ -71,6 +71,7 @@ export const transformBahnInfoResult = (
       numberPointsIMU: bahn.np_imu,
       numberPointsAccelSoll: bahn.np_accel_soll,
       frequencyAccelSoll: bahn.frequency_accel_soll,
+      settedVelocity: bahn.setted_velocity,
       stopPoint: bahn.stop_point,
       waitTime: bahn.wait_time,
     }),
@@ -115,6 +116,7 @@ export const transformBahnInfobyIDResult = (
   numberPointsIMU: bahnRaw.np_imu,
   numberPointsAccelSoll: bahnRaw.np_accel_soll,
   frequencyAccelSoll: bahnRaw.frequency_accel_soll,
+  settedVelocity: bahnRaw.setted_velocity,
   stopPoint: bahnRaw.stop_point,
   waitTime: bahnRaw.wait_time,
 });

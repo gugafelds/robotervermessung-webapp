@@ -34,6 +34,7 @@ export interface BahnInfo {
   frequencyIMU: number;
   pickAndPlaceRun: boolean;
   numberPointsIMU: number;
+  settedVelocity: number;
   stopPoint: number;
   waitTime: number;
 }
@@ -74,6 +75,7 @@ export interface BahnInfoRaw {
   pick_and_place: boolean;
   np_imu: number;
   frequency_accel_soll: number;
+  setted_velocity: number;
   stop_point: number;
   wait_time: number;
 }
