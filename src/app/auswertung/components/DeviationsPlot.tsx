@@ -284,7 +284,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
         x: timePoints,
         y: sortedEA.map((d) => d.EADistances),
         line: { color: methodColors.EA.line, width: 2 },
-        hovertemplate: 'Zeit: %{x:.1f}s<br>EA: %{y:.1f}mm<extra></extra>',
+        hovertemplate: 'Zeit: %{x:.2f}s<br>EA: %{y:.2f}mm<extra></extra>',
       });
     }
 
@@ -302,7 +302,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
         x: timePoints,
         y: sortedDFD.map((d) => d.DFDDistances),
         line: { color: methodColors.DFD.line, width: 2 },
-        hovertemplate: 'Zeit: %{x:.1f}s<br>DFD: %{y:.1f}mm<extra></extra>',
+        hovertemplate: 'Zeit: %{x:.2f}s<br>DFD: %{y:.2f}mm<extra></extra>',
       });
     }
 
@@ -320,7 +320,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
         x: timePoints,
         y: sortedSIDTW.map((d) => d.SIDTWDistances),
         line: { color: methodColors.SIDTW.line, width: 2 },
-        hovertemplate: 'Zeit: %{x:.1f}s<br>SIDTW: %{y:.1f}mm<extra></extra>',
+        hovertemplate: 'Zeit: %{x:.2f}s<br>SIDTW: %{y:.2f}mm<extra></extra>',
       });
     }
 
@@ -338,7 +338,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
         x: timePoints,
         y: sortedDTW.map((d) => d.DTWDistances),
         line: { color: methodColors.DTW.line, width: 2 },
-        hovertemplate: 'Zeit: %{x:.1f}s<br>DTW: %{y:.1f}mm<extra></extra>',
+        hovertemplate: 'Zeit: %{x:.2f}s<br>DTW: %{y:.2f}mm<extra></extra>',
       });
     }
 
@@ -386,9 +386,9 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
         width: 3,
       },
       hovertemplate:
-        'X: %{x:.1f}mm<br>' +
-        'Y: %{y:.1f}mm<br>' +
-        'Z: %{z:.1f}mm<br>' +
+        'X: %{x:.2f}mm<br>' +
+        'Y: %{y:.2f}mm<br>' +
+        'Z: %{z:.2f}mm<br>' +
         '<extra></extra>',
     });
 
@@ -405,9 +405,9 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
         width: 4,
       },
       hovertemplate:
-        'X: %{x:.1f}mm<br>' +
-        'Y: %{y:.1f}mm<br>' +
-        'Z: %{z:.1f}mm<br>' +
+        'X: %{x:.2f}mm<br>' +
+        'Y: %{y:.2f}mm<br>' +
+        'Z: %{z:.2f}mm<br>' +
         '<extra></extra>',
     });
 
@@ -437,7 +437,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
         width: 2,
         dash: 'solid',
       },
-      hovertemplate: `${methodName} Abweichung: %{text:.1f}mm<br><extra></extra>`,
+      hovertemplate: `${methodName} Abweichung: %{text:.2f}mm<br><extra></extra>`,
       text: sortedData.flatMap((point) => [
         point[`${methodName}Distances`],
         point[`${methodName}Distances`],

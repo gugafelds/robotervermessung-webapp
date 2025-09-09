@@ -38,6 +38,11 @@ async def get_db():
     finally:
         await db.release_connection(conn)
 
+async def get_db_pool():
+    if not db.pool:
+        await db.connect()
+    return db.pool
+
 def init_db(app: FastAPI):
     @app.on_event("startup")
     async def startup():

@@ -1,3 +1,5 @@
+// src/app/components/Navbar.tsx
+
 'use client';
 
 import Image from 'next/image';
@@ -46,6 +48,16 @@ export const Navbar = () => {
             }`}
           >
             Auswertung
+          </Typography>
+        </Link>
+        <Link href="/vergleich">
+          <Typography
+            as="h2"
+            className={`my-0 items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300 ${
+              pathname.includes('bahn-vergleich') ? 'bg-gray-300' : ''
+            }`}
+          >
+            Bahnvergleich
           </Typography>
         </Link>
         <Link href="/hochladen">
