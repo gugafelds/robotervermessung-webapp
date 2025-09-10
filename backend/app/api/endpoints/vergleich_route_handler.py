@@ -6,6 +6,7 @@ from ...database import get_db_pool, get_db
 from ...utils.metadata_calculator import MetadataCalculatorService
 from ...utils.background_tasks import (
     process_metadata_background,
+    process_meta_values_calculation,
     create_task_id,
     get_task_status,
     cleanup_old_tasks,
@@ -165,7 +166,6 @@ async def calculate_metadata(
         logger.error(f"Error starting metadata calculation: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-
 @router.get("/task-status/{task_id}", response_model=TaskStatusResponse)
 async def get_task_status_endpoint(task_id: str):
     """
@@ -228,7 +228,6 @@ async def list_all_tasks():
         "tasks": formatted_tasks
     }
 
-
 @router.delete("/task/{task_id}")
 async def cancel_task(task_id: str):
     """
@@ -263,9 +262,6 @@ async def cleanup_tasks_endpoint(max_age_hours: int = 24):
         "remaining_tasks": final_count
     }
 
-
-# Utility Endpoints
-
 @router.get("/metadata-stats")
 async def get_metadata_stats(db_pool=Depends(get_db_pool)):
     """
@@ -284,7 +280,7 @@ async def get_metadata_stats(db_pool=Depends(get_db_pool)):
             bahns_with_metadata_query = """
                                         SELECT COUNT(DISTINCT bahn_id) as bahns_with_metadata
                                         FROM robotervermessung.bewegungsdaten.bahn_meta
-                                        WHERE segment_id = bahn_id::text -- Nur Gesamtbahn-Zeilen zählen \
+                                        WHERE segment_id = bahn_id -- Nur Gesamtbahn-Zeilen zählen \
                                         """
             bahns_with_metadata = await conn.fetchval(bahns_with_metadata_query)
 
@@ -299,7 +295,7 @@ async def get_metadata_stats(db_pool=Depends(get_db_pool)):
             movement_type_query = """
                                   SELECT movement_type, COUNT(*) as count
                                   FROM robotervermessung.bewegungsdaten.bahn_meta
-                                  WHERE segment_id != bahn_id::text -- Nur Segmente, nicht Gesamtbahn
+                                  WHERE segment_id != bahn_id -- Nur Segmente, nicht Gesamtbahn
                                   GROUP BY movement_type
                                   ORDER BY count DESC \
                                   """
@@ -320,254 +316,6 @@ async def get_metadata_stats(db_pool=Depends(get_db_pool)):
     except Exception as e:
         logger.error(f"Error getting metadata stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/validate-datetime/{datetime_str}")
-async def validate_datetime_endpoint(datetime_str: str, db_pool=Depends(get_db_pool)):
-    """
-    Validiert ein Datetime-String und zeigt das Ergebnis
-    """
-    service = MetadataCalculatorService(db_pool)
-    unix_timestamp = await service.validate_datetime_input(datetime_str)
-
-    if unix_timestamp is None:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid datetime format. Expected: DD.MM.YYYY HH:MM:SS, got: {datetime_str}"
-        )
-
-    # Konvertiere zurück für Verifikation
-    dt = datetime.fromtimestamp(unix_timestamp)
-
-    return {
-        "input": datetime_str,
-        "unix_timestamp": unix_timestamp,
-        "verified_datetime": dt.strftime("%d.%m.%Y %H:%M:%S"),
-        "iso_format": dt.isoformat()
-    }
-
-
-############################ METAVALUES BERECHNEN #################################################################
-
-@router.get("/meta-values-status")
-async def get_meta_values_status(conn=Depends(get_db)):
-    """Prüft Status der Meta-Values"""
-    try:
-        query = """
-                SELECT COUNT(*)          as total_rows, \
-                       COUNT(meta_value) as meta_values_count, \
-                       AVG(meta_value)   as avg_meta_value, \
-                       MIN(meta_value)   as min_meta_value, \
-                       MAX(meta_value)   as max_meta_value
-                FROM robotervermessung.bewegungsdaten.bahn_meta \
-                """
-
-        result = await conn.fetchrow(query)
-
-        has_meta_values = result['meta_values_count'] > 0
-        completion_rate = (result['meta_values_count'] / result['total_rows'] * 100) if result['total_rows'] > 0 else 0
-
-        return {
-            "has_meta_values": has_meta_values,
-            "total_rows": int(result['total_rows']),
-            "meta_values_count": int(result['meta_values_count']),
-            "completion_rate": round(completion_rate, 1),
-            "avg_meta_value": float(result['avg_meta_value']) if result['avg_meta_value'] else None,
-            "min_meta_value": float(result['min_meta_value']) if result['min_meta_value'] else None,
-            "max_meta_value": float(result['max_meta_value']) if result['max_meta_value'] else None
-        }
-
-    except Exception as e:
-        logger.error(f"Error checking meta values status: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/available-parameters")
-def get_available_parameters():
-    """Gibt verfügbare Parameter zurück"""
-    return {
-        'basic': ['duration', 'weight', 'length', 'movement_type'],
-        'direction': ['direction_x', 'direction_y', 'direction_z'],
-        'position_soll': [
-            'min_position_x_soll', 'min_position_y_soll', 'min_position_z_soll',
-            'max_position_x_soll', 'max_position_y_soll', 'max_position_z_soll'
-        ],
-        'orientation_soll': [
-            'min_orientation_qw_soll', 'min_orientation_qx_soll', 'min_orientation_qy_soll', 'min_orientation_qz_soll',
-            'max_orientation_qw_soll', 'max_orientation_qx_soll', 'max_orientation_qy_soll', 'max_orientation_qz_soll'
-        ],
-        'twist_ist': ['min_twist_ist', 'max_twist_ist', 'median_twist_ist', 'std_twist_ist'],
-        'acceleration_ist': ['min_acceleration_ist', 'max_acceleration_ist', 'median_acceleration_ist',
-                             'std_acceleration_ist'],
-        'joints': [
-            'min_states_joint_1', 'min_states_joint_2', 'min_states_joint_3',
-            'min_states_joint_4', 'min_states_joint_5', 'min_states_joint_6',
-            'max_states_joint_1', 'max_states_joint_2', 'max_states_joint_3',
-            'max_states_joint_4', 'max_states_joint_5', 'max_states_joint_6'
-        ]
-    }
-
-
-@router.post("/calculate-meta-values")
-async def calculate_meta_values(conn=Depends(get_db)):
-    """Berechnet Meta-Values direkt in der Route"""
-    try:
-        logger.info("Starting Meta-Values calculation...")
-
-        # Standard-Parameter und Gewichtungen
-        selected_parameters = {
-            'duration', 'weight', 'length', 'movement_type',
-            'direction_x', 'direction_y', 'direction_z'
-        }
-        weights = {
-            'duration': 1.0, 'weight': 1.0, 'length': 1.0, 'movement_type': 1.0,
-            'direction_x': 1.0, 'direction_y': 1.0, 'direction_z': 1.0
-        }
-
-        # Daten laden
-        query = """
-                SELECT bm.*,
-                       ist.sidtw_average_distance,
-                       CAST(bm.bahn_id AS TEXT)    as bahn_id_str,
-                       CAST(bm.segment_id AS TEXT) as segment_id_str
-                FROM robotervermessung.bewegungsdaten.bahn_meta bm
-                         LEFT JOIN robotervermessung.auswertung.info_sidtw ist
-                                   ON CAST(bm.bahn_id AS TEXT) = ist.segment_id
-                                       AND ist.evaluation = 'position' \
-                """
-
-        rows = await conn.fetch(query)
-        if not rows:
-            raise HTTPException(status_code=404, detail="Keine Daten in bahn_meta gefunden")
-
-        logger.info(f"Gefunden: {len(rows)} Datensätze")
-
-        # Konvertiere zu Listen für Bulk-Update
-        all_numeric_columns = [
-            'duration', 'weight', 'length',
-            'direction_x', 'direction_y', 'direction_z',
-            'min_position_x_soll', 'min_position_y_soll', 'min_position_z_soll',
-            'max_position_x_soll', 'max_position_y_soll', 'max_position_z_soll',
-            'min_orientation_qw_soll', 'min_orientation_qx_soll', 'min_orientation_qy_soll', 'min_orientation_qz_soll',
-            'max_orientation_qw_soll', 'max_orientation_qx_soll', 'max_orientation_qy_soll', 'max_orientation_qz_soll',
-            'min_twist_ist', 'max_twist_ist', 'median_twist_ist', 'std_twist_ist',
-            'min_acceleration_ist', 'max_acceleration_ist', 'median_acceleration_ist', 'std_acceleration_ist',
-            'min_states_joint_1', 'min_states_joint_2', 'min_states_joint_3',
-            'min_states_joint_4', 'min_states_joint_5', 'min_states_joint_6',
-            'max_states_joint_1', 'max_states_joint_2', 'max_states_joint_3',
-            'max_states_joint_4', 'max_states_joint_5', 'max_states_joint_6'
-        ]
-
-        available_columns = [col for col in all_numeric_columns
-                             if col in selected_parameters and col in rows[0].keys()]
-
-        if not available_columns:
-            raise HTTPException(status_code=400, detail="Keine gültigen Parameter gefunden")
-
-        logger.info(f"Verwende {len(available_columns)} Parameter")
-
-        # Daten für Normalisierung vorbereiten
-        import numpy as np
-        from sklearn.preprocessing import StandardScaler
-
-        data_matrix = []
-        for row in rows:
-            row_data = [float(row[col]) if row[col] is not None else 0.0 for col in available_columns]
-            data_matrix.append(row_data)
-
-        data_array = np.array(data_matrix)
-
-        # Normalisierung
-        scaler = StandardScaler()
-        scaled_data = scaler.fit_transform(data_array)
-
-        # Meta-Value Berechnung
-        weight_vector = np.array([weights.get(col, 1.0) for col in available_columns])
-        abs_scaled = np.abs(scaled_data)
-        weighted_sums = abs_scaled @ weight_vector
-
-        # Movement type handling
-        if 'movement_type' in selected_parameters:
-            movement_weight = weights.get('movement_type', 1.0)
-            movement_scores = []
-            for row in rows:
-                x = row.get('movement_type')
-                score = (
-                        (len(str(x)) / 10.0 if x is not None else 0) +
-                        (0.5 if x is not None and 'c' in str(x).lower() else 0) +
-                        (0.3 if x is not None and 's' in str(x).lower() else 0)
-                )
-                movement_scores.append(score)
-
-            weighted_sums += np.array(movement_scores) * movement_weight
-            total_weight = weight_vector.sum() + movement_weight
-        else:
-            total_weight = weight_vector.sum()
-
-        meta_values = weighted_sums / total_weight if total_weight > 0 else weighted_sums
-
-        logger.info(
-            f"Meta-Value Statistiken: Min={meta_values.min():.6f}, Max={meta_values.max():.6f}, Avg={meta_values.mean():.6f}")
-
-        # Bulk Update
-        update_data = []
-        for i, row in enumerate(rows):
-            update_data.append({
-                'bahn_id': str(row['bahn_id_str']),
-                'segment_id': str(row['segment_id_str']),
-                'meta_value': float(meta_values[i])
-            })
-
-        # Database Update
-        async with conn.transaction():
-            # Temporäre Tabelle erstellen
-            await conn.execute("DROP TABLE IF EXISTS temp_meta_values")
-            await conn.execute("""
-                               CREATE
-                               TEMP TABLE temp_meta_values (
-                    bahn_id TEXT,
-                    segment_id TEXT,
-                    meta_value DOUBLE PRECISION
-                )
-                               """)
-
-            # Bulk Insert
-            await conn.executemany(
-                "INSERT INTO temp_meta_values (bahn_id, segment_id, meta_value) VALUES ($1, $2, $3)",
-                [(d['bahn_id'], d['segment_id'], d['meta_value']) for d in update_data]
-            )
-
-            # Update
-            result = await conn.execute("""
-                                        UPDATE robotervermessung.bewegungsdaten.bahn_meta bm
-                                        SET meta_value = t.meta_value FROM temp_meta_values t
-                                        WHERE (
-                                            (CAST (bm.bahn_id AS TEXT) = t.bahn_id
-                                          AND CAST (bm.bahn_id AS TEXT) = CAST (bm.segment_id AS TEXT))
-                                           OR
-                                            (CAST (bm.segment_id AS TEXT) = t.segment_id
-                                          AND CAST (bm.bahn_id AS TEXT) != CAST (bm.segment_id AS TEXT))
-                                            )
-                                        """)
-
-            await conn.execute("DROP TABLE temp_meta_values")
-
-        updated_count = result.split()[-1]  # Extract count from "UPDATE X"
-        logger.info(f"Meta-Value Berechnung abgeschlossen: {updated_count} Datensätze aktualisiert")
-
-        return {
-            "status": "success",
-            "message": f"Meta-Values erfolgreich berechnet für {updated_count} Datensätze",
-            "processed_rows": len(rows),
-            "parameters_used": list(selected_parameters)
-        }
-
-    except Exception as e:
-        logger.error(f"Error calculating meta values: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# Füge diese Route zu metadata_route_handler.py hinzu:
 
 @router.get("/available-dates")
 async def get_available_dates(db_pool=Depends(get_db_pool)):
@@ -595,4 +343,124 @@ async def get_available_dates(db_pool=Depends(get_db_pool)):
 
     except Exception as e:
         logger.error(f"Error getting available dates: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+############################ METAVALUES BERECHNEN #################################################################
+
+@router.get("/meta-values-status")
+async def get_meta_values_status(conn=Depends(get_db)):
+    """Prüft Status der Meta-Values"""
+    try:
+        query = """
+                SELECT COUNT(*)          as total_rows, \
+                       COUNT(meta_value) as meta_values_count, \
+                       AVG(meta_value)   as avg_meta_value, \
+                       MIN(meta_value)   as min_meta_value, \
+                       MAX(meta_value)   as max_meta_value
+                FROM robotervermessung.bewegungsdaten.bahn_meta bm \
+                WHERE bm.duration IS NOT NULL
+                    AND bm.weight IS NOT NULL
+                    AND bm.length IS NOT NULL
+                """
+
+        result = await conn.fetchrow(query)
+
+        has_meta_values = result['meta_values_count'] > 0
+        completion_rate = (result['meta_values_count'] / result['total_rows'] * 100) if result['total_rows'] > 0 else 0
+
+        return {
+            "has_meta_values": has_meta_values,
+            "total_rows": int(result['total_rows']),
+            "meta_values_count": int(result['meta_values_count']),
+            "completion_rate": round(completion_rate, 1),
+            "avg_meta_value": float(result['avg_meta_value']) if result['avg_meta_value'] else None,
+            "min_meta_value": float(result['min_meta_value']) if result['min_meta_value'] else None,
+            "max_meta_value": float(result['max_meta_value']) if result['max_meta_value'] else None
+        }
+
+    except Exception as e:
+        logger.error(f"Error checking meta values status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/available-parameters")
+def get_available_parameters():
+    """Gibt verfügbare Parameter zurück"""
+    return {
+        'basic': ['duration', 'weight', 'length', 'movement_type'],
+        'direction': ['direction_x', 'direction_y', 'direction_z'],
+        'position_soll': [
+            'min_position_x_soll', 'min_position_y_soll', 'min_position_z_soll',
+            'max_position_x_soll', 'max_position_y_soll', 'max_position_z_soll'
+        ],
+        'orientation_soll': [
+            'min_orientation_qw_soll', 'min_orientation_qx_soll', 'min_orientation_qy_soll', 'min_orientation_qz_soll',
+            'max_orientation_qw_soll', 'max_orientation_qx_soll', 'max_orientation_qy_soll', 'max_orientation_qz_soll'
+        ],
+        'twist_ist': ['min_twist_ist', 'max_twist_ist', 'median_twist_ist', 'std_twist_ist'],
+        'acceleration_ist': ['min_acceleration_ist', 'max_acceleration_ist', 'median_acceleration_ist',
+                             'std_acceleration_ist'],
+        'joints': [
+            'min_states_joint_1', 'min_states_joint_2', 'min_states_joint_3',
+            'min_states_joint_4', 'min_states_joint_5', 'min_states_joint_6',
+            'max_states_joint_1', 'max_states_joint_2', 'max_states_joint_3',
+            'max_states_joint_4', 'max_states_joint_5', 'max_states_joint_6'
+        ]
+    }
+
+@router.post("/calculate-meta-values")
+async def calculate_meta_values(
+        background_tasks: BackgroundTasks,
+        db_pool=Depends(get_db_pool)
+):
+    """Startet Meta-Values Berechnung als Background Task"""
+    try:
+        # Cleanup alte Tasks
+        cleanup_old_tasks()
+
+        # Task-ID generieren
+        task_id = create_task_id()
+
+        # Geschätzte Anzahl Rows ermitteln
+        async with db_pool.acquire() as conn:
+            count_query = """
+                          SELECT COUNT(*) as total_rows
+                          FROM robotervermessung.bewegungsdaten.bahn_meta bm
+                          WHERE bm.duration IS NOT NULL 
+                            AND bm.weight IS NOT NULL
+                            AND bm.length IS NOT NULL
+                          """
+            total_rows = await conn.fetchval(count_query)
+
+        if total_rows == 0:
+            return {
+                "status": "completed",
+                "message": "Keine gültigen Daten in bahn_meta gefunden",
+                "task_id": "",
+                "processed_rows": 0
+            }
+
+        # Geschätzte Dauer (sehr schnell, da optimiert)
+        estimated_seconds = total_rows * 0.001  # 1ms pro Row
+        estimated_minutes = estimated_seconds / 60
+
+        # Background Task starten
+        background_tasks.add_task(
+            process_meta_values_calculation,
+            task_id=task_id,
+            db_pool=db_pool
+        )
+
+        logger.info(f"Started meta-values background task {task_id} for {total_rows} rows")
+
+        return {
+            "status": "started",
+            "message": f"Meta-Values Berechnung gestartet für {total_rows} Datensätze",
+            "task_id": task_id,
+            "estimated_duration_minutes": round(estimated_minutes, 2),
+            "total_rows": total_rows
+        }
+
+    except Exception as e:
+        logger.error(f"Error starting meta-values calculation: {e}")
         raise HTTPException(status_code=500, detail=str(e))

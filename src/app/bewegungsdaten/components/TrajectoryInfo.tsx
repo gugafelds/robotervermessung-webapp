@@ -48,9 +48,7 @@ const InfoSection: React.FC<InfoSectionProps> = ({ title, children }) => (
   </div>
 );
 
-export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = ({
-  isTransformed,
-}) => {
+export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
   const { currentBahnInfo } = useTrajectory();
 
   if (currentBahnInfo === null) {

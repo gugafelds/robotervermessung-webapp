@@ -1,7 +1,6 @@
 import asyncpg
 import numpy as np
 from datetime import datetime
-from decimal import Decimal, ROUND_HALF_UP
 from typing import List, Dict, Optional
 import logging
 import re
@@ -37,17 +36,22 @@ class MetadataCalculatorService:
             return None
 
     async def get_bahn_ids_for_timerange(self, start_unix: int, end_unix: int) -> List[str]:
-        """Ermittelt alle bahn_ids im angegebenen Unix-Zeitraum"""
+        """Ermittelt alle bahn_ids im angegebenen Zeitraum basierend auf recording_date"""
         async with self.db_pool.acquire() as conn:
+            # Konvertiere Unix-Timestamps zu Datum-Strings
+            start_date = datetime.fromtimestamp(start_unix).strftime('%Y-%m-%d')
+            end_date = datetime.fromtimestamp(end_unix).strftime('%Y-%m-%d')
+
             query = """
                     SELECT bahn_id
                     FROM robotervermessung.bewegungsdaten.bahn_info
-                    WHERE bahn_id::bigint BETWEEN $1 \
+                    WHERE LEFT (recording_date \
+                        , 10) BETWEEN $1 \
                       AND $2
                     GROUP BY bahn_id
-                    ORDER BY bahn_id::bigint \
+                    ORDER BY bahn_id::text \
                     """
-            rows = await conn.fetch(query, start_unix, end_unix)
+            rows = await conn.fetch(query, start_date, end_date)
             return [row['bahn_id'] for row in rows]
 
     async def get_all_missing_bahn_ids(self) -> List[str]:
@@ -59,7 +63,7 @@ class MetadataCalculatorService:
                              LEFT JOIN robotervermessung.bewegungsdaten.bahn_meta bm
                                        ON bi.bahn_id = bm.bahn_id AND bm.segment_id = bm.bahn_id
                     WHERE bm.bahn_id IS NULL
-                    ORDER BY bi.bahn_id::bigint \
+                    ORDER BY bi.bahn_id::text \
                     """
             rows = await conn.fetch(query)
             return [row['bahn_id'] for row in rows]
@@ -70,11 +74,10 @@ class MetadataCalculatorService:
             return []
 
         async with self.db_pool.acquire() as conn:
-            # Verwende ANY() für bessere Performance bei vielen IDs
             query = """
                     SELECT DISTINCT bahn_id
                     FROM robotervermessung.bewegungsdaten.bahn_meta
-                    WHERE bahn_id = ANY ($1::numeric[]) \
+                    WHERE bahn_id = ANY ($1::text[]) \
                     """
             rows = await conn.fetch(query, bahn_ids)
             return [row['bahn_id'] for row in rows]
@@ -88,10 +91,9 @@ class MetadataCalculatorService:
             query = """
                     DELETE \
                     FROM robotervermessung.bewegungsdaten.bahn_meta
-                    WHERE bahn_id = ANY ($1::numeric[]) \
+                    WHERE bahn_id = ANY ($1::text[]) \
                     """
             result = await conn.execute(query, bahn_ids)
-            # Parse "DELETE X" to get count
             return int(result.split()[-1]) if result.startswith("DELETE") else 0
 
     def detect_movement_type(self, x_data: np.ndarray, y_data: np.ndarray, z_data: np.ndarray,
@@ -268,10 +270,10 @@ class MetadataCalculatorService:
 
             # Twist-Daten laden
             twist_query = """
-                          SELECT ROUND(MIN(tcp_speed_ist)::numeric, 2)    as min_twist,
-                                 ROUND(MAX(tcp_speed_ist)::numeric, 2)    as max_twist,
-                                 ROUND(AVG(tcp_speed_ist)::numeric, 2)    as median_twist,
-                                 ROUND(STDDEV(tcp_speed_ist)::numeric, 2) as std_twist
+                          SELECT ROUND(MIN(tcp_speed_ist)::numeric, 3)    as min_twist,
+                                 ROUND(MAX(tcp_speed_ist)::numeric, 3)    as max_twist,
+                                 ROUND(AVG(tcp_speed_ist)::numeric, 3)    as median_twist,
+                                 ROUND(STDDEV(tcp_speed_ist)::numeric, 3) as std_twist
                           FROM robotervermessung.bewegungsdaten.bahn_twist_ist
                           WHERE bahn_id = $1 \
                             AND segment_id = $2 \
@@ -320,45 +322,45 @@ class MetadataCalculatorService:
                 'bahn_id': bahn_id,
                 'segment_id': segment_id,
                 'movement_type': movement_type,
-                'duration': round(segment_duration, 2),
-                'length': round(length, 2),
-                'direction_x': round(direction_x, 2),
-                'direction_y': round(direction_y, 2),
-                'direction_z': round(direction_z, 2),
-                'min_position_x_soll': safe_round(first_row['min_pos_x'], 2),
-                'min_position_y_soll': safe_round(first_row['min_pos_y'], 2),
-                'min_position_z_soll': safe_round(first_row['min_pos_z'], 2),
-                'max_position_x_soll': safe_round(first_row['max_pos_x'], 2),
-                'max_position_y_soll': safe_round(first_row['max_pos_y'], 2),
-                'max_position_z_soll': safe_round(first_row['max_pos_z'], 2),
-                'min_orientation_qw_soll': safe_round(orient_data.get('min_qw'), 2),
-                'min_orientation_qx_soll': safe_round(orient_data.get('min_qx'), 2),
-                'min_orientation_qy_soll': safe_round(orient_data.get('min_qy'), 2),
-                'min_orientation_qz_soll': safe_round(orient_data.get('min_qz'), 2),
-                'max_orientation_qw_soll': safe_round(orient_data.get('max_qw'), 2),
-                'max_orientation_qx_soll': safe_round(orient_data.get('max_qx'), 2),
-                'max_orientation_qy_soll': safe_round(orient_data.get('max_qy'), 2),
-                'max_orientation_qz_soll': safe_round(orient_data.get('max_qz'), 2),
-                'min_twist_ist': safe_round(twist_data.get('min_twist'), 2),
-                'max_twist_ist': safe_round(twist_data.get('max_twist'), 2),
-                'median_twist_ist': safe_round(twist_data.get('median_twist'), 2),
-                'std_twist_ist': safe_round(twist_data.get('std_twist'), 2),
-                'min_acceleration_ist': safe_round(accel_data.get('min_accel'), 2),
-                'max_acceleration_ist': safe_round(accel_data.get('max_accel'), 2),
-                'median_acceleration_ist': safe_round(accel_data.get('median_accel'), 2),
-                'std_acceleration_ist': safe_round(accel_data.get('std_accel'), 2),
-                'min_states_joint_1': safe_round(joint_data.get('min_joint_1'), 2),
-                'min_states_joint_2': safe_round(joint_data.get('min_joint_2'), 2),
-                'min_states_joint_3': safe_round(joint_data.get('min_joint_3'), 2),
-                'min_states_joint_4': safe_round(joint_data.get('min_joint_4'), 2),
-                'min_states_joint_5': safe_round(joint_data.get('min_joint_5'), 2),
-                'min_states_joint_6': safe_round(joint_data.get('min_joint_6'), 2),
-                'max_states_joint_1': safe_round(joint_data.get('max_joint_1'), 2),
-                'max_states_joint_2': safe_round(joint_data.get('max_joint_2'), 2),
-                'max_states_joint_3': safe_round(joint_data.get('max_joint_3'), 2),
-                'max_states_joint_4': safe_round(joint_data.get('max_joint_4'), 2),
-                'max_states_joint_5': safe_round(joint_data.get('max_joint_5'), 2),
-                'max_states_joint_6': safe_round(joint_data.get('max_joint_6'), 2)
+                'duration': round(segment_duration, 3),
+                'length': round(length, 3),
+                'direction_x': round(direction_x, 3),
+                'direction_y': round(direction_y, 3),
+                'direction_z': round(direction_z, 3),
+                'min_position_x_soll': safe_round(first_row['min_pos_x'], 3),
+                'min_position_y_soll': safe_round(first_row['min_pos_y'], 3),
+                'min_position_z_soll': safe_round(first_row['min_pos_z'], 3),
+                'max_position_x_soll': safe_round(first_row['max_pos_x'], 3),
+                'max_position_y_soll': safe_round(first_row['max_pos_y'], 3),
+                'max_position_z_soll': safe_round(first_row['max_pos_z'], 3),
+                'min_orientation_qw_soll': safe_round(orient_data.get('min_qw'), 3),
+                'min_orientation_qx_soll': safe_round(orient_data.get('min_qx'), 3),
+                'min_orientation_qy_soll': safe_round(orient_data.get('min_qy'), 3),
+                'min_orientation_qz_soll': safe_round(orient_data.get('min_qz'), 3),
+                'max_orientation_qw_soll': safe_round(orient_data.get('max_qw'), 3),
+                'max_orientation_qx_soll': safe_round(orient_data.get('max_qx'), 3),
+                'max_orientation_qy_soll': safe_round(orient_data.get('max_qy'), 3),
+                'max_orientation_qz_soll': safe_round(orient_data.get('max_qz'), 3),
+                'min_twist_ist': safe_round(twist_data.get('min_twist'), 3),
+                'max_twist_ist': safe_round(twist_data.get('max_twist'), 3),
+                'median_twist_ist': safe_round(twist_data.get('median_twist'), 3),
+                'std_twist_ist': safe_round(twist_data.get('std_twist'), 3),
+                'min_acceleration_ist': safe_round(accel_data.get('min_accel'), 3),
+                'max_acceleration_ist': safe_round(accel_data.get('max_accel'), 3),
+                'median_acceleration_ist': safe_round(accel_data.get('median_accel'), 3),
+                'std_acceleration_ist': safe_round(accel_data.get('std_accel'), 3),
+                'min_states_joint_1': safe_round(joint_data.get('min_joint_1'), 3),
+                'min_states_joint_2': safe_round(joint_data.get('min_joint_2'), 3),
+                'min_states_joint_3': safe_round(joint_data.get('min_joint_3'), 3),
+                'min_states_joint_4': safe_round(joint_data.get('min_joint_4'), 3),
+                'min_states_joint_5': safe_round(joint_data.get('min_joint_5'), 3),
+                'min_states_joint_6': safe_round(joint_data.get('min_joint_6'), 3),
+                'max_states_joint_1': safe_round(joint_data.get('max_joint_1'), 3),
+                'max_states_joint_2': safe_round(joint_data.get('max_joint_2'), 3),
+                'max_states_joint_3': safe_round(joint_data.get('max_joint_3'), 3),
+                'max_states_joint_4': safe_round(joint_data.get('max_joint_4'), 3),
+                'max_states_joint_5': safe_round(joint_data.get('max_joint_5'), 3),
+                'max_states_joint_6': safe_round(joint_data.get('max_joint_6'), 3)
             }
 
         except Exception as e:
