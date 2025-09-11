@@ -224,8 +224,9 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
     },
     xaxis: { title: 's', range: [0, positionMaxTime], tickformat: '.2f' },
     yaxis: { title: 'mm' },
-    legend: { orientation: 'h', y: -0.2 },
+    legend: { orientation: 'h', y: -0.15 }, // Legende näher zum Plot
     hovermode: 'x unified',
+    margin: { l: 60, r: 20, b: 80, t: 50 }, // Kleinere Margins = mehr Platz für Plot
   };
 
   return (
@@ -236,7 +237,16 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
         useResizeHandler
         config={{
           displaylogo: false,
-          modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+          modeBarButtonsToRemove: [
+            'toImage',
+            'orbitRotation',
+            'lasso2d',
+            'zoomIn2d',
+            'zoomOut2d',
+            'autoScale2d',
+            'pan2d',
+            'select2d',
+          ],
           responsive: true,
         }}
         style={{ width: '100%', height: '500px' }}

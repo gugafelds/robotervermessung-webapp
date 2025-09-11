@@ -39,17 +39,15 @@ export const MetaValuesCalculator: React.FC = () => {
   }, [loadStatus]);
 
   return (
-    <div className="mx-auto max-w-xl space-y-4 p-6">
-      <div className="text-center">
-        <h1 className="mb-2 text-2xl font-bold">Meta-Values Status</h1>
-        <p className="text-gray-600">
-          Aktueller Stand der Meta-Values Berechnung
-        </p>
+    <div className="mx-auto w-fit min-w-96 max-w-xl space-y-2 p-6">
+      <div className="text-justify">
+        <h1 className="mb-2 text-xl font-bold">Metavalues</h1>
+        <p className="text-gray-600">Aktueller Stand der Meta-Values</p>
       </div>
 
       {/* Status Tabelle */}
       {status && (
-        <div className="rounded-lg bg-white p-4 shadow-md">
+        <div className="rounded-lg bg-gray-50 p-4 shadow-md">
           <table className="w-full">
             <tbody className="space-y-2">
               <tr className="border-b">
@@ -92,12 +90,6 @@ export const MetaValuesCalculator: React.FC = () => {
       >
         {isUpdating ? 'Berechnung läuft...' : 'Meta-Values aktualisieren'}
       </button>
-
-      {/* Info */}
-      <div className="rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
-        Meta-Values werden basierend auf den vorhandenen Metadaten berechnet.
-        Die Aktualisierung dauert je nach Datenmenge einige Sekunden.
-      </div>
     </div>
   );
 };

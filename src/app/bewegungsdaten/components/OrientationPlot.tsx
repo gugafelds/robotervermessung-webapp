@@ -268,7 +268,16 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
         useResizeHandler
         config={{
           displaylogo: false,
-          modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+          modeBarButtonsToRemove: [
+            'toImage',
+            'orbitRotation',
+            'lasso2d',
+            'zoomIn2d',
+            'zoomOut2d',
+            'autoScale2d',
+            'pan2d',
+            'select2d',
+          ],
           responsive: true,
         }}
         style={{ width: '100%', height: '500px' }}

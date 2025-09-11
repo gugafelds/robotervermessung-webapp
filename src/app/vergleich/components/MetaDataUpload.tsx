@@ -61,7 +61,7 @@ export const MetadataUpload: React.FC = () => {
       const request: MetadataCalculationRequest = {
         mode: selectedMode,
         duplicate_handling: 'skip',
-        batch_size: 10,
+        batch_size: 30,
       };
 
       if (selectedMode === 'single') {
@@ -85,19 +85,17 @@ export const MetadataUpload: React.FC = () => {
   }, [selectedMode, bahnId, startDate, endDate, loadStats]);
 
   return (
-    <div className="mx-auto max-w-xl space-y-4 p-6">
-      <div className="text-center">
-        <h1 className="mb-2 text-2xl font-bold">Metadata Status</h1>
-        <p className="text-gray-600">
-          Aktueller Stand der Metadaten Berechnung
-        </p>
+    <div className="mx-auto w-fit min-w-96 max-w-xl space-y-2 p-6">
+      <div className="text-justify">
+        <h1 className="text-xl font-bold">Metadata</h1>
+        <p className="text-gray-600">Aktueller Stand der Metadaten</p>
       </div>
 
       {/* Status Tabelle */}
       {stats && (
-        <div className="rounded-lg bg-white p-4 shadow-md">
+        <div className="rounded-lg bg-gray-50 p-4 shadow-md">
           <table className="w-full">
-            <tbody className="space-y-2">
+            <tbody className="space-y-1">
               <tr className="border-b">
                 <td className="py-2 font-medium text-gray-700">
                   Gesamte Bahnen
@@ -136,8 +134,8 @@ export const MetadataUpload: React.FC = () => {
       )}
 
       {/* Upload Optionen */}
-      <div className="rounded-lg bg-white p-4 shadow-md">
-        <h2 className="mb-4 text-lg font-semibold">Upload Modus</h2>
+      <div className="rounded-lg bg-gray-50 p-4 shadow-md">
+        <h2 className="mb-4 text-lg font-semibold">Upload-Modus</h2>
 
         <div className="space-y-3">
           {/* Alle fehlenden Bahnen */}
@@ -170,16 +168,16 @@ export const MetadataUpload: React.FC = () => {
                 className="size-4"
               />
               <label htmlFor="mode-single" className="font-medium">
-                Einzelne Bahn
+                Bahn-ID
               </label>
             </div>
             {selectedMode === 'single' && (
               <input
                 type="text"
-                placeholder="Bahn-ID (z.B. 1719408730)"
+                placeholder="(z.B. 1719408730)"
                 value={bahnId}
                 onChange={(e) => setBahnId(e.target.value)}
-                className="ml-7 w-min rounded border px-1 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="ml-7 w-min rounded border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             )}
           </div>
@@ -202,7 +200,7 @@ export const MetadataUpload: React.FC = () => {
               <span className="font-medium">Zeitraum</span>
             </label>
             {selectedMode === 'timerange' && (
-              <div className="ml-7 grid grid-cols-2 gap-3">
+              <div className="ml-7 grid grid-rows-2 gap-1">
                 <div>
                   <label
                     htmlFor="start-date"
@@ -217,9 +215,9 @@ export const MetadataUpload: React.FC = () => {
                       setStartDate(e.target.value);
                       if (!endDate) setEndDate(e.target.value);
                     }}
-                    className="w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-fit rounded border bg-white px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Tag wählen</option>
+                    <option value="">?</option>
                     {availableDates.map((dateInfo) => (
                       <option key={dateInfo.date} value={dateInfo.date}>
                         {dateInfo.date}
@@ -239,9 +237,9 @@ export const MetadataUpload: React.FC = () => {
                     id="end-date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-fit rounded border bg-white px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Tag wählen</option>
+                    <option value="">?</option>
                     {availableDates.map((dateInfo) => (
                       <option key={dateInfo.date} value={dateInfo.date}>
                         {dateInfo.date}

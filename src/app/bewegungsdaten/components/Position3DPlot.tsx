@@ -80,7 +80,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     marker: {
       size: 4,
       color: 'green',
-      symbol: 'diamond', // Andere verfügbare Symbole: 'square', 'diamond', 'cross', 'x', 'triangle-up', 'triangle-down', 'pentagon', 'hexagon', 'star'
+      symbol: 'diamond',
       opacity: 1,
       line: {
         color: 'darkgreen',
@@ -131,34 +131,46 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
 
   const layout: Partial<Layout> = {
     ...plotLayoutConfig,
+    title: '3D-Position',
     autosize: true,
-    margin: { l: 0, r: 0, b: 0, t: 0 },
+    height: 500,
+    width: 650,
+    margin: { l: 20, r: 20, b: 60, t: 50 },
     showlegend: true,
     legend: {
       orientation: 'h',
-      y: -0.15,
+      y: -0.1, // Legende näher zum Plot
       x: 0.5,
       xanchor: 'center',
     },
   };
 
   return (
-    <Plot
-      data={[
-        realTrajectoryData,
-        idealTrajectoryData,
-        targetLinesData,
-        targetPointsData,
-        startPointData, // Startpunkt hinzugefügt
-      ]}
-      layout={layout}
-      useResizeHandler
-      style={{ width: '100%', height: '100%' }}
-      config={{
-        displaylogo: false,
-        modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
-        responsive: true,
-      }}
-    />
+    <div className="m-2 w-fit rounded-lg border border-gray-400 bg-gray-50 p-2 shadow-sm">
+      <Plot
+        data={[
+          realTrajectoryData,
+          idealTrajectoryData,
+          targetLinesData,
+          targetPointsData,
+          startPointData,
+        ]}
+        layout={layout}
+        useResizeHandler
+        style={{ width: '100%', height: '100%' }}
+        config={{
+          displaylogo: false,
+          modeBarButtonsToRemove: [
+            'toImage',
+            'orbitRotation',
+            'zoom3d',
+            'tableRotation',
+            'pan3d',
+            'resetCameraLastSave3d',
+          ],
+          responsive: true,
+        }}
+      />
+    </div>
   );
 };

@@ -86,7 +86,7 @@ export const TCPSpeedPlot: React.FC<TCPSpeedPlotProps> = ({
   const { plotData: tcpSpeedPlotData, maxTimeSpeed } = createTcpSpeedPlot();
 
   const tcpSpeedLayout: Partial<Layout> = {
-    title: 'TCP-Geschwindigkeit',
+    title: 'Geschwindigkeit',
     font: {
       family: 'Helvetica',
     },
@@ -108,7 +108,15 @@ export const TCPSpeedPlot: React.FC<TCPSpeedPlotProps> = ({
         useResizeHandler
         config={{
           displaylogo: false,
-          modeBarButtonsToRemove: ['toImage', 'orbitRotation'],
+          modeBarButtonsToRemove: [
+            'toImage',
+            'orbitRotation',
+            'lasso2d',
+            'zoomIn2d',
+            'zoomOut2d',
+            'autoScale2d',
+            'pan2d',
+          ],
           responsive: true,
         }}
         style={{ width: '100%', height: '500px' }}

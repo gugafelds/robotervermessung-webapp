@@ -1,6 +1,8 @@
 'use client';
 
+import { ChartBarIcon } from '@heroicons/react/24/outline';
 import ErrorIcon from '@heroicons/react/24/outline/FaceFrownIcon';
+import Link from 'next/link';
 import React from 'react';
 
 import { Typography } from '@/src/components/Typography';
@@ -77,6 +79,18 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
               <div className="text-xl font-semibold">
                 {currentBahnInfo.recordFilename || '-'}
               </div>
+            </div>
+
+            <div className="my-2 flex w-fit rounded-lg bg-primary px-4 py-1 font-medium text-white transition duration-300 ease-in-out hover:bg-gray-800">
+              {currentBahnInfo && (
+                <Link
+                  href={`/auswertung/${currentBahnInfo.bahnID}`}
+                  className="flex items-center"
+                >
+                  <ChartBarIcon className="mr-2 size-5" />
+                  <span>Auswertung</span>
+                </Link>
+              )}
             </div>
           </div>
 

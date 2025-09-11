@@ -6,10 +6,10 @@ import { MetaValuesCalculator } from '@/src/app/vergleich/components/MetaValueCa
 
 export default function BahnVergleichPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       <div className="container mx-auto py-8">
-        <MetadataUpload />
         <MetaValuesCalculator />
+        <MetadataUpload />
       </div>
     </div>
   );
