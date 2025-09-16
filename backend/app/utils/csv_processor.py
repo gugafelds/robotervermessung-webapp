@@ -991,7 +991,8 @@ class CSVProcessor:
     @staticmethod
     def extract_tool_weight_from_filename(filename):
         tool_weights = {
-            'TProbeZylWW': 3.7
+            'TProbeZylWW': 3.7,
+            'Prototyp3D': 2.4
         }
 
         for tool_name, weight in tool_weights.items():

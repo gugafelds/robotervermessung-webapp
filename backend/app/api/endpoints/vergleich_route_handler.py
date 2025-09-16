@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from pydantic import BaseModel, field_validator
 from ...database import get_db_pool, get_db
 from ...utils.metadata_calculator import MetadataCalculatorService
+from ...utils.similarity_searcher import SimilaritySearcher
 from ...utils.background_tasks import (
     process_metadata_background,
     process_meta_values_calculation,
@@ -72,6 +73,179 @@ class MetadataCalculationResponse(BaseModel):
     status: str
     message: str
     estimated_duration_minutes: Optional[float] = None
+
+# backend/app/api/endpoints/vergleich_route_handler.py - Complex Version
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from ...database import get_db
+from ...utils.similarity_searcher import SimilaritySearcher
+from typing import Dict, Optional
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+############################ ÄHNLICHKEITSSUCHE #################################################################
+
+@router.get("/aehnlichkeitssuche/{target_id}")
+async def similarity_search(
+    target_id: str,
+    bahn_limit: int = Query(10, ge=1, le=50, description="Anzahl ähnlicher Bahnen"),
+    segment_limit: int = Query(5, ge=1, le=20, description="Anzahl ähnlicher Segmente pro Target-Segment"),
+    # Gewichtungsparameter
+    weight_duration: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Duration"),
+    weight_weight: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Weight"),
+    weight_length: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Length"),
+    weight_movement_type: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Movement Type"),
+    weight_direction_x: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Direction X"),
+    weight_direction_y: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Direction Y"),
+    weight_direction_z: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Direction Z"),
+    conn=Depends(get_db)
+):
+    """
+    Hierarchische Ähnlichkeitssuche für Bahnen und Segmente
+    
+    Erst ähnliche Bahnen, dann alle Segmente der Target-Bahn (mit komplexer Feature-Berechnung)
+    """
+    try:
+        searcher = SimilaritySearcher(conn)
+        
+        # Gewichtungen aus Query-Parametern zusammenstellen
+        weights = {
+            'duration': weight_duration,
+            'weight': weight_weight,
+            'length': weight_length,
+            'movement_type': weight_movement_type,
+            'direction_x': weight_direction_x,
+            'direction_y': weight_direction_y,
+            'direction_z': weight_direction_z
+        }
+        
+        # Immer hierarchische Suche verwenden
+        results = await searcher.find_similar_unified_complex(
+            target_id=target_id,
+            bahn_limit=bahn_limit,
+            segment_limit=segment_limit,
+            weights=weights
+        )
+        
+        if "error" in results:
+            raise HTTPException(status_code=404, detail=results["error"])
+        
+        logger.info(f"Hierarchische Ähnlichkeitssuche für {target_id} erfolgreich")
+        return results
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Fehler bei hierarchischer Ähnlichkeitssuche für {target_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Interner Serverfehler: {str(e)}")
+
+@router.get("/aehnlichkeitssuche/{target_id}/segmente")
+async def similarity_search_segmente_only(
+    target_segment_id: str,
+    limit: int = Query(5, ge=1, le=20, description="Anzahl ähnlicher Segmente"),
+    # Gewichtungsparameter
+    weight_duration: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Duration"),
+    weight_weight: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Weight"),
+    weight_length: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Length"),
+    weight_movement_type: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Movement Type"),
+    weight_direction_x: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Direction X"),
+    weight_direction_y: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Direction Y"),
+    weight_direction_z: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Direction Z"),
+    conn=Depends(get_db)
+):
+    """
+    KOMPLEXE Ähnlichkeitssuche nur für ein spezifisches Segment
+    """
+    try:
+        searcher = SimilaritySearcher(conn)
+        
+        # Gewichtungen zusammenstellen
+        weights = {
+            'duration': weight_duration,
+            'weight': weight_weight,
+            'length': weight_length,
+            'movement_type': weight_movement_type,
+            'direction_x': weight_direction_x,
+            'direction_y': weight_direction_y,
+            'direction_z': weight_direction_z
+        }
+        
+        # Prüfe ob es eine gültige Segment-ID ist
+        if searcher.detect_id_type(target_segment_id) != 'segment':
+            raise HTTPException(status_code=400, detail="Eingabe muss eine Segment-ID sein (mit Unterstrich)")
+        
+        results = await searcher.find_similar_segmente_complex(target_segment_id, limit, weights)
+        
+        if "error" in results:
+            raise HTTPException(status_code=404, detail=results["error"])
+        
+        return {
+            "target_segment_id": target_segment_id,
+            "results": results,
+            "calculation_method": "complex_weighted_similarity"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Fehler bei komplexer Segment-Ähnlichkeitssuche für {target_segment_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Interner Serverfehler: {str(e)}")
+
+@router.get("/info/{target_id}")
+async def get_similarity_info(
+    target_id: str,
+    conn=Depends(get_db)
+):
+    """
+    Informationen über eine ID (Typ, Meta-Value, verfügbare Segmente)
+    """
+    try:
+        searcher = SimilaritySearcher(conn)
+        
+        id_type = searcher.detect_id_type(target_id)
+        info = {
+            "id": target_id,
+            "type": id_type,
+            "normalized_id": searcher.normalize_id(target_id)
+        }
+        
+        if id_type == 'bahn':
+            info["meta_value"] = await searcher.get_target_bahn_meta_value(target_id)
+            info["segments"] = await searcher.get_bahn_segments(target_id)
+        else:
+            info["meta_value"] = await searcher.get_target_segment_meta_value(target_id)
+            bahn_id = target_id.split('_')[0]
+            info["parent_bahn_id"] = bahn_id
+            info["sibling_segments"] = await searcher.get_bahn_segments(bahn_id)
+        
+        return info
+        
+    except Exception as e:
+        logger.error(f"Fehler beim Laden der Info für {target_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Interner Serverfehler: {str(e)}")
+
+@router.get("/weights/defaults")
+async def get_default_weights():
+    """
+    Gibt die Standard-Gewichtungen zurück
+    """
+    return {
+        "default_weights": {
+            "duration": 1.0,
+            "weight": 1.0,
+            "length": 1.0,
+            "movement_type": 1.0,
+            "direction_x": 1.0,
+            "direction_y": 1.0,
+            "direction_z": 1.0
+        },
+        "description": "Standard-Gewichtungen für komplexe Ähnlichkeitsberechnung"
+    }
+
 
 ############################ METADATA BERECHNEN #################################################################
 
