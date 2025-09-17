@@ -195,24 +195,25 @@ async def similarity_search_segmente_only(
         logger.error(f"Fehler bei komplexer Segment-Ähnlichkeitssuche für {target_segment_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Interner Serverfehler: {str(e)}")
 
+
 @router.get("/info/{target_id}")
 async def get_similarity_info(
-    target_id: str,
-    conn=Depends(get_db)
+        target_id: str,
+        conn=Depends(get_db)
 ):
     """
     Informationen über eine ID (Typ, Meta-Value, verfügbare Segmente)
     """
     try:
         searcher = SimilaritySearcher(conn)
-        
+
         id_type = searcher.detect_id_type(target_id)
         info = {
             "id": target_id,
             "type": id_type,
-            "normalized_id": searcher.normalize_id(target_id)
+            # ENTFERNEN: "normalized_id": searcher.normalize_id(target_id)
         }
-        
+
         if id_type == 'bahn':
             info["meta_value"] = await searcher.get_target_bahn_meta_value(target_id)
             info["segments"] = await searcher.get_bahn_segments(target_id)
@@ -221,9 +222,9 @@ async def get_similarity_info(
             bahn_id = target_id.split('_')[0]
             info["parent_bahn_id"] = bahn_id
             info["sibling_segments"] = await searcher.get_bahn_segments(bahn_id)
-        
+
         return info
-        
+
     except Exception as e:
         logger.error(f"Fehler beim Laden der Info für {target_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Interner Serverfehler: {str(e)}")

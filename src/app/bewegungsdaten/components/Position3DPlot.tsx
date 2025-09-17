@@ -145,6 +145,10 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     },
   };
 
+  if (!realTrajectoryData) {
+    return null;
+  }
+
   return (
     <div className="m-2 w-fit rounded-lg border border-gray-400 bg-gray-50 p-2 shadow-sm">
       <Plot
