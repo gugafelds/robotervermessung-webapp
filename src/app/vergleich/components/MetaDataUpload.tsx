@@ -18,6 +18,9 @@ export const MetadataUpload: React.FC = () => {
   const [selectedMode, setSelectedMode] = useState<
     'all_missing' | 'single' | 'timerange'
   >('all_missing');
+  const [duplicateHandling, setDuplicateHandling] = useState<
+    'replace' | 'skip'
+  >('skip');
   const [bahnId, setBahnId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -60,8 +63,8 @@ export const MetadataUpload: React.FC = () => {
     try {
       const request: MetadataCalculationRequest = {
         mode: selectedMode,
-        duplicate_handling: 'skip',
-        batch_size: 30,
+        duplicate_handling: duplicateHandling,
+        batch_size: 100,
       };
 
       if (selectedMode === 'single') {
@@ -249,6 +252,29 @@ export const MetadataUpload: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+          <div>Duplikaten-Handling</div>
+          <div>
+            <input
+              type="radio"
+              name="duplicate_handling"
+              value="skip"
+              id="dh-skip"
+              checked={duplicateHandling === 'skip'}
+              onChange={(e) => setDuplicateHandling(e.target.value as any)}
+              className="ml-2 size-4"
+            />
+            <span className="ml-2 mr-4 font-medium">Skip</span>
+            <input
+              type="radio"
+              name="duplicate_handling"
+              value="replace"
+              id="dh-replace"
+              checked={duplicateHandling === 'replace'}
+              onChange={(e) => setDuplicateHandling(e.target.value as any)}
+              className="ml-2 size-4"
+            />
+            <span className="ml-2 font-medium">Überschreiben</span>
           </div>
         </div>
       </div>

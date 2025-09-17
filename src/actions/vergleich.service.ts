@@ -1,5 +1,3 @@
-// services/vergleich.service.ts
-
 // Bestehende Interfaces
 export interface MetaValuesStatus {
   total_rows: number;

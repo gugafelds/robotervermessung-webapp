@@ -1,10 +1,11 @@
 from datetime import datetime
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
-from pydantic import BaseModel, field_validator
-from ...database import get_db_pool, get_db
-from ...utils.metadata_calculator import MetadataCalculatorService
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from ...database import get_db
 from ...utils.similarity_searcher import SimilaritySearcher
+from pydantic import BaseModel, field_validator
+from ...database import get_db_pool
+from ...utils.metadata_calculator import MetadataCalculatorService
 from ...utils.background_tasks import (
     process_metadata_background,
     process_meta_values_calculation,
@@ -19,36 +20,14 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-
 # Pydantic Models
 class MetadataCalculationRequest(BaseModel):
     mode: str  # "single", "timerange", "all_missing"
     bahn_id: Optional[str] = None
     start_time: Optional[str] = None  # Format: "26.06.2025 12:12:10"
     end_time: Optional[str] = None
-    duplicate_handling: str = "skip"  # "replace" oder "skip"
+    duplicate_handling: str = "replace"  # "replace" oder "skip"
     batch_size: int = 10
-
-    @field_validator('mode')
-    @classmethod
-    def validate_mode(cls, v):
-        if v not in ['single', 'timerange', 'all_missing']:
-            raise ValueError('mode must be one of: single, timerange, all_missing')
-        return v
-
-    @field_validator('duplicate_handling')
-    @classmethod
-    def validate_duplicate_handling(cls, v):
-        if v not in ['replace', 'skip']:
-            raise ValueError('duplicate_handling must be either "replace" or "skip"')
-        return v
-
-    @field_validator('batch_size')
-    @classmethod
-    def validate_batch_size(cls, v):
-        if v < 1 or v > 100:
-            raise ValueError('batch_size must be between 1 and 100')
-        return v
 
 class TaskStatusResponse(BaseModel):
     task_id: str
@@ -74,19 +53,6 @@ class MetadataCalculationResponse(BaseModel):
     message: str
     estimated_duration_minutes: Optional[float] = None
 
-# backend/app/api/endpoints/vergleich_route_handler.py - Complex Version
-
-from fastapi import APIRouter, Depends, HTTPException, Query
-from ...database import get_db
-from ...utils.similarity_searcher import SimilaritySearcher
-from typing import Dict, Optional
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-router = APIRouter()
-
 ############################ ÄHNLICHKEITSSUCHE #################################################################
 
 @router.get("/aehnlichkeitssuche/{target_id}")
@@ -106,12 +72,12 @@ async def similarity_search(
 ):
     """
     Hierarchische Ähnlichkeitssuche für Bahnen und Segmente
-    
+
     Erst ähnliche Bahnen, dann alle Segmente der Target-Bahn (mit komplexer Feature-Berechnung)
     """
     try:
         searcher = SimilaritySearcher(conn)
-        
+
         # Gewichtungen aus Query-Parametern zusammenstellen
         weights = {
             'duration': weight_duration,
@@ -122,7 +88,7 @@ async def similarity_search(
             'direction_y': weight_direction_y,
             'direction_z': weight_direction_z
         }
-        
+
         # Immer hierarchische Suche verwenden
         results = await searcher.find_similar_unified_complex(
             target_id=target_id,
@@ -130,13 +96,13 @@ async def similarity_search(
             segment_limit=segment_limit,
             weights=weights
         )
-        
+
         if "error" in results:
             raise HTTPException(status_code=404, detail=results["error"])
-        
+
         logger.info(f"Hierarchische Ähnlichkeitssuche für {target_id} erfolgreich")
         return results
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -162,7 +128,7 @@ async def similarity_search_segmente_only(
     """
     try:
         searcher = SimilaritySearcher(conn)
-        
+
         # Gewichtungen zusammenstellen
         weights = {
             'duration': weight_duration,
@@ -173,22 +139,22 @@ async def similarity_search_segmente_only(
             'direction_y': weight_direction_y,
             'direction_z': weight_direction_z
         }
-        
+
         # Prüfe ob es eine gültige Segment-ID ist
         if searcher.detect_id_type(target_segment_id) != 'segment':
             raise HTTPException(status_code=400, detail="Eingabe muss eine Segment-ID sein (mit Unterstrich)")
-        
+
         results = await searcher.find_similar_segmente_complex(target_segment_id, limit, weights)
-        
+
         if "error" in results:
             raise HTTPException(status_code=404, detail=results["error"])
-        
+
         return {
             "target_segment_id": target_segment_id,
             "results": results,
             "calculation_method": "complex_weighted_similarity"
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

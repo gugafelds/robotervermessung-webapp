@@ -157,9 +157,7 @@ class SimilaritySearcher:
                        CAST(bm.max_position_x_soll AS FLOAT)     as max_position_x_soll,
                        CAST(bm.max_position_y_soll AS FLOAT)     as max_position_y_soll,
                        CAST(bm.max_position_z_soll AS FLOAT)     as max_position_z_soll,
-                       CAST(ist.sidtw_average_distance AS FLOAT) as sidtw_average_distance,
-                       CAST(bm.bahn_id AS TEXT)                  as bahn_id_normalized,
-                       CAST(bm.segment_id AS TEXT)               as segment_id_normalized
+                       CAST(ist.sidtw_average_distance AS FLOAT) as sidtw_average_distance
                 FROM robotervermessung.bewegungsdaten.bahn_meta bm
                          LEFT JOIN robotervermessung.auswertung.info_sidtw ist
                                    ON CAST(bm.segment_id AS TEXT) = ist.segment_id
@@ -233,7 +231,7 @@ class SimilaritySearcher:
             other_bahnen = []
 
             for row in data_all:
-                if row['bahn_id_normalized'] == target_bahn_id:
+                if row['bahn_id'] == target_bahn_id:
                     target_data = row
                 else:
                     other_bahnen.append(row)
@@ -330,7 +328,7 @@ class SimilaritySearcher:
             other_segments = []
 
             for row in all_segment_data:
-                segment_id = row['segment_id_normalized']
+                segment_id = row['segment_id']
                 if segment_id in target_segments:
                     target_data_lookup[segment_id] = row
                 else:
@@ -526,7 +524,7 @@ class SimilaritySearcher:
             other_segmente = []
 
             for row in data_all:
-                if row['segment_id_normalized'] == target_segment_id:
+                if row['segment_id'] == target_segment_id:
                     target_data = row
                 else:
                     other_segmente.append(row)
@@ -581,8 +579,6 @@ class SimilaritySearcher:
         Holt alle Segment-IDs einer Bahn
         """
         try:
-            bahn_id_normalized = bahn_id
-            
             query = """
             SELECT CAST(segment_id AS TEXT) as segment_id
             FROM robotervermessung.bewegungsdaten.bahn_meta bm
@@ -592,7 +588,7 @@ class SimilaritySearcher:
             ORDER BY segment_id
             """
             
-            results = await self.connection.fetch(query, bahn_id_normalized)
+            results = await self.connection.fetch(query, bahn_id)
             return [row['segment_id'] for row in results]
             
         except Exception as e:
