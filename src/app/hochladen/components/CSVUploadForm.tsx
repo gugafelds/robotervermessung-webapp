@@ -216,7 +216,7 @@ const CSVUploadForm: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center justify-center p-4">
+    <div className="flex items-center stify-center p-4">
       <form
         onSubmit={handleSubmit}
         className="mb-4 w-full max-w-lg rounded-xl bg-gray-100 p-4 shadow-md"

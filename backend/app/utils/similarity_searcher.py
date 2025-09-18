@@ -37,51 +37,53 @@ class SimilaritySearcher:
         else:
             threshold_percent = 25.0
 
-        return max(15.0, min(threshold_percent, 80.0))
+        return max(25.0, min(threshold_percent, 100.0))
 
     async def calculate_adaptive_threshold_bahn(self, target_meta_value: float) -> float:
         """Berechnet Schwellwert für Bahnen - mit Cache"""
-        try:
-            if self._bahn_meta_values_cache is None:
-                query = """
-                        SELECT meta_value as meta_value
-                        FROM robotervermessung.bewegungsdaten.bahn_meta bm
-                        WHERE bm.bahn_id = bm.segment_id
-                          AND meta_value IS NOT NULL
-                        ORDER BY meta_value \
-                        """
-                results = await self.connection.fetch(query)
-                if len(results) < 10:
-                    return 20.0
+        return 100.0
+        # try:
+        #     if self._bahn_meta_values_cache is None:
+        #         query = """
+        #                 SELECT meta_value as meta_value
+        #                 FROM robotervermessung.bewegungsdaten.bahn_meta bm
+        #                 WHERE bm.bahn_id = bm.segment_id
+        #                   AND meta_value IS NOT NULL
+        #                 ORDER BY meta_value \
+        #                 """
+        #         results = await self.connection.fetch(query)
+        #         if len(results) < 10:
+        #             return 20.0
 
-                self._bahn_meta_values_cache = np.array([row['meta_value'] for row in results])
+        #         self._bahn_meta_values_cache = np.array([row['meta_value'] for row in results])
 
-            return self._calculate_percentile_threshold(target_meta_value, self._bahn_meta_values_cache)
-        except Exception as e:
-            print(f"Fehler bei adaptive Schwellwert-Berechnung: {e}")
-            return 20.0
+        #     return self._calculate_percentile_threshold(target_meta_value, self._bahn_meta_values_cache)
+        # except Exception as e:
+        #     print(f"Fehler bei adaptive Schwellwert-Berechnung: {e}")
+        #     return 20.0
 
     async def calculate_adaptive_threshold_segment(self, target_meta_value: float) -> float:
         """Berechnet Schwellwert für Segmente - mit Cache"""
-        try:
-            if self._segment_meta_values_cache is None:
-                query = """
-                        SELECT meta_value  as meta_value
-                        FROM robotervermessung.bewegungsdaten.bahn_meta bm
-                        WHERE bm.bahn_id != bm.segment_id
-                AND meta_value IS NOT NULL
-                        ORDER BY meta_value \
-                        """
-                results = await self.connection.fetch(query)
-                if len(results) < 10:
-                    return 20.0
+        return 100.0
+        # try:
+        #     if self._segment_meta_values_cache is None:
+        #         query = """
+        #                 SELECT meta_value  as meta_value
+        #                 FROM robotervermessung.bewegungsdaten.bahn_meta bm
+        #                 WHERE bm.bahn_id != bm.segment_id
+        #         AND meta_value IS NOT NULL
+        #                 ORDER BY meta_value \
+        #                 """
+        #         results = await self.connection.fetch(query)
+        #         if len(results) < 10:
+        #             return 20.0
 
-                self._segment_meta_values_cache = np.array([row['meta_value'] for row in results])
+        #         self._segment_meta_values_cache = np.array([row['meta_value'] for row in results])
 
-            return self._calculate_percentile_threshold(target_meta_value, self._segment_meta_values_cache)
-        except Exception as e:
-            print(f"Fehler bei adaptive Schwellwert-Berechnung für Segmente: {e}")
-            return 20.0
+        #     return self._calculate_percentile_threshold(target_meta_value, self._segment_meta_values_cache)
+        # except Exception as e:
+        #     print(f"Fehler bei adaptive Schwellwert-Berechnung für Segmente: {e}")
+        #     return 20.0
 
     async def calculate_weighted_similarity_optimized(self, target_row: Dict,
                                                       compare_data: List[Dict],
@@ -124,9 +126,10 @@ class SimilaritySearcher:
         if 'movement_type' in target_row and all('movement_type' in row for row in compare_data):
             target_movement = str(target_row['movement_type'])
             movement_weight = weights.get('movement_type', 1.0)
-
-            movement_mismatch = np.array([1.0 if str(row['movement_type']) != target_movement else 0.0
-                                          for row in compare_data])
+            
+            # Vektorisierte String-Vergleiche
+            compare_movements = np.array([str(row.get('movement_type', '')) for row in compare_data])
+            movement_mismatch = (compare_movements != target_movement).astype(float)
             movement_penalty = movement_mismatch * movement_weight / (weight_vector.sum() + movement_weight)
             weighted_distances = weighted_distances + movement_penalty
 
@@ -313,6 +316,11 @@ class SimilaritySearcher:
             if target_bahn_meta_value is None:
                 return {"error": f"Bahn {target_bahn_id} hat keinen Meta-Value"}
 
+            # 2. EINHEITLICHER THRESHOLD: Basierend auf der ganzen Bahn
+            target_bahn_meta_value = await self.get_target_bahn_meta_value(target_bahn_id)
+            if target_bahn_meta_value is None:
+                return {"error": f"Bahn {target_bahn_id} hat keinen Meta-Value"}
+
             adaptive_threshold = await self.calculate_adaptive_threshold_bahn(target_bahn_meta_value)
 
             # 3. EINHEITLICHER META-VALUE-BEREICH
@@ -320,17 +328,31 @@ class SimilaritySearcher:
             bahn_meta_min = target_bahn_meta_value * (1 - threshold_factor)
             bahn_meta_max = target_bahn_meta_value * (1 + threshold_factor)
 
+            # DEBUG INFO HINZUFÜGEN:
+            print(f"🔍 DEBUG Batch-Segment-Loading für Bahn {target_bahn_id}")
+            print(f"   Bahn Meta-Value: {target_bahn_meta_value}")
+            print(f"   Bahn Threshold: {adaptive_threshold}%")
+            print(f"   Bahn-Bereich: {bahn_meta_min:.2f} - {bahn_meta_max:.2f}")
+            print(f"   Target-Segmente: {len(target_segments)}")
+
             # 4. Lade ALLE Segmente in diesem Bereich
             where_condition = """
-            WHERE CAST(bm.bahn_id AS TEXT) != CAST(bm.segment_id AS TEXT)
-            AND bm.meta_value IS NOT NULL
-            AND bm.meta_value BETWEEN $1 AND $2
+            WHERE (
+                (CAST(bm.bahn_id AS TEXT) != CAST(bm.segment_id AS TEXT)
+                AND bm.meta_value IS NOT NULL
+                AND bm.meta_value BETWEEN $1 AND $2)
+                OR 
+                CAST(bm.segment_id AS TEXT) = ANY($3)
+            )
             ORDER BY bm.meta_value
             """
 
-            all_segment_data = await self.load_data_with_features(where_condition, (bahn_meta_min, bahn_meta_max))
+            all_segment_data = await self.load_data_with_features(where_condition, (bahn_meta_min, bahn_meta_max, target_segments))
+
+            print(f"   Alle Segmente im Bahn-Bereich: {len(all_segment_data)}")
 
             if not all_segment_data:
+                print(f"   ❌ KEINE Segmente im Bahn-Bereich gefunden!")
                 return {"segment_results": [], "info": "Keine Segmente in Bereich gefunden"}
 
             # 5. Trenne Target und Vergleichsdaten
@@ -362,9 +384,13 @@ class SimilaritySearcher:
             # 7. Für jedes Target-Segment: Ähnlichkeitsberechnung
             segment_results = []
 
+            print(target_segments)
+
             for target_segment_id in target_segments:
                 if target_segment_id not in target_data_lookup:
                     continue
+
+                print(target_segment_id)
 
                 target_data = target_data_lookup[target_segment_id]
 
@@ -472,90 +498,6 @@ class SimilaritySearcher:
             print(f"Fehler bei Batch-Schwellwert-Berechnung für Segmente: {e}")
             return [20.0] * len(target_meta_values)
 
-    async def find_similar_segmente_complex(self, target_segment_id: str, limit: int = 10,
-                                            weights: Dict[str, float] = None) -> Dict[str, Any]:
-        """
-        KOMPLEXE Segment-Ähnlichkeitssuche mit vollständiger Feature-Berechnung - NumPy optimiert
-        """
-        try:
-            if weights is None:
-                weights = self.default_weights.copy()
-
-            # 1. Target Meta-Value für Threshold-Berechnung laden
-            target_meta_value = await self.get_target_segment_meta_value(target_segment_id)
-            if target_meta_value is None:
-                return {"error": f"Target-Segment {target_segment_id} hat keinen Meta-Value"}
-
-            # 2. Adaptive Schwellwert-Berechnung
-            adaptive_threshold = await self.calculate_adaptive_threshold_segment(target_meta_value)
-
-            # 3. Meta-Value Bereich für Vorfilterung
-            threshold_factor = adaptive_threshold / 100.0
-            meta_value_min = target_meta_value * (1 - threshold_factor)
-            meta_value_max = target_meta_value * (1 + threshold_factor)
-
-            # 4. Alle Segmente im Meta-Value-Bereich laden (ohne Pandas)
-            where_condition = """
-            WHERE CAST(bm.bahn_id AS TEXT) != CAST(bm.segment_id AS TEXT)
-            AND bm.meta_value BETWEEN $1 AND $2
-            ORDER BY bm.meta_value
-            """
-
-            data_all = await self.load_data_with_features(
-                where_condition,
-                (meta_value_min, meta_value_max)
-            )
-
-            if not data_all:
-                return {"error": f"Keine Segmente im Meta-Value-Bereich gefunden"}
-
-            # 5. Target und andere Segmente trennen (ohne Pandas)
-            target_data = None
-            other_segmente = []
-
-            for row in data_all:
-                if row['segment_id'] == target_segment_id:
-                    target_data = row
-                else:
-                    other_segmente.append(row)
-
-            if target_data is None:
-                return {"error": f"Target-Segment nicht in gefilterten Daten gefunden"}
-
-            if not other_segmente:
-                target_data['similarity_score'] = 0.0
-                return {
-                    "target": target_data,
-                    "similar_segmente": [],
-                    "auto_threshold": adaptive_threshold,
-                    "total_found": 0
-                }
-
-            # 6. KOMPLEXE Ähnlichkeitsberechnung (NumPy)
-            similarities = await self.calculate_weighted_similarity_optimized(
-                target_data, other_segmente, weights
-            )
-
-            # 7. Ergebnisse formatieren (ohne Pandas)
-            target_data['similarity_score'] = 0.0
-
-            # Top ähnliche Segmente (einfaches List Slicing)
-            similar_segmente = similarities[:limit]
-
-            return {
-                "target": target_data,
-                "similar_segmente": similar_segmente,
-                "auto_threshold": adaptive_threshold,
-                "total_found": len(similarities),
-                "weights_used": weights,
-                "meta_value_range": {
-                    "min": meta_value_min,
-                    "max": meta_value_max
-                }
-            }
-
-        except Exception as e:
-            return {"error": f"Fehler bei komplexer Segment-Ähnlichkeitssuche: {str(e)}"}
 
     async def find_similar_segmente_auto(self, target_segment_id: str, limit: int = 10,
                                         weights: Dict[str, float] = None) -> Dict[str, Any]:
@@ -584,7 +526,6 @@ class SimilaritySearcher:
         except Exception as e:
             print(f"Fehler beim Laden der Bahn-Segmente: {e}")
             return []
-
 
 ################ HIERARCHISCHE SUCHE #####################
 

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import React from 'react';
 
 interface SimilarityResult {
@@ -132,7 +133,13 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
                       <span
                         className={`text-sm ${isTarget ? 'font-bold text-blue-900' : 'text-gray-900'}`}
                       >
-                        {id}
+                      <Link
+  href={`/bewegungsdaten/${id.split('_')[0]}`}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="flex items-center">
+  <span>{id}</span>
+</Link>
                       </span>
                     </div>
                   </td>

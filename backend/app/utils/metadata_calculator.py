@@ -58,13 +58,13 @@ class MetadataCalculatorService:
         """Ermittelt alle bahn_ids die noch keine Metadaten haben"""
         async with self.db_pool.acquire() as conn:
             query = """
-                    SELECT DISTINCT bi.bahn_id
-                    FROM robotervermessung.bewegungsdaten.bahn_info bi
-                             LEFT JOIN robotervermessung.bewegungsdaten.bahn_meta bm
-                                       ON bi.bahn_id = bm.bahn_id AND bm.segment_id = bm.bahn_id
-                    WHERE bm.bahn_id IS NULL
-                    ORDER BY bi.bahn_id::text \
-                    """
+            SELECT DISTINCT bi.bahn_id
+            FROM robotervermessung.bewegungsdaten.bahn_info bi
+            LEFT JOIN robotervermessung.bewegungsdaten.bahn_meta bm
+            ON bi.bahn_id = bm.bahn_id AND bm.segment_id = bm.bahn_id
+            WHERE bm.bahn_id IS NULL
+            ORDER BY bi.bahn_id
+            """
             rows = await conn.fetch(query)
             return [row['bahn_id'] for row in rows]
 

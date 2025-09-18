@@ -106,7 +106,7 @@ export default function BahnVergleichPage() {
                 Ähnlichkeitssuche
               </h1>
               <p className="text-gray-600">
-                Finden Sie ähnliche Bahnen und Segmente basierend auf komplexer
+                Finden Sie ähnliche Bahnen und Segmente basierend auf 
                 Feature-Analyse
               </p>
             </div>
