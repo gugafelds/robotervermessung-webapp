@@ -155,34 +155,42 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({ onSearch }) => {
             Gewichtungen anpassen:
           </div>
 
-          {Object.entries(weights).map(([feature, value]) => (
-            <div key={feature} className="space-y-1">
-              <div className="flex items-center justify-between">
-                <label className="text-xs capitalize text-gray-600">
-                  {feature.replace('_', ' ')}:
-                </label>
-                <span className="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs">
-                  {value.toFixed(1)}
-                </span>
+          {Object.entries(weights).map(([feature, value]) => {
+            const sliderId = `slider-${feature}`;
+            return (
+              <div key={feature} className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor={sliderId}
+                    className="text-xs capitalize text-gray-600"
+                  >
+                    {feature.replace('_', ' ')}:
+                  </label>
+                  <span className="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs">
+                    {value.toFixed(1)}
+                  </span>
+                </div>
+                <input
+                  id={sliderId}
+                  type="range"
+                  min="0"
+                  max="10"
+                  step="1.0"
+                  value={value}
+                  onChange={(e) =>
+                    handleWeightChange(feature, parseFloat(e.target.value))
+                  }
+                  className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200"
+                />
               </div>
-              <input
-                type="range"
-                min="0"
-                max="10"
-                step="1.0"
-                value={value}
-                onChange={(e) =>
-                  handleWeightChange(feature, parseFloat(e.target.value))
-                }
-                className="slider h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200"
-              />
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Limit Einstellungen */}
         <div className="space-y-2 rounded-lg bg-white p-3">
           <div className="flex items-center justify-between">
+            {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
             <label
               htmlFor="bahn-limit"
               className="text-sm font-medium text-gray-700"

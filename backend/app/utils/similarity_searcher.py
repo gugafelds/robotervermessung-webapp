@@ -185,7 +185,7 @@ class SimilaritySearcher:
         WHERE CAST(bm.bahn_id AS TEXT) = $1
         AND CAST(bm.bahn_id AS TEXT) = CAST(bm.segment_id AS TEXT)
         """
-        
+
         result = await self.connection.fetchrow(query, bahn_id)
         return result['meta_value'] if result and result['meta_value'] is not None else None
 
@@ -274,13 +274,13 @@ class SimilaritySearcher:
         except Exception as e:
             return {"error": f"Fehler bei komplexer Bahn-Ähnlichkeitssuche: {str(e)}"}
 
-    async def find_similar_bahnen_auto(self, target_bahn_id: str, limit: int = 10, 
+    async def find_similar_bahnen_auto(self, target_bahn_id: str, limit: int = 10,
                                     weights: Dict[str, float] = None) -> Dict[str, Any]:
         """
         Wrapper-Funktion für komplexe Bahn-Ähnlichkeitssuche mit Auto-Threshold
         """
         return await self.find_similar_bahnen_complex(target_bahn_id, limit, weights)
-            
+
 ################## SEGMENTE #####################
 
     async def get_target_segment_meta_value(self, segment_id: str) -> Optional[float]:
@@ -293,37 +293,47 @@ class SimilaritySearcher:
         WHERE CAST(bm.segment_id AS TEXT) = $1
         AND CAST(bm.bahn_id AS TEXT) != CAST(bm.segment_id AS TEXT)
         """
-        
+
         result = await self.connection.fetchrow(query, segment_id)
         return result['meta_value'] if result and result['meta_value'] is not None else None
 
     async def load_all_segments_batch(self, target_bahn_id: str, segment_limit: int, weights: Dict[str, float]) -> Dict[
         str, Any]:
         """
-        Lädt ALLE Segmente einer Bahn in EINER Abfrage und berechnet Ähnlichkeiten
+        Lädt ALLE Segmente einer Bahn mit KONSISTENTER Ähnlichkeitsberechnung
         """
         try:
-            # 1. Alle Target-Segmente der Bahn holen
+            # 1. Target-Segmente der Bahn holen
             target_segments = await self.get_bahn_segments(target_bahn_id)
             if not target_segments:
                 return {"segment_results": [], "info": f"Keine Segmente gefunden für Bahn {target_bahn_id}"}
 
-            print(f"DEBUG: Target segments = {target_segments}")
+            # 2. EINHEITLICHER THRESHOLD: Basierend auf der ganzen Bahn
+            target_bahn_meta_value = await self.get_target_bahn_meta_value(target_bahn_id)
+            if target_bahn_meta_value is None:
+                return {"error": f"Bahn {target_bahn_id} hat keinen Meta-Value"}
 
-            # 2. EINE große Abfrage für alle Segment-Daten
+            adaptive_threshold = await self.calculate_adaptive_threshold_bahn(target_bahn_meta_value)
+
+            # 3. EINHEITLICHER META-VALUE-BEREICH
+            threshold_factor = adaptive_threshold / 100.0
+            bahn_meta_min = target_bahn_meta_value * (1 - threshold_factor)
+            bahn_meta_max = target_bahn_meta_value * (1 + threshold_factor)
+
+            # 4. Lade ALLE Segmente in diesem Bereich
             where_condition = """
-            WHERE bm.bahn_id != bm.segment_id
+            WHERE CAST(bm.bahn_id AS TEXT) != CAST(bm.segment_id AS TEXT)
             AND bm.meta_value IS NOT NULL
+            AND bm.meta_value BETWEEN $1 AND $2
             ORDER BY bm.meta_value
             """
 
-            all_segment_data = await self.load_data_with_features(where_condition)
+            all_segment_data = await self.load_data_with_features(where_condition, (bahn_meta_min, bahn_meta_max))
+
             if not all_segment_data:
-                return {"segment_results": [], "info": "Keine Segmente in Datenbank gefunden"}
+                return {"segment_results": [], "info": "Keine Segmente in Bereich gefunden"}
 
-            print(f"DEBUG: Loaded {len(all_segment_data)} segments from database")
-
-            # 3. Gruppiere Daten nach Segment-ID für schnellen Zugriff
+            # 5. Trenne Target und Vergleichsdaten
             target_data_lookup = {}
             other_segments = []
 
@@ -334,97 +344,80 @@ class SimilaritySearcher:
                 else:
                     other_segments.append(row)
 
-            print(f"DEBUG: Found {len(target_data_lookup)} target segments, {len(other_segments)} other segments")
+            if not other_segments:
+                return {"segment_results": [], "info": "Keine Vergleichssegmente gefunden"}
 
-            # 4. BATCH-THRESHOLD: Sammle alle Target-Meta-Values vor der Loop
-            target_meta_values = []
-            valid_segment_ids = []
+            # 6. KONSISTENTE NORMALISIERUNG
+
+            # Numerische Spalten bestimmen
+            available_columns = [col for col in weights.keys()
+                                 if col != 'movement_type'
+                                 and all(col in row for row in all_segment_data)]
+
+            if not available_columns:
+                available_columns = ['duration', 'length', 'direction_x', 'direction_y', 'direction_z']
+                available_columns = [col for col in available_columns
+                                     if all(col in row for row in all_segment_data)]
+
+            # 7. Für jedes Target-Segment: Ähnlichkeitsberechnung
+            segment_results = []
 
             for target_segment_id in target_segments:
-                if target_segment_id in target_data_lookup:
-                    target_data = target_data_lookup[target_segment_id]
-                    target_meta_value = target_data.get('meta_value')
-
-                    # Konvertiere Decimal zu Float falls nötig
-                    if target_meta_value is not None and hasattr(target_meta_value, '__float__'):
-                        target_meta_value = float(target_meta_value)
-
-                    if target_meta_value is not None:
-                        target_meta_values.append(target_meta_value)
-                        valid_segment_ids.append(target_segment_id)
-
-            # 5. BATCH-BERECHNUNG: Alle Thresholds auf einmal berechnen
-            if target_meta_values:
-                adaptive_thresholds = await self.calculate_batch_thresholds_segment(target_meta_values)
-            else:
-                adaptive_thresholds = []
-
-            print(f"DEBUG: Calculated {len(adaptive_thresholds)} thresholds in batch")
-
-            # 6. Für jedes Target-Segment: Ähnlichkeitsberechnung ohne weitere DB-Abfragen
-            segment_results = []
-            threshold_index = 0
-
-            for target_segment_id in valid_segment_ids:
-                print(f"DEBUG: Processing target segment {target_segment_id}")
-
-                target_data = target_data_lookup[target_segment_id]
-                target_meta_value = target_data.get('meta_value')
-
-                # Konvertiere Decimal zu Float falls nötig
-                if target_meta_value is not None and hasattr(target_meta_value, '__float__'):
-                    target_meta_value = float(target_meta_value)
-
-                print(f"DEBUG: Target meta_value = {target_meta_value} (type: {type(target_meta_value)})")
-
-                # BATCH-THRESHOLD: Verwende vorberechneten Threshold
-                adaptive_threshold = adaptive_thresholds[threshold_index] if threshold_index < len(
-                    adaptive_thresholds) else 20.0
-                threshold_index += 1
-
-                # Meta-Value Bereich filtern
-                threshold_factor = adaptive_threshold / 100.0
-                meta_value_min = target_meta_value * (1 - threshold_factor)
-                meta_value_max = target_meta_value * (1 + threshold_factor)
-
-                print(f"DEBUG: Meta-value range: {meta_value_min:.4f} - {meta_value_max:.4f}")
-
-                # Filtere andere Segmente im Meta-Value-Bereich (in-memory)
-                filtered_segments = []
-                for row in other_segments:
-                    row_meta = row.get('meta_value')
-                    if row_meta is not None:
-                        # Konvertiere Decimal zu Float falls nötig
-                        if hasattr(row_meta, '__float__'):
-                            row_meta = float(row_meta)
-                        if meta_value_min <= row_meta <= meta_value_max:
-                            filtered_segments.append(row)
-
-                print(f"DEBUG: Filtered to {len(filtered_segments)} segments in range")
-
-                if not filtered_segments:
-                    target_data['similarity_score'] = 0.0
-                    segment_results.append({
-                        "target_segment": target_segment_id,
-                        "similarity_data": {
-                            "target": target_data,
-                            "similar_segmente": [],
-                            "auto_threshold": adaptive_threshold,
-                            "total_found": 0
-                        }
-                    })
+                if target_segment_id not in target_data_lookup:
                     continue
 
-                # Ähnlichkeitsberechnung (NumPy)
-                similarities = await self.calculate_weighted_similarity_optimized(
-                    target_data, filtered_segments, weights
-                )
+                target_data = target_data_lookup[target_segment_id]
 
-                print(f"DEBUG: Calculated {len(similarities)} similarities")
+                # Erstelle target_row und compare_df
+                target_row_dict = {col: target_data.get(col, 0.0) for col in available_columns}
+                compare_data_dicts = [{col: row.get(col, 0.0) for col in available_columns} for row in other_segments]
+
+                # Kombiniere für StandardScaler
+                all_data_for_scaling = [target_row_dict] + compare_data_dicts
+
+                # StandardScaler
+                from sklearn.preprocessing import StandardScaler
+                scaler = StandardScaler()
+
+                # Erstelle Matrix für Scaler
+                data_matrix = np.array([[row[col] for col in available_columns] for row in all_data_for_scaling])
+                scaled_data = scaler.fit_transform(data_matrix)
+
+                # Trenne Target und Compare
+                target_scaled = scaled_data[0:1]  # Erste Zeile
+                compare_scaled = scaled_data[1:]  # Rest
+
+                # Gewichtungsvektor
+                weight_vector = np.array([weights.get(col, 1.0) for col in available_columns])
+
+                # Distanzberechnung
+                distances = np.abs(compare_scaled - target_scaled)
+                weighted_distances = (distances @ weight_vector) / weight_vector.sum()
+
+                # Movement type handling
+                if 'movement_type' in weights and 'movement_type' in target_data:
+                    target_movement = str(target_data['movement_type'])
+                    movement_weight = weights.get('movement_type', 1.0)
+                    if movement_weight > 0:
+                        movement_mismatch = np.array(
+                            [1.0 if str(row.get('movement_type', '')) != target_movement else 0.0
+                             for row in other_segments], dtype=np.float32)
+                        movement_penalty = movement_mismatch * movement_weight
+                        weighted_distances = weighted_distances + (
+                                    movement_penalty / (weight_vector.sum() + movement_weight))
+
+                # Ergebnisse mit Similarity Scores
+                similarities_with_scores = []
+                for j, row in enumerate(other_segments):
+                    row_copy = row.copy()
+                    row_copy['similarity_score'] = weighted_distances[j]
+                    similarities_with_scores.append(row_copy)
+
+                similarities_sorted = sorted(similarities_with_scores, key=lambda x: x['similarity_score'])
 
                 # Formatierung
                 target_data['similarity_score'] = 0.0
-                similar_segmente = similarities[:segment_limit]
+                similar_segmente = similarities_sorted[:segment_limit]
 
                 segment_results.append({
                     "target_segment": target_segment_id,
@@ -432,23 +425,20 @@ class SimilaritySearcher:
                         "target": target_data,
                         "similar_segmente": similar_segmente,
                         "auto_threshold": adaptive_threshold,
-                        "total_found": len(similarities),
+                        "total_found": len(similarities_sorted),
                         "weights_used": weights,
                         "meta_value_range": {
-                            "min": meta_value_min,
-                            "max": meta_value_max
+                            "min": bahn_meta_min,
+                            "max": bahn_meta_max
                         }
                     }
                 })
 
-            print(f"DEBUG: Final segment_results count = {len(segment_results)}")
             return {"segment_results": segment_results}
 
         except Exception as e:
-            print(f"DEBUG: Exception in batch loading: {str(e)}")
             import traceback
-            print(f"DEBUG: Traceback: {traceback.format_exc()}")
-            return {"error": f"Fehler bei Batch-Segment-Loading: {str(e)}"}
+            return {"error": f"Fehler bei konsistenter Segment-Ähnlichkeitssuche: {str(e)}"}
 
     async def calculate_batch_thresholds_segment(self, target_meta_values: List[float]) -> List[float]:
         """
@@ -567,7 +557,7 @@ class SimilaritySearcher:
         except Exception as e:
             return {"error": f"Fehler bei komplexer Segment-Ähnlichkeitssuche: {str(e)}"}
 
-    async def find_similar_segmente_auto(self, target_segment_id: str, limit: int = 10, 
+    async def find_similar_segmente_auto(self, target_segment_id: str, limit: int = 10,
                                         weights: Dict[str, float] = None) -> Dict[str, Any]:
         """
         Wrapper-Funktion für komplexe Segment-Ähnlichkeitssuche mit Auto-Threshold
@@ -587,10 +577,10 @@ class SimilaritySearcher:
             AND meta_value IS NOT NULL
             ORDER BY segment_id
             """
-            
+
             results = await self.connection.fetch(query, bahn_id)
             return [row['segment_id'] for row in results]
-            
+
         except Exception as e:
             print(f"Fehler beim Laden der Bahn-Segmente: {e}")
             return []
@@ -690,11 +680,11 @@ class SimilaritySearcher:
         """
         if not segment_results:
             return None
-        
+
         thresholds = []
         for result in segment_results:
             threshold = result.get("similarity_data", {}).get("auto_threshold")
             if threshold is not None:
                 thresholds.append(threshold)
-        
+
         return sum(thresholds) / len(thresholds) if thresholds else None

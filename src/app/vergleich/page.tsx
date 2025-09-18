@@ -11,6 +11,7 @@ export default function BahnVergleichPage() {
   const [results, setResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [originalId, setOriginalId] = useState<string>('');
 
   const handleSearch = async (
     id: string,
@@ -20,6 +21,8 @@ export default function BahnVergleichPage() {
   ) => {
     setIsLoading(true);
     setError('');
+    setOriginalId(id);
+
     try {
       // Erstelle URL mit Gewichtungsparametern
       const params = new URLSearchParams({
@@ -115,6 +118,7 @@ export default function BahnVergleichPage() {
                 results={results}
                 isLoading={isLoading}
                 error={error}
+                originalId={originalId}
               />
             </div>
           </div>

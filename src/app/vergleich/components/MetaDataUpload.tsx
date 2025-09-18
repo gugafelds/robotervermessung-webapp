@@ -85,7 +85,7 @@ export const MetadataUpload: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMode, bahnId, startDate, endDate, loadStats]);
+  }, [selectedMode, bahnId, startDate, endDate, duplicateHandling, loadStats]);
 
   return (
     <div className="mx-auto w-fit min-w-96 max-w-xl space-y-2 p-6">

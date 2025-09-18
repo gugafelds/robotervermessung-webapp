@@ -16,12 +16,14 @@ interface SimilarityResultsProps {
   results: SimilarityResult[];
   isLoading: boolean;
   error?: string;
+  originalId?: string;
 }
 
 const SimilarityResults: React.FC<SimilarityResultsProps> = ({
   results,
   isLoading,
   error,
+  originalId,
 }) => {
   if (isLoading) {
     return (
@@ -55,6 +57,13 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
       </div>
     );
   }
+
+  // Target-Erkennung basierend auf ursprünglich eingegebener ID
+  const isTargetEntry = (result: SimilarityResult): boolean => {
+    if (!originalId) return false;
+    const currentId = result.segment_id || result.bahn_id || '';
+    return currentId.includes(originalId);
+  };
 
   return (
     <div className="w-full overflow-hidden rounded-lg bg-white shadow-md">
@@ -96,21 +105,25 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
             {results.map((result, index) => {
-              const isTarget = result.similarity_score === 0;
+              const isTarget = isTargetEntry(result);
               const id = result.segment_id || result.bahn_id || 'N/A';
               const type = id.includes('_') ? 'Segment' : 'Bahn';
 
+              // Eindeutiger Key basierend auf ID statt Array-Index
+              const uniqueKey = `${id}-${index}`;
+
+              // Bedingte Klassennamen aufteilen für bessere Lesbarkeit
+              let rowClassName = 'transition-colors hover:bg-gray-100';
+              if (isTarget) {
+                rowClassName += ' border-l-4 border-blue-500 bg-blue-50';
+              } else if (index % 2 === 0) {
+                rowClassName += ' bg-white';
+              } else {
+                rowClassName += ' bg-gray-50';
+              }
+
               return (
-                <tr
-                  key={index}
-                  className={`${
-                    isTarget
-                      ? 'border-l-4 border-blue-500 bg-blue-50'
-                      : index % 2 === 0
-                        ? 'bg-white'
-                        : 'bg-gray-50'
-                  } transition-colors hover:bg-gray-100`}
-                >
+                <tr key={uniqueKey} className={rowClassName}>
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="flex items-center">
                       {isTarget && (
