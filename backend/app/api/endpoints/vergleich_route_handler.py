@@ -3,10 +3,11 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from ...database import get_db
 from ...utils.similarity_searcher import SimilaritySearcher
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 from ...database import get_db_pool
 from ...utils.metadata_calculator import MetadataCalculatorService
 from ...utils.background_tasks import (
+    process_segment_similarity_background,
     process_metadata_background,
     process_meta_values_calculation,
     create_task_id,
@@ -44,6 +45,7 @@ class TaskStatusResponse(BaseModel):
     errors: List[str] = []
     details: dict = {}
     summary: Optional[dict] = None
+    results: Optional[List[dict]] = None
     error: Optional[str] = None
 
 
@@ -53,9 +55,19 @@ class MetadataCalculationResponse(BaseModel):
     message: str
     estimated_duration_minutes: Optional[float] = None
 
+class SegmentSimilarityRequest(BaseModel):
+    segment_limit: int = 5
+    weight_duration: float = 1.0
+    weight_weight: float = 1.0
+    weight_length: float = 1.0
+    weight_movement_type: float = 1.0
+    weight_direction_x: float = 1.0
+    weight_direction_y: float = 1.0
+    weight_direction_z: float = 1.0
+
 ############################ ÄHNLICHKEITSSUCHE #################################################################
 
-@router.get("/aehnlichkeitssuche/{target_id}")
+@router.get("/similarity/{target_id}")
 async def similarity_search(
     target_id: str,
     bahn_limit: int = Query(10, ge=1, le=50, description="Anzahl ähnlicher Bahnen"),
@@ -90,7 +102,7 @@ async def similarity_search(
         }
 
         # Immer hierarchische Suche verwenden
-        results = await searcher.find_similar_unified_complex(
+        results = await searcher.find_similar_bs(
             target_id=target_id,
             bahn_limit=bahn_limit,
             segment_limit=segment_limit,
@@ -109,25 +121,32 @@ async def similarity_search(
         logger.error(f"Fehler bei hierarchischer Ähnlichkeitssuche für {target_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Interner Serverfehler: {str(e)}")
 
-@router.get("/aehnlichkeitssuche/{target_id}/segmente")
-async def similarity_search_segmente_only(
-    target_segment_id: str,
-    limit: int = Query(5, ge=1, le=20, description="Anzahl ähnlicher Segmente"),
-    # Gewichtungsparameter
-    weight_duration: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Duration"),
-    weight_weight: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Weight"),
-    weight_length: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Length"),
-    weight_movement_type: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Movement Type"),
-    weight_direction_x: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Direction X"),
-    weight_direction_y: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Direction Y"),
-    weight_direction_z: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Direction Z"),
-    conn=Depends(get_db)
+
+@router.get("/similarity/bahnen/{target_id}")
+async def similarity_search_bahnen_only(
+        target_id: str,
+        limit: int = Query(10, ge=1, le=50, description="Anzahl ähnlicher Bahnen"),
+        # Gewichtungsparameter
+        weight_duration: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Duration"),
+        weight_weight: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Weight"),
+        weight_length: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Length"),
+        weight_movement_type: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Movement Type"),
+        weight_direction_x: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Direction X"),
+        weight_direction_y: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Direction Y"),
+        weight_direction_z: float = Query(1.0, ge=0.0, le=10.0, description="Gewichtung für Direction Z"),
+        conn=Depends(get_db)
 ):
     """
-    KOMPLEXE Ähnlichkeitssuche nur für ein spezifisches Segment
+    Schnelle Ähnlichkeitssuche nur für Bahnen
+
+    Gibt nur ähnliche Bahnen zurück - ohne Segment-Berechnung
     """
     try:
         searcher = SimilaritySearcher(conn)
+
+        # Detect ID type and get target bahn
+        id_type = searcher.detect_id_type(target_id)
+        target_bahn_id = target_id if id_type == 'bahn' else target_id.split('_')[0]
 
         # Gewichtungen zusammenstellen
         weights = {
@@ -140,78 +159,105 @@ async def similarity_search_segmente_only(
             'direction_z': weight_direction_z
         }
 
-        # Prüfe ob es eine gültige Segment-ID ist
-        if searcher.detect_id_type(target_segment_id) != 'segment':
-            raise HTTPException(status_code=400, detail="Eingabe muss eine Segment-ID sein (mit Unterstrich)")
+        # Nur Bahn-Ähnlichkeitssuche
+        bahn_results = await searcher.find_similar_bahnen(target_bahn_id, limit, weights)
 
-        results = await searcher.find_similar_segmente_complex(target_segment_id, limit, weights)
+        if "error" in bahn_results:
+            raise HTTPException(status_code=404, detail=bahn_results["error"])
 
-        if "error" in results:
-            raise HTTPException(status_code=404, detail=results["error"])
+        logger.info(f"Bahn-Ähnlichkeitssuche für {target_id} erfolgreich")
 
         return {
-            "target_segment_id": target_segment_id,
-            "results": results,
-            "calculation_method": "complex_weighted_similarity"
+            "target_bahn_id": target_bahn_id,
+            "original_input": target_id,
+            "input_type": id_type,
+            "bahn_similarity": bahn_results,
+            "calculation_method": "fast_bahnen_only"
         }
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Fehler bei komplexer Segment-Ähnlichkeitssuche für {target_segment_id}: {str(e)}")
+        logger.error(f"Fehler bei Bahn-Ähnlichkeitssuche für {target_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Interner Serverfehler: {str(e)}")
 
 
-@router.get("/info/{target_id}")
-async def get_similarity_info(
+@router.post("/similarity/segments/start-task/{target_id}")
+async def start_segment_similarity_task(
         target_id: str,
+        request: SegmentSimilarityRequest,
+        background_tasks: BackgroundTasks,
         conn=Depends(get_db)
 ):
     """
-    Informationen über eine ID (Typ, Meta-Value, verfügbare Segmente)
+    Startet Segment-Ähnlichkeitssuche als Background Task
+
+    Gibt task_id zurück für Status-Polling
     """
     try:
+        # Cleanup alte Tasks
+        cleanup_old_tasks()
+
         searcher = SimilaritySearcher(conn)
 
+        # Detect ID type and get target bahn
         id_type = searcher.detect_id_type(target_id)
-        info = {
-            "id": target_id,
-            "type": id_type,
-            # ENTFERNEN: "normalized_id": searcher.normalize_id(target_id)
+        target_bahn_id = target_id if id_type == 'bahn' else target_id.split('_')[0]
+
+        # Prüfe ob target_bahn_id existiert und Segmente hat
+        target_segments = await searcher.get_bahn_segments(target_bahn_id)
+        if not target_segments:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Keine Segmente gefunden für Bahn {target_bahn_id}"
+            )
+
+        # Gewichtungen aus Request-Body
+        weights = {
+            'duration': request.weight_duration,
+            'weight': request.weight_weight,
+            'length': request.weight_length,
+            'movement_type': request.weight_movement_type,
+            'direction_x': request.weight_direction_x,
+            'direction_y': request.weight_direction_y,
+            'direction_z': request.weight_direction_z
         }
 
-        if id_type == 'bahn':
-            info["meta_value"] = await searcher.get_target_bahn_meta_value(target_id)
-            info["segments"] = await searcher.get_bahn_segments(target_id)
-        else:
-            info["meta_value"] = await searcher.get_target_segment_meta_value(target_id)
-            bahn_id = target_id.split('_')[0]
-            info["parent_bahn_id"] = bahn_id
-            info["sibling_segments"] = await searcher.get_bahn_segments(bahn_id)
+        # Task-ID generieren
+        task_id = create_task_id("segments")
 
-        return info
+        # Geschätzte Dauer berechnen (ca. 2-5 Sekunden pro Segment)
+        estimated_seconds = len(target_segments) * 3.0  # Durchschnitt 3 Sekunden pro Segment
+        estimated_minutes = estimated_seconds / 60
 
+        # Background Task starten
+        background_tasks.add_task(
+            process_segment_similarity_background,
+            task_id=task_id,
+            target_bahn_id=target_bahn_id,
+            segment_limit=request.segment_limit,
+            weights=weights,
+            total_segments=len(target_segments)
+        )
+
+        logger.info(f"Started segment similarity task {task_id} for {target_bahn_id} ({len(target_segments)} segments)")
+
+        return {
+            "task_id": task_id,
+            "status": "started",
+            "message": f"Segment-Ähnlichkeitssuche gestartet für {len(target_segments)} Segmente",
+            "target_bahn_id": target_bahn_id,
+            "original_input": target_id,
+            "input_type": id_type,
+            "total_segments": len(target_segments),
+            "estimated_duration_minutes": round(estimated_minutes, 1)
+        }
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Fehler beim Laden der Info für {target_id}: {str(e)}")
+        logger.error(f"Fehler beim Starten der Segment-Task für {target_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Interner Serverfehler: {str(e)}")
-
-@router.get("/weights/defaults")
-async def get_default_weights():
-    """
-    Gibt die Standard-Gewichtungen zurück
-    """
-    return {
-        "default_weights": {
-            "duration": 1.0,
-            "weight": 1.0,
-            "length": 1.0,
-            "movement_type": 1.0,
-            "direction_x": 1.0,
-            "direction_y": 1.0,
-            "direction_z": 1.0
-        },
-        "description": "Standard-Gewichtungen für komplexe Ähnlichkeitsberechnung"
-    }
 
 
 ############################ METADATA BERECHNEN #################################################################
@@ -275,7 +321,7 @@ async def calculate_metadata(
             )
 
         # Task-ID generieren
-        task_id = create_task_id()
+        task_id = create_task_id("metadata")
 
         # Geschätzte Dauer berechnen (ca. 0.5-2 Sekunden pro Bahn)
         estimated_seconds = len(bahn_ids) * 1.0  # Durchschnitt 1 Sekunde pro Bahn
@@ -317,10 +363,43 @@ async def get_task_status_endpoint(task_id: str):
     if not task_data:
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
-    # Progress berechnen
+    # DEBUG LOG - zeige rohe Task Data:
+    print(f"DEBUG Raw Task Data for {task_id}:")
+    print(f"  total_bahns: {task_data.get('total_bahns')}")
+    print(f"  total_segments: {task_data.get('total_segments')}")
+    print(f"  processed_bahns: {task_data.get('processed_bahns')}")
+    print(f"  processed_segments: {task_data.get('processed_segments')}")
+    print(f"  current_segment: {task_data.get('current_segment')}")
+    print(f"  status: {task_data.get('status')}")
+
+    # Progress berechnen - flexibel für Bahn- und Segment-Tasks
     progress_percent = 0.0
+    total_items = 0
+    processed_items = 0
+
+    # Prüfe Task-Typ anhand vorhandener Felder
     if task_data.get("total_bahns", 0) > 0:
-        progress_percent = (task_data.get("processed_bahns", 0) / task_data["total_bahns"]) * 100
+        # Bahn-Task
+        total_items = task_data.get("total_bahns", 0)
+        processed_items = task_data.get("processed_bahns", 0)
+        print(f"DEBUG: Detected BAHN task - total: {total_items}, processed: {processed_items}")
+    elif task_data.get("total_segments", 0) > 0:
+        # Segment-Task
+        total_items = task_data.get("total_segments", 0)
+        processed_items = task_data.get("processed_segments", 0)
+        print(f"DEBUG: Detected SEGMENT task - total: {total_items}, processed: {processed_items}")
+    else:
+        print(f"DEBUG: Could not detect task type!")
+
+    if total_items > 0:
+        progress_percent = (processed_items / total_items) * 100
+        print(f"DEBUG: Calculated progress: {progress_percent}%")
+
+    # DEBUG LOG - zeige finale Response-Werte:
+    print(f"DEBUG Response Values:")
+    print(f"  total_bahns (mapped): {total_items}")
+    print(f"  processed_bahns (mapped): {processed_items}")
+    print(f"  progress_percent: {progress_percent}")
 
     return TaskStatusResponse(
         task_id=task_id,
@@ -328,15 +407,16 @@ async def get_task_status_endpoint(task_id: str):
         started_at=task_data.get("started_at"),
         completed_at=task_data.get("completed_at"),
         failed_at=task_data.get("failed_at"),
-        total_bahns=task_data.get("total_bahns", 0),
-        processed_bahns=task_data.get("processed_bahns", 0),
-        successful_bahns=task_data.get("successful_bahns", 0),
-        failed_bahns=task_data.get("failed_bahns", 0),
-        current_bahn=task_data.get("current_bahn"),
+        total_bahns=total_items,
+        processed_bahns=processed_items,
+        successful_bahns=task_data.get("successful_bahns") or task_data.get("successful_segments", 0),
+        failed_bahns=task_data.get("failed_bahns") or task_data.get("failed_segments", 0),
+        current_bahn=task_data.get("current_bahn") or task_data.get("current_segment"),
         progress_percent=round(progress_percent, 1),
         errors=task_data.get("errors", []),
         details=task_data.get("details", {}),
         summary=task_data.get("summary"),
+        results=task_data.get("results"),
         error=task_data.get("error")
     )
 
@@ -560,7 +640,7 @@ async def calculate_meta_values(
         cleanup_old_tasks()
 
         # Task-ID generieren
-        task_id = create_task_id()
+        task_id = create_task_id("meta_values")
 
         # Geschätzte Anzahl Rows ermitteln
         async with db_pool.acquire() as conn:

@@ -18,6 +18,9 @@ interface SimilarityResultsProps {
   isLoading: boolean;
   error?: string;
   originalId?: string;
+  // Neue Props für progressives Loading
+  isSegmentTaskRunning?: boolean;
+  segmentProgress?: string;
 }
 
 const SimilarityResults: React.FC<SimilarityResultsProps> = ({
@@ -25,13 +28,23 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
   isLoading,
   error,
   originalId,
+  isSegmentTaskRunning = false,
+  segmentProgress = '',
 }) => {
+  // Bahnen vs Segmente trennen für bessere Anzeige
+  const bahnResults = results.filter(
+    (r) => !r.segment_id || !r.segment_id.includes('_'),
+  );
+  const segmentResults = results.filter(
+    (r) => r.segment_id && r.segment_id.includes('_'),
+  );
+
   if (isLoading) {
     return (
       <div className="w-full rounded-lg bg-white p-6 shadow-md">
         <div className="flex items-center justify-center py-8">
           <div className="size-8 animate-spin rounded-full border-b-2 border-blue-600" />
-          <span className="ml-3 text-gray-600">Suche ähnliche Einträge...</span>
+          <span className="ml-3 text-gray-600">Lade Bahn-Ähnlichkeiten...</span>
         </div>
       </div>
     );
@@ -48,7 +61,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
     );
   }
 
-  if (results.length === 0) {
+  if (results.length === 0 && !isSegmentTaskRunning) {
     return (
       <div className="w-full rounded-lg bg-white p-6 shadow-md">
         <div className="py-8 text-center text-gray-500">
@@ -66,12 +79,12 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
     return currentId.includes(originalId);
   };
 
-  return (
-    <div className="w-full overflow-hidden rounded-lg bg-white shadow-md">
+  const renderTable = (data: SimilarityResult[], title: string) => (
+    <div className="mb-6">
       <div className="border-b bg-gray-50 px-6 py-4">
-        <h3 className="text-lg font-medium text-gray-900">
-          Ähnlichkeitsergebnisse ({results.length})
-        </h3>
+        <h4 className="font-medium text-gray-900">
+          {title} ({data.length})
+        </h4>
       </div>
 
       <div className="overflow-x-auto">
@@ -105,15 +118,12 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
-            {results.map((result, index) => {
+            {data.map((result, index) => {
               const isTarget = isTargetEntry(result);
               const id = result.segment_id || result.bahn_id || 'N/A';
               const type = id.includes('_') ? 'Segment' : 'Bahn';
-
-              // Eindeutiger Key basierend auf ID statt Array-Index
               const uniqueKey = `${id}-${index}`;
 
-              // Bedingte Klassennamen aufteilen für bessere Lesbarkeit
               let rowClassName = 'transition-colors hover:bg-gray-100';
               if (isTarget) {
                 rowClassName += ' border-l-4 border-blue-500 bg-blue-50';
@@ -133,13 +143,14 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
                       <span
                         className={`text-sm ${isTarget ? 'font-bold text-blue-900' : 'text-gray-900'}`}
                       >
-                      <Link
-  href={`/bewegungsdaten/${id.split('_')[0]}`}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="flex items-center">
-  <span>{id}</span>
-</Link>
+                        <Link
+                          href={`/bewegungsdaten/${id.split('_')[0]}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center hover:text-blue-600"
+                        >
+                          <span>{id}</span>
+                        </Link>
                       </span>
                     </div>
                   </td>
@@ -192,6 +203,51 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
           </tbody>
         </table>
       </div>
+    </div>
+  );
+
+  return (
+    <div className="w-full overflow-hidden rounded-lg bg-white shadow-md">
+      <div className="border-b bg-gray-50 px-6 py-4">
+        <h3 className="text-lg font-medium text-gray-900">
+          Ähnlichkeitsergebnisse
+        </h3>
+        <p className="mt-1 text-sm text-gray-600">
+          {bahnResults.length > 0 && `${bahnResults.length} Bahnen`}
+          {bahnResults.length > 0 && segmentResults.length > 0 && ' • '}
+          {segmentResults.length > 0 && `${segmentResults.length} Segmente`}
+        </p>
+      </div>
+
+      {/* Bahn-Ergebnisse (sofort verfügbar) */}
+      {bahnResults.length > 0 && renderTable(bahnResults, 'Ähnliche Bahnen')}
+
+      {/* Segment-Status */}
+      {isSegmentTaskRunning && (
+        <div className="border-b bg-yellow-50 px-6 py-4">
+          <div className="flex items-center">
+            <div className="size-4 animate-spin rounded-full border-b-2 border-yellow-600" />
+            <span className="ml-3 text-sm text-yellow-800">
+              Berechne Segment-Ähnlichkeiten...
+              {segmentProgress && ` ${segmentProgress}`}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Segment-Ergebnisse (kommen später) */}
+      {segmentResults.length > 0 &&
+        renderTable(segmentResults, 'Ähnliche Segmente')}
+
+      {/* Fallback wenn gar nichts da ist */}
+      {!isSegmentTaskRunning &&
+        bahnResults.length === 0 &&
+        segmentResults.length === 0 && (
+          <div className="py-8 text-center text-gray-500">
+            <p>Keine Ergebnisse gefunden</p>
+            <p className="mt-1 text-sm">Versuchen Sie eine andere ID</p>
+          </div>
+        )}
     </div>
   );
 };

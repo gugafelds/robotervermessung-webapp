@@ -15,7 +15,7 @@ type SimilaritySearchProps = {
 
 const SimilaritySearch: React.FC<SimilaritySearchProps> = ({ onSearch }) => {
   const [id, setId] = useState('');
-  const [bahnLimit, setBahnLimit] = useState(10);
+  const [bahnLimit, setBahnLimit] = useState(5);
 
   // Gewichtungs-State
   const [weights, setWeights] = useState({
@@ -63,7 +63,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({ onSearch }) => {
     zeit: {
       duration: 10.0,
       weight: 1.0,
-      length: 1.0,
+      length: 2.0,
       movement_type: 1.0,
       direction_x: 1.0,
       direction_y: 1.0,
@@ -102,8 +102,8 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({ onSearch }) => {
   };
 
   return (
-    <div className="w-full bg-gray-100 p-4">
-      <div className="space-y-3">
+    <div className="w-full rounded border border-gray-300 bg-gray-100 p-4">
+      <div className="space-y-2">
         {/* Haupteingabe */}
         <div>
           <input
@@ -132,19 +132,19 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({ onSearch }) => {
               onClick={() => applyPreset('geometrie')}
               className="rounded-full bg-green-200 px-3 py-1 text-xs transition-colors hover:bg-green-300"
             >
-              Fokus Geometrie
+              Geometrie
             </button>
             <button
               onClick={() => applyPreset('bewegung')}
               className="rounded-full bg-blue-200 px-3 py-1 text-xs transition-colors hover:bg-blue-300"
             >
-              Fokus Bewegung
+              Bewegung
             </button>
             <button
               onClick={() => applyPreset('zeit')}
               className="rounded-full bg-yellow-200 px-3 py-1 text-xs transition-colors hover:bg-yellow-300"
             >
-              Fokus Zeit
+              Zeit
             </button>
           </div>
         </div>
@@ -223,7 +223,8 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({ onSearch }) => {
         {/* Such-Button */}
         <button
           onClick={handleSearch}
-          className="w-full rounded-lg bg-blue-600 py-2 font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-lg bg-blue-600 py-2 font-medium text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          style={{ backgroundColor: '#003560' }}
         >
           Ähnliche finden
         </button>
