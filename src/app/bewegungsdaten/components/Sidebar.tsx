@@ -108,7 +108,6 @@ export const Sidebar = () => {
 
   // Intersection Observer für Infinite Scrolling
   useEffect(() => {
-    // Only set up observer if there's more to load and we're not already loading
     if (!pagination?.hasNext || isLoading) {
       return undefined; // Explicit return for consistent-return rule
     }
@@ -120,7 +119,6 @@ export const Sidebar = () => {
         pagination?.hasNext &&
         !isLoadingNextPageRef.current
       ) {
-        // Add a small delay to prevent accidental double-triggering
         setTimeout(() => {
           loadNextPage();
         }, 100);

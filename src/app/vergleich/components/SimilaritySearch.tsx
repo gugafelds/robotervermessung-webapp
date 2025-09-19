@@ -2,7 +2,9 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+
+import type { BahnInfo } from '@/types/bewegungsdaten.types';
 
 type SimilaritySearchProps = {
   onSearch: (
@@ -11,11 +13,18 @@ type SimilaritySearchProps = {
     segmentLimit: number,
     weights: Record<string, number>,
   ) => void;
+  bahnInfo?: BahnInfo[] | undefined;
 };
 
-const SimilaritySearch: React.FC<SimilaritySearchProps> = ({ onSearch }) => {
+const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
+  onSearch,
+  bahnInfo,
+}) => {
   const [id, setId] = useState('');
   const [bahnLimit, setBahnLimit] = useState(5);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Gewichtungs-State
   const [weights, setWeights] = useState({
@@ -30,6 +39,26 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({ onSearch }) => {
 
   // Segment Limit ist automatisch die Hälfte von Bahn Limit, aufgerundet
   const segmentLimit = Math.ceil(bahnLimit / 2);
+
+  // Hole die letzten 5 Bahn-IDs (neueste zuerst)
+  const recentBahnIds = bahnInfo ? bahnInfo.map((bahn) => bahn.bahnID) : [];
+
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        inputRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        !inputRef.current.contains(event.target as Node)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Preset-Konfigurationen
   const presets = {
@@ -74,13 +103,29 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({ onSearch }) => {
   const handleSearch = () => {
     if (id.trim()) {
       onSearch(id.trim(), bahnLimit, segmentLimit, weights);
+      setShowDropdown(false);
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSearch();
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false);
     }
+  };
+
+  const handleInputFocus = () => {
+    if (recentBahnIds.length > 0) {
+      setShowDropdown(true);
+    }
+  };
+
+  const handleBahnIdSelect = (selectedId: string) => {
+    setId(selectedId);
+    setShowDropdown(false);
+    // Optional: Sofort suchen nach Auswahl
+    // onSearch(selectedId, bahnLimit, segmentLimit, weights);
   };
 
   const handleBahnLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,16 +149,39 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({ onSearch }) => {
   return (
     <div className="w-full rounded border border-gray-300 bg-gray-100 p-4">
       <div className="space-y-2">
-        {/* Haupteingabe */}
-        <div>
+        {/* Haupteingabe mit Dropdown */}
+        <div className="relative">
           <input
+            ref={inputRef}
             type="text"
             placeholder="Bahn/Segment-ID eingeben..."
             value={id}
             onChange={(e) => setId(e.target.value)}
             onKeyDown={handleKeyPress}
+            onFocus={handleInputFocus}
             className="w-full rounded-xl bg-gray-50 p-3 text-lg shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+
+          {/* Dropdown mit letzten Bahn-IDs */}
+          {showDropdown && recentBahnIds.length > 0 && (
+            <div
+              ref={dropdownRef}
+              className="absolute inset-x-0 top-full z-10 mt-1 rounded-lg border border-gray-200 bg-white shadow-lg"
+            >
+              <div className="p-2">
+                {recentBahnIds.map((bahnId, index) => (
+                  <button
+                    key={bahnId}
+                    onClick={() => handleBahnIdSelect(bahnId)}
+                    className="flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100"
+                  >
+                    <span className="font-mono">{bahnId}</span>
+                    <span className="text-xs text-gray-400">#{index + 1}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Preset-Buttons */}

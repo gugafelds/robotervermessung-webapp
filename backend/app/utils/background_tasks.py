@@ -84,12 +84,6 @@ async def process_segment_similarity_background(
                 task_data["current_segment"] = target_segment_id
                 task_data["processed_segments"] = i + 1
 
-                logger.info(
-                    f"Task {task_id} Progress: {i + 1}/{len(target_segments)} segments - Current: {target_segment_id}")
-                print(
-                    f"DEBUG Task Store Update: processed={task_data['processed_segments']}, total={task_data['total_segments']}")
-                print(f"DEBUG Full Task Data Keys: {list(task_data.keys())}")
-
                 try:
                     # Einzelnes Segment verarbeiten
                     # Hier müssen wir eine neue Methode in SimilaritySearcher erstellen

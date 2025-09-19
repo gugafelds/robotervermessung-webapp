@@ -467,7 +467,7 @@ export const SimilarityService = {
           clearInterval(pollInterval);
           reject(error);
         }
-      }, 500); // Alle 2 Sekunden pollen
+      }, 500);
     });
   },
 };

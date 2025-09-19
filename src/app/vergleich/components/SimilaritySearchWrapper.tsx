@@ -7,11 +7,18 @@ import type {
   SimilaritySearchParams,
 } from '@/src/actions/vergleich.service';
 import { SimilarityService } from '@/src/actions/vergleich.service';
+import type { BahnInfo } from '@/types/bewegungsdaten.types';
 
 import SimilarityResults from './SimilarityResults';
 import SimilaritySearch from './SimilaritySearch';
 
-export default function SimilaritySearchWrapper() {
+interface SimilaritySearchWrapperProps {
+  bahnInfo?: BahnInfo[];
+}
+
+export default function SimilaritySearchWrapper({
+  bahnInfo,
+}: SimilaritySearchWrapperProps) {
   const [results, setResults] = useState<SimilarityResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -75,7 +82,7 @@ export default function SimilaritySearchWrapper() {
 
   return (
     <div className="space-y-6">
-      <SimilaritySearch onSearch={handleSearch} />
+      <SimilaritySearch onSearch={handleSearch} bahnInfo={bahnInfo} />
       <SimilarityResults
         results={results}
         isLoading={isLoading}

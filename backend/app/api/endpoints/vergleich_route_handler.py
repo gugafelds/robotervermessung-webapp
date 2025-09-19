@@ -363,15 +363,6 @@ async def get_task_status_endpoint(task_id: str):
     if not task_data:
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
-    # DEBUG LOG - zeige rohe Task Data:
-    print(f"DEBUG Raw Task Data for {task_id}:")
-    print(f"  total_bahns: {task_data.get('total_bahns')}")
-    print(f"  total_segments: {task_data.get('total_segments')}")
-    print(f"  processed_bahns: {task_data.get('processed_bahns')}")
-    print(f"  processed_segments: {task_data.get('processed_segments')}")
-    print(f"  current_segment: {task_data.get('current_segment')}")
-    print(f"  status: {task_data.get('status')}")
-
     # Progress berechnen - flexibel für Bahn- und Segment-Tasks
     progress_percent = 0.0
     total_items = 0
@@ -382,24 +373,13 @@ async def get_task_status_endpoint(task_id: str):
         # Bahn-Task
         total_items = task_data.get("total_bahns", 0)
         processed_items = task_data.get("processed_bahns", 0)
-        print(f"DEBUG: Detected BAHN task - total: {total_items}, processed: {processed_items}")
     elif task_data.get("total_segments", 0) > 0:
         # Segment-Task
         total_items = task_data.get("total_segments", 0)
         processed_items = task_data.get("processed_segments", 0)
-        print(f"DEBUG: Detected SEGMENT task - total: {total_items}, processed: {processed_items}")
-    else:
-        print(f"DEBUG: Could not detect task type!")
 
     if total_items > 0:
         progress_percent = (processed_items / total_items) * 100
-        print(f"DEBUG: Calculated progress: {progress_percent}%")
-
-    # DEBUG LOG - zeige finale Response-Werte:
-    print(f"DEBUG Response Values:")
-    print(f"  total_bahns (mapped): {total_items}")
-    print(f"  processed_bahns (mapped): {processed_items}")
-    print(f"  progress_percent: {progress_percent}")
 
     return TaskStatusResponse(
         task_id=task_id,
@@ -423,9 +403,6 @@ async def get_task_status_endpoint(task_id: str):
 
 @router.get("/tasks")
 async def list_all_tasks():
-    """
-    Listet alle Tasks auf (für Admin/Debugging)
-    """
     tasks = get_all_tasks()
 
     # Formatiere für bessere Übersicht
