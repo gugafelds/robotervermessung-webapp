@@ -39,7 +39,7 @@ export function AuswertungWrapper() {
       const hasData = await checkPositionDataAvailability(id);
       setHasDeviationData(hasData);
     } catch (error) {
-      console.error('Fehler beim Laden der Bahndaten:', error);
+      /* empty */
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +99,6 @@ export function AuswertungWrapper() {
           hasDeviationData={hasDeviationData}
           bahnId={id}
           selectedSegment={selectedSegment}
-          onSegmentChange={handleSegmentChange}
         />
       </div>
     </>

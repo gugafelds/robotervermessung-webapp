@@ -134,14 +134,27 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     title: '3D-Position',
     autosize: true,
     height: 500,
-    width: 650,
-    margin: { l: 20, r: 20, b: 60, t: 50 },
+    scene: {
+      camera: {
+        up: { x: 0, y: 0, z: 1 },
+        center: { x: 0, y: 0, z: -0.1 },
+        eye: { x: 1.15, y: 1, z: 1 },
+      },
+      aspectmode: 'cube',
+      dragmode: 'orbit',
+      xaxis: { title: 'X [mm]', showgrid: true, zeroline: true },
+      yaxis: { title: 'Y [mm]', showgrid: true, zeroline: true },
+      zaxis: { title: 'Z [mm]', showgrid: true, zeroline: true },
+    },
+    margin: { t: 50, b: 20, l: 20, r: 20 },
     showlegend: true,
+    width: 600,
     legend: {
       orientation: 'h',
-      y: -0.1, // Legende näher zum Plot
+      y: -0.15,
       x: 0.5,
       xanchor: 'center',
+      bgcolor: 'rgba(255,255,255,0.8)',
     },
   };
 
@@ -170,7 +183,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
             'zoom3d',
             'tableRotation',
             'pan3d',
-            'resetCameraLastSave3d',
+            'resetCameraDefault3d',
           ],
           responsive: true,
         }}

@@ -149,7 +149,7 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
 
   if (isLoading) {
     return (
-      <div className="mb-6 w-1/2 rounded-lg border bg-white p-6 shadow-sm">
+      <div className="mb-6 rounded-lg border bg-white p-6 shadow-sm">
         <div className="flex items-center justify-center">
           <div className="size-5 animate-spin rounded-full border-b-2 border-gray-900" />
           <span className="ml-2">Lade Metriken...</span>
@@ -160,7 +160,7 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
 
   if (!eaMetrics && !dfdMetrics && !dtwMetrics && !sidtwMetrics) {
     return (
-      <div className="mb-6 w-full rounded-lg border bg-gray-200 p-6 shadow-sm">
+      <div className="mb-6 rounded-lg border bg-gray-200 p-6 shadow-sm">
         <Typography as="p" className="text-center text-gray-500">
           Keine Metriken verfügbar
         </Typography>
@@ -169,14 +169,14 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
   }
 
   return (
-    <div className="h-fit w-full rounded-lg border bg-gray-100 p-6 shadow-sm">
+    <div className="h-fit rounded-lg border bg-gray-100 p-6 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <Typography as="h2">Position</Typography>
 
         <div className="relative">
           <button
             onClick={() => setShowDropdown(!showDropdown)}
-            className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50"
+            className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm hover:bg-gray-50"
           >
             {segmentOptions.find((opt) => opt.value === selectedSegment)
               ?.label || 'Auswählen'}
