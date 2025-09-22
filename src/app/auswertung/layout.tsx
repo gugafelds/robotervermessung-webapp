@@ -23,7 +23,6 @@ export default async function AuswertungLayout({
       <main className="flex flex-col lg:flex-row">
         <Sidebar /> {/* ← Links: Sidebar */}
         {children}{' '}
-        {/* ← Mitte + Rechts: AuswertungWrapper mit TrajectoryInfo + Auswertung */}
       </main>
     </TrajectoryProvider>
   );

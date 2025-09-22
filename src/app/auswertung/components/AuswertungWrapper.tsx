@@ -15,10 +15,19 @@ import { useTrajectory } from '@/src/providers/trajectory.provider';
 export function AuswertungWrapper() {
   const [hasDeviationData, setHasDeviationData] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Zentraler State für Segmentauswahl
+  const [selectedSegment, setSelectedSegment] = useState<string>('total');
+
   const params = useParams();
   const id = params?.id as string;
 
   const { currentBahnInfo, setCurrentBahnInfo } = useTrajectory();
+
+  // Handler für Segmentauswahl - WICHTIG: useCallback verwenden!
+  const handleSegmentChange = useCallback((segment: string) => {
+    setSelectedSegment(segment);
+  }, []);
 
   const loadBahnDetails = useCallback(async () => {
     if (!id) return;
@@ -39,6 +48,8 @@ export function AuswertungWrapper() {
   // Lade beim ersten Rendern und wenn sich die Bahn-ID ändert
   useEffect(() => {
     loadBahnDetails();
+    // Reset segment selection when changing trajectory
+    setSelectedSegment('total');
   }, [loadBahnDetails]);
 
   // Lade Bahn-Info wenn sie noch nicht geladen ist
@@ -49,7 +60,7 @@ export function AuswertungWrapper() {
       const bahnInfo = await getBahnInfoById(id);
       setCurrentBahnInfo(bahnInfo);
     } catch (err) {
-      console.error('Bahninfo wurde nicht gefunden:', err);
+      /* empty */
     }
   }, [id, setCurrentBahnInfo]);
 
@@ -78,9 +89,18 @@ export function AuswertungWrapper() {
     <>
       <TrajectoryInfo />
 
-      <div className="flex h-fullscreen w-full space-x-4 overflow-y-auto p-4">
-        <DeviationsPlot hasDeviationData={hasDeviationData} bahnId={id} />
-        <MetrikenPanel bahnId={id} />
+      <div className="h-fullscreen w-full flex-row justify-items-stretch overflow-y-auto p-2">
+        <MetrikenPanel
+          bahnId={id}
+          selectedSegment={selectedSegment}
+          onSegmentChange={handleSegmentChange}
+        />
+        <DeviationsPlot
+          hasDeviationData={hasDeviationData}
+          bahnId={id}
+          selectedSegment={selectedSegment}
+          onSegmentChange={handleSegmentChange}
+        />
       </div>
     </>
   );

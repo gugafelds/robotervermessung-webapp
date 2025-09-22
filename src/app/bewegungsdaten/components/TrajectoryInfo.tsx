@@ -1,8 +1,11 @@
+// TrajectoryInfo.tsx - Mit kontextabhängigem Button
+
 'use client';
 
-import { ChartBarIcon } from '@heroicons/react/24/outline';
+import { ChartBarIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import ErrorIcon from '@heroicons/react/24/outline/FaceFrownIcon';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import React from 'react';
 
 import { Typography } from '@/src/components/Typography';
@@ -50,6 +53,10 @@ const InfoSection: React.FC<InfoSectionProps> = ({ title, children }) => (
 
 export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
   const { currentBahnInfo } = useTrajectory();
+  const pathname = usePathname();
+
+  // Prüfe, ob wir uns auf der Auswertungsseite befinden
+  const isOnAuswertungPage = pathname.includes('/auswertung');
 
   if (currentBahnInfo === null) {
     return (
@@ -79,14 +86,28 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
               </div>
             </div>
 
+            {/* Kontextabhängiger Button */}
             <div className="my-2 flex w-fit rounded-lg bg-primary px-4 py-1 font-medium text-white transition duration-300 ease-in-out hover:bg-gray-800">
               {currentBahnInfo && (
                 <Link
-                  href={`/auswertung/${currentBahnInfo.bahnID}`}
+                  href={
+                    isOnAuswertungPage
+                      ? `/bewegungsdaten/${currentBahnInfo.bahnID}`
+                      : `/auswertung/${currentBahnInfo.bahnID}`
+                  }
                   className="flex items-center"
                 >
-                  <ChartBarIcon className="mr-2 size-5" />
-                  <span>Auswertung</span>
+                  {isOnAuswertungPage ? (
+                    <>
+                      <DocumentTextIcon className="mr-2 size-5" />
+                      <span>Bewegungsdaten</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChartBarIcon className="mr-2 size-5" />
+                      <span>Auswertung</span>
+                    </>
+                  )}
                 </Link>
               )}
             </div>

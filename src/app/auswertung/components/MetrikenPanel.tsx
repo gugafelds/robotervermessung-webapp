@@ -20,11 +20,20 @@ interface SegmentOption {
   value: string;
 }
 
-export const MetrikenPanel: React.FC<{
+// Erweiterte Props Interface mit synchronisierter Segmentauswahl
+interface MetrikenPanelProps {
   bahnId: string;
-}> = ({ bahnId }) => {
+  selectedSegment: string; // Neu: von Parent kontrolliert
+  onSegmentChange: (segment: string) => void; // Neu: Callback für Änderungen
+}
+
+export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
+  bahnId,
+  selectedSegment, // Verwendet den State vom Parent
+  onSegmentChange, // Verwendet den Callback vom Parent
+}) => {
   const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedSegment, setSelectedSegment] = useState<string>('total');
+  // selectedSegment State entfernt - wird jetzt als Prop übergeben
   const [segmentOptions, setSegmentOptions] = useState<SegmentOption[]>([]);
 
   const [eaInfo, setEaInfo] = useState<EAInfo[]>([]);
@@ -87,6 +96,12 @@ export const MetrikenPanel: React.FC<{
     setSegmentOptions(options);
   }, [eaInfo, dfdInfo, dtwInfo, sidtwInfo]);
 
+  // Handler für Segmentauswahl - verwendet den Parent Callback
+  const handleSegmentSelect = (segment: string) => {
+    onSegmentChange(segment);
+    setShowDropdown(false);
+  };
+
   // Calculate metrics for selected segment
   const calculateMetrics = (analyses: any[], prefix: string) => {
     if (analyses.length === 0) return null;
@@ -145,7 +160,7 @@ export const MetrikenPanel: React.FC<{
 
   if (!eaMetrics && !dfdMetrics && !dtwMetrics && !sidtwMetrics) {
     return (
-      <div className="mb-6 w-1/2 rounded-lg border bg-white p-6 shadow-sm">
+      <div className="mb-6 w-full rounded-lg border bg-gray-200 p-6 shadow-sm">
         <Typography as="p" className="text-center text-gray-500">
           Keine Metriken verfügbar
         </Typography>
@@ -154,7 +169,7 @@ export const MetrikenPanel: React.FC<{
   }
 
   return (
-    <div className="h-fit w-1/2 rounded-lg border bg-white p-6 shadow-sm">
+    <div className="h-fit w-full rounded-lg border bg-gray-100 p-6 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <Typography as="h2">Position</Typography>
 
@@ -173,10 +188,7 @@ export const MetrikenPanel: React.FC<{
               {segmentOptions.map((option) => (
                 <button
                   key={option.value}
-                  onClick={() => {
-                    setSelectedSegment(option.value);
-                    setShowDropdown(false);
-                  }}
+                  onClick={() => handleSegmentSelect(option.value)}
                   className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-50"
                 >
                   {option.label}
