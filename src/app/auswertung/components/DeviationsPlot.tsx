@@ -508,7 +508,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
       title: 'Abweichung (mm)',
     },
     hovermode: 'x unified',
-    height: 500,
+    height: 400,
     margin: { t: 40, b: 40, l: 60, r: 20 },
     showlegend: true,
     legend: {
@@ -587,7 +587,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   };
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap gap-4">
           {/* EA Control */}

@@ -29,6 +29,7 @@ export const Sidebar = () => {
   });
 
   const pathname = usePathname();
+  const isAuswertungContext = pathname.startsWith('/auswertung');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedItemRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -255,7 +256,11 @@ export const Sidebar = () => {
               >
                 <div className="flex items-center justify-between">
                   <Link
-                    href={`/bewegungsdaten/${bahn.bahnID?.toString()}`}
+                    href={
+                      isAuswertungContext
+                        ? `/auswertung/${bahn.bahnID}` // ← Auswertung-Links
+                        : `/bewegungsdaten/${bahn.bahnID}`
+                    }
                     className="ml-1"
                   >
                     <div>

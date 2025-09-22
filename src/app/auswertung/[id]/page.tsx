@@ -1,9 +1,7 @@
-import { AuswertungDetails } from '@/src/app/auswertung/components/AuswertungDetails';
+import React from 'react';
 
-export default function AuswertungDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  return <AuswertungDetails bahnId={params.id} />;
+import { AuswertungWrapper } from '@/src/app/auswertung/components/AuswertungWrapper';
+
+export default function AuswertungPage() {
+  return <AuswertungWrapper />;
 }

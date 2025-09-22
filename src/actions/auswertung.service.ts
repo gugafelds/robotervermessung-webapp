@@ -146,60 +146,6 @@ export const getAuswertungBahnIDs = async (
   }
 };
 
-// Angepasste Funktion zur Unterstützung von Paginierung
-/*
-export const getAllAuswertungInfo = async (
-  params: PaginationParams = { page: 1, pageSize: 20 },
-): Promise<AuswertungInfoResponse> => {
-  try {
-    // URL-Parameter für die Paginierung erstellen
-    const queryParams = new URLSearchParams();
-    if (params.page) queryParams.append('page', params.page.toString());
-    if (params.pageSize)
-      queryParams.append('page_size', params.pageSize.toString());
-
-    const result = await fetchFromAPI<ApiResponse>(
-      `/auswertung/auswertung_info?${queryParams.toString()}`,
-    );
-
-    // Daten transformieren
-    const transformedData: AuswertungInfo = {
-      bahn_info: transformBahnInfoResult(result.bahn_info || []),
-      auswertung_info: {
-        info_dfd: transformDFDInfoResult(
-          result.auswertung_info?.info_dfd || [],
-        ),
-        info_sidtw: transformSIDTWInfoResult(
-          result.auswertung_info?.info_sidtw || [],
-        ),
-        info_dtw: transformDTWInfoResult(
-          result.auswertung_info?.info_dtw || [],
-        ),
-        info_euclidean: transformEAInfoResult(
-          result.auswertung_info?.info_euclidean || [],
-        ),
-      },
-    };
-
-    // Paginierung in camelCase transformieren
-    return {
-      auswertungInfo: transformedData,
-      pagination: {
-        total: result.pagination.total,
-        page: result.pagination.page,
-        pageSize: result.pagination.page_size,
-        totalPages: result.pagination.total_pages,
-        hasNext: result.pagination.has_next,
-        hasPrevious: result.pagination.has_previous,
-      },
-    };
-  } catch (error) {
-    console.error('Error fetching all Auswertung info:', error);
-    throw error;
-  }
-};
-*/
-
 export const getAuswertungInfoById = async (
   id: string,
 ): Promise<{

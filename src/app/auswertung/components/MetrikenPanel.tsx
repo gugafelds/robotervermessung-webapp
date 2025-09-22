@@ -154,7 +154,7 @@ export const MetrikenPanel: React.FC<{
   }
 
   return (
-    <div className="mb-6 w-1/2 rounded-lg border bg-white p-6 shadow-sm">
+    <div className="h-fit w-1/2 rounded-lg border bg-white p-6 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <Typography as="h2">Position</Typography>
 

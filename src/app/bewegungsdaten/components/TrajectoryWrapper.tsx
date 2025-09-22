@@ -280,7 +280,7 @@ export function TrajectoryWrapper() {
     </div>
   ) : (
     <>
-      <TrajectoryInfo isTransformed={isTransformed} />
+      <TrajectoryInfo />
       <TrajectoryPlot
         isTransformed={isTransformed}
         plotAvailability={plotAvailability}

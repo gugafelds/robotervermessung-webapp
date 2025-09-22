@@ -39,9 +39,7 @@ interface InfoSectionProps {
   children: React.ReactNode;
 }
 
-interface TrajectoryInfoProps {
-  isTransformed: boolean;
-}
+interface TrajectoryInfoProps {}
 
 const InfoSection: React.FC<InfoSectionProps> = ({ title, children }) => (
   <div className="mb-5 rounded-lg border-l-4 border-primary bg-white p-5 shadow-md">
