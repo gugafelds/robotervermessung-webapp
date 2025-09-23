@@ -14,7 +14,7 @@ from ...utils.background_tasks import (
     get_task_status,
     cleanup_old_tasks,
     get_all_tasks,
-    TaskStatus
+    TaskStatus, find_running_task
 )
 import logging
 
@@ -191,8 +191,7 @@ async def start_segment_similarity_task(
 ):
     """
     Startet Segment-Ähnlichkeitssuche als Background Task
-
-    Gibt task_id zurück für Status-Polling
+    Mit Duplikat-Prüfung
     """
     try:
         # Cleanup alte Tasks
@@ -203,6 +202,20 @@ async def start_segment_similarity_task(
         # Detect ID type and get target bahn
         id_type = searcher.detect_id_type(target_id)
         target_bahn_id = target_id if id_type == 'bahn' else target_id.split('_')[0]
+
+        # DUPLIKAT-PRÜFUNG
+        existing_task = find_running_task("segment_similarity", target_bahn_id)
+        if existing_task:
+            logger.info(f"Task für Bahn {target_bahn_id} läuft bereits: {existing_task}")
+            return {
+                "task_id": existing_task,
+                "status": "already_running",
+                "message": f"Segment-Ähnlichkeitssuche für Bahn {target_bahn_id} läuft bereits",
+                "target_bahn_id": target_bahn_id,
+                "original_input": target_id,
+                "input_type": id_type,
+                "existing_task": True
+            }
 
         # Prüfe ob target_bahn_id existiert und Segmente hat
         target_segments = await searcher.get_bahn_segments(target_bahn_id)
@@ -226,8 +239,8 @@ async def start_segment_similarity_task(
         # Task-ID generieren
         task_id = create_task_id("segments")
 
-        # Geschätzte Dauer berechnen (ca. 2-5 Sekunden pro Segment)
-        estimated_seconds = len(target_segments) * 3.0  # Durchschnitt 3 Sekunden pro Segment
+        # Geschätzte Dauer berechnen
+        estimated_seconds = len(target_segments) * 3.0
         estimated_minutes = estimated_seconds / 60
 
         # Background Task starten
@@ -259,7 +272,6 @@ async def start_segment_similarity_task(
         logger.error(f"Fehler beim Starten der Segment-Task für {target_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Interner Serverfehler: {str(e)}")
 
-
 ############################ METADATA BERECHNEN #################################################################
 
 @router.post("/calculate-metadata", response_model=MetadataCalculationResponse)
@@ -270,10 +282,25 @@ async def calculate_metadata(
 ):
     """
     Startet die Berechnung von Bahn-Metadaten als Background Task
+    Mit Duplikat-Prüfung
     """
     try:
         # Cleanup alte Tasks
         cleanup_old_tasks()
+
+        # DUPLIKAT-PRÜFUNG für Metadata-Tasks
+        existing_task = find_running_task(
+            "metadata_calculation",
+            mode=request.mode,
+            bahn_id=request.bahn_id if request.mode == "single" else None
+        )
+        if existing_task:
+            logger.info(f"Metadata-Task für Mode {request.mode} läuft bereits: {existing_task}")
+            return MetadataCalculationResponse(
+                task_id=existing_task,
+                status="already_running",
+                message=f"Metadata-Berechnung für {request.mode} läuft bereits"
+            )
 
         # Service initialisieren
         service = MetadataCalculatorService(db_pool)
@@ -611,10 +638,23 @@ async def calculate_meta_values(
         background_tasks: BackgroundTasks,
         db_pool=Depends(get_db_pool)
 ):
-    """Startet Meta-Values Berechnung als Background Task"""
+    """
+    Startet Meta-Values Berechnung als Background Task
+    Mit Duplikat-Prüfung
+    """
     try:
         # Cleanup alte Tasks
         cleanup_old_tasks()
+
+        # DUPLIKAT-PRÜFUNG für Meta-Values (global)
+        existing_task = find_running_task("meta_values")
+        if existing_task:
+            logger.info(f"Meta-Values Task läuft bereits: {existing_task}")
+            return {
+                "task_id": existing_task,
+                "status": "already_running",
+                "message": "Meta-Values Berechnung läuft bereits"
+            }
 
         # Task-ID generieren
         task_id = create_task_id("meta_values")
@@ -638,8 +678,8 @@ async def calculate_meta_values(
                 "processed_rows": 0
             }
 
-        # Geschätzte Dauer (sehr schnell, da optimiert)
-        estimated_seconds = total_rows * 0.001  # 1ms pro Row
+        # Geschätzte Dauer
+        estimated_seconds = total_rows * 0.001
         estimated_minutes = estimated_seconds / 60
 
         # Background Task starten

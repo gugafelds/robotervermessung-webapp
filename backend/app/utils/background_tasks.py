@@ -460,3 +460,50 @@ def cleanup_old_tasks(max_age_hours: int = 24):
 def get_all_tasks() -> Dict[str, Dict]:
     """Holt alle Tasks (für Admin/Debugging)"""
     return dict(task_store)
+
+
+def find_running_task(task_type: str, target_bahn_id: str = None, **kwargs) -> Optional[str]:
+    """
+    Sucht nach bereits laufenden Tasks für gleiche Parameter
+
+    Args:
+        task_type: Art des Tasks ("segment_similarity", "metadata_calculation", etc.)
+        target_bahn_id: Bahn-ID für Segment-Tasks
+        **kwargs: Weitere Parameter je nach Task-Type
+
+    Returns:
+        task_id falls laufender Task gefunden, sonst None
+    """
+    for task_id, task_data in task_store.items():
+        if task_data["status"] in [TaskStatus.PENDING, TaskStatus.RUNNING]:
+
+            # Segment Similarity Tasks
+            if (task_type == "segment_similarity" and
+                    task_data.get("task_type") == "segment_similarity" and
+                    task_data.get("target_bahn_id") == target_bahn_id):
+                return task_id
+
+            # Metadata Calculation Tasks
+            elif (task_type == "metadata_calculation" and
+                  task_data.get("details", {}).get("mode") is not None):  # Hat metadata structure
+                mode = kwargs.get("mode")
+                bahn_id = kwargs.get("bahn_id")
+
+                task_mode = task_data.get("details", {}).get("mode")
+                task_bahn_id = task_data.get("details", {}).get("bahn_id")
+
+                # Prüfe je nach Mode
+                if mode == "single" and task_mode == "single" and task_bahn_id == bahn_id:
+                    return task_id
+                elif mode == "all_missing" and task_mode == "all_missing":
+                    return task_id
+                elif mode == "timerange" and task_mode == "timerange":
+                    # Bei timerange könnten wir auch start/end_time vergleichen
+                    return task_id
+
+            # Meta Values Tasks (global, nur ein Task zur Zeit)
+            elif (task_type == "meta_values" and
+                  task_data.get("total_rows") is not None):  # Hat meta_values structure
+                return task_id
+
+    return None
