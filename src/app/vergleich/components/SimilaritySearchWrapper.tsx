@@ -7,6 +7,7 @@ import type {
   SimilaritySearchParams,
 } from '@/src/actions/vergleich.service';
 import { SimilarityService } from '@/src/actions/vergleich.service';
+import { VergleichPlot } from '@/src/app/vergleich/components/VergleichPlot';
 import type { BahnInfo } from '@/types/bewegungsdaten.types';
 
 import SimilarityResults from './SimilarityResults';
@@ -81,16 +82,31 @@ export default function SimilaritySearchWrapper({
   };
 
   return (
-    <div className="space-y-6">
-      <SimilaritySearch onSearch={handleSearch} bahnInfo={bahnInfo} />
-      <SimilarityResults
-        results={results}
-        isLoading={isLoading}
-        error={error}
-        originalId={originalId}
-        isSegmentTaskRunning={isSegmentTaskRunning}
-        segmentProgress={segmentProgress}
-      />
+    <div className="flex h-fullscreen">
+      {/* Hauptinhalt - nimmt verfügbaren Platz */}
+      <div className="flex-1 overflow-y-auto">
+        <SimilaritySearch onSearch={handleSearch} bahnInfo={bahnInfo} />
+        <SimilarityResults
+          results={results}
+          isLoading={isLoading}
+          error={error}
+          originalId={originalId}
+          isSegmentTaskRunning={isSegmentTaskRunning}
+          segmentProgress={segmentProgress}
+        />
+      </div>
+
+      {/* Plot - fest verankert rechts */}
+      {results.length > 0 && (
+        <div className="w-fit border-l bg-white">
+          <VergleichPlot
+            results={results}
+            isLoading={isLoading}
+            originalId={originalId}
+            className="h-fullscreen"
+          />
+        </div>
+      )}
     </div>
   );
 }

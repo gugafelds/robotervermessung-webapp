@@ -80,7 +80,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
   };
 
   const renderTable = (data: SimilarityResult[], title: string) => (
-    <div className="mb-6">
+    <div className="border-t">
       <div className="border-b bg-gray-50 px-6 py-4">
         <h4 className="font-medium text-gray-900">
           {title} ({data.length})
@@ -207,8 +207,8 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
   );
 
   return (
-    <div className="w-full overflow-hidden rounded-lg bg-white shadow-md">
-      <div className="border-b bg-gray-50 px-6 py-4">
+    <div className="w-full overflow-hidden rounded-lg border bg-white shadow-md">
+      <div className="bg-gray-50 px-6 py-4">
         <h3 className="text-lg font-medium text-gray-900">
           Ähnlichkeitsergebnisse
         </h3>

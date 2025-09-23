@@ -39,7 +39,7 @@ export const MetaValuesCalculator: React.FC = () => {
   }, [loadStatus]);
 
   return (
-    <div className="mx-auto w-fit min-w-96 max-w-xl space-y-2 p-6">
+    <div className="mx-auto w-fit min-w-96 max-w-xl  p-6">
       <div className="text-justify">
         <h1 className="mb-2 text-xl font-bold">Metavalues</h1>
         <p className="text-gray-600">Aktueller Stand der Meta-Values</p>

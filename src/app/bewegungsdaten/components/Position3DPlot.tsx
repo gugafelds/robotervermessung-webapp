@@ -175,6 +175,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
         layout={layout}
         useResizeHandler
         style={{ width: '100%', height: '100%' }}
+        className="border border-gray-400"
         config={{
           displaylogo: false,
           modeBarButtonsToRemove: [

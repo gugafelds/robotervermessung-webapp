@@ -223,36 +223,39 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
             Gewichtungen anpassen:
           </div>
 
-          {Object.entries(weights).map(([feature, value]) => {
-            const sliderId = `slider-${feature}`;
-            return (
-              <div key={feature} className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor={sliderId}
-                    className="text-xs capitalize text-gray-600"
-                  >
-                    {feature.replace('_', ' ')}:
-                  </label>
-                  <span className="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs">
-                    {value.toFixed(1)}
-                  </span>
+          {/* Responsive Grid: 4 Spalten auf großen Bildschirmen, 2 auf mittleren, 1 auf kleinen */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {Object.entries(weights).map(([feature, value]) => {
+              const sliderId = `slider-${feature}`;
+              return (
+                <div key={feature} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor={sliderId}
+                      className="text-xs capitalize text-gray-600"
+                    >
+                      {feature.replace('_', ' ')}:
+                    </label>
+                    <span className="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs">
+                      {value.toFixed(0)}
+                    </span>
+                  </div>
+                  <input
+                    id={sliderId}
+                    type="range"
+                    min="0"
+                    max="10"
+                    step="1.0"
+                    value={value}
+                    onChange={(e) =>
+                      handleWeightChange(feature, parseFloat(e.target.value))
+                    }
+                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200"
+                  />
                 </div>
-                <input
-                  id={sliderId}
-                  type="range"
-                  min="0"
-                  max="10"
-                  step="1.0"
-                  value={value}
-                  onChange={(e) =>
-                    handleWeightChange(feature, parseFloat(e.target.value))
-                  }
-                  className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200"
-                />
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
 
         {/* Limit Einstellungen */}
