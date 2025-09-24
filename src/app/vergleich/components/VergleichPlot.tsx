@@ -1,3 +1,4 @@
+/* eslint-disable react/button-has-type */
 /* eslint-disable jsx-a11y/label-has-associated-control */
 
 'use client';
@@ -84,7 +85,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
 
   // Hilfsfunktion um jeden 13. Punkt zu nehmen
   const sampleEveryFifthPoint = useCallback(<T,>(data: T[]): T[] => {
-    return data.filter((_, index) => index % 17 === 0);
+    return data.filter((_, index) => index % 1 === 0);
   }, []);
 
   // Separate Bahnen und Segmente aus den Ergebnissen
@@ -114,7 +115,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
         const parts = result.segment_id.split('_');
         if (parts.length >= 2) {
           const segmentNum = parseInt(parts[parts.length - 1], 10);
-          if (!isNaN(segmentNum)) {
+          if (!Number.isNaN(segmentNum)) {
             segmentNumbers.add(segmentNum);
           }
         }
@@ -129,6 +130,24 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
         label: `Segment ${segNum}`,
       }));
   }, [segmentResults, originalId, mode]);
+
+  const groupedSegments = useMemo((): Record<string, string[]> => {
+    const groups: Record<string, string[]> = {};
+    let currentOriginal: string | null = null;
+
+    segmentResults.forEach((result) => {
+      if (result.segment_id?.includes(originalId)) {
+        // Neues Original gefunden
+        currentOriginal = result.segment_id;
+        groups[currentOriginal] = [result.segment_id];
+      } else if (currentOriginal && result.segment_id) {
+        // Gehört zum aktuellen Original
+        groups[currentOriginal].push(result.segment_id);
+      }
+    });
+
+    return groups;
+  }, [segmentResults, originalId]);
 
   // Setze initial das erste Segment als ausgewählt
   useEffect(() => {
@@ -160,31 +179,12 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
     // Segment-Modus: Filtere für ausgewähltes Segment
     if (!selectedSegment || !originalId) return [];
 
-    const segmentNum = selectedSegment.replace('segment_', '');
-    const targetSegmentId = `${originalId}_${segmentNum}`;
-    const segmentIds = new Set<string>();
+    const targetSegmentId = `${originalId}_${selectedSegment.replace('segment_', '')}`;
 
-    // Original-Segment hinzufügen
-    segmentIds.add(targetSegmentId);
-
-    // Ähnliche Segmente zu diesem Original-Segment hinzufügen
-    // Filtere nur Segmente mit der gleichen Segment-Nummer (z.B. alle *_1, *_2, etc.)
-    segmentResults.forEach((result) => {
-      if (result.segment_id && result.segment_id !== targetSegmentId) {
-        // Prüfe ob das Segment die gleiche Segment-Nummer hat
-        const parts = result.segment_id.split('_');
-        if (parts.length >= 2) {
-          const resultSegmentNum = parts[parts.length - 1];
-          // Nur Segmente mit gleicher Segment-Nummer hinzufügen
-          if (resultSegmentNum === segmentNum) {
-            segmentIds.add(result.segment_id);
-          }
-        }
-      }
-    });
-
-    return Array.from(segmentIds).slice(0, 50); // Max 50 Segmente pro Gruppe
-  }, [mode, bahnResults, segmentResults, originalId, selectedSegment]);
+    // Verwende die gruppierten Segmente
+    const segmentGroup = groupedSegments[targetSegmentId] || [];
+    return segmentGroup.slice(0, 50); // Max 50 Segmente pro Gruppe
+  }, [mode, selectedSegment, originalId, groupedSegments, bahnResults]);
 
   // Setze alle Trajektorien initial als sichtbar
   useEffect(() => {
