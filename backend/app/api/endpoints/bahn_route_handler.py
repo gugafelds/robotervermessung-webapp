@@ -379,6 +379,16 @@ async def get_bahn_position_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     )
     return [dict(row) for row in rows]
 
+@router.get("/segment_position_soll/{segment_id}")
+@cache(expire=2400)
+async def get_segment_position_soll_by_id(segment_id: str, conn = Depends(get_db)):
+    rows = await conn.fetch(
+        "SELECT * FROM bewegungsdaten.bahn_position_soll WHERE segment_id = $1 ORDER BY timestamp ASC",
+        segment_id
+    )
+    return [dict(row) for row in rows]
+
+
 @router.get("/bahn_orientation_soll/{bahn_id}")
 @cache(expire=2400)
 async def get_bahn_orientation_soll_by_id(bahn_id: str, conn = Depends(get_db)):
@@ -412,6 +422,15 @@ async def get_bahn_events_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM bewegungsdaten.bahn_events WHERE bahn_id = $1 ORDER BY timestamp ASC",
         bahn_id
+    )
+    return [dict(row) for row in rows]
+
+@router.get("/segment_events/{segment_id}")
+@cache(expire=2400)
+async def get_segment_events_by_id(segment_id: str, conn = Depends(get_db)):
+    rows = await conn.fetch(
+        "SELECT * FROM bewegungsdaten.bahn_events WHERE segment_id = $1 ORDER BY timestamp ASC",
+        segment_id
     )
     return [dict(row) for row in rows]
 

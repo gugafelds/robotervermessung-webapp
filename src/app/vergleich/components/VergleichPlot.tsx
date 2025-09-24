@@ -2,6 +2,7 @@
 
 'use client';
 
+import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { Loader } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { Layout, PlotData } from 'plotly.js';
@@ -10,6 +11,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getBahnEventsById,
   getBahnPositionSollById,
+  getSegmentEventsById,
+  getSegmentPositionSollById,
 } from '@/src/actions/bewegungsdaten.service';
 import type { SimilarityResult } from '@/src/actions/vergleich.service';
 import { Typography } from '@/src/components/Typography';
@@ -21,7 +24,7 @@ import type {
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
-// Farben für verschiedene Bahnen
+// Farben für verschiedene Bahnen/Segmente
 const TRAJECTORY_COLORS = [
   '#1f77b4', // Blau
   '#ff7f0e', // Orange
@@ -37,15 +40,21 @@ const TRAJECTORY_COLORS = [
   '#ffbb78', // Hellorange
 ];
 
+interface SegmentOption {
+  value: string; // z.B. "segment_1"
+  label: string; // z.B. "Segment 1"
+}
+
 interface VergleichPlotProps {
   results: SimilarityResult[];
   isLoading: boolean;
   originalId: string;
+  mode: 'bahnen' | 'segmente';
   className?: string;
 }
 
-interface BahnTrajectoryData {
-  bahnId: string;
+interface TrajectoryData {
+  id: string; // bahnId oder segmentId
   positions: BahnPositionSoll[];
   events: BahnEvents[];
   color: string;
@@ -58,21 +67,24 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
   results,
   isLoading: searchLoading,
   originalId,
+  mode,
   className = '',
 }) => {
-  const [trajectoryData, setTrajectoryData] = useState<BahnTrajectoryData[]>(
-    [],
-  );
+  const [trajectoryData, setTrajectoryData] = useState<TrajectoryData[]>([]);
   const [isLoadingPlot, setIsLoadingPlot] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loadedBahnIds, setLoadedBahnIds] = useState<Set<string>>(new Set());
+  const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
   const [visibleTrajectories, setVisibleTrajectories] = useState<Set<string>>(
     new Set(),
   );
 
-  // Hilfsfunktion um jeden 5. Punkt zu nehmen
+  // Segment-spezifische States
+  const [selectedSegment, setSelectedSegment] = useState<string>('');
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  // Hilfsfunktion um jeden 13. Punkt zu nehmen
   const sampleEveryFifthPoint = useCallback(<T,>(data: T[]): T[] => {
-    return data.filter((_, index) => index % 13 === 0);
+    return data.filter((_, index) => index % 17 === 0);
   }, []);
 
   // Separate Bahnen und Segmente aus den Ergebnissen
@@ -86,41 +98,116 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
     return { bahnResults: bahnen, segmentResults: segmente };
   }, [results]);
 
-  // Extrahiere eindeutige Bahn-IDs aus Bahn-Ergebnissen
-  const uniqueBahnIds = useMemo((): string[] => {
-    const bahnIds = new Set<string>();
+  // Segment-Dropdown-Optionen (nur für Segmente-Modus)
+  const segmentOptions = useMemo((): SegmentOption[] => {
+    if (mode !== 'segmente' || !originalId) return [];
 
-    // Original-Bahn hinzufügen
-    if (originalId) {
-      bahnIds.add(originalId);
-    }
+    // Finde alle Segmente der Original-Bahn in den Segment-Ergebnissen
+    const originalBahnSegments = segmentResults.filter((result) =>
+      result.segment_id?.startsWith(originalId),
+    );
 
-    // Nur Bahnen hinzufügen
-    bahnResults.forEach((result) => {
-      if (result.bahn_id) {
-        bahnIds.add(result.bahn_id);
+    // Extrahiere eindeutige Segment-Nummern
+    const segmentNumbers = new Set<number>();
+    originalBahnSegments.forEach((result) => {
+      if (result.segment_id) {
+        const parts = result.segment_id.split('_');
+        if (parts.length >= 2) {
+          const segmentNum = parseInt(parts[parts.length - 1], 10);
+          if (!isNaN(segmentNum)) {
+            segmentNumbers.add(segmentNum);
+          }
+        }
       }
     });
 
-    return Array.from(bahnIds).slice(0, 50); // Max 50 Bahnen
-  }, [bahnResults, originalId]);
+    // Sortiere und erstelle Optionen
+    return Array.from(segmentNumbers)
+      .sort((a, b) => a - b)
+      .map((segNum) => ({
+        value: `segment_${segNum}`,
+        label: `Segment ${segNum}`,
+      }));
+  }, [segmentResults, originalId, mode]);
 
-  // Setze alle Bahnen initial als sichtbar
+  // Setze initial das erste Segment als ausgewählt
   useEffect(() => {
-    setVisibleTrajectories(new Set(trajectoryData.map((t) => t.bahnId)));
+    if (mode === 'segmente' && segmentOptions.length > 0 && !selectedSegment) {
+      setSelectedSegment(segmentOptions[0].value);
+    }
+  }, [segmentOptions, selectedSegment, mode]);
+
+  // Extrahiere relevante IDs basierend auf Modus
+  const uniqueIds = useMemo((): string[] => {
+    if (mode === 'bahnen') {
+      // Bahn-Modus: Extrahiere Bahn-IDs
+      const bahnIds = new Set<string>();
+
+      // Original-Bahn hinzufügen
+      if (originalId) {
+        bahnIds.add(originalId);
+      }
+
+      // Ähnliche Bahnen hinzufügen
+      bahnResults.forEach((result) => {
+        if (result.bahn_id) {
+          bahnIds.add(result.bahn_id);
+        }
+      });
+
+      return Array.from(bahnIds).slice(0, 50); // Max 50 Bahnen
+    }
+    // Segment-Modus: Filtere für ausgewähltes Segment
+    if (!selectedSegment || !originalId) return [];
+
+    const segmentNum = selectedSegment.replace('segment_', '');
+    const targetSegmentId = `${originalId}_${segmentNum}`;
+    const segmentIds = new Set<string>();
+
+    // Original-Segment hinzufügen
+    segmentIds.add(targetSegmentId);
+
+    // Ähnliche Segmente zu diesem Original-Segment hinzufügen
+    // Filtere nur Segmente mit der gleichen Segment-Nummer (z.B. alle *_1, *_2, etc.)
+    segmentResults.forEach((result) => {
+      if (result.segment_id && result.segment_id !== targetSegmentId) {
+        // Prüfe ob das Segment die gleiche Segment-Nummer hat
+        const parts = result.segment_id.split('_');
+        if (parts.length >= 2) {
+          const resultSegmentNum = parts[parts.length - 1];
+          // Nur Segmente mit gleicher Segment-Nummer hinzufügen
+          if (resultSegmentNum === segmentNum) {
+            segmentIds.add(result.segment_id);
+          }
+        }
+      }
+    });
+
+    return Array.from(segmentIds).slice(0, 50); // Max 50 Segmente pro Gruppe
+  }, [mode, bahnResults, segmentResults, originalId, selectedSegment]);
+
+  // Setze alle Trajektorien initial als sichtbar
+  useEffect(() => {
+    setVisibleTrajectories(new Set(trajectoryData.map((t) => t.id)));
   }, [trajectoryData]);
 
-  // Toggle Visibility für eine Bahn
-  const toggleVisibility = (bahnId: string) => {
+  // Toggle Visibility für eine Trajektorie
+  const toggleVisibility = (id: string) => {
     setVisibleTrajectories((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(bahnId)) {
-        newSet.delete(bahnId);
+      if (newSet.has(id)) {
+        newSet.delete(id);
       } else {
-        newSet.add(bahnId);
+        newSet.add(id);
       }
       return newSet;
     });
+  };
+
+  // Segment-Auswahl Handler
+  const handleSegmentSelect = (segmentValue: string) => {
+    setSelectedSegment(segmentValue);
+    setShowDropdown(false);
   };
 
   // Berechne Bounds aus den geladenen Trajektorien
@@ -168,51 +255,66 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
     };
   }, [trajectoryData]);
 
-  // Lade Daten für alle ähnlichen Bahnen
+  // Lade Trajektorien-Daten
   const loadTrajectoryData = useCallback(async () => {
-    if (uniqueBahnIds.length === 0) {
+    if (uniqueIds.length === 0) {
       setTrajectoryData([]);
       setIsLoadingPlot(false);
       return;
     }
 
-    // Prüfe ob wir diese Bahnen bereits geladen haben
-    const newBahnIds = uniqueBahnIds.filter((id) => !loadedBahnIds.has(id));
-    if (newBahnIds.length === 0) {
-      return; // Keine neuen Bahnen zu laden
+    // Prüfe ob wir diese IDs bereits geladen haben
+    const newIds = uniqueIds.filter((id) => !loadedIds.has(id));
+    if (newIds.length === 0) {
+      return; // Keine neuen IDs zu laden
     }
 
     setIsLoadingPlot(true);
     setError(null);
 
     try {
-      const trajectories: BahnTrajectoryData[] = [];
+      const trajectories: TrajectoryData[] = [];
 
-      // Parallel laden aller Bahnen
-      const trajectoryPromises = uniqueBahnIds.map(async (bahnId, i) => {
-        const isOriginal = bahnId === originalId;
-        const resultForBahn = bahnResults.find((r) => r.bahn_id === bahnId);
+      // Parallel laden aller IDs
+      const trajectoryPromises = uniqueIds.map(async (id, i) => {
+        const isOriginal =
+          id === originalId ||
+          (mode === 'segmente' &&
+            id === `${originalId}_${selectedSegment.replace('segment_', '')}`);
+
+        // Finde zugehöriges Ergebnis für Similarity Score
+        const resultForId =
+          mode === 'bahnen'
+            ? bahnResults.find((r) => r.bahn_id === id)
+            : segmentResults.find((r) => r.segment_id === id);
 
         try {
-          const [positionsResult, eventsResult] = await Promise.all([
-            getBahnPositionSollById(bahnId),
-            getBahnEventsById(bahnId),
-          ]);
+          // API-Calls basierend auf Modus
+          const [positionsResult, eventsResult] =
+            mode === 'bahnen'
+              ? await Promise.all([
+                  getBahnPositionSollById(id),
+                  getBahnEventsById(id),
+                ])
+              : await Promise.all([
+                  getSegmentPositionSollById(id),
+                  getSegmentEventsById(id),
+                ]);
 
           const sampledPositions = sampleEveryFifthPoint(positionsResult);
 
           return {
-            bahnId,
+            id,
             positions: sampledPositions,
             events: eventsResult,
             color: isOriginal
               ? '#000000'
               : TRAJECTORY_COLORS[i % TRAJECTORY_COLORS.length],
             name: isOriginal
-              ? `${bahnId} (Original)`
-              : `${bahnId}${resultForBahn ? ` (${resultForBahn.similarity_score.toFixed(3)})` : ''}`,
+              ? `${id} (Original)`
+              : `${id}${resultForId ? ` (${resultForId.similarity_score?.toFixed(3)})` : ''}`,
             isOriginal,
-            similarityScore: resultForBahn?.similarity_score,
+            similarityScore: resultForId?.similarity_score,
           };
         } catch {
           return null;
@@ -222,7 +324,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
       const trajectoryResults = await Promise.all(trajectoryPromises);
       const validTrajectories = trajectoryResults.filter(
         (t) => t !== null,
-      ) as BahnTrajectoryData[];
+      ) as TrajectoryData[];
 
       trajectories.push(...validTrajectories);
 
@@ -234,39 +336,35 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
       });
 
       setTrajectoryData(trajectories);
-      setLoadedBahnIds(new Set(uniqueBahnIds)); // Markiere als geladen
+      setLoadedIds(new Set(uniqueIds)); // Markiere als geladen
     } catch (err) {
       setError('Fehler beim Laden der Trajektorien');
     } finally {
       setIsLoadingPlot(false);
     }
   }, [
-    uniqueBahnIds,
-    loadedBahnIds,
+    uniqueIds,
+    loadedIds,
     originalId,
+    mode,
+    selectedSegment,
     bahnResults,
+    segmentResults,
     sampleEveryFifthPoint,
   ]);
 
-  // Effect für Bahn-Ergebnisse - lädt nur wenn sich uniqueBahnIds ändert
+  // Effect für Daten laden
   useEffect(() => {
-    if (!searchLoading && uniqueBahnIds.length > 0) {
+    if (!searchLoading && uniqueIds.length > 0) {
       loadTrajectoryData();
-    } else if (uniqueBahnIds.length === 0) {
+    } else if (uniqueIds.length === 0) {
       setTrajectoryData([]);
-      setLoadedBahnIds(new Set());
+      setLoadedIds(new Set());
       setIsLoadingPlot(false);
     }
-  }, [uniqueBahnIds, searchLoading, loadTrajectoryData]);
+  }, [uniqueIds, searchLoading, loadTrajectoryData]);
 
-  // Separater Effect für Segment-Ergebnisse - tut derzeit nichts, nur für Logging
-  useEffect(() => {
-    if (segmentResults.length > 0) {
-      /* empty */
-    }
-  }, [segmentResults]);
-
-  // Erstelle Plot-Daten für alle Bahnen
+  // Erstelle Plot-Daten für alle Trajektorien
   const createPlotData = useCallback((): Partial<PlotData>[] => {
     const plotData: Partial<PlotData>[] = [];
 
@@ -287,7 +385,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
           hoverlabel: {
             bgcolor: trajectory.color,
           },
-          visible: visibleTrajectories.has(trajectory.bahnId),
+          visible: visibleTrajectories.has(trajectory.id),
         });
       }
 
@@ -309,7 +407,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
           hoverlabel: {
             bgcolor: trajectory.color,
           },
-          visible: visibleTrajectories.has(trajectory.bahnId),
+          visible: visibleTrajectories.has(trajectory.id),
         });
       }
     });
@@ -317,10 +415,20 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
     return plotData;
   }, [trajectoryData, visibleTrajectories]);
 
+  // Dynamische Titel basierend auf Modus
+  const getPlotTitle = () => {
+    if (mode === 'bahnen') {
+      return `3D-Position (${trajectoryData.length} Bahnen)`;
+    }
+    const selectedSegmentLabel =
+      segmentOptions.find((opt) => opt.value === selectedSegment)?.label || '';
+    return `3D-Position ${selectedSegmentLabel} (${trajectoryData.length} Segmente)`;
+  };
+
   const bounds = calculateBounds();
   const layout: Partial<Layout> = {
     ...plotLayoutConfig,
-    title: `3D-Position (${trajectoryData.length} Bahnen)`,
+    title: getPlotTitle(),
     autosize: true,
     scene: {
       camera: {
@@ -353,20 +461,23 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
     showlegend: false,
   };
 
-  // Loading states
+  // Loading states - GENAU WIE ORIGINAL
   if (searchLoading || isLoadingPlot) {
     return (
-      <div className="m-2 h-fit w-[520.467px] rounded-lg border border-gray-400 bg-gray-50 p-4 shadow-sm">
+      <div className="m-2 w-fit rounded-lg border border-gray-400 bg-gray-50 p-4 shadow-sm">
         <div className="flex flex-col items-center space-y-4 py-8">
           <div className="animate-spin">
             <Loader className="size-8" color="#003560" />
           </div>
-          <Typography as="p">Lade Bahnen...</Typography>
+          <Typography as="p">
+            Lade {mode === 'bahnen' ? 'Bahnen' : 'Segmente'}...
+          </Typography>
         </div>
       </div>
     );
   }
 
+  // Error state - GENAU WIE ORIGINAL
   if (error) {
     return (
       <div className="m-2 w-fit rounded-lg border border-gray-400 bg-gray-50 p-4 shadow-sm">
@@ -382,6 +493,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
     );
   }
 
+  // Keine Daten - ANGEPASST FÜR BEIDE MODI
   if (trajectoryData.length === 0) {
     return (
       <div
@@ -389,11 +501,14 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
       >
         <div className="py-8 text-center">
           <Typography as="h5" className="mb-2">
-            Keine Vergleichsdaten verfügbar
+            {mode === 'segmente' && segmentOptions.length === 0
+              ? 'Keine Segmente für Visualisierung gefunden'
+              : 'Keine Vergleichsdaten verfügbar'}
           </Typography>
           <Typography as="p" className="text-gray-600">
-            Führe eine Ähnlichkeitssuche durch, um Bahnen im 3D-Raum zu
-            vergleichen.
+            {mode === 'bahnen'
+              ? 'Führe eine Ähnlichkeitssuche durch, um Bahnen im 3D-Raum zu vergleichen.'
+              : 'Warte auf Segment-Ähnlichkeitsergebnisse aus dem Background-Task.'}
           </Typography>
         </div>
       </div>
@@ -404,6 +519,45 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
 
   return (
     <div className="m-2 w-fit rounded-lg border border-gray-400 bg-gray-50 p-2 shadow-sm">
+      {/* Segment-Dropdown (nur im Segment-Modus) - NEU */}
+      {mode === 'segmente' && segmentOptions.length > 0 && (
+        <div className="mb-2 flex items-center justify-between rounded border bg-white p-2">
+          <Typography as="h6" className="font-medium text-gray-700">
+            Segment-Auswahl:
+          </Typography>
+
+          <div className="relative">
+            <button
+              onClick={() => setShowDropdown(!showDropdown)}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm hover:bg-gray-50"
+            >
+              {segmentOptions.find((opt) => opt.value === selectedSegment)
+                ?.label || 'Segment auswählen'}
+              <ChevronDownIcon className="size-4" />
+            </button>
+
+            {showDropdown && (
+              <div className="absolute right-0 top-10 z-10 w-40 rounded-md border bg-white shadow-lg">
+                {segmentOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => handleSegmentSelect(option.value)}
+                    className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 ${
+                      option.value === selectedSegment
+                        ? 'bg-blue-50 text-blue-600'
+                        : ''
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Plot - GENAU WIE ORIGINAL */}
       <Plot
         data={plotData}
         layout={layout}
@@ -424,21 +578,21 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
         }}
       />
 
-      {/* Externe Legende */}
+      {/* Externe Legende - GENAU WIE ORIGINAL */}
       {trajectoryData.length > 0 && (
         <div className="mt-4 max-h-40 space-y-2 overflow-y-auto">
           <div className="mb-2 text-sm font-medium text-gray-700">
-            Sichtbare Bahnen:
+            Sichtbare {mode === 'bahnen' ? 'Bahnen' : 'Segmente'}:
           </div>
           {trajectoryData.map((trajectory) => (
             <label
-              key={trajectory.bahnId}
+              key={trajectory.id}
               className="flex cursor-pointer items-center space-x-2"
             >
               <input
                 type="checkbox"
-                checked={visibleTrajectories.has(trajectory.bahnId)}
-                onChange={() => toggleVisibility(trajectory.bahnId)}
+                checked={visibleTrajectories.has(trajectory.id)}
+                onChange={() => toggleVisibility(trajectory.id)}
                 className="rounded"
               />
               <div

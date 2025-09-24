@@ -247,6 +247,22 @@ export const getBahnPositionSollById = async (
   }
 };
 
+export const getSegmentPositionSollById = async (
+  id: string,
+): Promise<BahnPositionSoll[]> => {
+  try {
+    const result = await fetchFromAPI(
+      `/bahn/segment_position_soll/${id}`,
+      true,
+    );
+    return transformBahnPositionSollResult(result);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching Bahn position soll by ID:', error);
+    throw error;
+  }
+};
+
 export const getBahnOrientationSollById = async (
   id: string,
 ): Promise<BahnOrientationSoll[]> => {
@@ -290,6 +306,19 @@ export const getBahnJointStatesById = async (
 };
 
 export const getBahnEventsById = async (id: string): Promise<BahnEvents[]> => {
+  try {
+    const result = await fetchFromAPI(`/bahn/bahn_events/${id}`, true);
+    return transformBahnEventsResult(result);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching Bahn events by ID:', error);
+    throw error;
+  }
+};
+
+export const getSegmentEventsById = async (
+  id: string,
+): Promise<BahnEvents[]> => {
   try {
     const result = await fetchFromAPI(`/bahn/bahn_events/${id}`, true);
     return transformBahnEventsResult(result);

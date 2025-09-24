@@ -26,6 +26,7 @@ export default function SimilaritySearchWrapper({
   const [originalId, setOriginalId] = useState('');
   const [isSegmentTaskRunning, setIsSegmentTaskRunning] = useState(false);
   const [segmentProgress, setSegmentProgress] = useState('');
+  const [hasSegmentResults, setHasSegmentResults] = useState(false);
 
   const handleSearch = async (
     id: string,
@@ -37,6 +38,7 @@ export default function SimilaritySearchWrapper({
     setError('');
     setOriginalId(id);
     setResults([]);
+    setHasSegmentResults(false); // Reset segment results state
 
     const params: SimilaritySearchParams = {
       bahnLimit,
@@ -66,6 +68,7 @@ export default function SimilaritySearchWrapper({
           setResults((prev) => [...prev, ...segmentResults]);
           setIsSegmentTaskRunning(false);
           setSegmentProgress('');
+          setHasSegmentResults(true); // Segment-Ergebnisse sind da!
         },
         onError: (errorMsg) => {
           setError(`Fehler bei der Suche: ${errorMsg}`);
@@ -80,6 +83,14 @@ export default function SimilaritySearchWrapper({
       setIsSegmentTaskRunning(false);
     }
   };
+
+  // Separate Bahn- und Segment-Ergebnisse
+  const bahnResults = results.filter(
+    (result) => result.bahn_id && !result.segment_id?.includes('_'),
+  );
+  const segmentResults = results.filter((result) =>
+    result.segment_id?.includes('_'),
+  );
 
   return (
     <div className="flex h-fullscreen">
@@ -96,15 +107,32 @@ export default function SimilaritySearchWrapper({
         />
       </div>
 
-      {/* Plot - fest verankert rechts */}
-      {results.length > 0 && (
-        <div className="w-fit border-l bg-white">
-          <VergleichPlot
-            results={results}
-            isLoading={isLoading}
-            originalId={originalId}
-            className="h-fullscreen"
-          />
+      {/* Plot-Bereich - fest verankert rechts */}
+      {bahnResults.length > 0 && (
+        <div className="h-fullscreen flex-col overflow-y-auto border-l bg-white">
+          {/* Bahnen-Plot - immer anzeigen wenn Bahn-Ergebnisse da sind */}
+          <div className="w-fit">
+            <VergleichPlot
+              mode="bahnen"
+              results={results}
+              isLoading={isLoading}
+              originalId={originalId}
+              className="h-fullscreen"
+            />
+          </div>
+
+          {/* Segmente-Plot - nur anzeigen wenn Segment-Ergebnisse komplett geliefert wurden */}
+          {hasSegmentResults && segmentResults.length > 0 && (
+            <div className="w-fit border-t">
+              <VergleichPlot
+                mode="segmente"
+                results={results}
+                isLoading={false} // Segmente sind bereits geladen
+                originalId={originalId}
+                className="h-fullscreen"
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
