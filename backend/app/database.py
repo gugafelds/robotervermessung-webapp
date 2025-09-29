@@ -15,7 +15,11 @@ class Database:
 
     async def connect(self):
         if not self.pool:
-            self.pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=15)
+            self.pool = await asyncpg.create_pool(
+                DATABASE_URL,
+                min_size=10,
+                max_size=100,
+            )
 
     async def disconnect(self):
         if self.pool:

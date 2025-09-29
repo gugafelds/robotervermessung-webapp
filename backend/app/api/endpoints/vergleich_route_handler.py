@@ -28,7 +28,6 @@ class MetadataCalculationRequest(BaseModel):
     start_time: Optional[str] = None  # Format: "26.06.2025 12:12:10"
     end_time: Optional[str] = None
     duplicate_handling: str = "replace"  # "replace" oder "skip"
-    batch_size: int = 10
 
 class TaskStatusResponse(BaseModel):
     task_id: str
@@ -351,7 +350,7 @@ async def calculate_metadata(
         task_id = create_task_id("metadata")
 
         # Geschätzte Dauer berechnen (ca. 0.5-2 Sekunden pro Bahn)
-        estimated_seconds = len(bahn_ids) * 1.0  # Durchschnitt 1 Sekunde pro Bahn
+        estimated_seconds = len(bahn_ids) * 0.3  # Durchschnitt 1 Sekunde pro Bahn
         estimated_minutes = estimated_seconds / 60
 
         # Background Task starten
@@ -362,7 +361,6 @@ async def calculate_metadata(
             mode=request.mode,
             bahn_ids=bahn_ids,
             duplicate_handling=request.duplicate_handling,
-            batch_size=request.batch_size
         )
 
         logger.info(f"Started background task {task_id} for {len(bahn_ids)} bahns")

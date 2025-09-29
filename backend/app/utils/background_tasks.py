@@ -302,16 +302,17 @@ async def process_meta_values_calculation(task_id: str, db_pool):
             "message": f"Meta-values calculation failed: {str(e)}"
         })
 
+
 async def process_metadata_background(
         task_id: str,
         service,  # MetadataCalculatorService instance
         mode: str,
         bahn_ids: List[str],
-        duplicate_handling: str,
-        batch_size: int = 10
+        duplicate_handling: str
 ):
     """
     Background Task für die Metadaten-Verarbeitung
+    NEU: In-Memory Processing mit Batch-Write am Ende
     """
 
     # Task Status initialisieren
@@ -326,8 +327,7 @@ async def process_metadata_background(
         "errors": [],
         "details": {
             "mode": mode,
-            "duplicate_handling": duplicate_handling,
-            "batch_size": batch_size
+            "duplicate_handling": duplicate_handling
         }
     }
 
@@ -349,67 +349,63 @@ async def process_metadata_background(
             task_store[task_id]["total_bahns"] = len(bahn_ids)
             logger.info(f"Skipping {len(existing_bahns)} existing bahns, processing {len(bahn_ids)} new ones")
 
-        # Verarbeitung in Batches
+        # NEU: In-Memory Processing mit Batch-Write
         successful_results = []
         failed_results = []
+        all_metadata_rows = []  # Sammle alle Metadaten hier
 
-        for i in range(0, len(bahn_ids), batch_size):
-            batch = bahn_ids[i:i + batch_size]
-            batch_tasks = []
+        # Verarbeite alle Bahnen sequentiell (schnell, da nur in-memory)
+        for bahn_id in bahn_ids:
+            task_store[task_id]["current_bahn"] = bahn_id
 
-            for bahn_id in batch:
-                task_store[task_id]["current_bahn"] = bahn_id
-                batch_tasks.append(service.process_single_bahn(bahn_id))
+            try:
+                # Hole und verarbeite Bahn (gibt Liste von Metadaten zurück)
+                bahn_metadata = await service.process_single_bahn_in_memory(bahn_id)
 
-            # Batch parallel verarbeiten
-            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+                if bahn_metadata.get('error'):
+                    failed_results.append(bahn_metadata)
+                    task_store[task_id]["failed_bahns"] += 1
+                    task_store[task_id]["errors"].append(f"{bahn_id}: {bahn_metadata['error']}")
+                else:
+                    # Sammle Metadaten (Liste von Dicts)
+                    all_metadata_rows.extend(bahn_metadata['metadata'])
+                    successful_results.append(bahn_metadata)
+                    task_store[task_id]["successful_bahns"] += 1
 
-            for j, result in enumerate(batch_results):
-                bahn_id = batch[j]
                 task_store[task_id]["processed_bahns"] += 1
 
-                if isinstance(result, Exception):
-                    logger.error(f"Exception processing bahn_id {bahn_id}: {result}")
-                    failed_results.append({
-                        "bahn_id": bahn_id,
-                        "error": str(result)
-                    })
-                    task_store[task_id]["failed_bahns"] += 1
-                    task_store[task_id]["errors"].append(f"bahn_id {bahn_id}: {str(result)}")
+                # Progress logging
+                if task_store[task_id]["processed_bahns"] % 100 == 0:
+                    progress = (task_store[task_id]["processed_bahns"] / task_store[task_id]["total_bahns"]) * 100
+                    logger.info(
+                        f"Task {task_id} progress: {progress:.1f}% ({task_store[task_id]['processed_bahns']}/{task_store[task_id]['total_bahns']})")
 
-                elif result and result.get("success"):
-                    successful_results.append(result)
-                    task_store[task_id]["successful_bahns"] += 1
-                    logger.debug(f"Successfully processed bahn_id {bahn_id}")
+            except Exception as e:
+                logger.error(f"Exception processing bahn_id {bahn_id}: {e}")
+                failed_results.append({
+                    "bahn_id": bahn_id,
+                    "error": str(e)
+                })
+                task_store[task_id]["failed_bahns"] += 1
+                task_store[task_id]["errors"].append(f"{bahn_id}: {str(e)}")
+                task_store[task_id]["processed_bahns"] += 1
 
-                else:
-                    error_msg = result.get("error", "Unknown error") if result else "No result returned"
-                    failed_results.append({
-                        "bahn_id": bahn_id,
-                        "error": error_msg
-                    })
-                    task_store[task_id]["failed_bahns"] += 1
-                    task_store[task_id]["errors"].append(f"bahn_id {bahn_id}: {error_msg}")
+        # Batch-Write: Schreibe ALLE Metadaten auf einmal
+        if all_metadata_rows:
+            logger.info(f"Writing {len(all_metadata_rows)} metadata rows in batch...")
+            await service.batch_write_metadata(all_metadata_rows)
+            logger.info(f"Batch write completed successfully!")
 
-            # Progress Update
-            progress = (task_store[task_id]["processed_bahns"] / task_store[task_id]["total_bahns"]) * 100
-            logger.info(
-                f"Task {task_id} progress: {progress:.1f}% ({task_store[task_id]['processed_bahns']}/{task_store[task_id]['total_bahns']})")
-
-            # Kurze Pause zwischen Batches
-            if i + batch_size < len(bahn_ids):
-                await asyncio.sleep(0.1)
-
-        # Task erfolgreich abgeschlossen
+        # Task abschließen
         task_store[task_id].update({
             "status": TaskStatus.COMPLETED,
             "completed_at": datetime.now().isoformat(),
             "current_bahn": None,
             "summary": {
-                "total_processed": len(successful_results) + len(failed_results),
+                "total_processed": len(bahn_ids),
                 "successful": len(successful_results),
                 "failed": len(failed_results),
-                "success_rate": (len(successful_results) / len(bahn_ids)) * 100 if bahn_ids else 0
+                "total_metadata_rows": len(all_metadata_rows)
             }
         })
 
@@ -417,11 +413,12 @@ async def process_metadata_background(
             f"Task {task_id} completed successfully. {len(successful_results)}/{len(bahn_ids)} bahns processed successfully")
 
     except Exception as e:
-        logger.error(f"Task {task_id} failed with error: {e}")
+        logger.error(f"Task {task_id} failed with exception: {e}")
         task_store[task_id].update({
             "status": TaskStatus.FAILED,
             "failed_at": datetime.now().isoformat(),
-            "error": str(e)
+            "error": str(e),
+            "current_bahn": None
         })
 
 def create_task_id(type) -> str:
