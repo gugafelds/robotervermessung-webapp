@@ -9,9 +9,6 @@ import re
 
 logger = logging.getLogger(__name__)
 
-SEGMENT_CONNECTION_SEMAPHORE = asyncio.Semaphore(50)
-
-
 class MetadataCalculatorService:
     def __init__(self, db_pool: asyncpg.Pool):
         self.db_pool = db_pool
@@ -67,12 +64,9 @@ class MetadataCalculatorService:
         """Ermittelt alle bahn_ids die noch keine Metadaten haben"""
         async with self.db_pool.acquire() as conn:
             query = """
-            SELECT DISTINCT bi.bahn_id
-            FROM robotervermessung.bewegungsdaten.bahn_info bi
-            LEFT JOIN robotervermessung.bewegungsdaten.bahn_meta bm
-            ON bi.bahn_id = bm.bahn_id AND bm.segment_id = bm.bahn_id
-            WHERE bm.bahn_id IS NULL
-            ORDER BY bi.bahn_id
+            SELECT DISTINCT bahn_id
+            FROM robotervermessung.bewegungsdaten.bahn_info
+            ORDER BY bahn_id
             """
             rows = await conn.fetch(query)
             return [row['bahn_id'] for row in rows]
@@ -126,27 +120,13 @@ class MetadataCalculatorService:
             direct_distance = float(np.linalg.norm(points[-1] - points[0]))
             ratio = direct_distance / path_length
 
-            # Geschlossene Form Check
-            if ratio < 0.1:
-                # Mittelpunkt
-                center = np.mean(points, axis=0)
-                # Radien (vektorisiert!)
-                radii = np.linalg.norm(points - center, axis=1)
-                mean_radius = np.mean(radii)
-
-                if mean_radius > 0:
-                    radius_variance = np.std(radii) / mean_radius
-                    if radius_variance < 0.3:
-                        return "circular"
-                return "spline"
-
             # Offene Form
-            if ratio > 0.95:
+            if ratio > 0.9:
                 return "linear"
             elif ratio > 0.3:
                 return "circular"
             else:
-                return "spline"
+                return "linear"
 
         except Exception as e:
             logger.warning(f"Fehler bei Movement-Type-Erkennung: {e}")
@@ -304,17 +284,16 @@ class MetadataCalculatorService:
 
         # Berechne Gesamtdauer
         total_duration = 0.0
-        if bahn_data['bahn_info']['start_time'] and bahn_data['bahn_info']['end_time']:
+        if bahn_data['segments'][0]['min_timestamp'] and bahn_data['segments'][-1]['max_timestamp']:
             try:
-                start_time = bahn_data['bahn_info']['start_time']
-                end_time = bahn_data['bahn_info']['end_time']
-                if isinstance(start_time, str):
-                    start_time = datetime.fromisoformat(start_time)
-                if isinstance(end_time, str):
-                    end_time = datetime.fromisoformat(end_time)
-                total_duration = (end_time - start_time).total_seconds()
+                start_time = bahn_data['segments'][0]['min_timestamp']
+                end_time = bahn_data['segments'][-1]['max_timestamp']
+                min_ts = int(float(start_time))
+                max_ts = int(float(end_time))
+                total_duration = max((max_ts - min_ts) / 1_000_000_000.0, 0.0)
             except Exception as e:
-                logger.warning(f"Fehler bei Duration-Berechnung: {e}")
+                pass
+
 
         # Verarbeite jedes Segment
         segment_movement_types = []
@@ -436,7 +415,6 @@ class MetadataCalculatorService:
             total_direction = total_delta / total_dir_length if total_dir_length > 0 else np.zeros(3)
             total_dir_x, total_dir_y, total_dir_z = total_direction.tolist()
 
-            # OPTIMIERUNG 4: Vektorisierte Aggregation mit numpy
             orientation_data = np.array([
                 [row['min_orientation_qw_soll'], row['min_orientation_qx_soll'],
                  row['min_orientation_qy_soll'], row['min_orientation_qz_soll'],

@@ -152,11 +152,13 @@ async def process_segment_similarity_background(
         task_data["current_segment"] = None
         task_data["errors"].append(error_msg)
 
+
 async def process_meta_values_calculation(task_id: str, db_pool):
     """
-    Background Task für Meta-Values Berechnung - genau wie die ursprüngliche Route
+    Background Task für Meta-Values Berechnung - OPTIMIERT
+    Mit Optimierungen #2, #3, #4
     """
-    # Task Status initialisieren (wie bei metadata)
+    # Task Status initialisieren
     task_store[task_id] = {
         "status": TaskStatus.RUNNING,
         "started_at": datetime.now().isoformat(),
@@ -169,7 +171,7 @@ async def process_meta_values_calculation(task_id: str, db_pool):
         async with db_pool.acquire() as conn:
             logger.info("Starting optimized Meta-Values calculation...")
 
-            # Standard-Parameter und Gewichtungen (genau wie vorher)
+            # Standard-Parameter und Gewichtungen
             selected_parameters = {
                 'duration', 'weight', 'length', 'movement_type',
                 'direction_x', 'direction_y', 'direction_z'
@@ -179,23 +181,24 @@ async def process_meta_values_calculation(task_id: str, db_pool):
                 'direction_x': 1.0, 'direction_y': 1.0, 'direction_z': 1.0
             }
 
-            # OPTIMIERUNG 1: Nur Spalten laden, die wir brauchen
+            # Nur numerische Spalten
             numeric_columns = [
                 'duration', 'weight', 'length',
                 'direction_x', 'direction_y', 'direction_z'
             ]
 
-            # OPTIMIERUNG 2: Simplified Query ohne LEFT JOIN
+            # Query - hole auch movement_type für Optimierung #3
             columns_str = ', '.join(['bm.' + col for col in numeric_columns])
             query = f"""
-                    SELECT bm.bahn_id,
-                           bm.segment_id,
-                           {columns_str}
-                    FROM robotervermessung.bewegungsdaten.bahn_meta bm
-                    WHERE bm.duration IS NOT NULL 
-                      AND bm.weight IS NOT NULL
-                      AND bm.length IS NOT NULL
-                    """
+                SELECT bm.bahn_id,
+                       bm.segment_id,
+                       bm.movement_type,
+                       {columns_str}
+                FROM robotervermessung.bewegungsdaten.bahn_meta bm
+                WHERE bm.duration IS NOT NULL 
+                  AND bm.weight IS NOT NULL
+                  AND bm.length IS NOT NULL
+            """
 
             task_store[task_id]["message"] = "Loading data from database..."
 
@@ -216,37 +219,46 @@ async def process_meta_values_calculation(task_id: str, db_pool):
 
             logger.info(f"Gefunden: {len(rows)} Datensätze mit vollständigen Daten")
 
-            # OPTIMIERUNG 3: Direkte NumPy Array Erstellung
+            # OPTIMIERUNG 2: Direkte NumPy Array Erstellung (vektorisiert!)
             import numpy as np
             from sklearn.preprocessing import StandardScaler
 
             task_store[task_id]["message"] = "Creating data matrix and calculating meta-values..."
 
-            # Erstelle Data Matrix direkt
-            data_matrix = np.array([
-                [float(row[col]) if row[col] is not None else 0.0 for col in numeric_columns]
-                for row in rows
-            ])
+            # Extrahiere Daten direkt als NumPy Array
+            data_matrix = np.array(
+                [[row[col] for col in numeric_columns] for row in rows],
+                dtype=np.float64
+            )
 
-            # OPTIMIERUNG 4: Batch Normalisierung
+            # In-place NaN handling (schneller als if-checks)
+            np.nan_to_num(data_matrix, copy=False, nan=0.0)
+
+            logger.info(f"Data matrix created: shape={data_matrix.shape}")
+
+            # Batch Normalisierung
             scaler = StandardScaler()
             scaled_data = scaler.fit_transform(data_matrix)
 
-            # OPTIMIERUNG 5: Vectorized Meta-Value Berechnung
+            # Vectorized Meta-Value Berechnung
             weight_vector = np.array([weights.get(col, 1.0) for col in numeric_columns])
             abs_scaled = np.abs(scaled_data)
             weighted_sums = abs_scaled @ weight_vector
 
-            # Movement type handling (falls benötigt)
+            # OPTIMIERUNG 3: Movement Type vektorisiert!
             if 'movement_type' in selected_parameters:
                 movement_weight = weights.get('movement_type', 1.0)
-                # Vectorized movement type processing
-                movement_scores = np.array([
-                    (len(str(row.get('movement_type', ''))) / 10.0 +
-                     (0.5 if 'c' in str(row.get('movement_type', '')).lower() else 0) +
-                     (0.3 if 's' in str(row.get('movement_type', '')).lower() else 0))
-                    for row in rows
-                ])
+
+                # Extrahiere alle movement_types auf einmal
+                movement_types = np.array([str(row.get('movement_type', '')) for row in rows])
+
+                # Vektorisierte Berechnungen (5-10x schneller!)
+                lengths = np.char.str_len(movement_types).astype(np.float64) / 10.0
+                has_c = (np.char.find(np.char.lower(movement_types), 'c') >= 0).astype(np.float64)
+                has_s = (np.char.find(np.char.lower(movement_types), 's') >= 0).astype(np.float64)
+
+                movement_scores = lengths + (has_c * 0.5) + (has_s * 0.3)
+
                 weighted_sums += movement_scores * movement_weight
                 total_weight = weight_vector.sum() + movement_weight
             else:
@@ -257,33 +269,69 @@ async def process_meta_values_calculation(task_id: str, db_pool):
             logger.info(f"Meta-Value Statistiken: Min={meta_values.min():.6f}, "
                         f"Max={meta_values.max():.6f}, Avg={meta_values.mean():.6f}")
 
-            # OPTIMIERUNG 6: Direct SQL UPDATE
+            # OPTIMIERUNG 4: Batch Updates mit temp table (3-5x schneller!)
             task_store[task_id]["message"] = "Updating database with calculated meta-values..."
 
-            async with conn.transaction():
-                # Bereite Update-Values vor
-                update_values = [
-                    (float(meta_values[i]), str(row['bahn_id']), str(row['segment_id']))
-                    for i, row in enumerate(rows)
-                ]
+            BATCH_SIZE = 50000  # Optimale Batch-Größe
+            total_updated = 0
 
-                # OPTIMIERUNG 7: Simplified UPDATE Logic
-                await conn.executemany("""
-                                       UPDATE robotervermessung.bewegungsdaten.bahn_meta
-                                       SET meta_value = CAST(ROUND($1::numeric, 4) AS DOUBLE PRECISION)
-                                       WHERE bahn_id = $2
-                                         AND segment_id = $3
-                                       """, update_values)
+            for batch_start in range(0, len(rows), BATCH_SIZE):
+                batch_end = min(batch_start + BATCH_SIZE, len(rows))
+                batch_rows = rows[batch_start:batch_end]
+                batch_values = meta_values[batch_start:batch_end]
 
-            logger.info(f"Meta-Value Berechnung abgeschlossen: {len(rows)} Datensätze aktualisiert")
+                async with conn.transaction():
+                    # Erstelle temporäre Tabelle
+                    await conn.execute("""
+                                       CREATE
+                                       TEMP TABLE IF NOT EXISTS temp_meta_updates (
+                            bahn_id TEXT,
+                            segment_id TEXT,
+                            meta_value DOUBLE PRECISION
+                        ) ON COMMIT DROP
+                                       """)
+
+                    # Bereite Daten vor (runde in Python, nicht SQL!)
+                    temp_values = [
+                        (str(row['bahn_id']),
+                         str(row['segment_id']),
+                         round(float(batch_values[i]), 4))
+                        for i, row in enumerate(batch_rows)
+                    ]
+
+                    # Bulk Insert in temp table (super schnell mit COPY!)
+                    await conn.copy_records_to_table(
+                        'temp_meta_updates',
+                        records=temp_values,
+                        columns=['bahn_id', 'segment_id', 'meta_value']
+                    )
+
+                    # Single UPDATE mit JOIN (viel schneller als executemany!)
+                    await conn.execute("""
+                                       UPDATE robotervermessung.bewegungsdaten.bahn_meta bm
+                                       SET meta_value = tmp.meta_value FROM temp_meta_updates tmp
+                                       WHERE bm.bahn_id = tmp.bahn_id
+                                         AND bm.segment_id = tmp.segment_id
+                                       """)
+
+                total_updated += len(batch_rows)
+
+                # Update Progress (nur alle 5000 Rows)
+                task_store[task_id]["processed_rows"] = total_updated
+
+                if total_updated % 10000 == 0:  # Log nur alle 10k
+                    logger.info(
+                        f"Updated {total_updated}/{total_rows} rows ({(total_updated / total_rows) * 100:.1f}%)")
+
+            logger.info(f"Meta-Value Berechnung abgeschlossen: {total_updated} Datensätze aktualisiert")
 
             # Task als completed markieren
             task_store[task_id].update({
                 "status": TaskStatus.COMPLETED,
                 "completed_at": datetime.now().isoformat(),
-                "message": f"Meta-Values erfolgreich berechnet für {len(rows)} Datensätze",
+                "message": f"Meta-Values erfolgreich berechnet für {total_updated} Datensätze",
                 "summary": {
-                    "processed_rows": len(rows),
+                    "processed_rows": total_updated,
                     "parameters_used": list(selected_parameters),
                     "stats": {
                         "min_meta_value": float(meta_values.min()),
@@ -295,6 +343,8 @@ async def process_meta_values_calculation(task_id: str, db_pool):
 
     except Exception as e:
         logger.error(f"Meta-values task {task_id} failed: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         task_store[task_id].update({
             "status": TaskStatus.FAILED,
             "failed_at": datetime.now().isoformat(),

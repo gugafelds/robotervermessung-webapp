@@ -75,6 +75,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
   const [isLoadingPlot, setIsLoadingPlot] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
+  const [normalizeStartPoint, setNormalizeStartPoint] = useState(true);
   const [visibleTrajectories, setVisibleTrajectories] = useState<Set<string>>(
     new Set(),
   );
@@ -87,6 +88,33 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
   const sampleEveryFifthPoint = useCallback(<T,>(data: T[]): T[] => {
     return data.filter((_, index) => index % 1 === 0);
   }, []);
+
+  const normalizeTrajectory = useCallback(
+    (trajectory: TrajectoryData): TrajectoryData => {
+      if (trajectory.positions.length === 0) return trajectory;
+
+      const offsetX = trajectory.positions[0].xSoll;
+      const offsetY = trajectory.positions[0].ySoll;
+      const offsetZ = trajectory.positions[0].zSoll;
+
+      return {
+        ...trajectory,
+        positions: trajectory.positions.map((p) => ({
+          ...p,
+          xSoll: p.xSoll - offsetX,
+          ySoll: p.ySoll - offsetY,
+          zSoll: p.zSoll - offsetZ,
+        })),
+        events: trajectory.events.map((e) => ({
+          ...e,
+          xReached: e.xReached - offsetX,
+          yReached: e.yReached - offsetY,
+          zReached: e.zReached - offsetZ,
+        })),
+      };
+    },
+    [],
+  );
 
   // Separate Bahnen und Segmente aus den Ergebnissen
   const { bahnResults, segmentResults } = useMemo(() => {
@@ -214,6 +242,10 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
   const calculateBounds = useCallback(() => {
     if (trajectoryData.length === 0) return null;
 
+    const dataForBounds = normalizeStartPoint
+      ? trajectoryData.map((t) => normalizeTrajectory(t))
+      : trajectoryData;
+
     let minX = Infinity;
     let maxX = -Infinity;
     let minY = Infinity;
@@ -221,7 +253,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
     let minZ = Infinity;
     let maxZ = -Infinity;
 
-    trajectoryData.forEach((trajectory) => {
+    dataForBounds.forEach((trajectory) => {
       // Aus Positionen
       trajectory.positions.forEach((pos) => {
         minX = Math.min(minX, pos.xSoll);
@@ -253,7 +285,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
       y: [minY - paddingY, maxY + paddingY],
       z: [minZ - paddingZ, maxZ + paddingZ],
     };
-  }, [trajectoryData]);
+  }, [normalizeStartPoint, normalizeTrajectory, trajectoryData]);
 
   // Lade Trajektorien-Daten
   const loadTrajectoryData = useCallback(async () => {
@@ -368,7 +400,11 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
   const createPlotData = useCallback((): Partial<PlotData>[] => {
     const plotData: Partial<PlotData>[] = [];
 
-    trajectoryData.forEach((trajectory) => {
+    const dataToPlot = normalizeStartPoint
+      ? trajectoryData.map((t) => normalizeTrajectory(t))
+      : trajectoryData;
+
+    dataToPlot.forEach((trajectory) => {
       // Soll-Trajectory (Linie)
       if (trajectory.positions.length > 0) {
         plotData.push({
@@ -413,7 +449,12 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
     });
 
     return plotData;
-  }, [trajectoryData, visibleTrajectories]);
+  }, [
+    normalizeStartPoint,
+    normalizeTrajectory,
+    trajectoryData,
+    visibleTrajectories,
+  ]);
 
   // Dynamische Titel basierend auf Modus
   const getPlotTitle = () => {
@@ -556,6 +597,19 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
           </div>
         </div>
       )}
+
+      {/* Normalisierungs-Toggle */}
+      <div className="mb-2 flex items-center justify-between rounded border bg-white p-2">
+        <label className="flex cursor-pointer items-center space-x-2">
+          <input
+            type="checkbox"
+            checked={normalizeStartPoint}
+            onChange={(e) => setNormalizeStartPoint(e.target.checked)}
+            className="rounded"
+          />
+          <div className="text-sm text-gray-700">Startpunkt normalisieren</div>
+        </label>
+      </div>
 
       {/* Plot - GENAU WIE ORIGINAL */}
       <Plot
