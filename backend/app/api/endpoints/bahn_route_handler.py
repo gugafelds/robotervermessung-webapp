@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/dashboard_data")
-@cache(expire=86400)  # 24 Stunden
 async def get_dashboard_data(conn=Depends(get_db)):
     try:
         # Bahnen und Filenames zählen - diese sind wichtig genug für exakte Zählung
@@ -21,97 +20,139 @@ async def get_dashboard_data(conn=Depends(get_db)):
             "SELECT COUNT(DISTINCT bahn_id) FROM bewegungsdaten.bahn_info"
         )
 
-        # Für die anderen Tabellen verwenden wir Statistiken
-        # Die n_distinct Spalte in pg_stats gibt Schätzungen der Anzahl eindeutiger Werte
-        component_counts = {}
-        for table, key in [
-            ('bahn_pose_ist', 'bahnPoseIst'),
-            ('bahn_twist_ist', 'bahnTwistIst'),
-            ('bahn_twist_soll', 'bahnTwistSoll'),
-            ('bahn_accel_ist', 'bahnAccelIst'),
-            ('bahn_position_soll', 'bahnPositionSoll'),
-            ('bahn_orientation_soll', 'bahnOrientationSoll'),
-            ('bahn_accel_soll', 'bahnAccelSoll'),
-            ('bahn_joint_states', 'bahnJointStates'),
-            ('bahn_events', 'bahnEvents'),
-            ('bahn_pose_trans', 'bahnPoseTrans'),
-        ]:
-            # Zuerst prüfen wir, ob Statistiken vorhanden sind
-            stats_query = """
+        stats = {}
+
+        # Velocity Distribution
+        velocity_query = """
+                       SELECT setted_velocity AS bucket, COUNT(*)
+                        FROM bewegungsdaten.bahn_info
+                           where setted_velocity IS NOT NULL
+                        GROUP BY bucket
+                        ORDER BY bucket
+                       """
+        velocity_rows = await conn.fetch(velocity_query)
+        stats["velocityDistribution"] = [{"bucket": r["bucket"], "count": r["count"]} for r in velocity_rows]
+
+        # Weight Distribution
+        weight_query = """
+                       SELECT weight AS bucket, COUNT(*)
+                        FROM bewegungsdaten.bahn_meta
+                        where bahn_id = segment_id
+                           and weight IS NOT NULL
+                        GROUP BY bucket
+                        ORDER BY bucket
+                       """
+        weight_rows = await conn.fetch(weight_query)
+        stats["weightDistribution"] = [{"bucket": r["bucket"], "count": r["count"]} for r in weight_rows]
+
+        # Duration Distribution (aus bahn_meta)
+        waypoints_query = """
+                       SELECT np_ereignisse AS bucket, COUNT(*)
+                        FROM bewegungsdaten.bahn_info
+                        GROUP BY bucket
+                        ORDER BY bucket
+                       """
+        waypoint_rows = await conn.fetch(waypoints_query)
+        stats["waypointDistribution"] = [{"bucket": r["bucket"], "count": r["count"]} for r in waypoint_rows]
+
+        # Length Distribution (aus bahn_meta)
+        sidtw_query = """
+            WITH sidtw_stats AS (
+                SELECT MAX(sidtw_average_distance) as max_val
+                FROM auswertung.info_sidtw
+                WHERE bahn_id = segment_id
+                  AND sidtw_average_distance IS NOT NULL
+            )
             SELECT 
-                CASE 
-                    WHEN n_distinct > 0 THEN n_distinct::integer  -- Positive Werte sind absolute Anzahlen
-                    WHEN n_distinct < 0 THEN (-n_distinct * reltuples)::integer  -- Negative Werte sind Prozentsätze
-                    ELSE 0
-                END as distinct_count
-            FROM pg_stats 
-            JOIN pg_class ON pg_stats.tablename = pg_class.relname
-            WHERE 
-                pg_stats.schemaname = 'bewegungsdaten'
-                AND pg_stats.tablename = $1
-                AND pg_stats.attname = 'bahn_id'
-            """
+                width_bucket(sidtw_average_distance, 
+                    0, 
+                    (SELECT max_val FROM sidtw_stats), 
+                    10
+                ) AS bucket, 
+                COUNT(*)
+            FROM auswertung.info_sidtw
+            WHERE bahn_id = segment_id
+              AND sidtw_average_distance IS NOT NULL
+            GROUP BY bucket
+            ORDER BY bucket
+        """
+        sidtw_rows = await conn.fetch(sidtw_query)
+        stats["performanceSIDTWDistribution"] = [{"bucket": r["bucket"], "count": r["count"]} for r in sidtw_rows]
 
-            distinct_count = await conn.fetchval(stats_query, table)
+        # Stop Point + Wait Time
+        stop_query = """
+                       SELECT stop_point AS bucket, COUNT(*)
+                        FROM bewegungsdaten.bahn_info
+                           where stop_point IS NOT NULL
+                        GROUP BY bucket
+                        ORDER BY bucket
+                       """
+        stop_rows = await conn.fetch(stop_query)
+        stats["stopPointDistribution"] = [{"bucket": r["bucket"], "count": r["count"]} for r in stop_rows]
 
-            # Fallback zu direkter Zählung, falls keine Statistiken verfügbar
-            if distinct_count is None:
-                count_query = f"SELECT COUNT(DISTINCT bahn_id) FROM bewegungsdaten.{table}"
-                distinct_count = await conn.fetchval(count_query)
-
-                # Nach der Zählung ANALYZE ausführen, damit künftige Statistik-Abfragen funktionieren
-                analyze_query = f"ANALYZE bewegungsdaten.{table}(bahn_id)"
-                await conn.execute(analyze_query)
-
-            component_counts[key] = distinct_count or 0
-
-        # Gleiches Vorgehen für Auswertungstabellen
-        analysis_counts = {}
-        for table, key in [
-            ('info_dfd', 'infoDFD'),
-            ('info_dtw', 'infoDTW'),
-            ('info_euclidean', 'infoEA'),
-            ('info_lcss', 'infoLCSS'),
-            ('info_sidtw', 'infoSIDTW'),
-        ]:
-            stats_query = """
-            SELECT 
-                CASE 
-                    WHEN n_distinct > 0 THEN n_distinct::integer  -- Positive Werte sind absolute Anzahlen
-                    WHEN n_distinct < 0 THEN (-n_distinct * reltuples)::integer  -- Negative Werte sind Prozentsätze
-                    ELSE 0
-                END as distinct_count
-            FROM pg_stats 
-            JOIN pg_class ON pg_stats.tablename = pg_class.relname
-            WHERE 
-                pg_stats.schemaname = 'auswertung'
-                AND pg_stats.tablename = $1
-                AND pg_stats.attname = 'bahn_id'
-            """
-
-            distinct_count = await conn.fetchval(stats_query, table)
-
-            # Fallback zu direkter Zählung
-            if distinct_count is None:
-                count_query = f"SELECT COUNT(DISTINCT bahn_id) FROM auswertung.{table}"
-                distinct_count = await conn.fetchval(count_query)
-
-                # Nach der Zählung ANALYZE ausführen
-                analyze_query = f"ANALYZE auswertung.{table}(bahn_id)"
-                await conn.execute(analyze_query)
-
-            analysis_counts[key] = distinct_count or 0
+        wait_query = """
+                       SELECT wait_time AS bucket, COUNT(*)
+                        FROM bewegungsdaten.bahn_info
+                           where wait_time IS NOT NULL
+                        GROUP BY bucket
+                        ORDER BY bucket
+                       """
+        wait_rows = await conn.fetch(wait_query)
+        stats["waitTimeDistribution"] = [{"bucket": r["bucket"], "count": r["count"]} for r in wait_rows]
 
         return {
             "filenamesCount": filenames_count,
             "bahnenCount": bahnen_count,
-            "componentCounts": component_counts,
-            "analysisCounts": analysis_counts,
+            "stats": stats,
         }
+
     except Exception as e:
         logger.error(f"Error fetching dashboard data: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
+
+@router.get("/dashboard_workarea")
+@cache(expire=24600)
+async def get_dashboard_workarea(conn=Depends(get_db)):
+    try:
+        workarea_query = """
+                         WITH numbered_events AS (SELECT be.x_reached, \
+                                                         be.y_reached, \
+                                                         be.z_reached, \
+                                                         s.sidtw_average_distance, \
+                                                         ROW_NUMBER() OVER (PARTITION BY be.bahn_id ORDER BY be.timestamp) as rn \
+                                                  FROM bewegungsdaten.bahn_events be \
+                                                           JOIN auswertung.info_sidtw s ON be.bahn_id = s.bahn_id \
+                                                           JOIN bewegungsdaten.bahn_info bi ON be.bahn_id = bi.bahn_id \
+                                                  WHERE s.bahn_id = s.segment_id \
+                                                    AND s.sidtw_average_distance IS NOT NULL \
+                                                    AND be.x_reached IS NOT NULL \
+                                                    AND be.y_reached IS NOT NULL \
+                                                    AND be.z_reached IS NOT NULL \
+                                                    AND bi.recording_date >= '2025-03-01'
+                         )
+                         SELECT x_reached, y_reached, z_reached, sidtw_average_distance
+                         FROM numbered_events
+                         WHERE rn % 3 = 0 \
+                         """
+
+        workarea_rows = await conn.fetch(workarea_query)
+
+        return {
+            "points": [
+                {
+                    "x": r["x_reached"],
+                    "y": r["y_reached"],
+                    "z": r["z_reached"],
+                    "sidtw": r["sidtw_average_distance"]
+                }
+                for r in workarea_rows
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching workarea data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 ########################## BEWEGUNGSDATEN #########################################
 
