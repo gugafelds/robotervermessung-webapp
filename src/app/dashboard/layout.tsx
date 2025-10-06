@@ -8,7 +8,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <main className="flex h-fullscreen flex-col overflow-y-auto bg-gray-50 p-6">
+    <main className="flex h-fullscreen justify-center overflow-y-auto p-6">
       {children}
     </main>
   );

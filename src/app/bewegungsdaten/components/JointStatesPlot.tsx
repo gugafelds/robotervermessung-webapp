@@ -120,6 +120,7 @@ export const JointStatesPlot: React.FC<JointStatesPlotProps> = ({
     yaxis: { title: '°' },
     legend: { orientation: 'h', y: -0.2 },
     hovermode: 'x unified',
+    uirevision: 'true',
   };
 
   return (

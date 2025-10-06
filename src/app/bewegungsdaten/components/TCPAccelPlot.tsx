@@ -175,6 +175,7 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
     legend: { orientation: 'h', y: -0.2 },
     hovermode: 'x unified',
     margin: { l: 60, r: 30, t: 50, b: 70 },
+    uirevision: 'true',
   };
 
   return (

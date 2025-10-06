@@ -147,6 +147,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
       zaxis: { title: 'Z [mm]', showgrid: true, zeroline: true },
     },
     margin: { t: 50, b: 20, l: 20, r: 20 },
+    uirevision: 'true',
     showlegend: true,
     width: 600,
     legend: {

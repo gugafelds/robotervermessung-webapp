@@ -500,6 +500,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
     },
     margin: { t: 60, b: 20, l: 20, r: 20 },
     showlegend: false,
+    uirevision: 'true',
   };
 
   // Loading states - GENAU WIE ORIGINAL

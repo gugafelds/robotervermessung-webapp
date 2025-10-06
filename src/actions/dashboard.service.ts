@@ -50,3 +50,55 @@ export const getWorkareaData = async () => {
     return { points: [] };
   }
 };
+
+// In dashboard.service.ts hinzufügen:
+
+export const getSIDTWTimeline = async () => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/bahn/dashboard_sidtw_timeline`,
+      {
+        cache: 'no-cache',
+        headers: {
+          Accept: 'application/json',
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `API request failed: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching SIDTW timeline:', error);
+    return { timeline: [] };
+  }
+};
+
+export const getSIDTWvsParameters = async () => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/bahn/dashboard_sidtw_vs_parameters`,
+      {
+        cache: 'no-cache',
+        headers: {
+          Accept: 'application/json',
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `API request failed: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching SIDTW vs parameters:', error);
+    return { data: [] };
+  }
+};

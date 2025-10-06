@@ -258,6 +258,7 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
     yaxis: { title: '°' },
     legend: { orientation: 'h', y: -0.2 },
     hovermode: 'x unified',
+    uirevision: 'true',
   };
 
   return (

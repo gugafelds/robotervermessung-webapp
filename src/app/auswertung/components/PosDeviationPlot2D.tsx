@@ -152,6 +152,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
         y: sortedDTW.map((d) => d.DTWDistances),
         line: { color: methodColors.DTW.line, width: 2 },
         hovertemplate: 'Zeit: %{x:.2f}s<br>DTW: %{y:.2f}mm<extra></extra>',
+        uirevision: 'true',
       });
     }
 

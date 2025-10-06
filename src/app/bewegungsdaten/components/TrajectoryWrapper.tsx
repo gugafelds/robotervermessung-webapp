@@ -185,9 +185,6 @@ export function TrajectoryWrapper() {
           setCurrentBahnEvents,
           'events',
         ).then(() => updateLoadingState('events', true)),
-      ];
-
-      const mediumPriorityFetches = [
         fetchDataWithCache(
           () => getBahnPositionSollById(id),
           setCurrentBahnPositionSoll,
@@ -198,11 +195,24 @@ export function TrajectoryWrapper() {
           setCurrentBahnOrientationSoll,
           'orientation_soll',
         ).then(() => updateLoadingState('orientationSoll', true)),
+      ];
+
+      const mediumPriorityFetches = [
+        fetchDataWithCache(
+          () => getBahnJointStatesById(id),
+          setCurrentBahnJointStates,
+          'joint_states',
+        ).then(() => updateLoadingState('jointStates', true)),
         fetchDataWithCache(
           () => getBahnTwistIstById(id),
           setCurrentBahnTwistIst,
           'twist_ist',
         ).then(() => updateLoadingState('twist', true)),
+        fetchDataWithCache(
+          () => getBahnTwistSollById(id),
+          setCurrentBahnTwistSoll,
+          'twist_soll',
+        ).then(() => updateLoadingState('twistSoll', true)),
       ];
 
       const lowPriorityFetches = [
@@ -216,16 +226,7 @@ export function TrajectoryWrapper() {
           setCurrentBahnAccelSoll,
           'accel_soll',
         ).then(() => updateLoadingState('accelSoll', true)),
-        fetchDataWithCache(
-          () => getBahnTwistSollById(id),
-          setCurrentBahnTwistSoll,
-          'twist_soll',
-        ).then(() => updateLoadingState('twistSoll', true)),
-        fetchDataWithCache(
-          () => getBahnJointStatesById(id),
-          setCurrentBahnJointStates,
-          'joint_states',
-        ).then(() => updateLoadingState('jointStates', true)),
+
         fetchDataWithCache(
           () => getBahnIMUById(id),
           setCurrentBahnIMU,

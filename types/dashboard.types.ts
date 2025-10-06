@@ -14,7 +14,8 @@ export interface DashboardData {
     stopPointDistribution: DistributionEntry[];
     waitTimeDistribution: DistributionEntry[];
   };
-  workareaPoints: Array<{
+  // Optional, da WorkareaPlot jetzt selbst lädt
+  workareaPoints?: Array<{
     x: number;
     y: number;
     z: number;

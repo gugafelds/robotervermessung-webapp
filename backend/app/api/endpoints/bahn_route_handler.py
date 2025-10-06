@@ -24,12 +24,25 @@ async def get_dashboard_data(conn=Depends(get_db)):
 
         # Velocity Distribution
         velocity_query = """
-                       SELECT setted_velocity AS bucket, COUNT(*)
-                        FROM bewegungsdaten.bahn_info
-                           where setted_velocity IS NOT NULL
-                        GROUP BY bucket
-                        ORDER BY bucket
-                       """
+            WITH vel_stats AS (
+                SELECT MAX(max_twist_ist) as max_val
+                FROM bewegungsdaten.bahn_meta
+                WHERE bahn_id = segment_id
+                  AND max_twist_ist IS NOT NULL
+            )
+            SELECT 
+                width_bucket(max_twist_ist, 
+                    0, 
+                    (SELECT max_val FROM vel_stats), 
+                    6
+                ) AS bucket, 
+                COUNT(*)
+            FROM bewegungsdaten.bahn_meta
+            WHERE bahn_id = segment_id
+              AND max_twist_ist IS NOT NULL
+            GROUP BY bucket
+            ORDER BY bucket
+        """
         velocity_rows = await conn.fetch(velocity_query)
         stats["velocityDistribution"] = [{"bucket": r["bucket"], "count": r["count"]} for r in velocity_rows]
 
@@ -111,6 +124,100 @@ async def get_dashboard_data(conn=Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+@router.get("/dashboard_sidtw_timeline")
+@cache(expire=24600)
+async def get_dashboard_sidtw_timeline(conn=Depends(get_db)):
+    """
+    Endpoint für SIDTW-Werte über Zeit
+    Gibt durchschnittliche SIDTW-Werte pro Aufnahmedatum zurück
+    """
+    try:
+        query = """
+                SELECT
+                    DATE (bi.recording_date) as date, AVG (info.sidtw_average_distance) as avg_sidtw, MIN (info.sidtw_average_distance) as min_sidtw, MAX (info.sidtw_average_distance) as max_sidtw, COUNT (*) as count
+                FROM bewegungsdaten.bahn_info bi
+                    INNER JOIN auswertung.info_sidtw info
+                ON bi.bahn_id = info.bahn_id
+                    AND bi.bahn_id = info.segment_id
+                WHERE
+                    bi.recording_date IS NOT NULL
+                  AND info.sidtw_average_distance IS NOT NULL
+                GROUP BY DATE (bi.recording_date)
+                ORDER BY date ASC \
+                """
+
+        rows = await conn.fetch(query)
+
+        return {
+            "timeline": [
+                {
+                    "date": str(row['date']),
+                    "avg_sidtw": float(row['avg_sidtw']),
+                    "min_sidtw": float(row['min_sidtw']),
+                    "max_sidtw": float(row['max_sidtw']),
+                    "count": int(row['count'])
+                }
+                for row in rows
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching SIDTW timeline: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get("/dashboard_sidtw_vs_parameters")
+@cache(expire=24600)
+async def get_dashboard_sidtw_vs_parameters(conn=Depends(get_db)):
+    """
+    Endpoint für SIDTW vs. verschiedene Bewegungsparameter
+    Velocity, Acceleration und Weight - optimiert mit Sampling (5000 Bahnen)
+    """
+    try:
+        query = """
+                WITH sampled_data AS (SELECT info.sidtw_average_distance as sidtw, \
+                                             bm.max_twist_ist            as velocity, \
+                                             bm.max_acceleration_ist     as acceleration, \
+                                             bm.weight                   as weight \
+                                      FROM auswertung.info_sidtw info \
+                                               INNER JOIN bewegungsdaten.bahn_meta bm \
+                                                          ON info.bahn_id = bm.bahn_id \
+                                                              AND info.bahn_id = bm.segment_id \
+                                                              AND bm.bahn_id = bm.segment_id \
+                                               INNER JOIN bewegungsdaten.bahn_info bi \
+                                                          ON info.bahn_id = bi.bahn_id \
+                                      WHERE info.bahn_id = info.segment_id \
+                                        AND info.sidtw_average_distance IS NOT NULL \
+                                        AND bi.source_data_ist = 'leica_at960' \
+                                        AND bm.max_twist_ist IS NOT NULL \
+                                        AND bm.max_acceleration_ist IS NOT NULL \
+                                        AND bm.weight IS NOT NULL \
+                                      ORDER BY RANDOM()
+                    LIMIT 5000
+                    )
+                SELECT * \
+                FROM sampled_data \
+                """
+
+        rows = await conn.fetch(query)
+
+        return {
+            "data": [
+                {
+                    "sidtw": float(row['sidtw']),
+                    "velocity": float(row['velocity']),
+                    "acceleration": float(row['acceleration']),
+                    "weight": float(row['weight'])
+                }
+                for row in rows
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching SIDTW vs parameters: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
 @router.get("/dashboard_workarea")
 @cache(expire=24600)
 async def get_dashboard_workarea(conn=Depends(get_db)):
@@ -124,7 +231,7 @@ async def get_dashboard_workarea(conn=Depends(get_db)):
                                                   FROM bewegungsdaten.bahn_events be \
                                                            JOIN auswertung.info_sidtw s ON be.bahn_id = s.bahn_id \
                                                            JOIN bewegungsdaten.bahn_info bi ON be.bahn_id = bi.bahn_id \
-                                                  WHERE s.bahn_id = s.segment_id \
+                                                  WHERE s.bahn_id <> s.segment_id \
                                                     AND s.sidtw_average_distance IS NOT NULL \
                                                     AND be.x_reached IS NOT NULL \
                                                     AND be.y_reached IS NOT NULL \
@@ -133,7 +240,7 @@ async def get_dashboard_workarea(conn=Depends(get_db)):
                          )
                          SELECT x_reached, y_reached, z_reached, sidtw_average_distance
                          FROM numbered_events
-                         WHERE rn % 3 = 0 \
+                         WHERE rn % 5 = 0 \
                          """
 
         workarea_rows = await conn.fetch(workarea_query)

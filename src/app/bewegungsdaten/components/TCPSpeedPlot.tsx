@@ -98,6 +98,7 @@ export const TCPSpeedPlot: React.FC<TCPSpeedPlotProps> = ({
     yaxis: { title: 'mm/s' },
     legend: { orientation: 'h', y: -0.2 },
     hovermode: 'x unified',
+    uirevision: 'true',
   };
 
   return (

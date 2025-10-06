@@ -278,6 +278,7 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
           x: [lastPoint[`${methodPrefix}IstX`]],
           y: [lastPoint[`${methodPrefix}IstY`]],
           z: [lastPoint[`${methodPrefix}IstZ`]],
+          uirevision: 'true',
           marker: {
             size: 4,
             color: 'red',

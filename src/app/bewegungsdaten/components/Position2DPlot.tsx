@@ -227,6 +227,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
     legend: { orientation: 'h', y: -0.15 }, // Legende näher zum Plot
     hovermode: 'x unified',
     margin: { l: 60, r: 20, b: 80, t: 50 }, // Kleinere Margins = mehr Platz für Plot
+    uirevision: 'true',
   };
 
   return (
