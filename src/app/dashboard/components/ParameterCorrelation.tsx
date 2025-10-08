@@ -11,13 +11,20 @@ import { Typography } from '@/src/components/Typography';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
-type ParameterType = 'velocity' | 'acceleration' | 'weight';
+type ParameterType =
+  | 'velocity'
+  | 'acceleration'
+  | 'weight'
+  | 'stop_point'
+  | 'wait_time';
 
 interface ParameterData {
   sidtw: number;
   velocity: number;
   acceleration: number;
   weight: number;
+  stop_point: number;
+  wait_time: number;
 }
 
 interface ParameterConfig {
@@ -25,6 +32,13 @@ interface ParameterConfig {
   label: string;
   unit: string;
   xLabel: string;
+  numBins: number;
+}
+
+interface BinnedData {
+  binLabel: string;
+  sidtwValues: number[];
+  count: number;
 }
 
 // Content Komponente ZUERST definiert
@@ -44,57 +58,101 @@ function ParameterCorrelationContent({
       id: 'velocity',
       label: 'Geschwindigkeit',
       unit: 'mm/s',
-      xLabel: 'Max. Geschwindigkeit (Twist Ist)',
+      xLabel: 'Geschwindigkeitsbereich',
+      numBins: 10,
     },
     {
       id: 'acceleration',
       label: 'Beschleunigung',
       unit: 'mm/s²',
-      xLabel: 'Max. Beschleunigung (Accel Ist)',
+      xLabel: 'Beschleunigungsbereich',
+      numBins: 10,
     },
     {
       id: 'weight',
       label: 'Last',
       unit: 'kg',
-      xLabel: 'Last',
+      xLabel: 'Lastbereich',
+      numBins: 6,
+    },
+    {
+      id: 'stop_point',
+      label: 'Stopp-Punkte',
+      unit: '%',
+      xLabel: 'Stopp-Punkte Bereich',
+      numBins: 100,
+    },
+    {
+      id: 'wait_time',
+      label: 'Wartezeit',
+      unit: 's',
+      xLabel: 'Wartezeit Bereich',
+      numBins: 6,
     },
   ];
 
   const activeConfig = parameters.find((p) => p.id === activeParam)!;
-  const xValues = data.map((d) => d[activeParam]);
-  const yValues = data.map((d) => d.sidtw);
 
-  // Berechne einfache Korrelation
-  const calculateCorrelation = (x: number[], y: number[]) => {
-    const n = x.length;
-    const sumX = x.reduce((a, b) => a + b, 0);
-    const sumY = y.reduce((a, b) => a + b, 0);
-    const sumXY = x.reduce((acc, xi, i) => acc + xi * y[i], 0);
-    const sumX2 = x.reduce((acc, xi) => acc + xi * xi, 0);
-    const sumY2 = y.reduce((acc, yi) => acc + yi * yi, 0);
+  // Binning-Funktion
+  const createBins = (paramValues: number[], numBins: number): BinnedData[] => {
+    const min = Math.min(...paramValues);
+    const max = Math.max(...paramValues);
+    const binWidth = (max - min) / numBins;
 
-    const numerator = n * sumXY - sumX * sumY;
-    const denominator = Math.sqrt(
-      (n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY),
-    );
+    const bins: BinnedData[] = [];
 
-    return denominator === 0 ? 0 : numerator / denominator;
+    for (let i = 0; i < numBins; i++) {
+      const binMin = min + i * binWidth;
+      const binMax = min + (i + 1) * binWidth;
+      const binLabel = `${binMin.toFixed(1)}-${binMax.toFixed(1)}`;
+
+      const sidtwInBin = data
+        .filter((d) => {
+          const val = d[activeParam];
+          return i === numBins - 1
+            ? val >= binMin && val <= binMax
+            : val >= binMin && val < binMax;
+        })
+        .map((d) => d.sidtw);
+
+      if (sidtwInBin.length > 0) {
+        bins.push({
+          binLabel,
+          sidtwValues: sidtwInBin,
+          count: sidtwInBin.length,
+        });
+      }
+    }
+
+    return bins;
   };
 
-  const correlation = calculateCorrelation(xValues, yValues);
+  const paramValues = data.map((d) => d[activeParam]);
+  const binnedData = createBins(paramValues, activeConfig.numBins);
+
+  // Berechne Statistiken für beste/schlechteste Bereiche
+  const binMedians = binnedData.map((bin) => {
+    const sorted = [...bin.sidtwValues].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+      ? (sorted[mid - 1] + sorted[mid]) / 2
+      : sorted[mid];
+  });
+
+  const bestBinIndex = binMedians.indexOf(Math.min(...binMedians));
+  const worstBinIndex = binMedians.indexOf(Math.max(...binMedians));
 
   return (
     <div className="rounded-2xl bg-white p-6 shadow">
       <Typography as="h3" className="mb-4">
-        SIDTW vs. Bewegungsparameter
+        SIDTW-Verteilung nach Bewegungsparametern
       </Typography>
 
       <div className="mb-4 text-sm text-gray-600">
         <p>
-          Diese Scatter-Plots zeigen den Zusammenhang zwischen SIDTW-Genauigkeit
-          und Bewegungsparametern. Eine Stichprobe von{' '}
-          {data.length.toLocaleString()} repräsentativen Bahnen (Leica AT960)
-          wird analysiert.
+          Box Plots zeigen die SIDTW-Verteilung für verschiedene
+          Parameter-Bereiche. Eine Stichprobe von {data.length.toLocaleString()}{' '}
+          repräsentativen Bahnen (Leica AT960).
         </p>
       </div>
 
@@ -115,43 +173,33 @@ function ParameterCorrelationContent({
         ))}
       </div>
 
-      {/* Scatter Plot */}
+      {/* Box Plot */}
       <Plot
-        data={[
-          {
-            x: xValues,
-            y: yValues,
-            type: 'scatter',
-            mode: 'markers',
-            name: 'Messungen',
-            marker: {
-              size: 6,
-              color: yValues,
-              colorscale: 'Viridis',
-              showscale: true,
-              colorbar: {
-                title: 'SIDTW [mm]',
-              },
-              opacity: 0.6,
-            },
-            hovertemplate:
-              `<b>${activeConfig.xLabel}</b><br>` +
-              `${activeConfig.label}: %{x:.2f} ${activeConfig.unit}<br>` +
-              'SIDTW: %{y:.3f} mm<br>' +
-              '<extra></extra>',
+        data={binnedData.map((bin, idx) => ({
+          y: bin.sidtwValues,
+          type: 'box',
+          name: bin.binLabel,
+          marker: {
+            color:
+              idx === bestBinIndex
+                ? '#10b981'
+                : idx === worstBinIndex
+                  ? '#ef4444'
+                  : '#003560',
           },
-        ]}
+          boxmean: 'sd',
+        }))}
         layout={{
           autosize: true,
           height: 500,
-          margin: { t: 20, r: 20, l: 80, b: 80 },
+          margin: { t: 20, r: 20, l: 80, b: 120 },
           xaxis: {
             title: `${activeConfig.xLabel} [${activeConfig.unit}]`,
+            tickangle: -45,
           },
           yaxis: {
             title: 'SIDTW [mm]',
           },
-          hovermode: 'closest',
           showlegend: false,
         }}
         style={{ width: '100%' }}
@@ -170,42 +218,38 @@ function ParameterCorrelationContent({
             {data.length.toLocaleString()}
           </p>
         </div>
-        <div
-          className={`rounded-lg p-4 ${
-            Math.abs(correlation) > 0.5
-              ? 'bg-orange-50'
-              : Math.abs(correlation) > 0.3
-                ? 'bg-yellow-50'
-                : 'bg-green-50'
-          }`}
-        >
-          <p className="text-sm text-gray-600">Korrelation</p>
-          <p
-            className={`text-2xl font-bold ${
-              Math.abs(correlation) > 0.5
-                ? 'text-orange-700'
-                : Math.abs(correlation) > 0.3
-                  ? 'text-yellow-700'
-                  : 'text-green-700'
-            }`}
-          >
-            {correlation.toFixed(3)}
+        <div className="rounded-lg bg-green-50 p-4">
+          <p className="text-sm text-gray-600">
+            Bester Bereich (niedrigste SIDTW)
+          </p>
+          <p className="text-2xl font-bold text-green-700">
+            {binnedData[bestBinIndex]?.binLabel} {activeConfig.unit}
           </p>
           <p className="mt-1 text-xs text-gray-500">
-            {Math.abs(correlation) > 0.5
-              ? 'Starker Zusammenhang'
-              : Math.abs(correlation) > 0.3
-                ? 'Mittlerer Zusammenhang'
-                : 'Schwacher Zusammenhang'}
+            Median: {binMedians[bestBinIndex]?.toFixed(3)} mm
           </p>
         </div>
-        <div className="rounded-lg bg-purple-50 p-4">
-          <p className="text-sm text-gray-600">Durchschn. SIDTW</p>
-          <p className="text-2xl font-bold text-purple-700">
-            {(yValues.reduce((a, b) => a + b, 0) / yValues.length).toFixed(3)}{' '}
-            mm
+        <div className="rounded-lg bg-red-50 p-4">
+          <p className="text-sm text-gray-600">Schlechtester Bereich</p>
+          <p className="text-2xl font-bold text-red-700">
+            {binnedData[worstBinIndex]?.binLabel} {activeConfig.unit}
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            Median: {binMedians[worstBinIndex]?.toFixed(3)} mm
           </p>
         </div>
+      </div>
+
+      {/* Interpretation */}
+      <div className="mt-4 rounded-lg bg-blue-50 p-4">
+        <p className="text-sm font-medium text-blue-900">💡 Interpretation:</p>
+        <p className="mt-1 text-sm text-blue-800">
+          <strong>Grün</strong> = Optimaler Bereich mit bester Genauigkeit •{' '}
+          <strong>Rot</strong> = Vermeiden - höchste Abweichungen •{' '}
+          <strong>Box</strong> = 50% der Daten (Q1-Q3) •{' '}
+          <strong>Linie in Box</strong> = Median • <strong>Whiskers</strong> =
+          Min/Max Bereich
+        </p>
       </div>
     </div>
   );
@@ -242,7 +286,7 @@ export function ParameterCorrelation() {
     return (
       <div className="rounded-2xl bg-white p-6 shadow">
         <Typography as="h3" className="mb-4">
-          SIDTW vs. Bewegungsparameter
+          SIDTW-Verteilung nach Bewegungsparametern
         </Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center">
@@ -259,7 +303,7 @@ export function ParameterCorrelation() {
     return (
       <div className="rounded-2xl bg-white p-6 shadow">
         <Typography as="h3" className="mb-4">
-          SIDTW vs. Bewegungsparameter
+          SIDTW-Verteilung nach Bewegungsparametern
         </Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center text-red-600">
@@ -281,7 +325,7 @@ export function ParameterCorrelation() {
     return (
       <div className="rounded-2xl bg-white p-6 shadow">
         <Typography as="h3" className="mb-4">
-          SIDTW vs. Bewegungsparameter
+          SIDTW-Verteilung nach Bewegungsparametern
         </Typography>
         <div className="flex h-96 items-center justify-center">
           <p className="text-gray-600">Keine Parameter-Daten verfügbar</p>

@@ -170,15 +170,17 @@ async def get_dashboard_sidtw_timeline(conn=Depends(get_db)):
 @cache(expire=24600)
 async def get_dashboard_sidtw_vs_parameters(conn=Depends(get_db)):
     """
-    Endpoint für SIDTW vs. verschiedene Bewegungsparameter
-    Velocity, Acceleration und Weight - optimiert mit Sampling (5000 Bahnen)
+    Endpoint für SIDTW vs. verschiedene Bewegungsparameter als Box Plot Daten
+    Gruppiert Parameter in Bins und gibt alle SIDTW-Werte pro Bin zurück
     """
     try:
         query = """
                 WITH sampled_data AS (SELECT info.sidtw_average_distance as sidtw, \
                                              bm.max_twist_ist            as velocity, \
                                              bm.max_acceleration_ist     as acceleration, \
-                                             bm.weight                   as weight \
+                                             bm.weight                   as weight, \
+                                             bi.stop_point               as stop_point, \
+                                             bi.wait_time                as wait_time \
                                       FROM auswertung.info_sidtw info \
                                                INNER JOIN bewegungsdaten.bahn_meta bm \
                                                           ON info.bahn_id = bm.bahn_id \
@@ -192,8 +194,10 @@ async def get_dashboard_sidtw_vs_parameters(conn=Depends(get_db)):
                                         AND bm.max_twist_ist IS NOT NULL \
                                         AND bm.max_acceleration_ist IS NOT NULL \
                                         AND bm.weight IS NOT NULL \
+                                        AND bi.stop_point IS NOT NULL \
+                                        AND bi.wait_time IS NOT NULL \
                                       ORDER BY RANDOM()
-                    LIMIT 5000
+                    LIMIT 10000
                     )
                 SELECT * \
                 FROM sampled_data \
@@ -201,13 +205,16 @@ async def get_dashboard_sidtw_vs_parameters(conn=Depends(get_db)):
 
         rows = await conn.fetch(query)
 
+        # Gib Rohdaten zurück - Binning wird im Frontend gemacht
         return {
             "data": [
                 {
                     "sidtw": float(row['sidtw']),
                     "velocity": float(row['velocity']),
                     "acceleration": float(row['acceleration']),
-                    "weight": float(row['weight'])
+                    "weight": float(row['weight']),
+                    "stop_point": float(row['stop_point']),
+                    "wait_time": float(row['wait_time'])
                 }
                 for row in rows
             ]
@@ -216,7 +223,6 @@ async def get_dashboard_sidtw_vs_parameters(conn=Depends(get_db)):
     except Exception as e:
         logger.error(f"Error fetching SIDTW vs parameters: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-
 
 @router.get("/dashboard_workarea")
 @cache(expire=24600)
