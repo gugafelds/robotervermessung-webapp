@@ -48,9 +48,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <DashboardClient
-      filenamesCount={data.filenamesCount}
-      bahnenCount={data.bahnenCount}
-    />
+    <div className="flex justify-center">
+      <DashboardClient
+        filenamesCount={data.filenamesCount}
+        bahnenCount={data.bahnenCount}
+      />
+    </div>
   );
 }

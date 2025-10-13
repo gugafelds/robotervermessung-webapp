@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 
 import { getDashboardData } from '@/src/actions/dashboard.service';
 import { Typography } from '@/src/components/Typography';
+import type { DashboardData } from '@/types/dashboard.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
@@ -22,26 +23,11 @@ type TabType =
 interface TabConfig {
   id: TabType;
   label: string;
-  data: Array<{ bucket: number; count: number }>;
-  unit: string;
-  min: number;
-  max: number;
-  numBuckets: number;
-  useRanges: boolean;
-}
-
-interface DashboardStats {
-  velocityDistribution: Array<{ bucket: number; count: number }>;
-  weightDistribution: Array<{ bucket: number; count: number }>;
-  waypointDistribution: Array<{ bucket: number; count: number }>;
-  performanceSIDTWDistribution: Array<{ bucket: number; count: number }>;
-  stopPointDistribution: Array<{ bucket: number; count: number }>;
-  waitTimeDistribution: Array<{ bucket: number; count: number }>;
 }
 
 // Separate Komponente für den eigentlichen Chart
 interface DistributionChartsContentProps {
-  stats: DashboardStats;
+  stats: DashboardData['stats'];
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
 }
@@ -64,81 +50,47 @@ function DistributionChartsContent({
   };
 
   const tabs: TabConfig[] = [
-    {
-      id: 'weight',
-      label: 'Last',
-      data: stats.weightDistribution,
-      unit: 'kg',
-      min: 0,
-      max: 0,
-      numBuckets: 0,
-      useRanges: false,
-    },
-    {
-      id: 'velocity',
-      label: 'Geschwindigkeit',
-      data: stats.velocityDistribution,
-      unit: 'mm/s',
-      min: 0,
-      max: 3000,
-      numBuckets: 6,
-      useRanges: true,
-    },
-    {
-      id: 'waypoint',
-      label: 'Zielpunkte',
-      data: stats.waypointDistribution,
-      unit: '-',
-      min: 0,
-      max: 0,
-      numBuckets: 0,
-      useRanges: false,
-    },
-    {
-      id: 'performance_sidtw',
-      label: 'Genauigkeit',
-      data: stats.performanceSIDTWDistribution,
-      unit: 'mm',
-      min: 0,
-      max: 3.2475,
-      numBuckets: 10,
-      useRanges: true,
-    },
-    {
-      id: 'stopPoint',
-      label: 'Stopp-Punkte',
-      data: stats.stopPointDistribution,
-      unit: '%',
-      min: 0,
-      max: 0,
-      numBuckets: 0,
-      useRanges: false,
-    },
-    {
-      id: 'waitTime',
-      label: 'Wartezeit',
-      data: stats.waitTimeDistribution,
-      unit: 's',
-      min: 0,
-      max: 0,
-      numBuckets: 0,
-      useRanges: false,
-    },
+    { id: 'weight', label: 'Last' },
+    { id: 'velocity', label: 'Geschwindigkeit' },
+    { id: 'waypoint', label: 'Zielpunkte' },
+    { id: 'performance_sidtw', label: 'Genauigkeit' },
+    { id: 'stopPoint', label: 'Stopp-Punkte' },
+    { id: 'waitTime', label: 'Wartezeit' },
   ];
 
-  const activeTabData = tabs.find((tab) => tab.id === activeTab);
-  const sortedData = activeTabData
-    ? [...activeTabData.data].sort((a, b) => a.bucket - b.bucket)
-    : [];
+  // Mapping von TabType zu Distribution
+  const getDistribution = (tabId: TabType) => {
+    switch (tabId) {
+      case 'weight':
+        return stats.weightDistribution;
+      case 'velocity':
+        return stats.velocityDistribution;
+      case 'waypoint':
+        return stats.waypointDistribution;
+      case 'performance_sidtw':
+        return stats.performanceSIDTWDistribution;
+      case 'stopPoint':
+        return stats.stopPointDistribution;
+      case 'waitTime':
+        return stats.waitTimeDistribution;
+      default:
+        return stats.weightDistribution;
+    }
+  };
+
+  const activeDistribution = getDistribution(activeTab);
+  const sortedData = [...activeDistribution.data].sort(
+    (a, b) => a.bucket - b.bucket,
+  );
 
   // X-Achsen Labels erstellen
-  const xLabels = activeTabData?.useRanges
+  const xLabels = activeDistribution.meta.useRanges
     ? sortedData.map((d) =>
         getBucketRange(
           d.bucket,
-          activeTabData.min,
-          activeTabData.max,
-          activeTabData.numBuckets,
+          activeDistribution.meta.min!,
+          activeDistribution.meta.max!,
+          activeDistribution.meta.numBuckets!,
         ),
       )
     : sortedData.map((d) => d.bucket);
@@ -177,7 +129,7 @@ function DistributionChartsContent({
           height: 300,
           margin: { t: 20, r: 20, l: 80, b: 80 },
           xaxis: {
-            title: `${activeTabData?.label} [${activeTabData?.unit}]`,
+            title: `${activeDistribution.meta.label} [${activeDistribution.meta.unit}]`,
             type: 'category',
           },
           yaxis: { title: 'Anzahl' },
@@ -202,7 +154,7 @@ function DistributionChartsContent({
 }
 
 export function DistributionCharts() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [stats, setStats] = useState<DashboardData['stats'] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('weight');

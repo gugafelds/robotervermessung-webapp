@@ -3,16 +3,30 @@ export interface DistributionEntry {
   count: number;
 }
 
+export interface DistributionMeta {
+  useRanges: boolean;
+  min?: number;
+  max?: number;
+  numBuckets?: number;
+  unit: string;
+  label: string;
+}
+
+export interface Distribution {
+  data: DistributionEntry[];
+  meta: DistributionMeta;
+}
+
 export interface DashboardData {
   filenamesCount: number;
   bahnenCount: number;
   stats: {
-    velocityDistribution: DistributionEntry[];
-    weightDistribution: DistributionEntry[];
-    waypointDistribution: DistributionEntry[];
-    performanceSIDTWDistribution: DistributionEntry[];
-    stopPointDistribution: DistributionEntry[];
-    waitTimeDistribution: DistributionEntry[];
+    velocityDistribution: Distribution;
+    weightDistribution: Distribution;
+    waypointDistribution: Distribution;
+    performanceSIDTWDistribution: Distribution;
+    stopPointDistribution: Distribution;
+    waitTimeDistribution: Distribution;
   };
   // Optional, da WorkareaPlot jetzt selbst lädt
   workareaPoints?: Array<{

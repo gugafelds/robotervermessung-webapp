@@ -34,7 +34,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
                 width_bucket(max_twist_ist, 
                     0, 
                     (SELECT max_val FROM vel_stats), 
-                    6
+                    7
                 ) AS bucket, 
                 COUNT(*)
             FROM bewegungsdaten.bahn_meta
@@ -44,74 +44,140 @@ async def get_dashboard_data(conn=Depends(get_db)):
             ORDER BY bucket
         """
         velocity_rows = await conn.fetch(velocity_query)
-        stats["velocityDistribution"] = [{"bucket": r["bucket"], "count": r["count"]} for r in velocity_rows]
+        velocity_max = await conn.fetchval("""
+            SELECT MAX(max_twist_ist) 
+            FROM bewegungsdaten.bahn_meta 
+            WHERE bahn_id = segment_id AND max_twist_ist IS NOT NULL
+        """)
+        stats["velocityDistribution"] = {
+            "data": [{"bucket": r["bucket"], "count": r["count"]} for r in velocity_rows],
+            "meta": {
+                "useRanges": True,
+                "min": 0,
+                "max": velocity_max or 3000,
+                "numBuckets": 7,
+                "unit": "mm/s",
+                "label": "Geschwindigkeit"
+            }
+        }
 
         # Weight Distribution
         weight_query = """
-                       SELECT weight AS bucket, COUNT(*)
-                        FROM bewegungsdaten.bahn_meta
-                        where bahn_id = segment_id
-                           and weight IS NOT NULL
-                        GROUP BY bucket
-                        ORDER BY bucket
-                       """
+            SELECT weight AS bucket, COUNT(*)
+            FROM bewegungsdaten.bahn_meta
+            WHERE bahn_id = segment_id
+              AND weight IS NOT NULL
+            GROUP BY bucket
+            ORDER BY bucket
+        """
         weight_rows = await conn.fetch(weight_query)
-        stats["weightDistribution"] = [{"bucket": r["bucket"], "count": r["count"]} for r in weight_rows]
+        stats["weightDistribution"] = {
+            "data": [{"bucket": r["bucket"], "count": r["count"]} for r in weight_rows],
+            "meta": {
+                "useRanges": False,
+                "unit": "kg",
+                "label": "Last"
+            }
+        }
 
-        # Duration Distribution (aus bahn_meta)
+        # Waypoint Distribution
         waypoints_query = """
-                       SELECT np_ereignisse AS bucket, COUNT(*)
-                        FROM bewegungsdaten.bahn_info
-                        GROUP BY bucket
-                        ORDER BY bucket
-                       """
+            SELECT np_ereignisse AS bucket, COUNT(*)
+            FROM bewegungsdaten.bahn_info
+            GROUP BY bucket
+            ORDER BY bucket
+        """
         waypoint_rows = await conn.fetch(waypoints_query)
-        stats["waypointDistribution"] = [{"bucket": r["bucket"], "count": r["count"]} for r in waypoint_rows]
+        stats["waypointDistribution"] = {
+            "data": [{"bucket": r["bucket"], "count": r["count"]} for r in waypoint_rows],
+            "meta": {
+                "useRanges": False,
+                "unit": "-",
+                "label": "Zielpunkte"
+            }
+        }
 
-        # Length Distribution (aus bahn_meta)
+        # Performance SIDTW Distribution
         sidtw_query = """
             WITH sidtw_stats AS (
-                SELECT MAX(sidtw_average_distance) as max_val
-                FROM auswertung.info_sidtw
-                WHERE bahn_id = segment_id
-                  AND sidtw_average_distance IS NOT NULL
+                SELECT MAX(i.sidtw_average_distance) as max_val
+                FROM auswertung.info_sidtw i
+                INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
+                WHERE i.bahn_id = i.segment_id
+                  AND i.sidtw_average_distance IS NOT NULL
+                  AND b.source_data_ist = 'leica_at960'
             )
             SELECT 
-                width_bucket(sidtw_average_distance, 
+                width_bucket(i.sidtw_average_distance, 
                     0, 
                     (SELECT max_val FROM sidtw_stats), 
                     10
                 ) AS bucket, 
                 COUNT(*)
-            FROM auswertung.info_sidtw
-            WHERE bahn_id = segment_id
-              AND sidtw_average_distance IS NOT NULL
+            FROM auswertung.info_sidtw i
+            INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
+            WHERE i.bahn_id = i.segment_id
+              AND i.sidtw_average_distance IS NOT NULL
+              AND b.source_data_ist = 'leica_at960'
             GROUP BY bucket
             ORDER BY bucket
         """
         sidtw_rows = await conn.fetch(sidtw_query)
-        stats["performanceSIDTWDistribution"] = [{"bucket": r["bucket"], "count": r["count"]} for r in sidtw_rows]
+        sidtw_max = await conn.fetchval("""
+            SELECT MAX(sidtw_average_distance) 
+            FROM auswertung.info_sidtw i
+            INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
+            WHERE i.bahn_id = i.segment_id 
+              AND i.sidtw_average_distance IS NOT NULL
+              AND b.source_data_ist = 'leica_at960'
+        """)
+        stats["performanceSIDTWDistribution"] = {
+            "data": [{"bucket": r["bucket"], "count": r["count"]} for r in sidtw_rows],
+            "meta": {
+                "useRanges": True,
+                "min": 0,
+                "max": sidtw_max or 3.2475,
+                "numBuckets": 10,
+                "unit": "mm",
+                "label": "Genauigkeit"
+            }
+        }
 
-        # Stop Point + Wait Time
+        # Stop Point Distribution
         stop_query = """
-                       SELECT stop_point AS bucket, COUNT(*)
-                        FROM bewegungsdaten.bahn_info
-                           where stop_point IS NOT NULL
-                        GROUP BY bucket
-                        ORDER BY bucket
-                       """
+            SELECT stop_point AS bucket, COUNT(*)
+            FROM bewegungsdaten.bahn_info
+            WHERE stop_point IS NOT NULL
+            GROUP BY bucket
+            ORDER BY bucket
+        """
         stop_rows = await conn.fetch(stop_query)
-        stats["stopPointDistribution"] = [{"bucket": r["bucket"], "count": r["count"]} for r in stop_rows]
+        stats["stopPointDistribution"] = {
+            "data": [{"bucket": r["bucket"], "count": r["count"]} for r in stop_rows],
+            "meta": {
+                "useRanges": False,
+                "unit": "%",
+                "label": "Stopp-Punkte"
+            }
+        }
 
+        # Wait Time Distribution
         wait_query = """
-                       SELECT wait_time AS bucket, COUNT(*)
-                        FROM bewegungsdaten.bahn_info
-                           where wait_time IS NOT NULL
-                        GROUP BY bucket
-                        ORDER BY bucket
-                       """
+            SELECT wait_time AS bucket, COUNT(*)
+            FROM bewegungsdaten.bahn_info
+            WHERE wait_time IS NOT NULL
+            GROUP BY bucket
+            ORDER BY bucket
+        """
         wait_rows = await conn.fetch(wait_query)
-        stats["waitTimeDistribution"] = [{"bucket": r["bucket"], "count": r["count"]} for r in wait_rows]
+        stats["waitTimeDistribution"] = {
+            "data": [{"bucket": r["bucket"], "count": r["count"]} for r in wait_rows],
+            "meta": {
+                "useRanges": False,
+                "unit": "s",
+                "label": "Wartezeit"
+            }
+        }
 
         return {
             "filenamesCount": filenames_count,
@@ -246,7 +312,7 @@ async def get_dashboard_workarea(conn=Depends(get_db)):
                          )
                          SELECT x_reached, y_reached, z_reached, sidtw_average_distance
                          FROM numbered_events
-                         WHERE rn % 5 = 0 \
+                         WHERE rn % 1 = 0 \
                          """
 
         workarea_rows = await conn.fetch(workarea_query)

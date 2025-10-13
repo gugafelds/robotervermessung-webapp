@@ -20,7 +20,7 @@ export default function DashboardClient({
   bahnenCount,
 }: DashboardClientProps) {
   return (
-    <div className="justify-center p-6">
+    <div className="p-2">
       <Typography as="h2" className="py-2">
         Bewegungsdaten
       </Typography>
@@ -37,22 +37,18 @@ export default function DashboardClient({
         Datenverteilung
       </Typography>
 
-      {/* Charts laden jetzt SELBSTSTÄNDIG! */}
       <DistributionCharts />
 
-      {/* Genauigkeit über Zeit */}
-      <Typography as="h2" className="mt-8 py-2">
-        Genauigkeitsentwicklung
-      </Typography>
-      <AccuracyTimeline />
-
-      {/* NEU: Parameter-Korrelation */}
       <Typography as="h2" className="mt-8 py-2">
         Einflussfaktoren auf Genauigkeit
       </Typography>
       <ParameterCorrelation />
 
-      {/* Arbeitsraum lädt auch SELBSTSTÄNDIG! */}
+      <Typography as="h2" className="mt-8 py-2">
+        Genauigkeitsentwicklung
+      </Typography>
+      <AccuracyTimeline />
+
       <Typography as="h2" className="mt-8 py-2">
         Arbeitsraum
       </Typography>

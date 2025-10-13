@@ -1,4 +1,4 @@
-/* eslint-disable react/button-has-type */
+/* eslint-disable react/button-has-type,no-nested-ternary */
 
 'use client';
 
@@ -7,7 +7,6 @@ import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 
 import { getSIDTWvsParameters } from '@/src/actions/dashboard.service';
-import { Typography } from '@/src/components/Typography';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
@@ -32,7 +31,8 @@ interface ParameterConfig {
   label: string;
   unit: string;
   xLabel: string;
-  numBins: number;
+  numBins?: number;
+  useRanges: boolean;
 }
 
 interface BinnedData {
@@ -59,39 +59,58 @@ function ParameterCorrelationContent({
       label: 'Geschwindigkeit',
       unit: 'mm/s',
       xLabel: 'Geschwindigkeitsbereich',
-      numBins: 10,
+      numBins: 6,
+      useRanges: true,
     },
     {
       id: 'acceleration',
       label: 'Beschleunigung',
       unit: 'mm/s²',
       xLabel: 'Beschleunigungsbereich',
-      numBins: 10,
+      numBins: 6,
+      useRanges: true,
     },
     {
       id: 'weight',
       label: 'Last',
       unit: 'kg',
-      xLabel: 'Lastbereich',
-      numBins: 6,
+      xLabel: 'Last',
+      useRanges: false,
     },
     {
       id: 'stop_point',
       label: 'Stopp-Punkte',
       unit: '%',
-      xLabel: 'Stopp-Punkte Bereich',
-      numBins: 100,
+      xLabel: 'Stopp-Punkte',
+      useRanges: false,
     },
     {
       id: 'wait_time',
       label: 'Wartezeit',
       unit: 's',
-      xLabel: 'Wartezeit Bereich',
-      numBins: 6,
+      xLabel: 'Wartezeit',
+      useRanges: false,
     },
   ];
 
   const activeConfig = parameters.find((p) => p.id === activeParam)!;
+
+  // Neue Funktion für exakte Werte
+  const createExactValueGroups = (paramValues: number[]): BinnedData[] => {
+    const uniqueValues = [...new Set(paramValues)].sort((a, b) => a - b);
+
+    return uniqueValues.map((value) => {
+      const sidtwInGroup = data
+        .filter((d) => d[activeParam] === value)
+        .map((d) => d.sidtw);
+
+      return {
+        binLabel: value.toString(),
+        sidtwValues: sidtwInGroup,
+        count: sidtwInGroup.length,
+      };
+    });
+  };
 
   // Binning-Funktion
   const createBins = (paramValues: number[], numBins: number): BinnedData[] => {
@@ -101,7 +120,7 @@ function ParameterCorrelationContent({
 
     const bins: BinnedData[] = [];
 
-    for (let i = 0; i < numBins; i++) {
+    for (let i = 0; i < numBins; i += 1) {
       const binMin = min + i * binWidth;
       const binMax = min + (i + 1) * binWidth;
       const binLabel = `${binMin.toFixed(1)}-${binMax.toFixed(1)}`;
@@ -128,7 +147,9 @@ function ParameterCorrelationContent({
   };
 
   const paramValues = data.map((d) => d[activeParam]);
-  const binnedData = createBins(paramValues, activeConfig.numBins);
+  const binnedData = activeConfig.useRanges
+    ? createBins(paramValues, activeConfig.numBins!)
+    : createExactValueGroups(paramValues);
 
   // Berechne Statistiken für beste/schlechteste Bereiche
   const binMedians = binnedData.map((bin) => {
@@ -144,15 +165,11 @@ function ParameterCorrelationContent({
 
   return (
     <div className="rounded-2xl bg-white p-6 shadow">
-      <Typography as="h3" className="mb-4">
-        SIDTW-Verteilung nach Bewegungsparametern
-      </Typography>
-
       <div className="mb-4 text-sm text-gray-600">
         <p>
           Box Plots zeigen die SIDTW-Verteilung für verschiedene
           Parameter-Bereiche. Eine Stichprobe von {data.length.toLocaleString()}{' '}
-          repräsentativen Bahnen (Leica AT960).
+          repräsentativen Bahnen.
         </p>
       </div>
 
@@ -195,7 +212,7 @@ function ParameterCorrelationContent({
           margin: { t: 20, r: 20, l: 80, b: 120 },
           xaxis: {
             title: `${activeConfig.xLabel} [${activeConfig.unit}]`,
-            tickangle: -45,
+            type: 'category',
           },
           yaxis: {
             title: 'SIDTW [mm]',
@@ -211,7 +228,7 @@ function ParameterCorrelationContent({
       />
 
       {/* Statistiken */}
-      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="mt-2 grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-lg bg-blue-50 p-4">
           <p className="text-sm text-gray-600">Datenpunkte (Stichprobe)</p>
           <p className="text-2xl font-bold text-blue-950">
@@ -239,18 +256,6 @@ function ParameterCorrelationContent({
           </p>
         </div>
       </div>
-
-      {/* Interpretation */}
-      <div className="mt-4 rounded-lg bg-blue-50 p-4">
-        <p className="text-sm font-medium text-blue-900">💡 Interpretation:</p>
-        <p className="mt-1 text-sm text-blue-800">
-          <strong>Grün</strong> = Optimaler Bereich mit bester Genauigkeit •{' '}
-          <strong>Rot</strong> = Vermeiden - höchste Abweichungen •{' '}
-          <strong>Box</strong> = 50% der Daten (Q1-Q3) •{' '}
-          <strong>Linie in Box</strong> = Median • <strong>Whiskers</strong> =
-          Min/Max Bereich
-        </p>
-      </div>
     </div>
   );
 }
@@ -270,7 +275,6 @@ export function ParameterCorrelation() {
         const result = await getSIDTWvsParameters();
         setData(result.data || []);
       } catch (err) {
-        console.error('Error loading parameter data:', err);
         setError('Fehler beim Laden der Parameter-Daten');
         setData([]);
       } finally {
@@ -285,9 +289,6 @@ export function ParameterCorrelation() {
   if (isLoading) {
     return (
       <div className="rounded-2xl bg-white p-6 shadow">
-        <Typography as="h3" className="mb-4">
-          SIDTW-Verteilung nach Bewegungsparametern
-        </Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center">
             <Loader className="mx-auto mb-4 size-12 animate-spin text-blue-950" />
@@ -302,9 +303,6 @@ export function ParameterCorrelation() {
   if (error) {
     return (
       <div className="rounded-2xl bg-white p-6 shadow">
-        <Typography as="h3" className="mb-4">
-          SIDTW-Verteilung nach Bewegungsparametern
-        </Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center text-red-600">
             <p className="mb-2 text-lg font-semibold">{error}</p>
@@ -324,9 +322,6 @@ export function ParameterCorrelation() {
   if (data.length === 0) {
     return (
       <div className="rounded-2xl bg-white p-6 shadow">
-        <Typography as="h3" className="mb-4">
-          SIDTW-Verteilung nach Bewegungsparametern
-        </Typography>
         <div className="flex h-96 items-center justify-center">
           <p className="text-gray-600">Keine Parameter-Daten verfügbar</p>
         </div>
