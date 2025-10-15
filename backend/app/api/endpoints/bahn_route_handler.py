@@ -64,9 +64,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
         # Weight Distribution
         weight_query = """
             SELECT weight AS bucket, COUNT(*)
-            FROM bewegungsdaten.bahn_meta
-            WHERE bahn_id = segment_id
-              AND weight IS NOT NULL
+            FROM bewegungsdaten.bahn_info
             GROUP BY bucket
             ORDER BY bucket
         """

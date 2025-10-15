@@ -991,14 +991,19 @@ class CSVProcessor:
     @staticmethod
     def extract_tool_weight_from_filename(filename):
         tool_weights = {
+            'Goodarzi35': 13.1,
+            'Goodarzi75': 17.1,
+            'Goodarzi100': 19.6,
+            'Goodarzi': 9.6,
             'TProbeZylWW': 3.7,
             'Prototyp3D': 2.4,
-            'Goodarzi': 9.1,
         }
 
-        for tool_name, weight in tool_weights.items():
+        # Sortiere nach Länge (längste zuerst)
+        for tool_name in sorted(tool_weights.keys(), key=len, reverse=True):
             if tool_name in filename:
-                return weight
+                return tool_weights[tool_name]
+
         return None
 
     @staticmethod
