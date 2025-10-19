@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 
 import { getSIDTWvsParameters } from '@/src/actions/dashboard.service';
+import { Typography } from '@/src/components/Typography';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
@@ -164,7 +165,10 @@ function ParameterCorrelationContent({
   const worstBinIndex = binMedians.indexOf(Math.max(...binMedians));
 
   return (
-    <div className="rounded-2xl bg-white p-6 shadow">
+    <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+      <Typography as="h2" className="mb-2">
+        Einflussfaktoren auf Genauigkeit
+      </Typography>
       <div className="mb-4 text-sm text-gray-600">
         <p>
           Box Plots zeigen die SIDTW-Verteilung für verschiedene
@@ -243,7 +247,7 @@ function ParameterCorrelationContent({
             {binnedData[bestBinIndex]?.binLabel} {activeConfig.unit}
           </p>
           <p className="mt-1 text-xs text-gray-500">
-            Median: {binMedians[bestBinIndex]?.toFixed(3)} mm
+            Median: {binMedians[bestBinIndex]?.toFixed(2)} mm
           </p>
         </div>
         <div className="rounded-lg bg-red-50 p-4">
@@ -252,7 +256,7 @@ function ParameterCorrelationContent({
             {binnedData[worstBinIndex]?.binLabel} {activeConfig.unit}
           </p>
           <p className="mt-1 text-xs text-gray-500">
-            Median: {binMedians[worstBinIndex]?.toFixed(3)} mm
+            Median: {binMedians[worstBinIndex]?.toFixed(2)} mm
           </p>
         </div>
       </div>
@@ -288,7 +292,10 @@ export function ParameterCorrelation() {
   // Loading State
   if (isLoading) {
     return (
-      <div className="rounded-2xl bg-white p-6 shadow">
+      <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+        <Typography as="h2" className="mb-2">
+          Einflussfaktoren auf Genauigkeit
+        </Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center">
             <Loader className="mx-auto mb-4 size-12 animate-spin text-blue-950" />
@@ -302,7 +309,10 @@ export function ParameterCorrelation() {
   // Error State
   if (error) {
     return (
-      <div className="rounded-2xl bg-white p-6 shadow">
+      <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+        <Typography as="h2" className="mb-2">
+          Einflussfaktoren auf Genauigkeit
+        </Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center text-red-600">
             <p className="mb-2 text-lg font-semibold">{error}</p>
@@ -321,7 +331,10 @@ export function ParameterCorrelation() {
   // Empty State
   if (data.length === 0) {
     return (
-      <div className="rounded-2xl bg-white p-6 shadow">
+      <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+        <Typography as="h2" className="mb-2">
+          Einflussfaktoren auf Genauigkeit
+        </Typography>
         <div className="flex h-96 items-center justify-center">
           <p className="text-gray-600">Keine Parameter-Daten verfügbar</p>
         </div>

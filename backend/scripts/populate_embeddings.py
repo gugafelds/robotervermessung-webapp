@@ -4,6 +4,8 @@ import asyncio
 import asyncpg
 import sys
 from pathlib import Path
+import io
+import time
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -18,12 +20,12 @@ logger = logging.getLogger(__name__)
 
 DATABASE_URL = "postgresql://postgres:manager@134.147.100.22:5432/robotervermessung"
 LAST_N_BAHNEN = 1000
-BATCH_SIZE = 50
 
 
-async def populate_fast(n: int = 1000):
+async def populate_fast_bulk(n: int = 1000):
     """
-    SCHNELLE Version - berechnet SEGMENT-Level + BAHN-Level Embeddings
+    BULK-OPTIMIERTE Version mit COPY
+    Lädt ALLE Daten auf einmal, berechnet in Python, schreibt mit COPY
     """
 
     logger.info(f"Verbinde zu Datenbank...")
@@ -37,16 +39,17 @@ async def populate_fast(n: int = 1000):
     try:
         calculator = FastJointEmbeddingCalculator(
             pool,
-            samples_per_joint=100,
-            downsample_factor=1
+            samples_per_joint=25,
+            downsample_factor=5
         )
 
         async with pool.acquire() as conn:
-            # === PHASE 1: BAHNEN ===
+            # === PHASE 1: BAHNEN laden ===
             logger.info("=" * 70)
             logger.info("PHASE 1: Lade Bahnen")
             logger.info("=" * 70)
 
+            t0 = time.time()
             bahnen = await conn.fetch("""
                                       SELECT bahn_id
                                       FROM bahn_info
@@ -55,13 +58,14 @@ async def populate_fast(n: int = 1000):
                                       """, n)
 
             bahn_ids = [row['bahn_id'] for row in bahnen]
-            logger.info(f"✓ Gefunden: {len(bahn_ids)} Bahnen")
+            logger.info(f"✓ Gefunden: {len(bahn_ids)} Bahnen ({time.time() - t0:.1f}s)")
 
-            # === PHASE 2: SEGMENTE ===
+            # === PHASE 2: SEGMENTE laden ===
             logger.info("\n" + "=" * 70)
             logger.info("PHASE 2: Lade Segmente")
             logger.info("=" * 70)
 
+            t0 = time.time()
             segments = await conn.fetch("""
                                         SELECT segment_id, bahn_id
                                         FROM bahn_meta
@@ -70,7 +74,7 @@ async def populate_fast(n: int = 1000):
                                         ORDER BY bahn_id, segment_id
                                         """, bahn_ids)
 
-            logger.info(f"✓ Gefunden: {len(segments)} Segmente")
+            logger.info(f"✓ Gefunden: {len(segments)} Segmente ({time.time() - t0:.1f}s)")
 
             # Mapping
             segment_to_bahn = {
@@ -78,11 +82,12 @@ async def populate_fast(n: int = 1000):
                 for seg in segments
             }
 
-            # === PHASE 3: Prüfe existierende ===
+            # === PHASE 3: Existierende laden ===
             logger.info("\n" + "=" * 70)
             logger.info("PHASE 3: Prüfe existierende Embeddings")
             logger.info("=" * 70)
 
+            t0 = time.time()
             existing = await conn.fetch("""
                                         SELECT segment_id
                                         FROM bahn_joint_embeddings
@@ -90,15 +95,14 @@ async def populate_fast(n: int = 1000):
                                         """, bahn_ids)
 
             existing_ids = {row['segment_id'] for row in existing}
-            logger.info(f"✓ Bereits vorhanden: {len(existing_ids)} Embeddings")
+            logger.info(f"✓ Bereits vorhanden: {len(existing_ids)} ({time.time() - t0:.1f}s)")
 
-            # Fehlende Segmente
+            # Fehlende berechnen
             missing_segment_ids = [
                 seg['segment_id'] for seg in segments
                 if seg['segment_id'] not in existing_ids
             ]
 
-            # Fehlende Bahnen (wo segment_id = bahn_id)
             missing_bahn_ids = [
                 bahn_id for bahn_id in bahn_ids
                 if bahn_id not in existing_ids
@@ -112,98 +116,230 @@ async def populate_fast(n: int = 1000):
                 logger.info("\n🎉 Alle Embeddings sind bereits vorhanden!")
                 return
 
-            # === PHASE 4: SEGMENT-EMBEDDINGS berechnen ===
+            # === PHASE 4: ALLE JOINT STATES auf einmal laden! ===
+            logger.info("\n" + "=" * 70)
+            logger.info("PHASE 4: Lade ALLE Joint States (BULK)")
+            logger.info("=" * 70)
+
+            t0 = time.time()
+
+            # Segmente - MIT ARRAY AGGREGATION!
+            segment_states = {}
             if missing_segment_ids:
-                logger.info("\n" + "=" * 70)
-                logger.info("PHASE 4: Berechne SEGMENT-Embeddings")
-                logger.info("=" * 70)
+                all_segment_states = await conn.fetch(f"""
+                    WITH numbered AS (
+                        SELECT segment_id,
+                               joint_1, joint_2, joint_3,
+                               joint_4, joint_5, joint_6,
+                               ROW_NUMBER() OVER (PARTITION BY segment_id ORDER BY timestamp) as rn
+                        FROM bewegungsdaten.bahn_joint_states
+                        WHERE segment_id = ANY ($1)
+                    )
+                    SELECT segment_id,
+                           array_agg(joint_1 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_1_arr,
+                           array_agg(joint_2 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_2_arr,
+                           array_agg(joint_3 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_3_arr,
+                           array_agg(joint_4 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_4_arr,
+                           array_agg(joint_5 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_5_arr,
+                           array_agg(joint_6 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_6_arr
+                    FROM numbered
+                    GROUP BY segment_id
+                    ORDER BY segment_id
+                """, missing_segment_ids)
 
-                total_segments = len(missing_segment_ids)
-                processed_segments = 0
+                # Konvertiere Arrays zu Dict Format
+                segment_states = {}
+                for row in all_segment_states:
+                    segment_id = row['segment_id']
+                    # Prüfe ob Arrays vorhanden sind
+                    if row['joint_1_arr'] is None or len(row['joint_1_arr']) == 0:
+                        continue
+                    # Erstelle Liste von Dicts aus den Arrays
+                    segment_states[segment_id] = [
+                        {
+                            'joint_1': row['joint_1_arr'][i],
+                            'joint_2': row['joint_2_arr'][i],
+                            'joint_3': row['joint_3_arr'][i],
+                            'joint_4': row['joint_4_arr'][i],
+                            'joint_5': row['joint_5_arr'][i],
+                            'joint_6': row['joint_6_arr'][i]
+                        }
+                        for i in range(len(row['joint_1_arr']))
+                    ]
 
-                for i in range(0, total_segments, BATCH_SIZE):
-                    batch = missing_segment_ids[i:i + BATCH_SIZE]
+                logger.info(
+                    f"✓ Segment States: {len(all_segment_states)} Segmente, {sum(len(v) for v in segment_states.values())} Punkte (aggregated+downsampled) ({time.time() - t0:.1f}s)")
 
-                    # Berechne Batch
-                    embeddings = await calculator.calculate_embedding_batch(batch)
-
-                    # Speichere Batch
-                    if embeddings:
-                        count = await calculator.store_embeddings_batch(
-                            embeddings,
-                            segment_to_bahn
-                        )
-                        processed_segments += count
-
-                        logger.info(
-                            f"  [{processed_segments}/{total_segments}] "
-                            f"Batch {i // BATCH_SIZE + 1}: "
-                            f"{count}/{len(batch)} erfolgreich"
-                        )
-                    else:
-                        logger.warning(
-                            f"  Batch {i // BATCH_SIZE + 1}: "
-                            f"Keine Embeddings berechnet"
-                        )
-
-                logger.info(f"✓ Segment-Embeddings: {processed_segments}/{total_segments}")
-
-            # === PHASE 5: BAHN-EMBEDDINGS berechnen ===
+            # Bahnen - MIT ARRAY AGGREGATION!
+            t0 = time.time()
+            bahn_states = {}
             if missing_bahn_ids:
+                all_bahn_states = await conn.fetch(f"""
+                    WITH numbered AS (
+                        SELECT bahn_id,
+                               joint_1, joint_2, joint_3,
+                               joint_4, joint_5, joint_6,
+                               ROW_NUMBER() OVER (PARTITION BY bahn_id ORDER BY segment_id, timestamp) as rn
+                        FROM bewegungsdaten.bahn_joint_states
+                        WHERE bahn_id = ANY ($1)
+                    )
+                    SELECT bahn_id,
+                           array_agg(joint_1 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_1_arr,
+                           array_agg(joint_2 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_2_arr,
+                           array_agg(joint_3 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_3_arr,
+                           array_agg(joint_4 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_4_arr,
+                           array_agg(joint_5 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_5_arr,
+                           array_agg(joint_6 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_6_arr
+                    FROM numbered
+                    GROUP BY bahn_id
+                    ORDER BY bahn_id
+                """, missing_bahn_ids)
+
+                # Konvertiere Arrays zu Dict Format
+                bahn_states = {}
+                for row in all_bahn_states:
+                    bahn_id = row['bahn_id']
+                    # Prüfe ob Arrays vorhanden sind
+                    if row['joint_1_arr'] is None or len(row['joint_1_arr']) == 0:
+                        continue
+                    bahn_states[bahn_id] = [
+                        {
+                            'joint_1': row['joint_1_arr'][i],
+                            'joint_2': row['joint_2_arr'][i],
+                            'joint_3': row['joint_3_arr'][i],
+                            'joint_4': row['joint_4_arr'][i],
+                            'joint_5': row['joint_5_arr'][i],
+                            'joint_6': row['joint_6_arr'][i]
+                        }
+                        for i in range(len(row['joint_1_arr']))
+                    ]
+
+                logger.info(
+                    f"✓ Bahn States: {len(all_bahn_states)} Bahnen, {sum(len(v) for v in bahn_states.values())} Punkte (aggregated+downsampled) ({time.time() - t0:.1f}s)")
+
+            # === PHASE 5: EMBEDDINGS berechnen (in Python) ===
+            logger.info("\n" + "=" * 70)
+            logger.info("PHASE 5: Berechne Embeddings (BULK)")
+            logger.info("=" * 70)
+
+            t0 = time.time()
+            rows_to_insert = []
+
+            # Segmente
+            if missing_segment_ids:
+                logger.info("Berechne Segment-Embeddings...")
+                for segment_id in missing_segment_ids:
+                    if segment_id not in segment_states:
+                        continue
+
+                    # Daten sind bereits downsampled im Query
+                    embedding = calculator._create_embedding_from_trajectory(
+                        segment_states[segment_id]
+                    )
+
+                    if embedding is not None:
+                        embedding_str = '[' + ','.join(str(x) for x in embedding.tolist()) + ']'
+                        rows_to_insert.append((
+                            segment_id,
+                            segment_to_bahn[segment_id],
+                            embedding_str,
+                            calculator.samples_per_joint
+                        ))
+
+                logger.info(f"✓ Segment-Embeddings: {len([r for r in rows_to_insert if r[0] != r[1]])} berechnet")
+
+            # Bahnen
+            if missing_bahn_ids:
+                logger.info("Berechne Bahn-Embeddings...")
+                for bahn_id in missing_bahn_ids:
+                    if bahn_id not in bahn_states:
+                        continue
+
+                    # Daten sind bereits downsampled im Query
+                    embedding = calculator._create_embedding_from_trajectory(
+                        bahn_states[bahn_id]
+                    )
+
+                    if embedding is not None:
+                        embedding_str = '[' + ','.join(str(x) for x in embedding.tolist()) + ']'
+                        rows_to_insert.append((
+                            bahn_id,  # segment_id = bahn_id für Bahnen!
+                            bahn_id,
+                            embedding_str,
+                            calculator.samples_per_joint
+                        ))
+
+                logger.info(f"✓ Bahn-Embeddings: {len([r for r in rows_to_insert if r[0] == r[1]])} berechnet")
+
+            logger.info(f"✓ Gesamt: {len(rows_to_insert)} Embeddings ({time.time() - t0:.1f}s)")
+
+            # === PHASE 6: BULK INSERT mit COPY ===
+            if rows_to_insert:
                 logger.info("\n" + "=" * 70)
-                logger.info("PHASE 5: Berechne BAHN-Embeddings")
+                logger.info("PHASE 6: Bulk Insert mit COPY")
                 logger.info("=" * 70)
 
-                total_bahnen = len(missing_bahn_ids)
-                processed_bahnen = 0
+                t0 = time.time()
 
-                for i in range(0, total_bahnen, BATCH_SIZE):
-                    batch = missing_bahn_ids[i:i + BATCH_SIZE]
+                # CREATE TEMP TABLE als TEXT (vector wird nicht unterstützt!)
+                await conn.execute("""
+                                   CREATE
+                                   TEMP TABLE temp_embeddings (
+                        segment_id TEXT,
+                        bahn_id TEXT,
+                        joint_embedding TEXT,
+                        sample_count INTEGER
+                    )
+                                   """)
 
-                    # Berechne Batch (ganze Bahnen!)
-                    embeddings = await calculator.calculate_bahn_embeddings_batch(batch)
+                # DIREKT mit copy_records_to_table
+                records = [
+                    (row[0], row[1], row[2], row[3])  # segment_id, bahn_id, embedding_str, sample_count
+                    for row in rows_to_insert
+                ]
 
-                    # Speichere Batch (mit bahn_id = segment_id!)
-                    if embeddings:
-                        count = await calculator.store_bahn_embeddings_batch(embeddings)
-                        processed_bahnen += count
+                await conn.copy_records_to_table(
+                    'temp_embeddings',
+                    records=records,
+                    columns=['segment_id', 'bahn_id', 'joint_embedding', 'sample_count']
+                )
 
-                        logger.info(
-                            f"  [{processed_bahnen}/{total_bahnen}] "
-                            f"Batch {i // BATCH_SIZE + 1}: "
-                            f"{count}/{len(batch)} erfolgreich"
-                        )
-                    else:
-                        logger.warning(
-                            f"  Batch {i // BATCH_SIZE + 1}: "
-                            f"Keine Embeddings berechnet"
-                        )
+                logger.info(f"✓ COPY: {len(records)} Zeilen ({time.time() - t0:.1f}s)")
 
-                logger.info(f"✓ Bahn-Embeddings: {processed_bahnen}/{total_bahnen}")
+                # INSERT mit ON CONFLICT (mit ::vector cast!)
+                t0 = time.time()
+                result = await conn.execute("""
+                                            INSERT INTO bahn_joint_embeddings
+                                                (segment_id, bahn_id, joint_embedding, sample_count)
+                                            SELECT segment_id,
+                                                   bahn_id,
+                                                   joint_embedding::vector, sample_count
+                                            FROM temp_embeddings ON CONFLICT (segment_id) DO
+                                            UPDATE SET
+                                                joint_embedding = EXCLUDED.joint_embedding,
+                                                updated_at = NOW()
+                                            """)
+
+                logger.info(f"✓ INSERT: {result} ({time.time() - t0:.1f}s)")
 
             # === ZUSAMMENFASSUNG ===
             logger.info("\n" + "=" * 70)
             logger.info("FERTIG!")
             logger.info("=" * 70)
-            logger.info(f"✓ Segment-Embeddings: {processed_segments if missing_segment_ids else 0}")
-            logger.info(f"✓ Bahn-Embeddings:    {processed_bahnen if missing_bahn_ids else 0}")
-            logger.info(
-                f"✓ Gesamt neu:         {(processed_segments if missing_segment_ids else 0) + (processed_bahnen if missing_bahn_ids else 0)}")
-            logger.info(
-                f"✓ Gesamt in DB:       {len(existing_ids) + (processed_segments if missing_segment_ids else 0) + (processed_bahnen if missing_bahn_ids else 0)}")
+            logger.info(f"✓ Neue Embeddings: {len(rows_to_insert)}")
+            logger.info(f"✓ Gesamt in DB:    {len(existing_ids) + len(rows_to_insert)}")
 
     finally:
         await pool.close()
 
 
-async def recompute_bahn_embeddings(n: int = 1000):
+async def recompute_bahn_embeddings_bulk(n: int = 1000):
     """
-    NEU-Berechnung NUR der Bahn-Embeddings
-    (z.B. wenn Segmente schon da sind, aber Bahnen fehlen)
+    NEU-Berechnung NUR der Bahn-Embeddings (BULK-optimiert)
     """
 
     logger.info("=" * 70)
-    logger.info("RE-COMPUTE: Nur Bahn-Embeddings")
+    logger.info("RE-COMPUTE: Nur Bahn-Embeddings (BULK)")
     logger.info("=" * 70)
 
     pool = await asyncpg.create_pool(
@@ -216,6 +352,7 @@ async def recompute_bahn_embeddings(n: int = 1000):
 
         async with pool.acquire() as conn:
             # Letzte N Bahnen
+            t0 = time.time()
             bahnen = await conn.fetch("""
                                       SELECT bahn_id
                                       FROM bahn_info
@@ -224,9 +361,10 @@ async def recompute_bahn_embeddings(n: int = 1000):
                                       """, n)
 
             bahn_ids = [row['bahn_id'] for row in bahnen]
-            logger.info(f"Bahnen: {len(bahn_ids)}")
+            logger.info(f"Bahnen: {len(bahn_ids)} ({time.time() - t0:.1f}s)")
 
-            # Prüfe welche Bahn-Embeddings fehlen
+            # Existierende
+            t0 = time.time()
             existing = await conn.fetch("""
                                         SELECT segment_id
                                         FROM bahn_joint_embeddings
@@ -237,38 +375,133 @@ async def recompute_bahn_embeddings(n: int = 1000):
             existing_ids = {row['segment_id'] for row in existing}
             missing_ids = [bid for bid in bahn_ids if bid not in existing_ids]
 
-            logger.info(f"Fehlende Bahn-Embeddings: {len(missing_ids)}")
+            logger.info(f"Fehlende: {len(missing_ids)} ({time.time() - t0:.1f}s)")
 
             if not missing_ids:
                 logger.info("🎉 Alle Bahn-Embeddings vorhanden!")
                 return
 
-            # Berechne in Batches
-            total = len(missing_ids)
-            processed = 0
+            # ALLE Joint States laden (bereits downsampled + aggregated!)
+            t0 = time.time()
+            all_states = await conn.fetch(f"""
+                WITH numbered AS (
+                    SELECT bahn_id,
+                           joint_1, joint_2, joint_3,
+                           joint_4, joint_5, joint_6,
+                           ROW_NUMBER() OVER (PARTITION BY bahn_id ORDER BY segment_id, timestamp) as rn
+                    FROM bewegungsdaten.bahn_joint_states
+                    WHERE bahn_id = ANY ($1)
+                )
+                SELECT bahn_id,
+                       array_agg(joint_1 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_1_arr,
+                       array_agg(joint_2 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_2_arr,
+                       array_agg(joint_3 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_3_arr,
+                       array_agg(joint_4 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_4_arr,
+                       array_agg(joint_5 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_5_arr,
+                       array_agg(joint_6 ORDER BY rn) FILTER (WHERE rn % {calculator.downsample_factor} = 1) as joint_6_arr
+                FROM numbered
+                GROUP BY bahn_id
+                ORDER BY bahn_id
+            """, missing_ids)
 
-            for i in range(0, total, BATCH_SIZE):
-                batch = missing_ids[i:i + BATCH_SIZE]
+            logger.info(f"States geladen: {len(all_states)} Bahnen (aggregated) ({time.time() - t0:.1f}s)")
 
-                embeddings = await calculator.calculate_bahn_embeddings_batch(batch)
+            # Gruppiere
+            bahn_states = {}
+            for row in all_states:
+                bahn_id = row['bahn_id']
+                # Prüfe ob Arrays vorhanden sind
+                if row['joint_1_arr'] is None or len(row['joint_1_arr']) == 0:
+                    continue
+                bahn_states[bahn_id] = [
+                    {
+                        'joint_1': row['joint_1_arr'][i],
+                        'joint_2': row['joint_2_arr'][i],
+                        'joint_3': row['joint_3_arr'][i],
+                        'joint_4': row['joint_4_arr'][i],
+                        'joint_5': row['joint_5_arr'][i],
+                        'joint_6': row['joint_6_arr'][i]
+                    }
+                    for i in range(len(row['joint_1_arr']))
+                ]
 
-                if embeddings:
-                    count = await calculator.store_bahn_embeddings_batch(embeddings)
-                    processed += count
-                    logger.info(f"[{processed}/{total}] Batch {i // BATCH_SIZE + 1}: {count}")
+            # Berechne
+            t0 = time.time()
+            rows_to_insert = []
+            for bahn_id in missing_ids:
+                if bahn_id not in bahn_states:
+                    continue
 
-            logger.info(f"✓ Fertig: {processed}/{total}")
+                # WICHTIG: Daten sind bereits downsampled,
+                # also _create_embedding_from_trajectory verwenden
+                embedding = calculator._create_embedding_from_trajectory(
+                    bahn_states[bahn_id]
+                )
+
+                if embedding is not None:
+                    embedding_str = '[' + ','.join(str(x) for x in embedding.tolist()) + ']'
+                    rows_to_insert.append((
+                        bahn_id,
+                        bahn_id,
+                        embedding_str,
+                        calculator.samples_per_joint
+                    ))
+
+            logger.info(f"Embeddings berechnet: {len(rows_to_insert)} ({time.time() - t0:.1f}s)")
+
+            # COPY
+            if rows_to_insert:
+                t0 = time.time()
+
+                await conn.execute("""
+                                   CREATE
+                                   TEMP TABLE temp_bahn_embeddings (
+                        segment_id TEXT,
+                        bahn_id TEXT,
+                        joint_embedding TEXT,
+                        sample_count INTEGER
+                    )
+                                   """)
+
+                # DIREKT mit copy_records_to_table
+                records = [
+                    (row[0], row[1], row[2], row[3])
+                    for row in rows_to_insert
+                ]
+
+                await conn.copy_records_to_table(
+                    'temp_bahn_embeddings',
+                    records=records,
+                    columns=['segment_id', 'bahn_id', 'joint_embedding', 'sample_count']
+                )
+
+                logger.info(f"COPY: {len(records)} ({time.time() - t0:.1f}s)")
+
+                t0 = time.time()
+                result = await conn.execute("""
+                                            INSERT INTO bahn_joint_embeddings
+                                                (segment_id, bahn_id, joint_embedding, sample_count)
+                                            SELECT segment_id,
+                                                   bahn_id,
+                                                   joint_embedding::vector, sample_count
+                                            FROM temp_bahn_embeddings ON CONFLICT (segment_id) DO
+                                            UPDATE SET
+                                                joint_embedding = EXCLUDED.joint_embedding,
+                                                updated_at = NOW()
+                                            """)
+
+                logger.info(f"INSERT: {result} ({time.time() - t0:.1f}s)")
+                logger.info(f"✓ Fertig: {len(rows_to_insert)}/{len(missing_ids)}")
 
     finally:
         await pool.close()
 
 
 if __name__ == "__main__":
-    import time
     import argparse
 
     parser = argparse.ArgumentParser(
-        description='Populate Joint Embeddings (Segment + Bahn Level)'
+        description='Populate Joint Embeddings (BULK-optimiert mit COPY)'
     )
     parser.add_argument(
         '--mode',
@@ -287,16 +520,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     logger.info("=" * 70)
-    logger.info("FAST Joint Embeddings Population")
+    logger.info("BULK Joint Embeddings Population (mit COPY)")
     logger.info("Mode: " + args.mode.upper())
     logger.info("=" * 70)
 
     start = time.time()
 
     if args.mode == 'full':
-        asyncio.run(populate_fast(args.limit))
+        asyncio.run(populate_fast_bulk(args.limit))
     else:
-        asyncio.run(recompute_bahn_embeddings(args.limit))
+        asyncio.run(recompute_bahn_embeddings_bulk(args.limit))
 
     duration = time.time() - start
 

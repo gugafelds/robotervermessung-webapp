@@ -17,9 +17,29 @@ export interface Distribution {
   meta: DistributionMeta;
 }
 
+export interface PerformerData {
+  bahn_id: number;
+  sidtw_average_distance: number;
+  weight: number;
+  waypoints: number;
+  stop_point: number;
+  wait_time: number;
+  max_velocity: number;
+  max_acceleration: number;
+  trajectory: Array<{
+    x: number;
+    y: number;
+    z: number;
+  }>;
+}
+
 export interface DashboardData {
   filenamesCount: number;
   bahnenCount: number;
+  medianSIDTW?: number;
+  meanSIDTW?: number;
+  bestPerformers?: PerformerData[]; // NEU
+  worstPerformers?: PerformerData[]; // NEU
   stats: {
     velocityDistribution: Distribution;
     weightDistribution: Distribution;
@@ -28,7 +48,6 @@ export interface DashboardData {
     stopPointDistribution: Distribution;
     waitTimeDistribution: Distribution;
   };
-  // Optional, da WorkareaPlot jetzt selbst lädt
   workareaPoints?: Array<{
     x: number;
     y: number;

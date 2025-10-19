@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 
 import { getWorkareaData } from '@/src/actions/dashboard.service';
 import { Typography } from '@/src/components/Typography';
+import type { PerformerData } from '@/types/dashboard.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
@@ -18,44 +19,53 @@ interface WorkareaPoint {
   sidtw: number;
 }
 
+interface WorkareaPlotProps {
+  bestPerformers?: PerformerData[];
+  worstPerformers?: PerformerData[];
+}
+
 // Separate Komponente für den eigentlichen Plot
-function WorkareaPlotContent({ data }: { data: WorkareaPoint[] }) {
-  // Min/Max SIDTW für Slider berechnen
+function WorkareaPlotContent({
+  data,
+  bestPerformers = [],
+  worstPerformers = [],
+}: {
+  data: WorkareaPoint[];
+  bestPerformers?: PerformerData[];
+  worstPerformers?: PerformerData[];
+}) {
   const maxSidtw = Math.max(...data.map((p) => p.sidtw));
   const minSidtw = Math.min(...data.map((p) => p.sidtw));
 
   const [sidtwMin, setSidtwMin] = useState(minSidtw);
   const [sidtwMax, setSidtwMax] = useState(maxSidtw);
+  const [showBest, setShowBest] = useState(false);
+  const [showWorst, setShowWorst] = useState(false);
 
-  // Initialisiere die Werte wenn die Daten sich ändern
   useEffect(() => {
     setSidtwMin(minSidtw);
     setSidtwMax(maxSidtw);
   }, [minSidtw, maxSidtw]);
 
-  // Filtere Punkte basierend auf Min/Max Threshold
   const filteredData = data.filter(
     (p) => p.sidtw >= sidtwMin && p.sidtw <= sidtwMax,
   );
 
-  // Arbeitsbereich-Würfel als Linien
+  // Arbeitsbereich-Würfel
   const workspaceBox = {
     x: [
-      // Untere Fläche
       400,
       1900,
       1900,
       400,
       400,
       null,
-      // Obere Fläche
       400,
       1900,
       1900,
       400,
       400,
       null,
-      // Vertikale Verbindungen
       400,
       400,
       null,
@@ -69,21 +79,18 @@ function WorkareaPlotContent({ data }: { data: WorkareaPoint[] }) {
       400,
     ],
     y: [
-      // Untere Fläche
       -1100,
       -1100,
       1100,
       1100,
       -1100,
       null,
-      // Obere Fläche
       -1100,
       -1100,
       1100,
       1100,
       -1100,
       null,
-      // Vertikale Verbindungen
       -1100,
       -1100,
       null,
@@ -97,21 +104,18 @@ function WorkareaPlotContent({ data }: { data: WorkareaPoint[] }) {
       1100,
     ],
     z: [
-      // Untere Fläche
       400,
       400,
       400,
       400,
       400,
       null,
-      // Obere Fläche
       2000,
       2000,
       2000,
       2000,
       2000,
       null,
-      // Vertikale Verbindungen
       400,
       2000,
       null,
@@ -126,23 +130,112 @@ function WorkareaPlotContent({ data }: { data: WorkareaPoint[] }) {
     ],
     mode: 'lines' as const,
     type: 'scatter3d' as const,
-    line: {
-      color: '#ff0000',
-      width: 3,
-    },
+    line: { color: '#ff0000', width: 3 },
     hoverinfo: 'skip' as const,
     showlegend: false,
   };
 
+  // Generiere Grün-Töne für Best Performers
+  const greenColors = [
+    '#00ff00', // Bright green
+    '#00cc00', // Medium green
+    '#00aa00', // Green
+    '#008800', // Dark green
+    '#006600', // Darker green
+  ];
+
+  // Generiere Rot-Töne für Worst Performers
+  const redColors = [
+    '#ff0000', // Bright red
+    '#dd0000', // Medium red
+    '#bb0000', // Red
+    '#990000', // Dark red
+    '#770000', // Darker red
+  ];
+
+  // Best Performers Trajektorien
+  const bestTrajectories = showBest
+    ? bestPerformers.map((performer, idx) => ({
+        x: performer.trajectory.map((p) => p.x),
+        y: performer.trajectory.map((p) => p.y),
+        z: performer.trajectory.map((p) => p.z),
+        mode: 'lines' as const,
+        type: 'scatter3d' as const,
+        name: `Best #${idx + 1} (ID: ${performer.bahn_id})`,
+        line: {
+          color: greenColors[idx % greenColors.length],
+          width: 4,
+        },
+        hovertemplate:
+          `<b>Best Performer #${idx + 1}</b><br>` +
+          `Bahn-ID: ${performer.bahn_id}<br>` +
+          `SIDTW: ${performer.sidtw_average_distance.toFixed(3)} mm<br>` +
+          'X: %{x:.2f} mm<br>' +
+          'Y: %{y:.2f} mm<br>' +
+          'Z: %{z:.2f} mm' +
+          '<extra></extra>',
+      }))
+    : [];
+
+  // Worst Performers Trajektorien
+  const worstTrajectories = showWorst
+    ? worstPerformers.map((performer, idx) => ({
+        x: performer.trajectory.map((p) => p.x),
+        y: performer.trajectory.map((p) => p.y),
+        z: performer.trajectory.map((p) => p.z),
+        mode: 'lines' as const,
+        type: 'scatter3d' as const,
+        name: `Worst #${idx + 1} (ID: ${performer.bahn_id})`,
+        line: {
+          color: redColors[idx % redColors.length],
+          width: 4,
+        },
+        hovertemplate:
+          `<b>Worst Performer #${idx + 1}</b><br>` +
+          `Bahn-ID: ${performer.bahn_id}<br>` +
+          `SIDTW: ${performer.sidtw_average_distance.toFixed(3)} mm<br>` +
+          'X: %{x:.2f} mm<br>' +
+          'Y: %{y:.2f} mm<br>' +
+          'Z: %{z:.2f} mm' +
+          '<extra></extra>',
+      }))
+    : [];
+
   return (
-    <div className="rounded-2xl bg-white p-6 shadow">
+    <div className="flex flex-col justify-center rounded-2xl border bg-white p-4 shadow-md">
+      <Typography as="h2" className="mb-2">
+        Arbeitsraum
+      </Typography>
+      {/* Toggle Buttons für Trajektorien */}
+      <div className="mb-4 flex gap-4">
+        <button
+          onClick={() => setShowBest(!showBest)}
+          className={`rounded-lg px-4 py-2 font-medium transition-colors ${
+            showBest
+              ? 'bg-green-600 text-white'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+        >
+          {showBest ? '✓' : ''} Best Performers
+        </button>
+        <button
+          onClick={() => setShowWorst(!showWorst)}
+          className={`rounded-lg px-4 py-2 font-medium transition-colors ${
+            showWorst
+              ? 'bg-red-600 text-white'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+        >
+          {showWorst ? '✓' : ''} Worst Performers
+        </button>
+      </div>
+
       {/* Range-Slider für SIDTW Threshold */}
       <div className="mb-4">
         <label className="mb-2 block text-sm font-medium text-gray-700">
           SIDTW Bereich: {sidtwMin.toFixed(3)} mm - {sidtwMax.toFixed(3)} mm
         </label>
 
-        {/* Minimum Slider */}
         <div className="mb-3">
           <label className="mb-1 block text-xs text-gray-600">
             Minimum: {sidtwMin.toFixed(3)} mm
@@ -163,7 +256,6 @@ function WorkareaPlotContent({ data }: { data: WorkareaPoint[] }) {
           />
         </div>
 
-        {/* Maximum Slider */}
         <div className="mb-3">
           <label className="mb-1 block text-xs text-gray-600">
             Maximum: {sidtwMax.toFixed(3)} mm
@@ -203,7 +295,7 @@ function WorkareaPlotContent({ data }: { data: WorkareaPoint[] }) {
             z: filteredData.map((p) => p.z),
             mode: 'markers',
             type: 'scatter3d',
-            name: 'Messpunkte', // Name statt "trace0"
+            name: 'Messpunkte',
             marker: {
               size: 3,
               opacity: 0.5,
@@ -220,14 +312,18 @@ function WorkareaPlotContent({ data }: { data: WorkareaPoint[] }) {
               'Y: %{y:.2f} mm<br>' +
               'Z: %{z:.2f} mm<br>' +
               'SIDTW: %{marker.color:.3f} mm' +
-              '<extra></extra>', // <extra></extra> entfernt "trace0"
+              '<extra></extra>',
           },
           // Arbeitsbereich-Würfel
           workspaceBox,
+          // Best Performer Trajektorien
+          ...bestTrajectories,
+          // Worst Performer Trajektorien
+          ...worstTrajectories,
         ]}
         layout={{
           autosize: true,
-          height: 600,
+          height: 550,
           scene: {
             xaxis: { title: 'X [mm]', range: [0, 2300] },
             yaxis: { title: 'Y [mm]', range: [-1300, 1300] },
@@ -235,7 +331,12 @@ function WorkareaPlotContent({ data }: { data: WorkareaPoint[] }) {
           },
           margin: { t: 10, r: 10, l: 10, b: 10 },
           uirevision: 'true',
-          showlegend: false,
+          showlegend: true,
+          legend: {
+            x: 0,
+            y: 1,
+            bgcolor: 'rgba(255, 255, 255, 0.8)',
+          },
         }}
         style={{ width: '100%' }}
         config={{
@@ -255,12 +356,14 @@ function WorkareaPlotContent({ data }: { data: WorkareaPoint[] }) {
   );
 }
 
-export function WorkareaPlot() {
+export function WorkareaPlot({
+  bestPerformers,
+  worstPerformers,
+}: WorkareaPlotProps) {
   const [data, setData] = useState<WorkareaPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Selbstständiges Laden der Daten
   useEffect(() => {
     const fetchWorkareaData = async () => {
       try {
@@ -279,10 +382,9 @@ export function WorkareaPlot() {
     fetchWorkareaData();
   }, []);
 
-  // Loading State
   if (isLoading) {
     return (
-      <div className="rounded-2xl bg-white p-6 shadow">
+      <div className="flex flex-col justify-center rounded-2xl border bg-white p-4 shadow-md">
         <div className="flex h-96 items-center justify-center">
           <div className="text-center">
             <Loader className="mx-auto mb-4 size-12 animate-spin text-blue-950" />
@@ -293,10 +395,9 @@ export function WorkareaPlot() {
     );
   }
 
-  // Error State
   if (error) {
     return (
-      <div className="rounded-2xl bg-white p-6 shadow">
+      <div className="flex flex-col justify-center rounded-2xl border bg-white p-4 shadow-md">
         <div className="flex h-96 items-center justify-center">
           <div className="text-center text-red-600">
             <p className="mb-2 text-lg font-semibold">{error}</p>
@@ -312,10 +413,9 @@ export function WorkareaPlot() {
     );
   }
 
-  // Empty State
   if (data.length === 0) {
     return (
-      <div className="rounded-2xl bg-white p-6 shadow">
+      <div className="flex flex-col justify-center rounded-2xl border bg-white p-4  shadow-md">
         <Typography as="h3" className="mb-4">
           Arbeitsraum-Erkundung
         </Typography>
@@ -326,6 +426,11 @@ export function WorkareaPlot() {
     );
   }
 
-  // Main Component (mit Daten)
-  return <WorkareaPlotContent data={data} />;
+  return (
+    <WorkareaPlotContent
+      data={data}
+      bestPerformers={bestPerformers}
+      worstPerformers={worstPerformers}
+    />
+  );
 }

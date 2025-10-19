@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 
 import { getSIDTWTimeline } from '@/src/actions/dashboard.service';
+import { Typography } from '@/src/components/Typography';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
@@ -31,7 +32,10 @@ function AccuracyTimelineContent({ data }: AccuracyTimelineContentProps) {
   const maxValues = data.map((d) => d.max_sidtw);
 
   return (
-    <div className="rounded-2xl bg-white p-6 shadow">
+    <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+      <Typography as="h2" className="mb-2">
+        Genauigkeitsentwicklung
+      </Typography>
       <div className="mb-4 text-sm text-gray-600">
         <p>
           Dieser Plot zeigt die Entwicklung der Messgenauigkeit über die Zeit.
@@ -88,7 +92,7 @@ function AccuracyTimelineContent({ data }: AccuracyTimelineContentProps) {
         ]}
         layout={{
           autosize: true,
-          height: 400,
+          height: 500,
           margin: { t: 20, r: 20, l: 80, b: 80 },
           xaxis: {
             title: 'Aufnahmedatum',
@@ -133,13 +137,13 @@ function AccuracyTimelineContent({ data }: AccuracyTimelineContentProps) {
         <div className="rounded-lg bg-green-50 p-4">
           <p className="text-sm text-gray-600">Bester Durchschnitt</p>
           <p className="text-2xl font-bold text-green-700">
-            {Math.min(...avgValues).toFixed(3)} mm
+            {Math.min(...avgValues).toFixed(2)} mm
           </p>
         </div>
         <div className="rounded-lg bg-red-50 p-4">
           <p className="text-sm text-gray-600">Schlechtester Durchschnitt</p>
           <p className="text-2xl font-bold text-red-700">
-            {Math.max(...avgValues).toFixed(3)} mm
+            {Math.max(...avgValues).toFixed(2)} mm
           </p>
         </div>
       </div>
@@ -174,7 +178,10 @@ export function AccuracyTimeline() {
   // Loading State
   if (isLoading) {
     return (
-      <div className="rounded-2xl bg-white p-6 shadow">
+      <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+        <Typography as="h2" className="mb-2">
+          Genauigkeitsentwicklung
+        </Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center">
             <Loader className="mx-auto mb-4 size-12 animate-spin text-blue-950" />
@@ -188,7 +195,10 @@ export function AccuracyTimeline() {
   // Error State
   if (error) {
     return (
-      <div className="rounded-2xl bg-white p-6 shadow">
+      <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+        <Typography as="h2" className="mb-2">
+          Genauigkeitsentwicklung
+        </Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center text-red-600">
             <p className="mb-2 text-lg font-semibold">{error}</p>
@@ -207,7 +217,10 @@ export function AccuracyTimeline() {
   // Empty State
   if (data.length === 0) {
     return (
-      <div className="rounded-2xl bg-white p-6 shadow">
+      <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+        <Typography as="h2" className="mb-2">
+          Genauigkeitsentwicklung
+        </Typography>
         <div className="flex h-96 items-center justify-center">
           <p className="text-gray-600">Keine Zeitreihen-Daten verfügbar</p>
         </div>

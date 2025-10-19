@@ -4,12 +4,17 @@ import { Loader } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { getDashboardData } from '@/src/actions/dashboard.service';
+import type { PerformerData } from '@/types/dashboard.types';
 
 import DashboardClient from './components/DashboardClient';
 
 interface BasicDashboardData {
   filenamesCount: number;
   bahnenCount: number;
+  medianSIDTW?: number;
+  meanSIDTW?: number;
+  bestPerformers?: PerformerData[];
+  worstPerformers?: PerformerData[];
 }
 
 export default function DashboardPage() {
@@ -20,11 +25,14 @@ export default function DashboardPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Nur die leichten Count-Daten laden
         const dashboardResult = await getDashboardData();
         setData({
           filenamesCount: dashboardResult.filenamesCount,
           bahnenCount: dashboardResult.bahnenCount,
+          medianSIDTW: dashboardResult.medianSIDTW,
+          meanSIDTW: dashboardResult.meanSIDTW,
+          bestPerformers: dashboardResult.bestPerformers,
+          worstPerformers: dashboardResult.worstPerformers,
         });
       } catch (error) {
         setData(null);
@@ -52,6 +60,10 @@ export default function DashboardPage() {
       <DashboardClient
         filenamesCount={data.filenamesCount}
         bahnenCount={data.bahnenCount}
+        medianSIDTW={data.medianSIDTW}
+        meanSIDTW={data.meanSIDTW}
+        bestPerformers={data.bestPerformers}
+        worstPerformers={data.worstPerformers}
       />
     </div>
   );

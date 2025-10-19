@@ -46,14 +46,10 @@ class FastJointEmbeddingCalculator:
             for row in joint_states_data
         ], dtype=np.float32)
 
-        # Downsample
-        traj = traj[::self.downsample_factor]
-
         if len(traj) < 5:
             return None
 
-        # Normalisierung: Startpunkt auf 0
-        traj_norm = traj - traj[0]
+        traj_norm = traj
 
         # Resample auf feste Anzahl
         indices = np.linspace(

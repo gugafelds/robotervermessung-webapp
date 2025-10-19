@@ -20,42 +20,135 @@ async def get_dashboard_data(conn=Depends(get_db)):
             "SELECT COUNT(DISTINCT bahn_id) FROM bewegungsdaten.bahn_info"
         )
 
+        median_sidtw = await conn.fetchval("""
+                                           SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY sidtw_average_distance)
+                                           FROM auswertung.info_sidtw i
+                                               INNER JOIN bewegungsdaten.bahn_info b
+                                           ON i.bahn_id = b.bahn_id
+                                           WHERE i.bahn_id = i.segment_id
+                                             AND i.sidtw_average_distance IS NOT NULL
+                                             AND b.source_data_ist = 'leica_at960'
+                                           """)
+
+        mean_sidtw = await conn.fetchval("""
+                                         SELECT AVG(sidtw_average_distance)
+                                         FROM auswertung.info_sidtw i
+                                                  INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
+                                         WHERE i.bahn_id = i.segment_id
+                                           AND i.sidtw_average_distance IS NOT NULL
+                                           AND b.source_data_ist = 'leica_at960'
+                                         """)
+
+        # Top 5 Best Performers
+        best_performers_raw = await conn.fetch("""
+                                               SELECT i.bahn_id,
+                                                      i.sidtw_average_distance,
+                                                      b.weight,
+                                                      b.np_ereignisse        as waypoints,
+                                                      b.stop_point,
+                                                      b.wait_time,
+                                                      m.max_twist_ist        as max_velocity,
+                                                      m.max_acceleration_ist as max_acceleration
+                                               FROM auswertung.info_sidtw i
+                                                        INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
+                                                        LEFT JOIN bewegungsdaten.bahn_meta m
+                                                                  ON i.bahn_id = m.bahn_id AND m.bahn_id = m.segment_id
+                                               WHERE i.bahn_id = i.segment_id
+                                                 AND i.sidtw_average_distance IS NOT NULL
+                                                 AND b.source_data_ist = 'leica_at960'
+                                               ORDER BY i.sidtw_average_distance ASC LIMIT 5
+                                               """)
+
+        # Top 5 Worst Performers
+        worst_performers_raw = await conn.fetch("""
+                                                SELECT i.bahn_id,
+                                                       i.sidtw_average_distance,
+                                                       b.weight,
+                                                       b.np_ereignisse        as waypoints,
+                                                       b.stop_point,
+                                                       b.wait_time,
+                                                       m.max_twist_ist        as max_velocity,
+                                                       m.max_acceleration_ist as max_acceleration
+                                                FROM auswertung.info_sidtw i
+                                                         INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
+                                                         LEFT JOIN bewegungsdaten.bahn_meta m
+                                                                   ON i.bahn_id = m.bahn_id AND m.bahn_id = m.segment_id
+                                                WHERE i.bahn_id = i.segment_id
+                                                  AND i.sidtw_average_distance IS NOT NULL
+                                                  AND b.source_data_ist = 'leica_at960'
+                                                ORDER BY i.sidtw_average_distance DESC LIMIT 5
+                                                """)
+
+        # Für jeden Performer: Hole alle Segment-Punkte (Trajektorie)
+        best_performers = []
+        for perf in best_performers_raw:
+            trajectory = await conn.fetch("""
+                                          SELECT x_reached, y_reached, z_reached
+                                          FROM bewegungsdaten.bahn_events
+                                          WHERE bahn_id = $1
+                                          ORDER BY timestamp
+                                          """, perf["bahn_id"])
+
+            best_performers.append({
+                "bahn_id": perf["bahn_id"],
+                "sidtw_average_distance": perf["sidtw_average_distance"],
+                "weight": perf["weight"],
+                "waypoints": perf["waypoints"],
+                "stop_point": perf["stop_point"],
+                "wait_time": perf["wait_time"],
+                "max_velocity": perf["max_velocity"],
+                "max_acceleration": perf["max_acceleration"],
+                "trajectory": [{"x": p["x_reached"], "y": p["y_reached"], "z": p["z_reached"]} for p in trajectory]
+            })
+
+        worst_performers = []
+        for perf in worst_performers_raw:
+            trajectory = await conn.fetch("""
+                                          SELECT x_reached, y_reached, z_reached
+                                          FROM bewegungsdaten.bahn_events
+                                          WHERE bahn_id = $1
+                                          ORDER BY timestamp 
+                                          """, perf["bahn_id"])
+
+            worst_performers.append({
+                "bahn_id": perf["bahn_id"],
+                "sidtw_average_distance": perf["sidtw_average_distance"],
+                "weight": perf["weight"],
+                "waypoints": perf["waypoints"],
+                "stop_point": perf["stop_point"],
+                "wait_time": perf["wait_time"],
+                "max_velocity": perf["max_velocity"],
+                "max_acceleration": perf["max_acceleration"],
+                "trajectory": [{"x": p["x_reached"], "y": p["y_reached"], "z": p["z_reached"]} for p in trajectory]
+            })
+
         stats = {}
 
-        # Velocity Distribution
+        # Velocity Distribution - mit festen Buckets
         velocity_query = """
-            WITH vel_stats AS (
-                SELECT MAX(max_twist_ist) as max_val
-                FROM bewegungsdaten.bahn_meta
-                WHERE bahn_id = segment_id
-                  AND max_twist_ist IS NOT NULL
-            )
-            SELECT 
-                width_bucket(max_twist_ist, 
-                    0, 
-                    (SELECT max_val FROM vel_stats), 
-                    7
-                ) AS bucket, 
-                COUNT(*)
-            FROM bewegungsdaten.bahn_meta
-            WHERE bahn_id = segment_id
-              AND max_twist_ist IS NOT NULL
-            GROUP BY bucket
-            ORDER BY bucket
-        """
+                         SELECT CASE \
+                                    WHEN max_twist_ist < 500 THEN 1 \
+                                    WHEN max_twist_ist >= 500 AND max_twist_ist < 1000 THEN 2 \
+                                    WHEN max_twist_ist >= 1000 AND max_twist_ist < 1500 THEN 3 \
+                                    WHEN max_twist_ist >= 1500 AND max_twist_ist < 2000 THEN 4 \
+                                    WHEN max_twist_ist >= 2000 AND max_twist_ist < 2500 THEN 5 \
+                                    WHEN max_twist_ist >= 2500 THEN 6 \
+                                    END AS bucket, \
+                                COUNT(*)
+                         FROM bewegungsdaten.bahn_meta
+                         WHERE bahn_id = segment_id
+                           AND max_twist_ist IS NOT NULL
+                         GROUP BY bucket
+                         ORDER BY bucket \
+                         """
         velocity_rows = await conn.fetch(velocity_query)
-        velocity_max = await conn.fetchval("""
-            SELECT MAX(max_twist_ist) 
-            FROM bewegungsdaten.bahn_meta 
-            WHERE bahn_id = segment_id AND max_twist_ist IS NOT NULL
-        """)
         stats["velocityDistribution"] = {
             "data": [{"bucket": r["bucket"], "count": r["count"]} for r in velocity_rows],
             "meta": {
                 "useRanges": True,
                 "min": 0,
-                "max": velocity_max or 3000,
-                "numBuckets": 7,
+                "max": 3000,
+                "numBuckets": 6,
                 "unit": "mm/s",
                 "label": "Geschwindigkeit"
             }
@@ -65,6 +158,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
         weight_query = """
             SELECT weight AS bucket, COUNT(*)
             FROM bewegungsdaten.bahn_info
+                WHERE source_data_ist = 'leica_at960'
             GROUP BY bucket
             ORDER BY bucket
         """
@@ -82,6 +176,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
         waypoints_query = """
             SELECT np_ereignisse AS bucket, COUNT(*)
             FROM bewegungsdaten.bahn_info
+                WHERE source_data_ist = 'leica_at960'
             GROUP BY bucket
             ORDER BY bucket
         """
@@ -180,6 +275,10 @@ async def get_dashboard_data(conn=Depends(get_db)):
         return {
             "filenamesCount": filenames_count,
             "bahnenCount": bahnen_count,
+            "medianSIDTW": median_sidtw,
+            "meanSIDTW": mean_sidtw,
+            "bestPerformers": best_performers,
+            "worstPerformers": worst_performers,
             "stats": stats,
         }
 
@@ -261,7 +360,7 @@ async def get_dashboard_sidtw_vs_parameters(conn=Depends(get_db)):
                                         AND bi.stop_point IS NOT NULL \
                                         AND bi.wait_time IS NOT NULL \
                                       ORDER BY RANDOM()
-                    LIMIT 10000
+                    LIMIT 1000
                     )
                 SELECT * \
                 FROM sampled_data \
@@ -310,7 +409,7 @@ async def get_dashboard_workarea(conn=Depends(get_db)):
                          )
                          SELECT x_reached, y_reached, z_reached, sidtw_average_distance
                          FROM numbered_events
-                         WHERE rn % 1 = 0 \
+                         WHERE rn % 7 = 0 \
                          """
 
         workarea_rows = await conn.fetch(workarea_query)

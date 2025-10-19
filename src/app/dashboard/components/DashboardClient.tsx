@@ -2,57 +2,64 @@
 
 'use client';
 
+import { AccuracyCard } from '@/src/app/dashboard/components/AccuracyCard';
 import { AccuracyTimeline } from '@/src/app/dashboard/components/AccuracyTimeline';
 import { DataCard } from '@/src/app/dashboard/components/DataCard';
 import { DistributionCharts } from '@/src/app/dashboard/components/DistributionCharts';
 import { ParameterCorrelation } from '@/src/app/dashboard/components/ParameterCorrelation';
+import { PerformersTable } from '@/src/app/dashboard/components/PerformersTable';
 import { WorkareaPlot } from '@/src/app/dashboard/components/WorkareaPlot';
 import { Typography } from '@/src/components/Typography';
+import type { PerformerData } from '@/types/dashboard.types';
 
-// Nur noch die Counts!
 interface DashboardClientProps {
   filenamesCount: number;
   bahnenCount: number;
+  medianSIDTW?: number;
+  meanSIDTW?: number;
+  bestPerformers?: PerformerData[]; // NEU
+  worstPerformers?: PerformerData[]; // NEU
 }
 
 export default function DashboardClient({
   filenamesCount,
   bahnenCount,
+  medianSIDTW,
+  meanSIDTW,
+  bestPerformers,
+  worstPerformers,
 }: DashboardClientProps) {
   return (
-    <div className="p-2">
-      <Typography as="h2" className="py-2">
-        Bewegungsdaten
-      </Typography>
-
-      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <DataCard componentName="Roboterbahnen insgesamt" value={bahnenCount} />
-        <DataCard
-          componentName="Aufnahmendateien insgesamt"
-          value={filenamesCount}
-        />
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2">
+      <div>
+        <Typography as="h2">Bewegungsdaten</Typography>
+        <div className="my-2 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <DataCard
+            componentName="Roboterbahnen insgesamt"
+            value={bahnenCount}
+          />
+          <DataCard
+            componentName="Aufnahmendateien insgesamt"
+            value={filenamesCount}
+          />
+          <AccuracyCard medianSIDTW={medianSIDTW} meanSIDTW={meanSIDTW} />
+        </div>
+        <DistributionCharts />
       </div>
 
-      <Typography as="h2" className="py-2">
-        Datenverteilung
-      </Typography>
+      <PerformersTable
+        bestPerformers={bestPerformers}
+        worstPerformers={worstPerformers}
+      />
 
-      <DistributionCharts />
-
-      <Typography as="h2" className="mt-8 py-2">
-        Einflussfaktoren auf Genauigkeit
-      </Typography>
       <ParameterCorrelation />
 
-      <Typography as="h2" className="mt-8 py-2">
-        Genauigkeitsentwicklung
-      </Typography>
-      <AccuracyTimeline />
+      <WorkareaPlot
+        bestPerformers={bestPerformers}
+        worstPerformers={worstPerformers}
+      />
 
-      <Typography as="h2" className="mt-8 py-2">
-        Arbeitsraum
-      </Typography>
-      <WorkareaPlot />
+      <AccuracyTimeline />
     </div>
   );
 }

@@ -96,9 +96,10 @@ function DistributionChartsContent({
     : sortedData.map((d) => d.bucket);
 
   return (
-    <div className="rounded-2xl bg-white p-6 shadow">
+    <div className="flex flex-col justify-center rounded-2xl border bg-white p-4 shadow-md">
+      <Typography as="h2">Datenverteilung</Typography>
       {/* Tab Navigation */}
-      <div className="mb-6 flex flex-wrap gap-2 border-b">
+      <div className="mb-6 flex flex-wrap gap-4 border-b">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -126,7 +127,7 @@ function DistributionChartsContent({
         ]}
         layout={{
           autosize: true,
-          height: 300,
+          height: 450,
           margin: { t: 20, r: 20, l: 80, b: 80 },
           xaxis: {
             title: `${activeDistribution.meta.label} [${activeDistribution.meta.unit}]`,
@@ -146,6 +147,7 @@ function DistributionChartsContent({
             'zoomOut2d',
             'autoScale2d',
             'pan2d',
+            'select2d',
           ],
         }}
       />
@@ -181,10 +183,8 @@ export function DistributionCharts() {
   // Loading State
   if (isLoading) {
     return (
-      <div className="rounded-2xl bg-white p-6 shadow">
-        <Typography as="h3" className="mb-4">
-          Datenverteilung
-        </Typography>
+      <div className="flex flex-col justify-center rounded-2xl border bg-white p-4 shadow-md">
+        <Typography as="h2">Datenverteilung</Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center">
             <Loader className="mx-auto mb-4 size-12 animate-spin text-blue-950" />
@@ -197,10 +197,8 @@ export function DistributionCharts() {
 
   if (error || !stats) {
     return (
-      <div className="rounded-2xl bg-white p-6 shadow">
-        <Typography as="h3" className="mb-4">
-          Datenverteilung
-        </Typography>
+      <div className="flex flex-col justify-center rounded-2xl border bg-white p-2 shadow-md">
+        <Typography as="h2">Datenverteilung</Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center text-red-600">
             <p className="mb-2 text-lg font-semibold">
