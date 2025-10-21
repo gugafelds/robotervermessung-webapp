@@ -207,7 +207,7 @@ async def process_meta_values_calculation(task_id: str, db_pool):
                 task_store[task_id].update({
                     "status": TaskStatus.FAILED,
                     "failed_at": datetime.now().isoformat(),
-                    "error": "Keine gültigen Daten in bahn_meta gefunden"
+                    "error": "Keine gültigen Daten in bahn_metadata gefunden"
                 })
                 return
 

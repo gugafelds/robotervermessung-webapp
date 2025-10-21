@@ -19,6 +19,7 @@ class Database:
                 DATABASE_URL,
                 min_size=10,
                 max_size=100,
+                server_settings={'search_path': 'bewegungsdaten, public'}
             )
 
     async def disconnect(self):

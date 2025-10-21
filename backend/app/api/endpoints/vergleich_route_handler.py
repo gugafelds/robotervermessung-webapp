@@ -502,7 +502,7 @@ async def get_metadata_stats(db_pool=Depends(get_db_pool)):
             # Bahnen mit Metadaten
             bahns_with_metadata_query = """
                                         SELECT COUNT(DISTINCT bahn_id) as bahns_with_metadata
-                                        FROM robotervermessung.bewegungsdaten.bahn_meta
+                                        FROM robotervermessung.bewegungsdaten.bahn_metadata
                                         WHERE segment_id = bahn_id -- Nur Gesamtbahn-Zeilen zählen \
                                         """
             bahns_with_metadata = await conn.fetchval(bahns_with_metadata_query)
@@ -510,14 +510,14 @@ async def get_metadata_stats(db_pool=Depends(get_db_pool)):
             # Gesamtzahl Metadaten-Zeilen
             total_metadata_rows_query = """
                                         SELECT COUNT(*) as total_rows
-                                        FROM robotervermessung.bewegungsdaten.bahn_meta \
+                                        FROM robotervermessung.bewegungsdaten.bahn_metadata \
                                         """
             total_metadata_rows = await conn.fetchval(total_metadata_rows_query)
 
             # Movement Type Verteilung
             movement_type_query = """
                                   SELECT movement_type, COUNT(*) as count
-                                  FROM robotervermessung.bewegungsdaten.bahn_meta
+                                  FROM robotervermessung.bewegungsdaten.bahn_metadata
                                   WHERE segment_id != bahn_id -- Nur Segmente, nicht Gesamtbahn
                                   GROUP BY movement_type
                                   ORDER BY count DESC \

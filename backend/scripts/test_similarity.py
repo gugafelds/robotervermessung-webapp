@@ -10,7 +10,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from scripts.joint_calculator import FastJointEmbeddingCalculator
+from scripts.embedding_calculator import EmbeddingCalculator
 import logging
 
 logging.basicConfig(
@@ -132,7 +132,7 @@ async def test_bahn_similarity(
             # Lade Target Bahn-Embedding
             target = await conn.fetchrow("""
                                          SELECT joint_embedding, segment_id
-                                         FROM bahn_joint_embeddings
+                                         FROM bahn_embeddings
                                          WHERE bahn_id = $1
                                            AND segment_id = $1
                                          """, target_bahn_id)
@@ -149,7 +149,7 @@ async def test_bahn_similarity(
                                        SELECT bahn_id,
                                               segment_id,
                                               joint_embedding <-> $1::vector AS distance
-                                       FROM bahn_joint_embeddings
+                                       FROM bahn_embeddings
                                        WHERE bahn_id = segment_id
                                          AND bahn_id != $2
                                        ORDER BY joint_embedding <-> $1::vector
@@ -166,7 +166,7 @@ async def test_bahn_similarity(
                                                        LEFT JOIN bahn_meta bm
                                                                  ON bi.bahn_id = bm.bahn_id
                                                                      AND bi.bahn_id = bm.segment_id
-                                                       LEFT JOIN bahn_joint_embeddings bje
+                                                       LEFT JOIN bahn_embeddings bje
                                                                  ON bi.bahn_id = bje.bahn_id
                                               WHERE bi.bahn_id = $1
                                               GROUP BY bi.robot_model, bi.recording_date, bm.meta_value
@@ -195,7 +195,7 @@ async def test_bahn_similarity(
                                            SELECT bi.robot_model,
                                                   COUNT(DISTINCT bje.segment_id) - 1 as segment_count
                                            FROM bahn_info bi
-                                                    LEFT JOIN bahn_joint_embeddings bje
+                                                    LEFT JOIN bahn_embeddings bje
                                                               ON bi.bahn_id = bje.bahn_id
                                            WHERE bi.bahn_id = $1
                                            GROUP BY bi.robot_model
@@ -238,7 +238,7 @@ async def test_segment_similarity(
             # Lade alle Segmente der Target-Bahn
             target_segments = await conn.fetch("""
                                                SELECT segment_id, joint_embedding
-                                               FROM bahn_joint_embeddings
+                                               FROM bahn_embeddings
                                                WHERE bahn_id = $1
                                                  AND segment_id != $1
                                                ORDER BY segment_id
@@ -262,7 +262,7 @@ async def test_segment_similarity(
                                            SELECT segment_id,
                                                   bahn_id,
                                                   joint_embedding <-> $1::vector AS distance
-                                           FROM bahn_joint_embeddings
+                                           FROM bahn_embeddings
                                            WHERE segment_id != bahn_id
                       AND segment_id != $2
                                              AND bahn_id != $3
@@ -325,7 +325,7 @@ async def test_hierarchical_similarity(
 
             target_bahn = await conn.fetchrow("""
                                               SELECT joint_embedding
-                                              FROM bahn_joint_embeddings
+                                              FROM bahn_embeddings
                                               WHERE bahn_id = $1
                                                 AND segment_id = $1
                                               """, target_bahn_id)
@@ -337,7 +337,7 @@ async def test_hierarchical_similarity(
             bahn_results = await conn.fetch("""
                                             SELECT bahn_id,
                                                    joint_embedding <-> $1::vector AS distance
-                                            FROM bahn_joint_embeddings
+                                            FROM bahn_embeddings
                                             WHERE bahn_id = segment_id
                                               AND bahn_id != $2
                                             ORDER BY joint_embedding <-> $1::vector
@@ -351,7 +351,7 @@ async def test_hierarchical_similarity(
 
             target_segments = await conn.fetch("""
                                                SELECT segment_id, joint_embedding
-                                               FROM bahn_joint_embeddings
+                                               FROM bahn_embeddings
                                                WHERE bahn_id = $1
                                                  AND segment_id != $1
                                                ORDER BY segment_id
@@ -363,7 +363,7 @@ async def test_hierarchical_similarity(
                                            SELECT segment_id,
                                                   bahn_id,
                                                   joint_embedding <-> $1::vector AS distance
-                                           FROM bahn_joint_embeddings
+                                           FROM bahn_embeddings
                                            WHERE segment_id != bahn_id
                       AND segment_id != $2
                                              AND bahn_id != $3

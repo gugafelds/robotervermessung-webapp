@@ -1,5 +1,6 @@
-import asyncio
+# backend/app/utils/metadata_calculator.py
 
+import asyncio
 import asyncpg
 import numpy as np
 from datetime import datetime
@@ -9,9 +10,11 @@ import re
 
 logger = logging.getLogger(__name__)
 
+
 class MetadataCalculatorService:
     def __init__(self, db_pool: asyncpg.Pool):
         self.db_pool = db_pool
+        self.downsample_factor = 3  # Jeder 3. Punkt
 
     async def validate_datetime_input(self, date_string: str) -> Optional[int]:
         """
@@ -64,10 +67,13 @@ class MetadataCalculatorService:
         """Ermittelt alle bahn_ids die noch keine Metadaten haben"""
         async with self.db_pool.acquire() as conn:
             query = """
-            SELECT DISTINCT bahn_id
-            FROM robotervermessung.bewegungsdaten.bahn_info
-            ORDER BY bahn_id
-            """
+                    SELECT DISTINCT bi.bahn_id
+                    FROM robotervermessung.bewegungsdaten.bahn_info bi
+                             LEFT JOIN robotervermessung.bewegungsdaten.bahn_metadata bm
+                                       ON bi.bahn_id = bm.bahn_id AND bi.bahn_id = bm.segment_id
+                    WHERE bm.segment_id IS NULL
+                    ORDER BY bi.bahn_id \
+                    """
             rows = await conn.fetch(query)
             return [row['bahn_id'] for row in rows]
 
@@ -79,7 +85,7 @@ class MetadataCalculatorService:
         async with self.db_pool.acquire() as conn:
             query = """
                     SELECT DISTINCT bahn_id
-                    FROM robotervermessung.bewegungsdaten.bahn_meta
+                    FROM robotervermessung.bewegungsdaten.bahn_metadata
                     WHERE bahn_id = ANY ($1::text[]) \
                     """
             rows = await conn.fetch(query, bahn_ids)
@@ -93,7 +99,7 @@ class MetadataCalculatorService:
         async with self.db_pool.acquire() as conn:
             query = """
                     DELETE \
-                    FROM robotervermessung.bewegungsdaten.bahn_meta
+                    FROM robotervermessung.bewegungsdaten.bahn_metadata
                     WHERE bahn_id = ANY ($1::text[]) \
                     """
             result = await conn.execute(query, bahn_ids)
@@ -167,7 +173,8 @@ class MetadataCalculatorService:
 
     async def _fetch_all_bahn_data(self, conn: asyncpg.Connection, bahn_id: str) -> Dict:
         """
-        Holt ALLE benötigten Daten für eine Bahn in EINEM Durchgang
+        Holt ALLE benötigten Daten für eine Bahn
+        NUR: Bahn Info, Position (für movement_type), Twist, Accel
         """
         # Bahn Info
         bahn_info_query = """
@@ -180,20 +187,14 @@ class MetadataCalculatorService:
         if not bahn_info:
             return None
 
-        # Alle Segmente mit Position-Daten
+        # Segmente mit Position (für movement_type + length + duration)
         segments_query = """
-                         SELECT segment_id, \
-                                array_agg(x_soll ORDER BY timestamp) as x_data, \
-                                array_agg(y_soll ORDER BY timestamp) as y_data, \
-                                array_agg(z_soll ORDER BY timestamp) as z_data, \
-                                MIN(timestamp)                       as min_timestamp, \
-                                MAX(timestamp)                       as max_timestamp, \
-                                MIN(x_soll)                          as min_x, \
-                                MAX(x_soll)                          as max_x, \
-                                MIN(y_soll)                          as min_y, \
-                                MAX(y_soll)                          as max_y, \
-                                MIN(z_soll)                          as min_z, \
-                                MAX(z_soll)                          as max_z
+                         SELECT segment_id,
+                                array_agg(x_soll ORDER BY timestamp) as x_data,
+                                array_agg(y_soll ORDER BY timestamp) as y_data,
+                                array_agg(z_soll ORDER BY timestamp) as z_data,
+                                MIN(timestamp)                       as min_timestamp,
+                                MAX(timestamp)                       as max_timestamp
                          FROM robotervermessung.bewegungsdaten.bahn_position_soll
                          WHERE bahn_id = $1
                          GROUP BY segment_id
@@ -201,83 +202,48 @@ class MetadataCalculatorService:
                          """
         segments = await conn.fetch(segments_query, bahn_id)
 
-        # Orientation Stats pro Segment
-        orientation_query = """
-                            SELECT segment_id, \
-                                   MIN(qw_soll) as min_qw, \
-                                   MAX(qw_soll) as max_qw, \
-                                   MIN(qx_soll) as min_qx, \
-                                   MAX(qx_soll) as max_qx, \
-                                   MIN(qy_soll) as min_qy, \
-                                   MAX(qy_soll) as max_qy, \
-                                   MIN(qz_soll) as min_qz, \
-                                   MAX(qz_soll) as max_qz
-                            FROM robotervermessung.bewegungsdaten.bahn_orientation_soll
-                            WHERE bahn_id = $1
-                            GROUP BY segment_id \
-                            """
-        orientations = await conn.fetch(orientation_query, bahn_id)
-
-        # Twist Stats pro Segment
-        twist_query = """
-                      SELECT segment_id, \
-                             MIN(tcp_speed_ist) as min_twist, \
-                             MAX(tcp_speed_ist) as max_twist, \
-                             PERCENTILE_CONT(0.5)  WITHIN GROUP (ORDER BY tcp_speed_ist) as median_twist,
-                STDDEV(tcp_speed_ist) as std_twist
-                      FROM robotervermessung.bewegungsdaten.bahn_twist_ist
-                      WHERE bahn_id = $1
-                      GROUP BY segment_id \
-                      """
+        # Twist Stats mit Downsampling (jeder 3. Punkt)
+        twist_query = f"""
+            WITH numbered AS (
+                SELECT segment_id,
+                       tcp_speed_ist,
+                       ROW_NUMBER() OVER (PARTITION BY segment_id ORDER BY timestamp) as rn
+                FROM robotervermessung.bewegungsdaten.bahn_twist_ist
+                WHERE bahn_id = $1
+            )
+            SELECT segment_id,
+                   array_agg(tcp_speed_ist ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as twist_values
+            FROM numbered
+            GROUP BY segment_id
+        """
         twists = await conn.fetch(twist_query, bahn_id)
 
-        # Acceleration Stats pro Segment
-        accel_query = """
-                      SELECT segment_id, \
-                             MIN(tcp_accel_ist) as min_accel, \
-                             MAX(tcp_accel_ist) as max_accel, \
-                             PERCENTILE_CONT(0.5)  WITHIN GROUP (ORDER BY tcp_accel_ist) as median_accel,
-                STDDEV(tcp_accel_ist) as std_accel
-                      FROM robotervermessung.bewegungsdaten.bahn_accel_ist
-                      WHERE bahn_id = $1
-                      GROUP BY segment_id \
-                      """
+        # Acceleration Stats mit Downsampling (jeder 3. Punkt)
+        accel_query = f"""
+            WITH numbered AS (
+                SELECT segment_id,
+                       tcp_accel_ist,
+                       ROW_NUMBER() OVER (PARTITION BY segment_id ORDER BY timestamp) as rn
+                FROM robotervermessung.bewegungsdaten.bahn_accel_ist
+                WHERE bahn_id = $1
+            )
+            SELECT segment_id,
+                   array_agg(tcp_accel_ist ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as accel_values
+            FROM numbered
+            GROUP BY segment_id
+        """
         accels = await conn.fetch(accel_query, bahn_id)
-
-        # Joint Stats pro Segment
-        joint_query = """
-                      SELECT segment_id, \
-                             MIN(joint_1) as min_joint_1, \
-                             MAX(joint_1) as max_joint_1, \
-                             MIN(joint_2) as min_joint_2, \
-                             MAX(joint_2) as max_joint_2, \
-                             MIN(joint_3) as min_joint_3, \
-                             MAX(joint_3) as max_joint_3, \
-                             MIN(joint_4) as min_joint_4, \
-                             MAX(joint_4) as max_joint_4, \
-                             MIN(joint_5) as min_joint_5, \
-                             MAX(joint_5) as max_joint_5, \
-                             MIN(joint_6) as min_joint_6, \
-                             MAX(joint_6) as max_joint_6
-                      FROM robotervermessung.bewegungsdaten.bahn_joint_states
-                      WHERE bahn_id = $1
-                      GROUP BY segment_id \
-                      """
-        joints = await conn.fetch(joint_query, bahn_id)
 
         return {
             'bahn_info': bahn_info,
             'segments': segments,
-            'orientations': {row['segment_id']: row for row in orientations},
-            'twists': {row['segment_id']: row for row in twists},
-            'accels': {row['segment_id']: row for row in accels},
-            'joints': {row['segment_id']: row for row in joints}
+            'twists': {row['segment_id']: row['twist_values'] for row in twists},
+            'accels': {row['segment_id']: row['accel_values'] for row in accels}
         }
 
     def _calculate_all_metadata_in_memory(self, bahn_id: str, bahn_data: Dict) -> List[Dict]:
         """
-        Berechnet alle Metadaten komplett in Python (keine DB!)
-        OPTIMIERT: Vektorisierte Aggregationen
+        Berechnet SIMPLIFIED Metadaten (nur 14 Spalten!)
         """
         metadata_rows = []
         weight = bahn_data['bahn_info']['weight']
@@ -291,9 +257,8 @@ class MetadataCalculatorService:
                 min_ts = int(float(start_time))
                 max_ts = int(float(end_time))
                 total_duration = max((max_ts - min_ts) / 1_000_000_000.0, 0.0)
-            except Exception as e:
+            except:
                 pass
-
 
         # Verarbeite jedes Segment
         segment_movement_types = []
@@ -302,18 +267,15 @@ class MetadataCalculatorService:
         for segment in bahn_data['segments']:
             segment_id = segment['segment_id']
 
-            # Movement Type Detection (pure Python!)
+            # Movement Type Detection
             x_data = np.array(segment['x_data'])
             y_data = np.array(segment['y_data'])
             z_data = np.array(segment['z_data'])
 
-            # Sample für Movement Type (direkt slicen - schneller!)
             step = max(1, len(x_data) // 20)
-            x_sample = x_data[::step]
-            y_sample = y_data[::step]
-            z_sample = z_data[::step]
-
-            movement_type = self.detect_movement_type(x_sample, y_sample, z_sample)
+            movement_type = self.detect_movement_type(
+                x_data[::step], y_data[::step], z_data[::step]
+            )
             segment_movement_types.append(movement_type)
 
             # Duration
@@ -326,23 +288,40 @@ class MetadataCalculatorService:
             except:
                 pass
 
-            # Length und Direction (vektorisiert!)
-            delta = np.array([x_data[-1] - x_data[0],
-                              y_data[-1] - y_data[0],
-                              z_data[-1] - z_data[0]])
+            # Length (Euclidean distance)
+            delta = np.array([
+                x_data[-1] - x_data[0],
+                y_data[-1] - y_data[0],
+                z_data[-1] - z_data[0]
+            ])
             length = float(np.linalg.norm(delta))
             total_length += length
 
-            direction = delta / length if length > 0 else np.zeros(3)
-            direction_x, direction_y, direction_z = direction.tolist()
+            # Twist Stats (von downsampled Daten)
+            twist_values = bahn_data['twists'].get(segment_id, [])
+            if twist_values and len(twist_values) > 0:
+                twist_arr = np.array(twist_values, dtype=np.float32)
+                min_twist = float(np.min(twist_arr))
+                max_twist = float(np.max(twist_arr))
+                mean_twist = float(np.mean(twist_arr))
+                median_twist = float(np.median(twist_arr))
+                std_twist = float(np.std(twist_arr))
+            else:
+                min_twist = max_twist = mean_twist = median_twist = std_twist = 0.0
 
-            # Hole Zusatzdaten
-            orient = bahn_data['orientations'].get(segment_id, {})
-            twist = bahn_data['twists'].get(segment_id, {})
-            accel = bahn_data['accels'].get(segment_id, {})
-            joint = bahn_data['joints'].get(segment_id, {})
+            # Acceleration Stats (von downsampled Daten)
+            accel_values = bahn_data['accels'].get(segment_id, [])
+            if accel_values and len(accel_values) > 0:
+                accel_arr = np.array(accel_values, dtype=np.float32)
+                min_accel = float(np.min(accel_arr))
+                max_accel = float(np.max(accel_arr))
+                mean_accel = float(np.mean(accel_arr))
+                median_accel = float(np.median(accel_arr))
+                std_accel = float(np.std(accel_arr))
+            else:
+                min_accel = max_accel = mean_accel = median_accel = std_accel = 0.0
 
-            # Erstelle Metadaten-Row (mit safe_float!)
+            # Segment Metadata Row (14 Spalten!)
             metadata_rows.append({
                 'bahn_id': bahn_id,
                 'segment_id': segment_id,
@@ -350,148 +329,50 @@ class MetadataCalculatorService:
                 'duration': segment_duration,
                 'weight': weight,
                 'length': length,
-                'direction_x': direction_x,
-                'direction_y': direction_y,
-                'direction_z': direction_z,
-                'min_position_x_soll': float(segment['min_x']),
-                'min_position_y_soll': float(segment['min_y']),
-                'min_position_z_soll': float(segment['min_z']),
-                'max_position_x_soll': float(segment['max_x']),
-                'max_position_y_soll': float(segment['max_y']),
-                'max_position_z_soll': float(segment['max_z']),
-                'min_orientation_qw_soll': self.safe_float(orient.get('min_qw')),
-                'min_orientation_qx_soll': self.safe_float(orient.get('min_qx')),
-                'min_orientation_qy_soll': self.safe_float(orient.get('min_qy')),
-                'min_orientation_qz_soll': self.safe_float(orient.get('min_qz')),
-                'max_orientation_qw_soll': self.safe_float(orient.get('max_qw')),
-                'max_orientation_qx_soll': self.safe_float(orient.get('max_qx')),
-                'max_orientation_qy_soll': self.safe_float(orient.get('max_qy')),
-                'max_orientation_qz_soll': self.safe_float(orient.get('max_qz')),
-                'min_twist_ist': self.safe_float(twist.get('min_twist')),
-                'max_twist_ist': self.safe_float(twist.get('max_twist')),
-                'median_twist_ist': self.safe_float(twist.get('median_twist')),
-                'std_twist_ist': self.safe_float(twist.get('std_twist')),
-                'min_acceleration_ist': self.safe_float(accel.get('min_accel')),
-                'max_acceleration_ist': self.safe_float(accel.get('max_accel')),
-                'median_acceleration_ist': self.safe_float(accel.get('median_accel')),
-                'std_acceleration_ist': self.safe_float(accel.get('std_accel')),
-                'min_states_joint_1': self.safe_float(joint.get('min_joint_1')),
-                'min_states_joint_2': self.safe_float(joint.get('min_joint_2')),
-                'min_states_joint_3': self.safe_float(joint.get('min_joint_3')),
-                'min_states_joint_4': self.safe_float(joint.get('min_joint_4')),
-                'min_states_joint_5': self.safe_float(joint.get('min_joint_5')),
-                'min_states_joint_6': self.safe_float(joint.get('min_joint_6')),
-                'max_states_joint_1': self.safe_float(joint.get('max_joint_1')),
-                'max_states_joint_2': self.safe_float(joint.get('max_joint_2')),
-                'max_states_joint_3': self.safe_float(joint.get('max_joint_3')),
-                'max_states_joint_4': self.safe_float(joint.get('max_joint_4')),
-                'max_states_joint_5': self.safe_float(joint.get('max_joint_5')),
-                'max_states_joint_6': self.safe_float(joint.get('max_joint_6'))
+                'min_twist_ist': min_twist,
+                'max_twist_ist': max_twist,
+                'mean_twist_ist': mean_twist,
+                'median_twist_ist': median_twist,
+                'std_twist_ist': std_twist,
+                'min_acceleration_ist': min_accel,
+                'max_acceleration_ist': max_accel,
+                'mean_acceleration_ist': mean_accel,
+                'median_acceleration_ist': median_accel,
+                'std_acceleration_ist': std_accel
             })
 
-        # Gesamtbahn-Zeile erstellen
+        # Gesamtbahn-Zeile (Aggregation über alle Segmente)
         if metadata_rows:
             total_movement_string = ''.join([mt[0].lower() for mt in segment_movement_types])
 
-            # Aggregiere Min/Max über alle Segmente
-            all_min_x = min(row['min_position_x_soll'] for row in metadata_rows)
-            all_max_x = max(row['max_position_x_soll'] for row in metadata_rows)
-            all_min_y = min(row['min_position_y_soll'] for row in metadata_rows)
-            all_max_y = max(row['max_position_y_soll'] for row in metadata_rows)
-            all_min_z = min(row['min_position_z_soll'] for row in metadata_rows)
-            all_max_z = max(row['max_position_z_soll'] for row in metadata_rows)
+            # Aggregiere Twist/Accel über alle Segmente
+            all_twist = [row['min_twist_ist'] for row in metadata_rows]
+            all_twist += [row['max_twist_ist'] for row in metadata_rows]
+            all_twist += [row['mean_twist_ist'] for row in metadata_rows]
+            all_twist += [row['median_twist_ist'] for row in metadata_rows]
 
-            # Gesamtrichtung (erste Segment Start → letzte Segment Ende)
-            first_seg = bahn_data['segments'][0]
-            last_seg = bahn_data['segments'][-1]
+            all_accel = [row['min_acceleration_ist'] for row in metadata_rows]
+            all_accel += [row['max_acceleration_ist'] for row in metadata_rows]
+            all_accel += [row['mean_acceleration_ist'] for row in metadata_rows]
+            all_accel += [row['median_acceleration_ist'] for row in metadata_rows]
 
-            total_delta = np.array([
-                last_seg['x_data'][-1] - first_seg['x_data'][0],
-                last_seg['y_data'][-1] - first_seg['y_data'][0],
-                last_seg['z_data'][-1] - first_seg['z_data'][0]
-            ])
-            total_dir_length = float(np.linalg.norm(total_delta))
-
-            total_direction = total_delta / total_dir_length if total_dir_length > 0 else np.zeros(3)
-            total_dir_x, total_dir_y, total_dir_z = total_direction.tolist()
-
-            orientation_data = np.array([
-                [row['min_orientation_qw_soll'], row['min_orientation_qx_soll'],
-                 row['min_orientation_qy_soll'], row['min_orientation_qz_soll'],
-                 row['max_orientation_qw_soll'], row['max_orientation_qx_soll'],
-                 row['max_orientation_qy_soll'], row['max_orientation_qz_soll']]
-                for row in metadata_rows
-            ])
-
-            twist_data = np.array([
-                [row['min_twist_ist'], row['max_twist_ist'],
-                 row['median_twist_ist'], row['std_twist_ist']]
-                for row in metadata_rows
-            ])
-
-            accel_data = np.array([
-                [row['min_acceleration_ist'], row['max_acceleration_ist'],
-                 row['median_acceleration_ist'], row['std_acceleration_ist']]
-                for row in metadata_rows
-            ])
-
-            joint_data = np.array([
-                [row['min_states_joint_1'], row['min_states_joint_2'], row['min_states_joint_3'],
-                 row['min_states_joint_4'], row['min_states_joint_5'], row['min_states_joint_6'],
-                 row['max_states_joint_1'], row['max_states_joint_2'], row['max_states_joint_3'],
-                 row['max_states_joint_4'], row['max_states_joint_5'], row['max_states_joint_6']]
-                for row in metadata_rows
-            ])
-
-            # Aggregiere Stats über alle Segmente (vektorisiert!)
             total_metadata = {
                 'bahn_id': bahn_id,
-                'segment_id': bahn_id,
+                'segment_id': bahn_id,  # Bahn-Level: segment_id = bahn_id
                 'movement_type': total_movement_string,
                 'duration': total_duration,
                 'weight': weight,
                 'length': total_length,
-                'direction_x': total_dir_x,
-                'direction_y': total_dir_y,
-                'direction_z': total_dir_z,
-                'min_position_x_soll': all_min_x,
-                'min_position_y_soll': all_min_y,
-                'min_position_z_soll': all_min_z,
-                'max_position_x_soll': all_max_x,
-                'max_position_y_soll': all_max_y,
-                'max_position_z_soll': all_max_z,
-                # Vektorisierte Orientation Aggregation
-                'min_orientation_qw_soll': float(np.min(orientation_data[:, 0])),
-                'min_orientation_qx_soll': float(np.min(orientation_data[:, 1])),
-                'min_orientation_qy_soll': float(np.min(orientation_data[:, 2])),
-                'min_orientation_qz_soll': float(np.min(orientation_data[:, 3])),
-                'max_orientation_qw_soll': float(np.max(orientation_data[:, 4])),
-                'max_orientation_qx_soll': float(np.max(orientation_data[:, 5])),
-                'max_orientation_qy_soll': float(np.max(orientation_data[:, 6])),
-                'max_orientation_qz_soll': float(np.max(orientation_data[:, 7])),
-                # Vektorisierte Twist Aggregation
-                'min_twist_ist': float(np.min(twist_data[:, 0])),
-                'max_twist_ist': float(np.max(twist_data[:, 1])),
-                'median_twist_ist': float(np.median(twist_data[:, 2])),
-                'std_twist_ist': float(np.mean(twist_data[:, 3])),
-                # Vektorisierte Acceleration Aggregation
-                'min_acceleration_ist': float(np.min(accel_data[:, 0])),
-                'max_acceleration_ist': float(np.max(accel_data[:, 1])),
-                'median_acceleration_ist': float(np.median(accel_data[:, 2])),
-                'std_acceleration_ist': float(np.mean(accel_data[:, 3])),
-                # Vektorisierte Joint Aggregation
-                'min_states_joint_1': float(np.min(joint_data[:, 0])),
-                'min_states_joint_2': float(np.min(joint_data[:, 1])),
-                'min_states_joint_3': float(np.min(joint_data[:, 2])),
-                'min_states_joint_4': float(np.min(joint_data[:, 3])),
-                'min_states_joint_5': float(np.min(joint_data[:, 4])),
-                'min_states_joint_6': float(np.min(joint_data[:, 5])),
-                'max_states_joint_1': float(np.max(joint_data[:, 6])),
-                'max_states_joint_2': float(np.max(joint_data[:, 7])),
-                'max_states_joint_3': float(np.max(joint_data[:, 8])),
-                'max_states_joint_4': float(np.max(joint_data[:, 9])),
-                'max_states_joint_5': float(np.max(joint_data[:, 10])),
-                'max_states_joint_6': float(np.max(joint_data[:, 11]))
+                'min_twist_ist': float(min(all_twist)) if all_twist else 0.0,
+                'max_twist_ist': float(max(all_twist)) if all_twist else 0.0,
+                'mean_twist_ist': float(np.mean(all_twist)) if all_twist else 0.0,
+                'median_twist_ist': float(np.median(all_twist)) if all_twist else 0.0,
+                'std_twist_ist': float(np.std(all_twist)) if all_twist else 0.0,
+                'min_acceleration_ist': float(min(all_accel)) if all_accel else 0.0,
+                'max_acceleration_ist': float(max(all_accel)) if all_accel else 0.0,
+                'mean_acceleration_ist': float(np.mean(all_accel)) if all_accel else 0.0,
+                'median_acceleration_ist': float(np.median(all_accel)) if all_accel else 0.0,
+                'std_acceleration_ist': float(np.std(all_accel)) if all_accel else 0.0
             }
 
             metadata_rows.append(total_metadata)
@@ -500,30 +381,19 @@ class MetadataCalculatorService:
 
     async def batch_write_metadata(self, metadata_rows: List[Dict]):
         """
-        Schreibt alle Metadaten in EINEM Batch mit COPY
+        Schreibt Metadaten in NEUE Tabelle: bahn_metadata
         """
         if not metadata_rows:
             return
 
         async with self.db_pool.acquire() as conn:
-            # Konvertiere zu Tupeln für COPY
             columns = [
                 'bahn_id', 'segment_id', 'movement_type',
                 'duration', 'weight', 'length',
-                'direction_x', 'direction_y', 'direction_z',
-                'min_position_x_soll', 'min_position_y_soll', 'min_position_z_soll',
-                'max_position_x_soll', 'max_position_y_soll', 'max_position_z_soll',
-                'min_orientation_qw_soll', 'min_orientation_qx_soll',
-                'min_orientation_qy_soll', 'min_orientation_qz_soll',
-                'max_orientation_qw_soll', 'max_orientation_qx_soll',
-                'max_orientation_qy_soll', 'max_orientation_qz_soll',
-                'min_twist_ist', 'max_twist_ist', 'median_twist_ist', 'std_twist_ist',
-                'min_acceleration_ist', 'max_acceleration_ist',
-                'median_acceleration_ist', 'std_acceleration_ist',
-                'min_states_joint_1', 'min_states_joint_2', 'min_states_joint_3',
-                'min_states_joint_4', 'min_states_joint_5', 'min_states_joint_6',
-                'max_states_joint_1', 'max_states_joint_2', 'max_states_joint_3',
-                'max_states_joint_4', 'max_states_joint_5', 'max_states_joint_6'
+                'min_twist_ist', 'max_twist_ist', 'mean_twist_ist',
+                'median_twist_ist', 'std_twist_ist',
+                'min_acceleration_ist', 'max_acceleration_ist', 'mean_acceleration_ist',
+                'median_acceleration_ist', 'std_acceleration_ist'
             ]
 
             records = [
@@ -532,10 +402,10 @@ class MetadataCalculatorService:
             ]
 
             await conn.copy_records_to_table(
-                'bahn_meta',
+                'bahn_metadata',  # NEUE Tabelle!
                 records=records,
                 columns=columns,
                 schema_name='bewegungsdaten'
             )
 
-            logger.info(f"Successfully wrote {len(records)} metadata rows using COPY")
+            logger.info(f"Successfully wrote {len(records)} metadata rows to bahn_metadata")
