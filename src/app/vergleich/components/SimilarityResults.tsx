@@ -10,7 +10,25 @@ interface SimilarityResult {
   weight?: number;
   length?: number;
   movement_type?: string;
+  median_twist_ist?: number;
+  median_acceleration_ist?: number;
   sidtw_average_distance?: number;
+}
+
+interface TargetFeatures {
+  segment_id: string;
+  bahn_id: string;
+  duration?: number;
+  length?: number;
+  median_twist_ist?: number;
+  median_acceleration_ist?: number;
+  movement_type?: string;
+}
+
+interface SegmentGroup {
+  target_segment: string;
+  target_segment_features?: TargetFeatures;
+  results: SimilarityResult[];
 }
 
 interface SimilarityResultsProps {
@@ -18,7 +36,8 @@ interface SimilarityResultsProps {
   isLoading: boolean;
   error?: string;
   originalId?: string;
-  // Neue Props für progressives Loading
+  targetBahnFeatures?: TargetFeatures; // ✅ NEU
+  segmentGroups?: SegmentGroup[]; // ✅ NEU
   isSegmentTaskRunning?: boolean;
   segmentProgress?: string;
 }
@@ -28,6 +47,8 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
   isLoading,
   error,
   originalId,
+  targetBahnFeatures,
+  segmentGroups = [],
   isSegmentTaskRunning = false,
   segmentProgress = '',
 }) => {
@@ -61,7 +82,11 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
     );
   }
 
-  if (results.length === 0 && !isSegmentTaskRunning) {
+  if (
+    results.length === 0 &&
+    !isSegmentTaskRunning &&
+    segmentGroups.length === 0
+  ) {
     return (
       <div className="w-full rounded-lg bg-white p-6 shadow-md">
         <div className="py-8 text-center text-gray-500">
@@ -170,7 +195,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
                       <span className="font-bold text-blue-600">Original</span>
                     ) : (
                       <span className="font-mono">
-                        {result.similarity_score.toFixed(4)}
+                        {result.similarity_score?.toFixed(4) ?? 'N/A'}
                       </span>
                     )}
                   </td>
@@ -206,6 +231,20 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
     </div>
   );
 
+  // ✅ Helper: Konvertiere Target Features zu SimilarityResult Format
+  const featuresToResult = (features: TargetFeatures): SimilarityResult => ({
+    bahn_id: features.segment_id.includes('_')
+      ? features.bahn_id
+      : features.segment_id,
+    segment_id: features.segment_id,
+    similarity_score: 0, // Target hat keinen Score
+    duration: features.duration,
+    length: features.length,
+    movement_type: features.movement_type,
+    median_twist_ist: features.median_twist_ist,
+    median_acceleration_ist: features.median_acceleration_ist,
+  });
+
   return (
     <div className="w-full overflow-hidden rounded-lg border bg-white shadow-md">
       <div className="bg-gray-50 px-6 py-4">
@@ -214,10 +253,17 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
         </h3>
         <p className="mt-1 text-sm text-gray-600">
           {bahnResults.length > 0 && `${bahnResults.length} Bahnen`}
-          {bahnResults.length > 0 && segmentResults.length > 0 && ' • '}
-          {segmentResults.length > 0 && `${segmentResults.length} Segmente`}
+          {bahnResults.length > 0 &&
+            (segmentResults.length > 0 || segmentGroups.length > 0) &&
+            ' • '}
+          {(segmentResults.length > 0 || segmentGroups.length > 0) &&
+            `${segmentGroups.length || segmentResults.length} Segmente`}
         </p>
       </div>
+
+      {/* ✅ TARGET BAHN (falls Features vorhanden) */}
+      {targetBahnFeatures &&
+        renderTable([featuresToResult(targetBahnFeatures)], '🎯 Target Bahn')}
 
       {/* Bahn-Ergebnisse (sofort verfügbar) */}
       {bahnResults.length > 0 && renderTable(bahnResults, 'Ähnliche Bahnen')}
@@ -235,14 +281,35 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
         </div>
       )}
 
-      {/* Segment-Ergebnisse (kommen später) */}
+      {/* ✅ SEGMENT GROUPS (Target Segment + Ähnliche) */}
+      {segmentGroups.length > 0 &&
+        segmentGroups.map((group, idx) => (
+          <React.Fragment key={group.target_segment}>
+            {/* Target Segment */}
+            {group.target_segment_features &&
+              renderTable(
+                [featuresToResult(group.target_segment_features)],
+                `🎯 Target Segment ${idx + 1}: ${group.target_segment}`,
+              )}
+            {/* Ähnliche Segmente für dieses Target */}
+            {group.results.length > 0 &&
+              renderTable(
+                group.results,
+                `Ähnliche Segmente für ${group.target_segment}`,
+              )}
+          </React.Fragment>
+        ))}
+
+      {/* Segment-Ergebnisse (Fallback für alte Struktur) */}
       {segmentResults.length > 0 &&
+        segmentGroups.length === 0 &&
         renderTable(segmentResults, 'Ähnliche Segmente')}
 
       {/* Fallback wenn gar nichts da ist */}
       {!isSegmentTaskRunning &&
         bahnResults.length === 0 &&
-        segmentResults.length === 0 && (
+        segmentResults.length === 0 &&
+        segmentGroups.length === 0 && (
           <div className="py-8 text-center text-gray-500">
             <p>Keine Ergebnisse gefunden</p>
             <p className="mt-1 text-sm">Versuchen Sie eine andere ID</p>

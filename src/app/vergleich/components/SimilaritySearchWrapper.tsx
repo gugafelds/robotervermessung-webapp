@@ -2,13 +2,9 @@
 
 import React, { useState } from 'react';
 
-import type {
-  SimilarityResult,
-  SimilaritySearchParams,
-} from '@/src/actions/vergleich.service';
 import { SimilarityService } from '@/src/actions/vergleich.service';
-import { VergleichPlot } from '@/src/app/vergleich/components/VergleichPlot';
 import type { BahnInfo } from '@/types/bewegungsdaten.types';
+import type { SimilarityResult } from '@/types/similarity.types';
 
 import SimilarityResults from './SimilarityResults';
 import SimilaritySearch from './SimilaritySearch';
@@ -17,124 +13,93 @@ interface SimilaritySearchWrapperProps {
   bahnInfo?: BahnInfo[];
 }
 
+interface TargetFeatures {
+  segment_id: string;
+  bahn_id: string;
+  duration?: number;
+  length?: number;
+  median_twist_ist?: number;
+  median_acceleration_ist?: number;
+  movement_type?: string;
+}
+
+interface SegmentGroup {
+  target_segment: string;
+  target_segment_features?: TargetFeatures;
+  results: SimilarityResult[];
+}
+
 export default function SimilaritySearchWrapper({
   bahnInfo,
 }: SimilaritySearchWrapperProps) {
-  const [results, setResults] = useState<SimilarityResult[]>([]);
+  const [bahnResults, setBahnResults] = useState<SimilarityResult[]>([]);
+  const [targetBahnFeatures, setTargetBahnFeatures] = useState<
+    TargetFeatures | undefined
+  >();
+  const [segmentGroups, setSegmentGroups] = useState<SegmentGroup[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [originalId, setOriginalId] = useState('');
-  const [isSegmentTaskRunning, setIsSegmentTaskRunning] = useState(false);
-  const [segmentProgress, setSegmentProgress] = useState('');
-  const [hasSegmentResults, setHasSegmentResults] = useState(false);
 
   const handleSearch = async (
     id: string,
-    bahnLimit: number,
-    segmentLimit: number,
-    weights: Record<string, number>,
+    limit: number,
+    modes: string[],
+    weights: { joint: number; position: number; orientation: number },
   ) => {
     setIsLoading(true);
     setError('');
     setOriginalId(id);
-    setResults([]);
-    setHasSegmentResults(false); // Reset segment results state
+    setBahnResults([]);
+    setTargetBahnFeatures(undefined);
+    setSegmentGroups([]);
 
-    const params: SimilaritySearchParams = {
-      bahnLimit,
-      segmentLimit,
-      weights: {
-        duration: weights.duration,
-        weight: weights.weight,
-        length: weights.length,
-        movement_type: weights.movement_type,
-        direction_x: weights.direction_x,
-        direction_y: weights.direction_y,
-        direction_z: weights.direction_z,
-      },
-    };
+    console.log('🚀 Starting search for:', id);
 
     try {
-      await SimilarityService.searchSimilarity(id, params, {
-        onBahnenFound: (bahnResults) => {
-          setResults(bahnResults);
-          setIsLoading(false);
+      await SimilarityService.searchSimilarityEmbedding(
+        id,
+        { modes, weights, limit },
+        {
+          onBahnenFound: (results, targetFeatures) => {
+            console.log('✅ Bahnen received:', results);
+            console.log('✅ Target Bahn Features:', targetFeatures);
+            setBahnResults(results);
+            setTargetBahnFeatures(targetFeatures);
+            setIsLoading(false);
+          },
+          onSegmentsFound: (groups) => {
+            console.log('✅ Segment Groups received:', groups);
+            setSegmentGroups(groups);
+          },
+          onError: (errorMsg) => {
+            console.error('❌ Error:', errorMsg);
+            setError(`Fehler bei der Suche: ${errorMsg}`);
+            setIsLoading(false);
+          },
         },
-        onSegmentProgress: (progress) => {
-          setIsSegmentTaskRunning(true);
-          setSegmentProgress(progress);
-        },
-        onSegmentsFound: (segmentResults) => {
-          setResults((prev) => [...prev, ...segmentResults]);
-          setIsSegmentTaskRunning(false);
-          setSegmentProgress('');
-          setHasSegmentResults(true); // Segment-Ergebnisse sind da!
-        },
-        onError: (errorMsg) => {
-          setError(`Fehler bei der Suche: ${errorMsg}`);
-          setIsLoading(false);
-          setIsSegmentTaskRunning(false);
-        },
-      });
+      );
     } catch (err) {
+      console.error('❌ Catch Error:', err);
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(`Fehler bei der Suche: ${errorMessage}`);
       setIsLoading(false);
-      setIsSegmentTaskRunning(false);
     }
   };
 
-  // Separate Bahn- und Segment-Ergebnisse
-  const bahnResults = results.filter(
-    (result) => result.bahn_id && !result.segment_id?.includes('_'),
-  );
-  const segmentResults = results.filter((result) =>
-    result.segment_id?.includes('_'),
-  );
-
   return (
     <div className="flex h-fullscreen">
-      {/* Hauptinhalt - nimmt verfügbaren Platz */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <SimilaritySearch onSearch={handleSearch} bahnInfo={bahnInfo} />
         <SimilarityResults
-          results={results}
+          results={bahnResults}
           isLoading={isLoading}
           error={error}
           originalId={originalId}
-          isSegmentTaskRunning={isSegmentTaskRunning}
-          segmentProgress={segmentProgress}
+          targetBahnFeatures={targetBahnFeatures}
+          segmentGroups={segmentGroups}
         />
       </div>
-
-      {/* Plot-Bereich - fest verankert rechts */}
-      {bahnResults.length > 0 && (
-        <div className="h-fullscreen flex-col overflow-y-auto border-l bg-white">
-          {/* Bahnen-Plot - immer anzeigen wenn Bahn-Ergebnisse da sind */}
-          <div className="w-fit">
-            <VergleichPlot
-              mode="bahnen"
-              results={results}
-              isLoading={isLoading}
-              originalId={originalId}
-              className="h-fullscreen"
-            />
-          </div>
-
-          {/* Segmente-Plot - nur anzeigen wenn Segment-Ergebnisse komplett geliefert wurden */}
-          {hasSegmentResults && segmentResults.length > 0 && (
-            <div className="w-fit border-t">
-              <VergleichPlot
-                mode="segmente"
-                results={results}
-                isLoading={false} // Segmente sind bereits geladen
-                originalId={originalId}
-                className="h-fullscreen"
-              />
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

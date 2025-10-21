@@ -22,16 +22,6 @@ class SimilaritySearchRequest(BaseModel):
         None,
         description="Weights für RRF Fusion, z.B. {'joint': 0.5, 'position': 0.3, 'orientation': 0.2}"
     )
-    use_prefilter: bool = Field(
-        True,
-        description="Pre-Filter aktivieren (empfohlen für Performance)"
-    )
-    prefilter_tolerance: float = Field(
-        0.25,
-        ge=0.1,
-        le=1.0,
-        description="Pre-Filter Tolerance (±Prozent), z.B. 0.25 = ±25%"
-    )
     limit: int = Field(
         10,
         ge=1,
@@ -51,59 +41,6 @@ class SimilaritySearchResponse(BaseModel):
     error: Optional[str] = None
 
 
-@router.post("/similar", response_model=SimilaritySearchResponse)
-async def search_similar(
-        request: SimilaritySearchRequest,
-        conn=Depends(get_db)
-):
-    """
-    Multi-Modal Similarity Search mit Pre-Filter + RRF Fusion
-
-    **Flow:**
-    1. Pre-Filter basierend auf Features (duration, twist, accel)
-    2. Shape Search mit Embeddings (joint, position, orientation)
-    3. RRF Fusion mit user-definierten Gewichten
-
-    **Beispiel:**
-```json
-    {
-      "target_id": "1760613717",
-      "modes": ["joint", "position", "orientation"],
-      "weights": {
-        "joint": 0.5,
-        "position": 0.3,
-        "orientation": 0.2
-      },
-      "use_prefilter": true,
-      "prefilter_tolerance": 0.25,
-      "limit": 10
-    }
-```
-    """
-    try:
-        searcher = MultiModalSearcher(conn)
-
-        result = await searcher.search_similar(
-            target_id=request.target_id,
-            modes=request.modes,
-            weights=request.weights,
-            use_prefilter=request.use_prefilter,
-            prefilter_tolerance=request.prefilter_tolerance,
-            limit=request.limit
-        )
-
-        if result.get('error'):
-            raise HTTPException(status_code=404, detail=result['error'])
-
-        return result
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in similarity search: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/similar/{target_id}")
 async def search_similar_get(
         target_id: str,
@@ -111,10 +48,7 @@ async def search_similar_get(
         joint_weight: float = Query(0.0, ge=0.0, le=1.0),
         position_weight: float = Query(1.0, ge=0.0, le=1.0),
         orientation_weight: float = Query(0.0, ge=0.0, le=1.0),
-        use_prefilter: bool = Query(True),
-        prefilter_tolerance: float = Query(0.25, ge=0.1, le=1.0),
-        bahn_limit: int = Query(10, ge=1, le=100),
-        segment_limit: int = Query(10, ge=1, le=100),
+        limit: int = Query(10, ge=1, le=100),
         conn=Depends(get_db)
 ):
     """
@@ -144,15 +78,14 @@ async def search_similar_get(
             target_id=target_id,
             modes=mode_list,
             weights=weights,
-            use_prefilter=use_prefilter,
-            prefilter_tolerance=prefilter_tolerance,
-            bahn_limit=bahn_limit,
-            segment_limit=segment_limit
+            limit=limit
 
         )
 
         if result.get('error'):
             raise HTTPException(status_code=404, detail=result['error'])
+
+        #logger.info(f"{result}")
 
         return result
 
@@ -160,40 +93,4 @@ async def search_similar_get(
         raise
     except Exception as e:
         logger.error(f"Error in similarity search: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/similar/adaptive")
-async def search_similar_adaptive(
-        target_id: str,
-        modes: Optional[List[str]] = None,
-        weights: Optional[Dict[str, float]] = None,
-        limit: int = Query(10, ge=1, le=100),
-        conn=Depends(get_db)
-):
-    """
-    ADAPTIVE Similarity Search
-
-    Findet automatisch die beste Pre-Filter Strategie
-    """
-    try:
-        searcher = MultiModalSearcher(conn)
-
-        result = await searcher.search_adaptive(
-            target_id=target_id,
-            modes=modes,
-            weights=weights,
-            bahn_limit=limit,
-            segment_limit=limit
-        )
-
-        if result.get('error'):
-            raise HTTPException(status_code=404, detail=result['error'])
-
-        return result
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in adaptive search: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -3,7 +3,6 @@
 import asyncpg
 from typing import Dict, List, Optional
 import logging
-from .prefilter_searcher import PreFilterSearcher
 from .shape_searcher import ShapeSearcher
 from .rrf_ranker import RRFRanker
 
@@ -21,7 +20,6 @@ class MultiModalSearcher:
 
     def __init__(self, connection: asyncpg.Connection):
         self.connection = connection
-        self.prefilter = PreFilterSearcher(connection)
         self.shape = ShapeSearcher(connection)
         self.ranker = RRFRanker(k=60)
 
@@ -30,10 +28,7 @@ class MultiModalSearcher:
             target_id: str,
             modes: Optional[List[str]] = None,
             weights: Optional[Dict[str, float]] = None,
-            use_prefilter: bool = True,
-            prefilter_tolerance: float = 0.25,
-            bahn_limit: int = 10,
-            segment_limit: int = 5
+            limit: int = 10
     ) -> Dict:
         """
         HIERARCHICAL Similarity Search
@@ -58,9 +53,13 @@ class MultiModalSearcher:
                     'segment_similarity': []
                 }
 
+            # ✅ NEU: Hole Target Bahn Features
+            target_bahn_features = await self._get_features(target_bahn_id)
+
             result = {
                 'target_id': target_id,
                 'target_bahn_id': target_bahn_id,
+                'target_bahn_features': target_bahn_features,  # ✅ NEU!
                 'modes': modes,
                 'weights': weights,
                 'bahn_similarity': {},
@@ -69,22 +68,18 @@ class MultiModalSearcher:
             }
 
             # ===== PHASE 1: BAHN-LEVEL SEARCH =====
-            # Target: Die BAHN selbst (target_bahn_id mit segment_id = bahn_id)
             logger.info(f"[Phase 1] Bahn-Level Search: {target_bahn_id} vs other Bahnen")
 
             bahn_results = await self._search_bahnen(
-                target_bahn_id=target_bahn_id,  # ✅ BAHN als Target!
+                target_bahn_id=target_bahn_id,
                 modes=modes,
                 weights=weights,
-                use_prefilter=use_prefilter,
-                prefilter_tolerance=prefilter_tolerance,
-                limit=bahn_limit
+                limit=limit
             )
 
             result['bahn_similarity'] = bahn_results
 
             # ===== PHASE 2: SEGMENT-LEVEL SEARCH =====
-            # Für jedes SEGMENT der Target-Bahn
             logger.info(f"[Phase 2] Segment-Level Search for Bahn {target_bahn_id}")
 
             # Hole alle Segmente der Target-Bahn
@@ -103,17 +98,19 @@ class MultiModalSearcher:
             for target_segment_id in target_segments:
                 logger.info(f"  → Searching similar segments for {target_segment_id}")
 
+                # ✅ NEU: Hole Target Segment Features
+                target_segment_features = await self._get_features(target_segment_id)
+
                 segment_result = await self._search_segments(
-                    target_segment_id=target_segment_id,  # ✅ SEGMENT als Target!
+                    target_segment_id=target_segment_id,
                     modes=modes,
                     weights=weights,
-                    use_prefilter=use_prefilter,
-                    prefilter_tolerance=prefilter_tolerance,
-                    limit=segment_limit
+                    limit=limit
                 )
 
                 segment_results.append({
                     'target_segment': target_segment_id,
+                    'target_segment_features': target_segment_features,  # ✅ NEU!
                     'similar_segments': segment_result
                 })
 
@@ -136,7 +133,6 @@ class MultiModalSearcher:
                 'bahn_similarity': {},
                 'segment_similarity': []
             }
-
 
     async def _get_bahn_id(self, target_id: str) -> Optional[str]:
         """Ermittelt bahn_id für gegebene target_id"""
@@ -168,13 +164,44 @@ class MultiModalSearcher:
             logger.error(f"Error getting segments for bahn {bahn_id}: {e}")
             return []
 
+    async def _get_features(self, segment_id: str) -> Optional[Dict]:
+        """
+        ✅ NEU: Holt Features für eine beliebige segment_id (Bahn oder Segment)
+
+        Returns:
+            Dict mit allen Features oder None
+        """
+        try:
+            query = """
+                    SELECT segment_id,
+                           bahn_id,
+                           duration,
+                           length,
+                           median_twist_ist,
+                           median_acceleration_ist,
+                           mean_twist_ist,
+                           mean_acceleration_ist,
+                           movement_type
+                    FROM bewegungsdaten.bahn_metadata
+                    WHERE segment_id = $1 \
+                    """
+            result = await self.connection.fetchrow(query, segment_id)
+
+            if result:
+                return dict(result)
+
+            logger.warning(f"No features found for {segment_id}")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error getting features for {segment_id}: {e}")
+            return None
+
     async def _search_bahnen(
             self,
-            target_bahn_id: str,  # ✅ Die BAHN ID (wo segment_id = bahn_id!)
+            target_bahn_id: str,
             modes: List[str],
             weights: Dict[str, float],
-            use_prefilter: bool,
-            prefilter_tolerance: float,
             limit: int
     ) -> Dict:
         """
@@ -184,7 +211,7 @@ class MultiModalSearcher:
         Compare: Nur andere Bahnen (segment_id = bahn_id)
         """
         try:
-            # ✅ Check ob BAHN-Embedding existiert (segment_id = bahn_id)
+            # Check ob BAHN-Embedding existiert
             embedding_status = await self.shape.check_embeddings_exist(target_bahn_id)
             available_modes = [m for m in modes if embedding_status.get(m, False)]
 
@@ -194,32 +221,16 @@ class MultiModalSearcher:
                     'results': []
                 }
 
-            # Pre-Filter: Hole Kandidaten basierend auf Bahn-Features
-            candidate_ids = None
-            if use_prefilter:
-                all_candidates = await self.prefilter.get_filtered_candidates(
-                    target_id=target_bahn_id,  # ✅ Nutze BAHN features für Filter
-                    tolerance=prefilter_tolerance,
-                    exclude_target=True
-                )
-
-                # ✅ Filter: Nur Bahnen (segment_id = bahn_id)
-                if all_candidates:
-                    candidate_ids = await self._filter_bahnen_only(all_candidates)
-                    logger.info(f"Pre-filter Bahnen: {len(all_candidates)} → {len(candidate_ids)} bahnen")
-
-            # Shape Search: Target BAHN vs Kandidaten Bahnen
+            # Shape Search mit Filter: NUR Bahnen!
             rankings = {}
             for mode in available_modes:
                 mode_results = await self.shape.search_by_embedding(
-                    target_id=target_bahn_id,  # ✅ BAHN als Target!
+                    target_id=target_bahn_id,
                     mode=mode,
-                    limit=limit * 10,
-                    candidate_ids=candidate_ids
+                    limit=limit * 3,
+                    candidate_ids=None,
+                    only_bahnen=True
                 )
-
-                # ✅ WICHTIG: Immer nur Bahnen behalten!
-                mode_results = await self._filter_results_bahnen_only(mode_results)
 
                 rankings[mode] = mode_results
 
@@ -235,9 +246,7 @@ class MultiModalSearcher:
                 'results': enriched,
                 'metadata': {
                     'modes': available_modes,
-                    'weights': weights,
-                    'prefilter_enabled': use_prefilter,
-                    'candidates_filtered': len(candidate_ids) if candidate_ids else 0
+                    'weights': weights
                 }
             }
 
@@ -247,11 +256,9 @@ class MultiModalSearcher:
 
     async def _search_segments(
             self,
-            target_segment_id: str,  # ✅ Ein SEGMENT (segment_id != bahn_id)
+            target_segment_id: str,
             modes: List[str],
             weights: Dict[str, float],
-            use_prefilter: bool,
-            prefilter_tolerance: float,
             limit: int
     ) -> Dict:
         """
@@ -261,7 +268,7 @@ class MultiModalSearcher:
         Compare: Nur andere Segmente (segment_id != bahn_id)
         """
         try:
-            # ✅ Check ob SEGMENT-Embedding existiert
+            # Check ob SEGMENT-Embedding existiert
             embedding_status = await self.shape.check_embeddings_exist(target_segment_id)
             available_modes = [m for m in modes if embedding_status.get(m, False)]
 
@@ -271,32 +278,16 @@ class MultiModalSearcher:
                     'results': []
                 }
 
-            # Pre-Filter: Hole Kandidaten basierend auf Segment-Features
-            candidate_ids = None
-            if use_prefilter:
-                all_candidates = await self.prefilter.get_filtered_candidates(
-                    target_id=target_segment_id,  # ✅ Nutze SEGMENT features
-                    tolerance=prefilter_tolerance,
-                    exclude_target=True
-                )
-
-                # ✅ Filter: Nur Segmente (segment_id != bahn_id)
-                if all_candidates:
-                    candidate_ids = await self._filter_segments_only(all_candidates)
-                    logger.info(f"Pre-filter Segments: {len(all_candidates)} → {len(candidate_ids)} segments")
-
-            # Shape Search: Target SEGMENT vs Kandidaten Segmente
+            # Shape Search mit Filter: NUR Segmente!
             rankings = {}
             for mode in available_modes:
                 mode_results = await self.shape.search_by_embedding(
-                    target_id=target_segment_id,  # ✅ SEGMENT als Target!
+                    target_id=target_segment_id,
                     mode=mode,
-                    limit=limit * 10,
-                    candidate_ids=candidate_ids
+                    limit=limit * 3,
+                    candidate_ids=None,
+                    only_segments=True
                 )
-
-                # ✅ WICHTIG: Immer nur Segmente behalten!
-                mode_results = await self._filter_results_segments_only(mode_results)
 
                 rankings[mode] = mode_results
 
@@ -320,56 +311,6 @@ class MultiModalSearcher:
             logger.error(f"Error searching segments for {target_segment_id}: {e}")
             return {'error': str(e), 'results': []}
 
-    async def _filter_bahnen_only(self, segment_ids: List[str]) -> List[str]:
-        """Filtert Liste: Nur Bahnen (segment_id = bahn_id)"""
-        if not segment_ids:
-            return []
-
-        try:
-            query = """
-                    SELECT segment_id
-                    FROM bewegungsdaten.bahn_metadata
-                    WHERE segment_id = ANY ($1)
-                      AND segment_id = bahn_id \
-                    """
-            results = await self.connection.fetch(query, segment_ids)
-            return [row['segment_id'] for row in results]
-        except Exception as e:
-            logger.error(f"Error filtering bahnen: {e}")
-            return []
-
-    async def _filter_segments_only(self, segment_ids: List[str]) -> List[str]:
-        """Filtert Liste: Nur Segmente (segment_id != bahn_id)"""
-        if not segment_ids:
-            return []
-
-        try:
-            query = """
-                    SELECT segment_id
-                    FROM bewegungsdaten.bahn_metadata
-                    WHERE segment_id = ANY ($1)
-                      AND segment_id != bahn_id \
-                    """
-            results = await self.connection.fetch(query, segment_ids)
-            return [row['segment_id'] for row in results]
-        except Exception as e:
-            logger.error(f"Error filtering segments: {e}")
-            return []
-
-    async def _filter_results_bahnen_only(self, results: List[Dict]) -> List[Dict]:
-        """Filtert Results: Nur Bahnen behalten"""
-        segment_ids = [r['segment_id'] for r in results]
-        bahn_ids = await self._filter_bahnen_only(segment_ids)
-        bahn_set = set(bahn_ids)
-        return [r for r in results if r['segment_id'] in bahn_set]
-
-    async def _filter_results_segments_only(self, results: List[Dict]) -> List[Dict]:
-        """Filtert Results: Nur Segmente behalten"""
-        segment_ids = [r['segment_id'] for r in results]
-        seg_ids = await self._filter_segments_only(segment_ids)
-        seg_set = set(seg_ids)
-        return [r for r in results if r['segment_id'] in seg_set]
-
     async def _enrich_results(self, results: List[Dict]) -> List[Dict]:
         """Reichert Ergebnisse mit Features aus bahn_metadata an"""
         if not results:
@@ -379,12 +320,14 @@ class MultiModalSearcher:
 
         try:
             query = """
-                    SELECT segment_id, \
-                           bahn_id, \
-                           duration, \
-                           length, \
-                           median_twist_ist, \
-                           median_acceleration_ist, \
+                    SELECT segment_id,
+                           bahn_id,
+                           duration,
+                           length,
+                           median_twist_ist,
+                           median_acceleration_ist,
+                           mean_twist_ist,
+                           mean_acceleration_ist,
                            movement_type
                     FROM bewegungsdaten.bahn_metadata
                     WHERE segment_id = ANY ($1) \
@@ -406,40 +349,3 @@ class MultiModalSearcher:
         except Exception as e:
             logger.error(f"Error enriching results: {e}")
             return results
-
-    async def search_adaptive(
-            self,
-            target_id: str,
-            modes: Optional[List[str]] = None,
-            weights: Optional[Dict[str, float]] = None,
-            bahn_limit: int = 10,
-            segment_limit: int = 5
-    ) -> Dict:
-        """
-        ADAPTIVE Hierarchical Search
-        """
-        try:
-            candidate_ids, tolerance = await self.prefilter.adaptive_prefilter(
-                target_id=target_id,
-                max_candidates=10000,
-                min_candidates=10
-            )
-
-            return await self.search_similar(
-                target_id=target_id,
-                modes=modes,
-                weights=weights,
-                use_prefilter=True,
-                prefilter_tolerance=tolerance,
-                bahn_limit=bahn_limit,
-                segment_limit=segment_limit
-            )
-
-        except Exception as e:
-            logger.error(f"Error in adaptive search: {e}")
-            return {
-                'target_id': target_id,
-                'error': str(e),
-                'bahn_similarity': {},
-                'segment_similarity': []
-            }

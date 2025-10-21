@@ -1,4 +1,4 @@
-/* eslint-disable react/button-has-type */
+// components/SimilaritySearch.tsx
 
 'use client';
 
@@ -9,9 +9,9 @@ import type { BahnInfo } from '@/types/bewegungsdaten.types';
 type SimilaritySearchProps = {
   onSearch: (
     id: string,
-    bahnLimit: number,
-    segmentLimit: number,
-    weights: Record<string, number>,
+    limit: number,
+    modes: string[],
+    weights: { joint: number; position: number; orientation: number },
   ) => void;
   bahnInfo?: BahnInfo[] | undefined;
 };
@@ -21,26 +21,24 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
   bahnInfo,
 }) => {
   const [id, setId] = useState('');
-  const [bahnLimit, setBahnLimit] = useState(5);
+  const [limit, setLimit] = useState(10); // ✅ Ein Limit für Bahnen + Segmente
   const [showDropdown, setShowDropdown] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Gewichtungs-State
+  // ✅ NEU: Embedding Modi (welche Embeddings nutzen?)
+  const [activeModes, setActiveModes] = useState<Set<string>>(
+    new Set(['joint', 'position', 'orientation']),
+  );
+
+  // ✅ NEU: Embedding Gewichtungen (statt Feature-Gewichtungen)
   const [weights, setWeights] = useState({
-    duration: 1.0,
-    weight: 1.0,
-    length: 1.0,
-    movement_type: 1.0,
-    direction_x: 1.0,
-    direction_y: 1.0,
-    direction_z: 1.0,
+    joint: 0.33,
+    position: 0.33,
+    orientation: 0.34,
   });
 
-  // Segment Limit ist automatisch die Hälfte von Bahn Limit, aufgerundet
-  const segmentLimit = Math.ceil(bahnLimit / 2);
-
-  // Hole die letzten 5 Bahn-IDs (neueste zuerst)
+  // Hole die letzten Bahn-IDs
   const recentBahnIds = bahnInfo ? bahnInfo.map((bahn) => bahn.bahnID) : [];
 
   // Click outside handler
@@ -60,49 +58,48 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Preset-Konfigurationen
+  // ✅ NEU: Preset-Konfigurationen für Embeddings
   const presets = {
-    standard: {
-      duration: 1.0,
-      weight: 1.0,
-      length: 1.0,
-      movement_type: 1.0,
-      direction_x: 1.0,
-      direction_y: 1.0,
-      direction_z: 1.0,
+    balanced: {
+      joint: 0.33,
+      position: 0.33,
+      orientation: 0.34,
+      modes: ['joint', 'position', 'orientation'],
     },
-    geometrie: {
-      duration: 2.0,
-      weight: 1.0,
-      length: 10.0,
-      movement_type: 1.0,
-      direction_x: 5.0,
-      direction_y: 5.0,
-      direction_z: 5.0,
+    geometry: {
+      joint: 0.1,
+      position: 0.6,
+      orientation: 0.3,
+      modes: ['position', 'orientation'],
     },
-    bewegung: {
-      duration: 1.0,
-      weight: 1.0,
-      length: 3.0,
-      movement_type: 10.0,
-      direction_x: 5.0,
-      direction_y: 5.0,
-      direction_z: 5.0,
+    motion: {
+      joint: 0.7,
+      position: 0.2,
+      orientation: 0.1,
+      modes: ['joint', 'position'],
     },
-    zeit: {
-      duration: 10.0,
-      weight: 1.0,
-      length: 2.0,
-      movement_type: 1.0,
-      direction_x: 1.0,
-      direction_y: 1.0,
-      direction_z: 1.0,
+    shape: {
+      joint: 0.0,
+      position: 0.5,
+      orientation: 0.5,
+      modes: ['position', 'orientation'],
     },
   };
 
   const handleSearch = () => {
-    if (id.trim()) {
-      onSearch(id.trim(), bahnLimit, segmentLimit, weights);
+    if (id.trim() && activeModes.size > 0) {
+      // Normalisiere Gewichte basierend auf aktiven Modi
+      const activeWeights = { ...weights };
+      const inactiveModes = ['joint', 'position', 'orientation'].filter(
+        (m) => !activeModes.has(m),
+      );
+
+      // Setze inaktive Modi auf 0
+      inactiveModes.forEach((mode) => {
+        activeWeights[mode as keyof typeof weights] = 0;
+      });
+
+      onSearch(id.trim(), limit, Array.from(activeModes), activeWeights);
       setShowDropdown(false);
     }
   };
@@ -124,26 +121,45 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
   const handleBahnIdSelect = (selectedId: string) => {
     setId(selectedId);
     setShowDropdown(false);
-    // Optional: Sofort suchen nach Auswahl
-    // onSearch(selectedId, bahnLimit, segmentLimit, weights);
   };
 
-  const handleBahnLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value, 10);
-    if (value >= 1 && value <= 50) {
-      setBahnLimit(value);
+    if (value >= 1 && value <= 100) {
+      setLimit(value);
     }
   };
 
-  const handleWeightChange = (feature: string, value: number) => {
+  const handleWeightChange = (mode: string, value: number) => {
     setWeights((prev) => ({
       ...prev,
-      [feature]: value,
+      [mode]: value,
     }));
   };
 
+  const toggleMode = (mode: string) => {
+    setActiveModes((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(mode)) {
+        // Mindestens ein Modus muss aktiv bleiben
+        if (newSet.size > 1) {
+          newSet.delete(mode);
+        }
+      } else {
+        newSet.add(mode);
+      }
+      return newSet;
+    });
+  };
+
   const applyPreset = (presetName: keyof typeof presets) => {
-    setWeights(presets[presetName]);
+    const preset = presets[presetName];
+    setWeights({
+      joint: preset.joint,
+      position: preset.position,
+      orientation: preset.orientation,
+    });
+    setActiveModes(new Set(preset.modes));
   };
 
   return (
@@ -184,73 +200,98 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
           )}
         </div>
 
-        {/* Preset-Buttons */}
+        {/* ✅ NEU: Embedding Modi Auswahl */}
         <div className="space-y-2 rounded-lg bg-white p-3">
           <div className="mb-2 text-sm font-medium text-gray-700">
-            Gewichtungs-Presets:
+            Embedding Modi:
           </div>
           <div className="flex flex-wrap gap-2">
+            {['joint', 'position', 'orientation'].map((mode) => (
+              <button
+                key={mode}
+                onClick={() => toggleMode(mode)}
+                className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                  activeModes.has(mode)
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {mode.charAt(0).toUpperCase() + mode.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Preset-Buttons */}
+        <div className="space-y-2 rounded-lg bg-white p-3">
+          <div className="mb-2 text-sm font-medium text-gray-700">Presets:</div>
+          <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => applyPreset('standard')}
+              onClick={() => applyPreset('balanced')}
               className="rounded-full bg-gray-200 px-3 py-1 text-xs transition-colors hover:bg-gray-300"
             >
-              Standard
+              Balanced
             </button>
             <button
-              onClick={() => applyPreset('geometrie')}
+              onClick={() => applyPreset('geometry')}
               className="rounded-full bg-green-200 px-3 py-1 text-xs transition-colors hover:bg-green-300"
             >
-              Geometrie
+              Geometry
             </button>
             <button
-              onClick={() => applyPreset('bewegung')}
+              onClick={() => applyPreset('motion')}
               className="rounded-full bg-blue-200 px-3 py-1 text-xs transition-colors hover:bg-blue-300"
             >
-              Bewegung
+              Motion
             </button>
             <button
-              onClick={() => applyPreset('zeit')}
-              className="rounded-full bg-yellow-200 px-3 py-1 text-xs transition-colors hover:bg-yellow-300"
+              onClick={() => applyPreset('shape')}
+              className="rounded-full bg-purple-200 px-3 py-1 text-xs transition-colors hover:bg-purple-300"
             >
-              Zeit
+              Shape
             </button>
           </div>
         </div>
 
-        {/* Gewichtungs-Slider */}
+        {/* ✅ Embedding Gewichtungs-Slider */}
         <div className="space-y-3 rounded-lg bg-white p-3">
           <div className="text-sm font-medium text-gray-700">
-            Gewichtungen anpassen:
+            Embedding Gewichtungen:
           </div>
 
-          {/* Responsive Grid: 4 Spalten auf großen Bildschirmen, 2 auf mittleren, 1 auf kleinen */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {Object.entries(weights).map(([feature, value]) => {
-              const sliderId = `slider-${feature}`;
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {Object.entries(weights).map(([mode, value]) => {
+              const isActive = activeModes.has(mode);
+              const sliderId = `slider-${mode}`;
+
               return (
-                <div key={feature} className="space-y-1">
+                <div
+                  key={mode}
+                  className={`space-y-1 ${!isActive ? 'opacity-40' : ''}`}
+                >
                   <div className="flex items-center justify-between">
                     <label
                       htmlFor={sliderId}
                       className="text-xs capitalize text-gray-600"
                     >
-                      {feature.replace('_', ' ')}:
+                      {mode}:
                     </label>
                     <span className="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs">
-                      {value.toFixed(0)}
+                      {value.toFixed(2)}
                     </span>
                   </div>
                   <input
                     id={sliderId}
                     type="range"
                     min="0"
-                    max="10"
-                    step="1.0"
+                    max="1"
+                    step="0.01"
                     value={value}
                     onChange={(e) =>
-                      handleWeightChange(feature, parseFloat(e.target.value))
+                      handleWeightChange(mode, parseFloat(e.target.value))
                     }
-                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200"
+                    disabled={!isActive}
+                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 disabled:cursor-not-allowed"
                   />
                 </div>
               );
@@ -261,40 +302,34 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
         {/* Limit Einstellungen */}
         <div className="space-y-2 rounded-lg bg-white p-3">
           <div className="flex items-center justify-between">
-            {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
             <label
-              htmlFor="bahn-limit"
+              htmlFor="limit"
               className="text-sm font-medium text-gray-700"
             >
-              Anzahl ähnliche Bahnen:
+              Anzahl Ergebnisse (Bahnen + Segmente):
             </label>
             <input
-              id="bahn-limit"
+              id="limit"
               type="number"
               min="1"
-              max="50"
-              value={bahnLimit}
-              onChange={handleBahnLimitChange}
+              max="100"
+              value={limit}
+              onChange={handleLimitChange}
               className="w-16 rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <span>Segmente pro Target-Segment:</span>
-            <span className="rounded bg-gray-100 px-2 py-1 font-mono">
-              {segmentLimit}
-            </span>
-          </div>
         </div>
 
-        {/* Auto-Schwellwert Info */}
+        {/* Info */}
         <div className="text-xs text-gray-600">
-          Schwellwert wird automatisch optimiert
+          🎯 Embedding-basierte Ähnlichkeitssuche (RRF Fusion)
         </div>
 
         {/* Such-Button */}
         <button
           onClick={handleSearch}
-          className="w-full rounded-lg bg-blue-600 py-2 font-medium text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          disabled={activeModes.size === 0}
+          className="w-full rounded-lg bg-blue-600 py-2 font-medium text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           style={{ backgroundColor: '#003560' }}
         >
           Ähnliche finden

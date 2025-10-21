@@ -9,7 +9,6 @@ from ...utils.metadata_calculator import MetadataCalculatorService
 from ...utils.background_tasks import (
     process_segment_similarity_background,
     process_metadata_background,
-    process_meta_values_calculation,
     create_task_id,
     get_task_status,
     cleanup_old_tasks,
@@ -112,7 +111,11 @@ async def similarity_search(
             raise HTTPException(status_code=404, detail=results["error"])
 
         logger.info(f"Hierarchische Ähnlichkeitssuche für {target_id} erfolgreich")
+
+
         return results
+
+
 
     except HTTPException:
         raise
@@ -566,137 +569,4 @@ async def get_available_dates(db_pool=Depends(get_db_pool)):
 
     except Exception as e:
         logger.error(f"Error getting available dates: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-############################ METAVALUES BERECHNEN #################################################################
-
-@router.get("/meta-values-status")
-async def get_meta_values_status(conn=Depends(get_db)):
-    """Prüft Status der Meta-Values"""
-    try:
-        query = """
-                SELECT COUNT(*)          as total_rows, \
-                       COUNT(meta_value) as meta_values_count, \
-                       AVG(meta_value)   as avg_meta_value, \
-                       MIN(meta_value)   as min_meta_value, \
-                       MAX(meta_value)   as max_meta_value
-                FROM robotervermessung.bewegungsdaten.bahn_meta bm \
-                WHERE bm.duration IS NOT NULL
-                    AND bm.weight IS NOT NULL
-                    AND bm.length IS NOT NULL
-                """
-
-        result = await conn.fetchrow(query)
-
-        has_meta_values = result['meta_values_count'] > 0
-        completion_rate = (result['meta_values_count'] / result['total_rows'] * 100) if result['total_rows'] > 0 else 0
-
-        return {
-            "has_meta_values": has_meta_values,
-            "total_rows": int(result['total_rows']),
-            "meta_values_count": int(result['meta_values_count']),
-            "completion_rate": round(completion_rate, 1),
-            "avg_meta_value": float(result['avg_meta_value']) if result['avg_meta_value'] else None,
-            "min_meta_value": float(result['min_meta_value']) if result['min_meta_value'] else None,
-            "max_meta_value": float(result['max_meta_value']) if result['max_meta_value'] else None
-        }
-
-    except Exception as e:
-        logger.error(f"Error checking meta values status: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/available-parameters")
-def get_available_parameters():
-    """Gibt verfügbare Parameter zurück"""
-    return {
-        'basic': ['duration', 'weight', 'length', 'movement_type'],
-        'direction': ['direction_x', 'direction_y', 'direction_z'],
-        'position_soll': [
-            'min_position_x_soll', 'min_position_y_soll', 'min_position_z_soll',
-            'max_position_x_soll', 'max_position_y_soll', 'max_position_z_soll'
-        ],
-        'orientation_soll': [
-            'min_orientation_qw_soll', 'min_orientation_qx_soll', 'min_orientation_qy_soll', 'min_orientation_qz_soll',
-            'max_orientation_qw_soll', 'max_orientation_qx_soll', 'max_orientation_qy_soll', 'max_orientation_qz_soll'
-        ],
-        'twist_ist': ['min_twist_ist', 'max_twist_ist', 'median_twist_ist', 'std_twist_ist'],
-        'acceleration_ist': ['min_acceleration_ist', 'max_acceleration_ist', 'median_acceleration_ist',
-                             'std_acceleration_ist'],
-        'joints': [
-            'min_states_joint_1', 'min_states_joint_2', 'min_states_joint_3',
-            'min_states_joint_4', 'min_states_joint_5', 'min_states_joint_6',
-            'max_states_joint_1', 'max_states_joint_2', 'max_states_joint_3',
-            'max_states_joint_4', 'max_states_joint_5', 'max_states_joint_6'
-        ]
-    }
-
-@router.post("/calculate-meta-values")
-async def calculate_meta_values(
-        background_tasks: BackgroundTasks,
-        db_pool=Depends(get_db_pool)
-):
-    """
-    Startet Meta-Values Berechnung als Background Task
-    Mit Duplikat-Prüfung
-    """
-    try:
-        # Cleanup alte Tasks
-        cleanup_old_tasks()
-
-        # DUPLIKAT-PRÜFUNG für Meta-Values (global)
-        existing_task = find_running_task("meta_values")
-        if existing_task:
-            logger.info(f"Meta-Values Task läuft bereits: {existing_task}")
-            return {
-                "task_id": existing_task,
-                "status": "already_running",
-                "message": "Meta-Values Berechnung läuft bereits"
-            }
-
-        # Task-ID generieren
-        task_id = create_task_id("meta_values")
-
-        # Geschätzte Anzahl Rows ermitteln
-        async with db_pool.acquire() as conn:
-            count_query = """
-                          SELECT COUNT(*) as total_rows
-                          FROM robotervermessung.bewegungsdaten.bahn_meta bm
-                          WHERE bm.duration IS NOT NULL 
-                            AND bm.weight IS NOT NULL
-                            AND bm.length IS NOT NULL
-                          """
-            total_rows = await conn.fetchval(count_query)
-
-        if total_rows == 0:
-            return {
-                "status": "completed",
-                "message": "Keine gültigen Daten in bahn_meta gefunden",
-                "task_id": "",
-                "processed_rows": 0
-            }
-
-        # Geschätzte Dauer
-        estimated_seconds = total_rows * 0.001
-        estimated_minutes = estimated_seconds / 60
-
-        # Background Task starten
-        background_tasks.add_task(
-            process_meta_values_calculation,
-            task_id=task_id,
-            db_pool=db_pool
-        )
-
-        logger.info(f"Started meta-values background task {task_id} for {total_rows} rows")
-
-        return {
-            "status": "started",
-            "message": f"Meta-Values Berechnung gestartet für {total_rows} Datensätze",
-            "task_id": task_id,
-            "estimated_duration_minutes": round(estimated_minutes, 2),
-            "total_rows": total_rows
-        }
-
-    except Exception as e:
-        logger.error(f"Error starting meta-values calculation: {e}")
         raise HTTPException(status_code=500, detail=str(e))

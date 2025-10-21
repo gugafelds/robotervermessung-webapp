@@ -152,207 +152,6 @@ async def process_segment_similarity_background(
         task_data["current_segment"] = None
         task_data["errors"].append(error_msg)
 
-
-async def process_meta_values_calculation(task_id: str, db_pool):
-    """
-    Background Task für Meta-Values Berechnung - OPTIMIERT
-    Mit Optimierungen #2, #3, #4
-    """
-    # Task Status initialisieren
-    task_store[task_id] = {
-        "status": TaskStatus.RUNNING,
-        "started_at": datetime.now().isoformat(),
-        "message": "Starting optimized Meta-Values calculation...",
-        "total_rows": 0,
-        "processed_rows": 0
-    }
-
-    try:
-        async with db_pool.acquire() as conn:
-            logger.info("Starting optimized Meta-Values calculation...")
-
-            # Standard-Parameter und Gewichtungen
-            selected_parameters = {
-                'duration', 'weight', 'length', 'movement_type',
-                'direction_x', 'direction_y', 'direction_z'
-            }
-            weights = {
-                'duration': 1.0, 'weight': 1.0, 'length': 1.0, 'movement_type': 1.0,
-                'direction_x': 1.0, 'direction_y': 1.0, 'direction_z': 1.0
-            }
-
-            # Nur numerische Spalten
-            numeric_columns = [
-                'duration', 'weight', 'length',
-                'direction_x', 'direction_y', 'direction_z'
-            ]
-
-            # Query - hole auch movement_type für Optimierung #3
-            columns_str = ', '.join(['bm.' + col for col in numeric_columns])
-            query = f"""
-                SELECT bm.bahn_id,
-                       bm.segment_id,
-                       bm.movement_type,
-                       {columns_str}
-                FROM robotervermessung.bewegungsdaten.bahn_meta bm
-                WHERE bm.duration IS NOT NULL 
-                  AND bm.weight IS NOT NULL
-                  AND bm.length IS NOT NULL
-            """
-
-            task_store[task_id]["message"] = "Loading data from database..."
-
-            rows = await conn.fetch(query)
-            if not rows:
-                task_store[task_id].update({
-                    "status": TaskStatus.FAILED,
-                    "failed_at": datetime.now().isoformat(),
-                    "error": "Keine gültigen Daten in bahn_metadata gefunden"
-                })
-                return
-
-            total_rows = len(rows)
-            task_store[task_id].update({
-                "total_rows": total_rows,
-                "message": f"Processing {total_rows} rows..."
-            })
-
-            logger.info(f"Gefunden: {len(rows)} Datensätze mit vollständigen Daten")
-
-            # OPTIMIERUNG 2: Direkte NumPy Array Erstellung (vektorisiert!)
-            import numpy as np
-            from sklearn.preprocessing import StandardScaler
-
-            task_store[task_id]["message"] = "Creating data matrix and calculating meta-values..."
-
-            # Extrahiere Daten direkt als NumPy Array
-            data_matrix = np.array(
-                [[row[col] for col in numeric_columns] for row in rows],
-                dtype=np.float64
-            )
-
-            # In-place NaN handling (schneller als if-checks)
-            np.nan_to_num(data_matrix, copy=False, nan=0.0)
-
-            logger.info(f"Data matrix created: shape={data_matrix.shape}")
-
-            # Batch Normalisierung
-            scaler = StandardScaler()
-            scaled_data = scaler.fit_transform(data_matrix)
-
-            # Vectorized Meta-Value Berechnung
-            weight_vector = np.array([weights.get(col, 1.0) for col in numeric_columns])
-            abs_scaled = np.abs(scaled_data)
-            weighted_sums = abs_scaled @ weight_vector
-
-            # OPTIMIERUNG 3: Movement Type vektorisiert!
-            if 'movement_type' in selected_parameters:
-                movement_weight = weights.get('movement_type', 1.0)
-
-                # Extrahiere alle movement_types auf einmal
-                movement_types = np.array([str(row.get('movement_type', '')) for row in rows])
-
-                # Vektorisierte Berechnungen (5-10x schneller!)
-                lengths = np.char.str_len(movement_types).astype(np.float64) / 10.0
-                has_c = (np.char.find(np.char.lower(movement_types), 'c') >= 0).astype(np.float64)
-                has_s = (np.char.find(np.char.lower(movement_types), 's') >= 0).astype(np.float64)
-
-                movement_scores = lengths + (has_c * 0.5) + (has_s * 0.3)
-
-                weighted_sums += movement_scores * movement_weight
-                total_weight = weight_vector.sum() + movement_weight
-            else:
-                total_weight = weight_vector.sum()
-
-            meta_values = weighted_sums / total_weight if total_weight > 0 else weighted_sums
-
-            logger.info(f"Meta-Value Statistiken: Min={meta_values.min():.6f}, "
-                        f"Max={meta_values.max():.6f}, Avg={meta_values.mean():.6f}")
-
-            # OPTIMIERUNG 4: Batch Updates mit temp table (3-5x schneller!)
-            task_store[task_id]["message"] = "Updating database with calculated meta-values..."
-
-            BATCH_SIZE = 50000  # Optimale Batch-Größe
-            total_updated = 0
-
-            for batch_start in range(0, len(rows), BATCH_SIZE):
-                batch_end = min(batch_start + BATCH_SIZE, len(rows))
-                batch_rows = rows[batch_start:batch_end]
-                batch_values = meta_values[batch_start:batch_end]
-
-                async with conn.transaction():
-                    # Erstelle temporäre Tabelle
-                    await conn.execute("""
-                                       CREATE
-                                       TEMP TABLE IF NOT EXISTS temp_meta_updates (
-                            bahn_id TEXT,
-                            segment_id TEXT,
-                            meta_value DOUBLE PRECISION
-                        ) ON COMMIT DROP
-                                       """)
-
-                    # Bereite Daten vor (runde in Python, nicht SQL!)
-                    temp_values = [
-                        (str(row['bahn_id']),
-                         str(row['segment_id']),
-                         round(float(batch_values[i]), 4))
-                        for i, row in enumerate(batch_rows)
-                    ]
-
-                    # Bulk Insert in temp table (super schnell mit COPY!)
-                    await conn.copy_records_to_table(
-                        'temp_meta_updates',
-                        records=temp_values,
-                        columns=['bahn_id', 'segment_id', 'meta_value']
-                    )
-
-                    # Single UPDATE mit JOIN (viel schneller als executemany!)
-                    await conn.execute("""
-                                       UPDATE robotervermessung.bewegungsdaten.bahn_meta bm
-                                       SET meta_value = tmp.meta_value FROM temp_meta_updates tmp
-                                       WHERE bm.bahn_id = tmp.bahn_id
-                                         AND bm.segment_id = tmp.segment_id
-                                       """)
-
-                total_updated += len(batch_rows)
-
-                # Update Progress (nur alle 5000 Rows)
-                task_store[task_id]["processed_rows"] = total_updated
-
-                if total_updated % 10000 == 0:  # Log nur alle 10k
-                    logger.info(
-                        f"Updated {total_updated}/{total_rows} rows ({(total_updated / total_rows) * 100:.1f}%)")
-
-            logger.info(f"Meta-Value Berechnung abgeschlossen: {total_updated} Datensätze aktualisiert")
-
-            # Task als completed markieren
-            task_store[task_id].update({
-                "status": TaskStatus.COMPLETED,
-                "completed_at": datetime.now().isoformat(),
-                "message": f"Meta-Values erfolgreich berechnet für {total_updated} Datensätze",
-                "summary": {
-                    "processed_rows": total_updated,
-                    "parameters_used": list(selected_parameters),
-                    "stats": {
-                        "min_meta_value": float(meta_values.min()),
-                        "max_meta_value": float(meta_values.max()),
-                        "avg_meta_value": float(meta_values.mean())
-                    }
-                }
-            })
-
-    except Exception as e:
-        logger.error(f"Meta-values task {task_id} failed: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        task_store[task_id].update({
-            "status": TaskStatus.FAILED,
-            "failed_at": datetime.now().isoformat(),
-            "error": str(e),
-            "message": f"Meta-values calculation failed: {str(e)}"
-        })
-
-
 async def process_metadata_background(
         task_id: str,
         service,  # MetadataCalculatorService instance
@@ -362,7 +161,7 @@ async def process_metadata_background(
 ):
     """
     Background Task für die Metadaten-Verarbeitung
-    NEU: In-Memory Processing mit Batch-Write am Ende
+    ✅ AKTUALISIERT: Verarbeitet Metadata UND Embeddings gleichzeitig
     """
 
     # Task Status initialisieren
@@ -381,95 +180,122 @@ async def process_metadata_background(
         }
     }
 
-    try:
-        logger.info(f"Starting background task {task_id} for {len(bahn_ids)} bahns")
+    # ✅ NEU: Hole Connection aus Pool für die gesamte Task
+    async with service.db_pool.acquire() as conn:
+        try:
+            logger.info(f"Starting background task {task_id} for {len(bahn_ids)} bahns (Metadata + Embeddings)")
 
-        # Duplikat-Behandlung
-        if duplicate_handling == "replace":
-            existing_bahns = await service.check_existing_bahns(bahn_ids)
-            if existing_bahns:
-                deleted_count = await service.delete_existing_metadata(existing_bahns)
-                logger.info(f"Deleted {deleted_count} existing metadata rows")
-                task_store[task_id]["details"]["deleted_existing"] = deleted_count
-
-        elif duplicate_handling == "skip":
-            existing_bahns = await service.check_existing_bahns(bahn_ids)
-            bahn_ids = [bid for bid in bahn_ids if bid not in existing_bahns]
-            task_store[task_id]["details"]["skipped_existing"] = len(existing_bahns)
-            task_store[task_id]["total_bahns"] = len(bahn_ids)
-            logger.info(f"Skipping {len(existing_bahns)} existing bahns, processing {len(bahn_ids)} new ones")
-
-        # NEU: In-Memory Processing mit Batch-Write
-        successful_results = []
-        failed_results = []
-        all_metadata_rows = []  # Sammle alle Metadaten hier
-
-        # Verarbeite alle Bahnen sequentiell (schnell, da nur in-memory)
-        for bahn_id in bahn_ids:
-            task_store[task_id]["current_bahn"] = bahn_id
-
-            try:
-                # Hole und verarbeite Bahn (gibt Liste von Metadaten zurück)
-                bahn_metadata = await service.process_single_bahn_in_memory(bahn_id)
-
-                if bahn_metadata.get('error'):
-                    failed_results.append(bahn_metadata)
-                    task_store[task_id]["failed_bahns"] += 1
-                    task_store[task_id]["errors"].append(f"{bahn_id}: {bahn_metadata['error']}")
-                else:
-                    # Sammle Metadaten (Liste von Dicts)
-                    all_metadata_rows.extend(bahn_metadata['metadata'])
-                    successful_results.append(bahn_metadata)
-                    task_store[task_id]["successful_bahns"] += 1
-
-                task_store[task_id]["processed_bahns"] += 1
-
-                # Progress logging
-                if task_store[task_id]["processed_bahns"] % 100 == 0:
-                    progress = (task_store[task_id]["processed_bahns"] / task_store[task_id]["total_bahns"]) * 100
+            # Duplikat-Behandlung
+            if duplicate_handling == "replace":
+                existing_bahns = await service.check_existing_bahns(bahn_ids)
+                if existing_bahns:
+                    # ✅ Lösche SOWOHL Metadata ALS AUCH Embeddings
+                    deleted_metadata = await service.delete_existing_metadata(existing_bahns)
+                    deleted_embeddings = await service.delete_existing_embeddings(existing_bahns)
                     logger.info(
-                        f"Task {task_id} progress: {progress:.1f}% ({task_store[task_id]['processed_bahns']}/{task_store[task_id]['total_bahns']})")
+                        f"Deleted {deleted_metadata} metadata rows and {deleted_embeddings} embedding rows"
+                    )
+                    task_store[task_id]["details"]["deleted_metadata"] = deleted_metadata
+                    task_store[task_id]["details"]["deleted_embeddings"] = deleted_embeddings
 
-            except Exception as e:
-                logger.error(f"Exception processing bahn_id {bahn_id}: {e}")
-                failed_results.append({
-                    "bahn_id": bahn_id,
-                    "error": str(e)
-                })
-                task_store[task_id]["failed_bahns"] += 1
-                task_store[task_id]["errors"].append(f"{bahn_id}: {str(e)}")
-                task_store[task_id]["processed_bahns"] += 1
+            elif duplicate_handling == "skip":
+                existing_bahns = await service.check_existing_bahns(bahn_ids)
+                bahn_ids = [bid for bid in bahn_ids if bid not in existing_bahns]
+                task_store[task_id]["details"]["skipped_existing"] = len(existing_bahns)
+                task_store[task_id]["total_bahns"] = len(bahn_ids)
+                logger.info(
+                    f"Skipping {len(existing_bahns)} existing bahns, processing {len(bahn_ids)} new ones"
+                )
 
-        # Batch-Write: Schreibe ALLE Metadaten auf einmal
-        if all_metadata_rows:
-            logger.info(f"Writing {len(all_metadata_rows)} metadata rows in batch...")
-            await service.batch_write_metadata(all_metadata_rows)
-            logger.info(f"Batch write completed successfully!")
+            # In-Memory Processing mit Batch-Write für BEIDES
+            successful_results = []
+            failed_results = []
+            all_metadata_rows = []
+            all_embedding_rows = []
 
-        # Task abschließen
-        task_store[task_id].update({
-            "status": TaskStatus.COMPLETED,
-            "completed_at": datetime.now().isoformat(),
-            "current_bahn": None,
-            "summary": {
-                "total_processed": len(bahn_ids),
-                "successful": len(successful_results),
-                "failed": len(failed_results),
-                "total_metadata_rows": len(all_metadata_rows)
-            }
-        })
+            # Verarbeite alle Bahnen sequentiell
+            for bahn_id in bahn_ids:
+                task_store[task_id]["current_bahn"] = bahn_id
 
-        logger.info(
-            f"Task {task_id} completed successfully. {len(successful_results)}/{len(bahn_ids)} bahns processed successfully")
+                try:
+                    # ✅ Hole und verarbeite Bahn (gibt Metadata UND Embeddings zurück)
+                    # ✅ NEU: Übergebe Connection explizit
+                    result = await service.process_single_bahn(conn, bahn_id)
 
-    except Exception as e:
-        logger.error(f"Task {task_id} failed with exception: {e}")
-        task_store[task_id].update({
-            "status": TaskStatus.FAILED,
-            "failed_at": datetime.now().isoformat(),
-            "error": str(e),
-            "current_bahn": None
-        })
+                    if result.get('error'):
+                        failed_results.append(result)
+                        task_store[task_id]["failed_bahns"] += 1
+                        task_store[task_id]["errors"].append(f"{bahn_id}: {result['error']}")
+                    else:
+                        # Sammle Metadaten UND Embeddings
+                        all_metadata_rows.extend(result['metadata'])
+                        all_embedding_rows.extend(result['embeddings'])
+                        successful_results.append(result)
+                        task_store[task_id]["successful_bahns"] += 1
+
+                    task_store[task_id]["processed_bahns"] += 1
+
+                    # Progress logging
+                    if task_store[task_id]["processed_bahns"] % 100 == 0:
+                        progress = (task_store[task_id]["processed_bahns"] / task_store[task_id]["total_bahns"]) * 100
+                        logger.info(
+                            f"Task {task_id} progress: {progress:.1f}% "
+                            f"({task_store[task_id]['processed_bahns']}/{task_store[task_id]['total_bahns']}) "
+                            f"- Metadata: {len(all_metadata_rows)}, Embeddings: {len(all_embedding_rows)}"
+                        )
+
+                except Exception as e:
+                    logger.error(f"Exception processing bahn_id {bahn_id}: {e}")
+                    failed_results.append({
+                        "bahn_id": bahn_id,
+                        "error": str(e)
+                    })
+                    task_store[task_id]["failed_bahns"] += 1
+                    task_store[task_id]["errors"].append(f"{bahn_id}: {str(e)}")
+                    task_store[task_id]["processed_bahns"] += 1
+
+            # ✅ Batch-Write: Schreibe ALLE Metadaten UND Embeddings auf einmal
+            # ✅ NEU: Übergebe Connection explizit
+            if all_metadata_rows or all_embedding_rows:
+                logger.info(
+                    f"Writing {len(all_metadata_rows)} metadata rows and "
+                    f"{len(all_embedding_rows)} embedding rows in batch..."
+                )
+                await service.batch_write_everything(
+                    conn,
+                    all_metadata_rows,
+                    all_embedding_rows
+                )
+                logger.info(f"Batch write completed successfully!")
+
+            # Task abschließen
+            task_store[task_id].update({
+                "status": TaskStatus.COMPLETED,
+                "completed_at": datetime.now().isoformat(),
+                "current_bahn": None,
+                "summary": {
+                    "total_processed": len(bahn_ids),
+                    "successful": len(successful_results),
+                    "failed": len(failed_results),
+                    "total_metadata_rows": len(all_metadata_rows),
+                    "total_embedding_rows": len(all_embedding_rows)
+                }
+            })
+
+            logger.info(
+                f"Task {task_id} completed successfully. "
+                f"{len(successful_results)}/{len(bahn_ids)} bahns processed. "
+                f"Metadata: {len(all_metadata_rows)}, Embeddings: {len(all_embedding_rows)}"
+            )
+
+        except Exception as e:
+            logger.error(f"Task {task_id} failed with exception: {e}")
+            task_store[task_id].update({
+                "status": TaskStatus.FAILED,
+                "failed_at": datetime.now().isoformat(),
+                "error": str(e),
+                "current_bahn": None
+            })
 
 def create_task_id(type) -> str:
     """Generiert eine eindeutige Task-ID"""

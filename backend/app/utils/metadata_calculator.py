@@ -1,12 +1,17 @@
 # backend/app/utils/metadata_calculator.py
 
-import asyncio
 import asyncpg
 import numpy as np
 from datetime import datetime
 from typing import List, Dict, Optional
 import logging
 import re
+import sys
+from pathlib import Path
+
+# Import EmbeddingCalculator
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from ..utils.embedding_calculator import EmbeddingCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +20,13 @@ class MetadataCalculatorService:
     def __init__(self, db_pool: asyncpg.Pool):
         self.db_pool = db_pool
         self.downsample_factor = 3  # Jeder 3. Punkt
+
+        # ✅ NEU: EmbeddingCalculator initialisieren
+        self.embedding_calculator = EmbeddingCalculator(
+            joint_samples=50,
+            position_samples=50,
+            orientation_samples=30
+        )
 
     async def validate_datetime_input(self, date_string: str) -> Optional[int]:
         """
@@ -105,6 +117,20 @@ class MetadataCalculatorService:
             result = await conn.execute(query, bahn_ids)
             return int(result.split()[-1]) if result.startswith("DELETE") else 0
 
+    async def delete_existing_embeddings(self, bahn_ids: List[str]) -> int:
+        """Löscht vorhandene Embeddings für gegebene bahn_ids"""
+        if not bahn_ids:
+            return 0
+
+        async with self.db_pool.acquire() as conn:
+            query = """
+                    DELETE \
+                    FROM robotervermessung.bewegungsdaten.bahn_embeddings
+                    WHERE bahn_id = ANY ($1::text[]) \
+                    """
+            result = await conn.execute(query, bahn_ids)
+            return int(result.split()[-1]) if result.startswith("DELETE") else 0
+
     def detect_movement_type(self, x_data, y_data, z_data) -> str:
         """Erkennt Movement-Type - VEKTORISIERT"""
         try:
@@ -138,43 +164,10 @@ class MetadataCalculatorService:
             logger.warning(f"Fehler bei Movement-Type-Erkennung: {e}")
             return "linear"
 
-    async def process_single_bahn_in_memory(self, bahn_id: str) -> Dict:
-        """
-        Verarbeitet eine einzelne Bahn komplett in-memory
-        Gibt Liste von Metadaten zurück (keine DB-Writes hier!)
-        """
-        result = {
-            'bahn_id': bahn_id,
-            'metadata': [],  # Liste aller Metadaten-Rows
-            'segments_processed': 0,
-            'error': None
-        }
-
-        async with self.db_pool.acquire() as conn:
-            try:
-                # 1. Hole ALLE Daten für diese Bahn in EINEM Durchgang
-                bahn_data = await self._fetch_all_bahn_data(conn, bahn_id)
-
-                if not bahn_data:
-                    result['error'] = 'Keine Daten gefunden'
-                    return result
-
-                # 2. Verarbeite alles IN MEMORY (keine DB mehr!)
-                metadata_rows = self._calculate_all_metadata_in_memory(bahn_id, bahn_data)
-
-                result['metadata'] = metadata_rows
-                result['segments_processed'] = len(metadata_rows) - 1  # -1 für Gesamtbahn-Zeile
-
-            except Exception as e:
-                logger.error(f"Fehler bei Verarbeitung bahn_id {bahn_id}: {e}")
-                result['error'] = str(e)
-
-        return result
-
     async def _fetch_all_bahn_data(self, conn: asyncpg.Connection, bahn_id: str) -> Dict:
         """
         Holt ALLE benötigten Daten für eine Bahn
-        NUR: Bahn Info, Position (für movement_type), Twist, Accel
+        Inkl. Joint States und Orientation für Embeddings!
         """
         # Bahn Info
         bahn_info_query = """
@@ -187,7 +180,7 @@ class MetadataCalculatorService:
         if not bahn_info:
             return None
 
-        # Segmente mit Position (für movement_type + length + duration)
+        # Segmente mit Position (für movement_type + length + duration + position embedding)
         segments_query = """
                          SELECT segment_id,
                                 array_agg(x_soll ORDER BY timestamp) as x_data,
@@ -202,7 +195,46 @@ class MetadataCalculatorService:
                          """
         segments = await conn.fetch(segments_query, bahn_id)
 
-        # Twist Stats mit Downsampling (jeder 3. Punkt)
+        # ✅ NEU: Joint States für Embeddings
+        joint_query = f"""
+            WITH numbered AS (
+                SELECT segment_id,
+                       joint_1, joint_2, joint_3, joint_4, joint_5, joint_6,
+                       ROW_NUMBER() OVER (PARTITION BY segment_id ORDER BY timestamp) as rn
+                FROM robotervermessung.bewegungsdaten.bahn_joint_states
+                WHERE bahn_id = $1
+            )
+            SELECT segment_id,
+                   array_agg(joint_1 ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as j1,
+                   array_agg(joint_2 ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as j2,
+                   array_agg(joint_3 ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as j3,
+                   array_agg(joint_4 ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as j4,
+                   array_agg(joint_5 ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as j5,
+                   array_agg(joint_6 ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as j6
+            FROM numbered
+            GROUP BY segment_id
+        """
+        joints = await conn.fetch(joint_query, bahn_id)
+
+        # ✅ NEU: Orientation für Embeddings
+        orientation_query = f"""
+            WITH numbered AS (
+                SELECT segment_id, qw_soll, qx_soll, qy_soll, qz_soll,
+                       ROW_NUMBER() OVER (PARTITION BY segment_id ORDER BY timestamp) as rn
+                FROM robotervermessung.bewegungsdaten.bahn_orientation_soll
+                WHERE bahn_id = $1
+            )
+            SELECT segment_id,
+                   array_agg(qw_soll ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as qw,
+                   array_agg(qx_soll ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as qx,
+                   array_agg(qy_soll ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as qy,
+                   array_agg(qz_soll ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as qz
+            FROM numbered
+            GROUP BY segment_id
+        """
+        orientations = await conn.fetch(orientation_query, bahn_id)
+
+        # Twist Stats mit Downsampling
         twist_query = f"""
             WITH numbered AS (
                 SELECT segment_id,
@@ -218,7 +250,7 @@ class MetadataCalculatorService:
         """
         twists = await conn.fetch(twist_query, bahn_id)
 
-        # Acceleration Stats mit Downsampling (jeder 3. Punkt)
+        # Acceleration Stats mit Downsampling
         accel_query = f"""
             WITH numbered AS (
                 SELECT segment_id,
@@ -237,6 +269,8 @@ class MetadataCalculatorService:
         return {
             'bahn_info': bahn_info,
             'segments': segments,
+            'joints': {row['segment_id']: row for row in joints},  # ✅ NEU
+            'orientations': {row['segment_id']: row for row in orientations},  # ✅ NEU
             'twists': {row['segment_id']: row['twist_values'] for row in twists},
             'accels': {row['segment_id']: row['accel_values'] for row in accels}
         }
@@ -297,7 +331,7 @@ class MetadataCalculatorService:
             length = float(np.linalg.norm(delta))
             total_length += length
 
-            # Twist Stats (von downsampled Daten)
+            # Twist Stats
             twist_values = bahn_data['twists'].get(segment_id, [])
             if twist_values and len(twist_values) > 0:
                 twist_arr = np.array(twist_values, dtype=np.float32)
@@ -309,7 +343,7 @@ class MetadataCalculatorService:
             else:
                 min_twist = max_twist = mean_twist = median_twist = std_twist = 0.0
 
-            # Acceleration Stats (von downsampled Daten)
+            # Acceleration Stats
             accel_values = bahn_data['accels'].get(segment_id, [])
             if accel_values and len(accel_values) > 0:
                 accel_arr = np.array(accel_values, dtype=np.float32)
@@ -321,7 +355,7 @@ class MetadataCalculatorService:
             else:
                 min_accel = max_accel = mean_accel = median_accel = std_accel = 0.0
 
-            # Segment Metadata Row (14 Spalten!)
+            # Segment Metadata Row
             metadata_rows.append({
                 'bahn_id': bahn_id,
                 'segment_id': segment_id,
@@ -346,15 +380,17 @@ class MetadataCalculatorService:
             total_movement_string = ''.join([mt[0].lower() for mt in segment_movement_types])
 
             # Aggregiere Twist/Accel über alle Segmente
-            all_twist = [row['min_twist_ist'] for row in metadata_rows]
-            all_twist += [row['max_twist_ist'] for row in metadata_rows]
-            all_twist += [row['mean_twist_ist'] for row in metadata_rows]
-            all_twist += [row['median_twist_ist'] for row in metadata_rows]
-
-            all_accel = [row['min_acceleration_ist'] for row in metadata_rows]
-            all_accel += [row['max_acceleration_ist'] for row in metadata_rows]
-            all_accel += [row['mean_acceleration_ist'] for row in metadata_rows]
-            all_accel += [row['median_acceleration_ist'] for row in metadata_rows]
+            all_twist = []
+            all_accel = []
+            for row in metadata_rows:
+                all_twist.extend([
+                    row['min_twist_ist'], row['max_twist_ist'],
+                    row['mean_twist_ist'], row['median_twist_ist']
+                ])
+                all_accel.extend([
+                    row['min_acceleration_ist'], row['max_acceleration_ist'],
+                    row['mean_acceleration_ist'], row['median_acceleration_ist']
+                ])
 
             total_metadata = {
                 'bahn_id': bahn_id,
@@ -379,33 +415,306 @@ class MetadataCalculatorService:
 
         return metadata_rows
 
-    async def batch_write_metadata(self, metadata_rows: List[Dict]):
+    def _calculate_all_embeddings_in_memory(self, bahn_id: str, bahn_data: Dict) -> List[Dict]:
         """
-        Schreibt Metadaten in NEUE Tabelle: bahn_metadata
+        ✅ NEU: Berechnet Embeddings für alle Segmente UND die Gesamtbahn
+
+        Returns:
+            List[Dict] mit segment_id, bahn_id, joint_embedding, position_embedding, orientation_embedding
+        """
+        embedding_rows = []
+
+        # 1. Segmente (segment_id != bahn_id)
+        for segment in bahn_data['segments']:
+            segment_id = segment['segment_id']
+
+            # Joint Embedding
+            joint_emb = None
+            joint_data_raw = bahn_data['joints'].get(segment_id)
+            if joint_data_raw and joint_data_raw['j1']:
+                joint_data = [
+                    {
+                        'joint_1': joint_data_raw['j1'][i],
+                        'joint_2': joint_data_raw['j2'][i],
+                        'joint_3': joint_data_raw['j3'][i],
+                        'joint_4': joint_data_raw['j4'][i],
+                        'joint_5': joint_data_raw['j5'][i],
+                        'joint_6': joint_data_raw['j6'][i]
+                    }
+                    for i in range(len(joint_data_raw['j1']))
+                ]
+                joint_emb = self.embedding_calculator.compute_joint_embedding(joint_data)
+
+            # Position Embedding
+            pos_emb = None
+            if segment['x_data'] and len(segment['x_data']) > 0:
+                pos_data = [
+                    {
+                        'x_soll': segment['x_data'][i],
+                        'y_soll': segment['y_data'][i],
+                        'z_soll': segment['z_data'][i]
+                    }
+                    for i in range(len(segment['x_data']))
+                ]
+                pos_emb = self.embedding_calculator.compute_position_embedding(pos_data)
+
+            # Orientation Embedding
+            ori_emb = None
+            ori_data_raw = bahn_data['orientations'].get(segment_id)
+            if ori_data_raw and ori_data_raw['qw']:
+                ori_data = [
+                    {
+                        'qw_soll': ori_data_raw['qw'][i],
+                        'qx_soll': ori_data_raw['qx'][i],
+                        'qy_soll': ori_data_raw['qy'][i],
+                        'qz_soll': ori_data_raw['qz'][i]
+                    }
+                    for i in range(len(ori_data_raw['qw']))
+                ]
+                ori_emb = self.embedding_calculator.compute_orientation_embedding(ori_data)
+
+            # Skip wenn keine Embeddings berechnet wurden
+            if joint_emb is None and pos_emb is None and ori_emb is None:
+                continue
+
+            embedding_rows.append({
+                'segment_id': segment_id,
+                'bahn_id': bahn_id,
+                'joint_embedding': self._array_to_str(joint_emb) if joint_emb is not None else None,
+                'position_embedding': self._array_to_str(pos_emb) if pos_emb is not None else None,
+                'orientation_embedding': self._array_to_str(ori_emb) if ori_emb is not None else None,
+                'joint_sample_count': self.embedding_calculator.joint_samples,
+                'position_sample_count': self.embedding_calculator.position_samples,
+                'orientation_sample_count': self.embedding_calculator.orientation_samples
+            })
+
+        # 2. Gesamtbahn (segment_id = bahn_id)
+        # Für Bahn: Kombiniere ALLE Daten über alle Segmente
+        all_joint_data = []
+        all_pos_data = []
+        all_ori_data = []
+
+        for segment in bahn_data['segments']:
+            segment_id = segment['segment_id']
+
+            # Joint
+            joint_raw = bahn_data['joints'].get(segment_id)
+            if joint_raw and joint_raw['j1']:
+                for i in range(len(joint_raw['j1'])):
+                    all_joint_data.append({
+                        'joint_1': joint_raw['j1'][i],
+                        'joint_2': joint_raw['j2'][i],
+                        'joint_3': joint_raw['j3'][i],
+                        'joint_4': joint_raw['j4'][i],
+                        'joint_5': joint_raw['j5'][i],
+                        'joint_6': joint_raw['j6'][i]
+                    })
+
+            # Position
+            if segment['x_data']:
+                for i in range(len(segment['x_data'])):
+                    all_pos_data.append({
+                        'x_soll': segment['x_data'][i],
+                        'y_soll': segment['y_data'][i],
+                        'z_soll': segment['z_data'][i]
+                    })
+
+            # Orientation
+            ori_raw = bahn_data['orientations'].get(segment_id)
+            if ori_raw and ori_raw['qw']:
+                for i in range(len(ori_raw['qw'])):
+                    all_ori_data.append({
+                        'qw_soll': ori_raw['qw'][i],
+                        'qx_soll': ori_raw['qx'][i],
+                        'qy_soll': ori_raw['qy'][i],
+                        'qz_soll': ori_raw['qz'][i]
+                    })
+
+        # Berechne Bahn-Level Embeddings
+        bahn_joint_emb = self.embedding_calculator.compute_joint_embedding(all_joint_data) if all_joint_data else None
+        bahn_pos_emb = self.embedding_calculator.compute_position_embedding(all_pos_data) if all_pos_data else None
+        bahn_ori_emb = self.embedding_calculator.compute_orientation_embedding(all_ori_data) if all_ori_data else None
+
+        if bahn_joint_emb is not None or bahn_pos_emb is not None or bahn_ori_emb is not None:
+            embedding_rows.append({
+                'segment_id': bahn_id,  # ✅ Bahn-Level: segment_id = bahn_id
+                'bahn_id': bahn_id,
+                'joint_embedding': self._array_to_str(bahn_joint_emb) if bahn_joint_emb is not None else None,
+                'position_embedding': self._array_to_str(bahn_pos_emb) if bahn_pos_emb is not None else None,
+                'orientation_embedding': self._array_to_str(bahn_ori_emb) if bahn_ori_emb is not None else None,
+                'joint_sample_count': self.embedding_calculator.joint_samples,
+                'position_sample_count': self.embedding_calculator.position_samples,
+                'orientation_sample_count': self.embedding_calculator.orientation_samples
+            })
+
+        return embedding_rows
+
+    @staticmethod
+    def _array_to_str(arr: np.ndarray) -> str:
+        """Convert numpy array to PostgreSQL vector string"""
+        return '[' + ','.join(str(x) for x in arr.tolist()) + ']'
+
+    async def process_single_bahn(
+            self,
+            conn: asyncpg.Connection,
+            bahn_id: str
+    ) -> Dict:
+        """
+        ✅ NEU: Wie process_single_bahn_in_memory, aber mit expliziter Connection
+        Für Background Tasks
+        """
+        result = {
+            'bahn_id': bahn_id,
+            'metadata': [],
+            'embeddings': [],
+            'segments_processed': 0,
+            'error': None
+        }
+
+        try:
+            # 1. Hole ALLE Daten für diese Bahn
+            bahn_data = await self._fetch_all_bahn_data(conn, bahn_id)
+
+            if not bahn_data:
+                result['error'] = 'Keine Daten gefunden'
+                return result
+
+            # 2. Verarbeite Metadaten IN MEMORY
+            metadata_rows = self._calculate_all_metadata_in_memory(bahn_id, bahn_data)
+            result['metadata'] = metadata_rows
+
+            # 3. Berechne Embeddings IN MEMORY
+            embedding_rows = self._calculate_all_embeddings_in_memory(bahn_id, bahn_data)
+            result['embeddings'] = embedding_rows
+
+            result['segments_processed'] = len(metadata_rows) - 1
+
+            #logger.info(
+            #    f"Bahn {bahn_id}: {len(metadata_rows)} metadata rows, "
+            #    f"{len(embedding_rows)} embedding rows"
+            #)
+
+        except Exception as e:
+            logger.error(f"Fehler bei Verarbeitung bahn_id {bahn_id}: {e}")
+            result['error'] = str(e)
+
+        return result
+
+    async def batch_write_metadata(
+            self,
+            conn: asyncpg.Connection,
+            metadata_rows: List[Dict]
+    ):
+        """
+        ✅ NEU: Schreibt Metadaten mit expliziter Connection
         """
         if not metadata_rows:
             return
 
-        async with self.db_pool.acquire() as conn:
-            columns = [
-                'bahn_id', 'segment_id', 'movement_type',
-                'duration', 'weight', 'length',
-                'min_twist_ist', 'max_twist_ist', 'mean_twist_ist',
-                'median_twist_ist', 'std_twist_ist',
-                'min_acceleration_ist', 'max_acceleration_ist', 'mean_acceleration_ist',
-                'median_acceleration_ist', 'std_acceleration_ist'
-            ]
+        columns = [
+            'bahn_id', 'segment_id', 'movement_type',
+            'duration', 'weight', 'length',
+            'min_twist_ist', 'max_twist_ist', 'mean_twist_ist',
+            'median_twist_ist', 'std_twist_ist',
+            'min_acceleration_ist', 'max_acceleration_ist', 'mean_acceleration_ist',
+            'median_acceleration_ist', 'std_acceleration_ist'
+        ]
 
-            records = [
-                tuple(row[col] for col in columns)
-                for row in metadata_rows
-            ]
+        records = [
+            tuple(row[col] for col in columns)
+            for row in metadata_rows
+        ]
 
-            await conn.copy_records_to_table(
-                'bahn_metadata',  # NEUE Tabelle!
-                records=records,
-                columns=columns,
-                schema_name='bewegungsdaten'
+        await conn.copy_records_to_table(
+            'bahn_metadata',
+            records=records,
+            columns=columns,
+            schema_name='bewegungsdaten'
+        )
+
+        logger.info(f"✓ Wrote {len(records)} metadata rows to bahn_metadata")
+
+    async def batch_write_embeddings(
+            self,
+            conn: asyncpg.Connection,
+            embedding_rows: List[Dict]
+    ):
+        """
+        ✅ NEU: Schreibt Embeddings mit expliziter Connection
+        """
+        if not embedding_rows:
+            return
+
+        # Temp table
+        await conn.execute("""
+                           CREATE
+                           TEMP TABLE temp_embeddings (
+                segment_id TEXT,
+                bahn_id TEXT,
+                joint_embedding TEXT,
+                position_embedding TEXT,
+                orientation_embedding TEXT,
+                joint_sample_count INTEGER,
+                position_sample_count INTEGER,
+                orientation_sample_count INTEGER
             )
+                           """)
 
-            logger.info(f"Successfully wrote {len(records)} metadata rows to bahn_metadata")
+        # COPY
+        records = [
+            (
+                row['segment_id'],
+                row['bahn_id'],
+                row['joint_embedding'],
+                row['position_embedding'],
+                row['orientation_embedding'],
+                row['joint_sample_count'],
+                row['position_sample_count'],
+                row['orientation_sample_count']
+            )
+            for row in embedding_rows
+        ]
+
+        await conn.copy_records_to_table(
+            'temp_embeddings',
+            records=records,
+            columns=[
+                'segment_id', 'bahn_id', 'joint_embedding', 'position_embedding',
+                'orientation_embedding', 'joint_sample_count', 'position_sample_count',
+                'orientation_sample_count'
+            ]
+        )
+
+        # INSERT with conflict handling
+        await conn.execute("""
+                           INSERT INTO bewegungsdaten.bahn_embeddings
+                           (segment_id, bahn_id, joint_embedding, position_embedding, orientation_embedding,
+                            joint_sample_count, position_sample_count, orientation_sample_count)
+                           SELECT segment_id,
+                                  bahn_id,
+                                  joint_embedding::vector, position_embedding::vector, orientation_embedding::vector, joint_sample_count,
+                                  position_sample_count,
+                                  orientation_sample_count
+                           FROM temp_embeddings ON CONFLICT (segment_id) DO
+                           UPDATE SET
+                               joint_embedding = EXCLUDED.joint_embedding,
+                               position_embedding = EXCLUDED.position_embedding,
+                               orientation_embedding = EXCLUDED.orientation_embedding,
+                               joint_sample_count = EXCLUDED.joint_sample_count,
+                               position_sample_count = EXCLUDED.position_sample_count,
+                               orientation_sample_count = EXCLUDED.orientation_sample_count
+                           """)
+
+        logger.info(f"✓ Wrote {len(records)} embedding rows to bahn_embeddings")
+
+    async def batch_write_everything(
+            self,
+            conn: asyncpg.Connection,
+            metadata_rows: List[Dict],
+            embedding_rows: List[Dict]
+    ):
+        """
+        ✅ NEU: Schreibt SOWOHL Metadaten ALS AUCH Embeddings mit expliziter Connection
+        """
+        await self.batch_write_metadata(conn, metadata_rows)
+        await self.batch_write_embeddings(conn, embedding_rows)

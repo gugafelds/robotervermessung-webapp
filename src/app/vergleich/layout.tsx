@@ -2,7 +2,6 @@ import React from 'react';
 
 import { getBahnInfo } from '@/src/actions/bewegungsdaten.service';
 import { MetadataUpload } from '@/src/app/vergleich/components/MetaDataUpload';
-import { MetaValuesCalculator } from '@/src/app/vergleich/components/MetaValueCalculator';
 import { TrajectoryProvider } from '@/src/providers/trajectory.provider';
 
 interface VergleichLayoutProps {
@@ -31,7 +30,6 @@ export default async function VergleichLayout({
               Tools & Konfiguration
             </h2>
             <div className="space-y-2">
-              <MetaValuesCalculator />
               <MetadataUpload />
             </div>
           </div>
