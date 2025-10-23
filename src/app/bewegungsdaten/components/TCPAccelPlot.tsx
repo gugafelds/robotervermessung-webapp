@@ -107,7 +107,7 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
         mode: 'lines',
         visible: true,
         x: timestampsIst,
-        y: currentBahnAccelIst.map((bahn) => Math.abs(bahn.tcpAccelIst)), // Convert to mm/s²
+        y: currentBahnAccelIst.map((bahn) => bahn.tcpAccelIst), // Convert to mm/s²
         line: {
           color: 'green',
           width: 3,
@@ -124,7 +124,7 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
         mode: 'lines',
         visible: true,
         x: timestampsSoll,
-        y: currentBahnAccelSoll.map((bahn) => Math.abs(bahn.tcpAccelSoll)), // Convert to mm/s²
+        y: currentBahnAccelSoll.map((bahn) => bahn.tcpAccelSoll), // Convert to mm/s²
         line: {
           color: 'lightgreen',
           width: 3,
