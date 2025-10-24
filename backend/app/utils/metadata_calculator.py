@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class MetadataCalculatorService:
     def __init__(self, db_pool: asyncpg.Pool):
         self.db_pool = db_pool
-        self.downsample_factor = 3  # Jeder 3. Punkt
+        self.downsample_factor = 3
 
         # ✅ NEU: EmbeddingCalculator initialisieren
         self.embedding_calculator = EmbeddingCalculator(
@@ -291,6 +291,7 @@ class MetadataCalculatorService:
                 min_ts = int(float(start_time))
                 max_ts = int(float(end_time))
                 total_duration = max((max_ts - min_ts) / 1_000_000_000.0, 0.0)
+                
             except:
                 pass
 
@@ -360,19 +361,19 @@ class MetadataCalculatorService:
                 'bahn_id': bahn_id,
                 'segment_id': segment_id,
                 'movement_type': movement_type,
-                'duration': segment_duration,
-                'weight': weight,
-                'length': length,
-                'min_twist_ist': min_twist,
-                'max_twist_ist': max_twist,
-                'mean_twist_ist': mean_twist,
-                'median_twist_ist': median_twist,
-                'std_twist_ist': std_twist,
-                'min_acceleration_ist': min_accel,
-                'max_acceleration_ist': max_accel,
-                'mean_acceleration_ist': mean_accel,
-                'median_acceleration_ist': median_accel,
-                'std_acceleration_ist': std_accel
+                'duration': round(segment_duration, 3),
+                'weight': round(weight, 3),
+                'length': round(length, 3),
+                'min_twist_ist': round(min_twist, 3),
+                'max_twist_ist': round(max_twist, 3),
+                'mean_twist_ist': round(mean_twist, 3),
+                'median_twist_ist': round(median_twist, 3),
+                'std_twist_ist': round(std_twist, 3),
+                'min_acceleration_ist': round(min_accel, 3),
+                'max_acceleration_ist': round(max_accel, 3),
+                'mean_acceleration_ist': round(mean_accel, 3),
+                'median_acceleration_ist': round(median_accel, 3),
+                'std_acceleration_ist': round(std_accel, 3)
             })
 
         # Gesamtbahn-Zeile (Aggregation über alle Segmente)

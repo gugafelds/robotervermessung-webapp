@@ -15,7 +15,43 @@ class PreFilterSearcher:
 
     def __init__(self, connection: asyncpg.Connection):
         self.connection = connection
-        self.default_tolerance = 0.25  # ±25% Range
+        self.default_tolerance = 25  # ±25% Range
+
+    def calculate_movement_type_similarity(self, target_type: str, candidate_type: str) -> float:
+        """
+        Berechnet Ähnlichkeit zwischen zwei movement_type Strings
+        
+        Priorisiert:
+        1. Gleiche Länge (wichtiger)
+        2. Character-Übereinstimmung (weniger wichtig)
+        
+        Returns:
+            Score zwischen 0.0 (keine Ähnlichkeit) und 1.0 (identisch)
+        """
+        if not target_type or not candidate_type:
+            return 0.0
+        
+        if target_type == candidate_type:
+            return 1.0
+        
+        # Length difference penalty
+        len_target = len(target_type)
+        len_candidate = len(candidate_type)
+        len_diff = abs(len_target - len_candidate)
+        
+        # Length similarity (0.0 bis 1.0)
+        max_len = max(len_target, len_candidate)
+        length_similarity = 1.0 - (len_diff / max_len) if max_len > 0 else 0.0
+        
+        # Character overlap (Jaccard-ähnlich)
+        min_len = min(len_target, len_candidate)
+        matches = sum(1 for i in range(min_len) if target_type[i] == candidate_type[i])
+        char_similarity = matches / max_len if max_len > 0 else 0.0
+        
+        # Gewichtung: 60% Länge, 40% Characters
+        total_score = (0.6 * length_similarity) + (0.4 * char_similarity)
+        
+        return total_score
 
     async def get_target_features(self, target_id: str) -> Optional[Dict]:
         """
@@ -31,6 +67,7 @@ class PreFilterSearcher:
                            bahn_id, \
                            duration, \
                            length, \
+                           movement_type, \
                            min_twist_ist, \
                            max_twist_ist, \
                            mean_twist_ist, \
@@ -56,6 +93,7 @@ class PreFilterSearcher:
                 'bahn_id': result['bahn_id'],
                 'duration': float(result['duration']) if result['duration'] else None,
                 'length': float(result['length']) if result['length'] else None,
+                'movement_type': (result['movement_type']) if result['movement_type'] else None,
                 # Twist (5 Spalten)
                 'min_twist_ist': float(result['min_twist_ist']) if result['min_twist_ist'] else None,
                 'max_twist_ist': float(result['max_twist_ist']) if result['max_twist_ist'] else None,
@@ -149,7 +187,8 @@ class PreFilterSearcher:
             features_to_use: Optional[List[str]] = None,
             exclude_target: bool = True,
             same_bahn_only: bool = False,
-            limit: Optional[int] = None
+            limit: Optional[int] = None,
+            movement_type_threshold: float = 0.7
     ) -> List[str]:
         """
         Hauptfunktion: Pre-Filter basierend auf Target Features
@@ -162,6 +201,7 @@ class PreFilterSearcher:
             exclude_target: Target aus Ergebnissen ausschließen
             same_bahn_only: Nur Segmente der gleichen Bahn (für Segment-Search)
             limit: Max Anzahl Kandidaten (None = unbegrenzt)
+            movement_type_threshold: Mindest-Ähnlichkeit für movement_type String-Match
 
         Returns:
             List von segment_ids die den Filter passieren
@@ -174,14 +214,21 @@ class PreFilterSearcher:
                 logger.error(f"Cannot get features for target {target_id}")
                 return []
 
-            # 2. Berechne Ranges
-            ranges = self.calculate_ranges(target_features, tolerance, custom_ranges, features_to_use)
+            target_movement_type = target_features.get('movement_type')
+            
+            # Check ob movement_type überhaupt gefiltert werden soll
+            use_movement_type_filter = features_to_use and 'movement_type' in features_to_use
 
-            if not ranges:
-                logger.warning(f"No valid ranges calculated for {target_id}")
-                return []
+            # 2. Berechne Ranges (nur für numerische Features)
+            # Filtere movement_type aus features_to_use bevor calculate_ranges aufgerufen wird
+            if features_to_use:
+                numeric_features = [f for f in features_to_use if f != 'movement_type']
+            else:
+                numeric_features = None
+            
+            ranges = self.calculate_ranges(target_features, tolerance, custom_ranges, numeric_features)
 
-            # 3. Baue WHERE Clause
+            # 3. Baue WHERE Clause (nur numerische Features)
             where_clauses = []
             params = []
             param_idx = 1
@@ -204,23 +251,45 @@ class PreFilterSearcher:
                 params.append(target_bahn_id)
                 param_idx += 1
 
-            where_clause = " AND ".join(where_clauses)
+            where_clause = " AND ".join(where_clauses) if where_clauses else "TRUE"
 
-            # 4. Query
-            limit_clause = f"LIMIT {limit}" if limit else ""
-
+            # 4. Query - hole auch movement_type zurück wenn nötig
             query = f"""
-                SELECT segment_id
+                SELECT segment_id{', movement_type' if use_movement_type_filter else ''}
                 FROM bewegungsdaten.bahn_metadata
                 WHERE {where_clause}
-                ORDER BY duration  -- Schnelles Sortieren für LIMIT
-                {limit_clause}
+                ORDER BY duration
             """
 
-            logger.info(f"Pre-filter query for {target_id}: {len(where_clauses)} conditions, {len(ranges)} features")
+            logger.info(f"Pre-filter query for {target_id}: {len(where_clauses)} conditions, {len(ranges)} numeric features")
 
             results = await self.connection.fetch(query, *params)
-            candidate_ids = [row['segment_id'] for row in results]
+
+            # 5. Movement Type Filtering (falls aktiviert)
+            candidate_ids = []
+            
+            if use_movement_type_filter:
+                for row in results:
+                    candidate_movement_type = row['movement_type']
+                    
+                    if target_movement_type and candidate_movement_type:
+                        similarity = self.calculate_movement_type_similarity(
+                            target_movement_type, 
+                            candidate_movement_type
+                        )
+                        
+                        if similarity >= movement_type_threshold:
+                            candidate_ids.append(row['segment_id'])
+                    elif not target_movement_type:
+                        # Kein movement_type beim Target -> alle nehmen
+                        candidate_ids.append(row['segment_id'])
+            else:
+                # Kein movement_type filtering
+                candidate_ids = [row['segment_id'] for row in results]
+            
+            # 6. Apply Limit nach movement_type filtering
+            if limit and len(candidate_ids) > limit:
+                candidate_ids = candidate_ids[:limit]
 
             logger.info(f"Pre-filter found {len(candidate_ids)} candidates for {target_id}")
 
@@ -347,3 +416,4 @@ class PreFilterSearcher:
         except Exception as e:
             logger.error(f"Error in adaptive prefilter: {e}")
             return [], 0.25
+        

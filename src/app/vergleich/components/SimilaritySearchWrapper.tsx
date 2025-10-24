@@ -54,33 +54,26 @@ export default function SimilaritySearchWrapper({
     setTargetBahnFeatures(undefined);
     setSegmentGroups([]);
 
-    console.log('🚀 Starting search for:', id);
-
     try {
       await SimilarityService.searchSimilarityEmbedding(
         id,
         { modes, weights, limit },
         {
           onBahnenFound: (results, targetFeatures) => {
-            console.log('✅ Bahnen received:', results);
-            console.log('✅ Target Bahn Features:', targetFeatures);
             setBahnResults(results);
             setTargetBahnFeatures(targetFeatures);
             setIsLoading(false);
           },
           onSegmentsFound: (groups) => {
-            console.log('✅ Segment Groups received:', groups);
             setSegmentGroups(groups);
           },
           onError: (errorMsg) => {
-            console.error('❌ Error:', errorMsg);
             setError(`Fehler bei der Suche: ${errorMsg}`);
             setIsLoading(false);
           },
         },
       );
     } catch (err) {
-      console.error('❌ Catch Error:', err);
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(`Fehler bei der Suche: ${errorMessage}`);
       setIsLoading(false);
@@ -89,7 +82,7 @@ export default function SimilaritySearchWrapper({
 
   return (
     <div className="flex h-fullscreen">
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="flex flex-col w-full space-y-4 overflow-y-auto p-4">
         <SimilaritySearch onSearch={handleSearch} bahnInfo={bahnInfo} />
         <SimilarityResults
           results={bahnResults}

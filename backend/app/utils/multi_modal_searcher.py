@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 import logging
 from .shape_searcher import ShapeSearcher
 from .rrf_ranker import RRFRanker
+from .prefilter_searcher import PreFilterSearcher
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class MultiModalSearcher:
     def __init__(self, connection: asyncpg.Connection):
         self.connection = connection
         self.shape = ShapeSearcher(connection)
+        self.prefilter = PreFilterSearcher(connection)
         self.ranker = RRFRanker(k=60)
 
     async def search_similar(
@@ -221,6 +223,25 @@ class MultiModalSearcher:
                     'results': []
                 }
 
+            candidate_ids, used_tolerance = await self.prefilter.adaptive_prefilter(
+                target_bahn_id,
+                max_candidates=15000,   # oder was für dich sinnvoll ist
+                min_candidates=1000,
+                features_to_use=['duration', 'length']  # Mehr Features können hinzugefügt werden
+            )
+            logger.info(f"[Prefilter Bahn] {len(candidate_ids)} Kandidaten (tol={used_tolerance})")
+
+            #candidate_ids = await self.prefilter.get_filtered_candidates(
+            #    target_bahn_id,
+            #    tolerance=0.75,   # oder was für dich sinnvoll ist
+            #    features_to_use=['length'],
+            #    limit=limit * 15
+            #)
+            #logger.info(f"[Prefilter Bahn] {len(candidate_ids)}")
+
+            print(candidate_ids)
+
+
             # Shape Search mit Filter: NUR Bahnen!
             rankings = {}
             for mode in available_modes:
@@ -228,7 +249,7 @@ class MultiModalSearcher:
                     target_id=target_bahn_id,
                     mode=mode,
                     limit=limit * 3,
-                    candidate_ids=None,
+                    candidate_ids=candidate_ids,
                     only_bahnen=True
                 )
 
@@ -277,6 +298,14 @@ class MultiModalSearcher:
                     'error': f"No embeddings for segment {target_segment_id}",
                     'results': []
                 }
+            
+            candidate_ids, used_tolerance = await self.prefilter.adaptive_prefilter(
+                target_segment_id,
+                max_candidates=15000,   # oder was für dich sinnvoll ist
+                min_candidates=1000,
+                features_to_use=['duration']  # Mehr Features können hinzugefügt werden
+            )
+            logger.info(f"[Prefilter Bahn] {len(candidate_ids)} Kandidaten (tol={used_tolerance})")
 
             # Shape Search mit Filter: NUR Segmente!
             rankings = {}

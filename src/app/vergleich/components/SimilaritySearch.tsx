@@ -1,3 +1,5 @@
+/* eslint-disable jsx-a11y/label-has-associated-control */
+/* eslint-disable react/button-has-type */
 // components/SimilaritySearch.tsx
 
 'use client';
@@ -200,12 +202,9 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
           )}
         </div>
 
-        {/* ✅ NEU: Embedding Modi Auswahl */}
-        <div className="space-y-2 rounded-lg bg-white p-3">
-          <div className="mb-2 text-sm font-medium text-gray-700">
-            Embedding Modi:
-          </div>
-          <div className="flex flex-wrap gap-2">
+        <div className="flex lg:flex-row items-center gap-8 rounded-lg bg-white p-3 sm:flex-col">
+          <div>Embedding Modi:</div>
+          <div className="w-fit gap-2 space-x-2">
             {['joint', 'position', 'orientation'].map((mode) => (
               <button
                 key={mode}
@@ -220,6 +219,45 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
               </button>
             ))}
           </div>
+          <div className="text-sm font-medium text-gray-700">Gewichtungen:</div>
+          <span className="flex w-fit flex-col gap-3 sm:flex-row">
+            {Object.entries(weights).map(([mode, value]) => {
+              const isActive = activeModes.has(mode);
+              const sliderId = `slider-${mode}`;
+
+              return (
+                <div
+                  key={mode}
+                  className={`space-y-1 ${!isActive ? 'opacity-40' : ''}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor={sliderId}
+                      className="text-xs capitalize text-gray-600"
+                    >
+                      {mode}:
+                    </label>
+                    <span className="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs">
+                      {value.toFixed(1)}
+                    </span>
+                  </div>
+                  <input
+                    id={sliderId}
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={value}
+                    onChange={(e) =>
+                      handleWeightChange(mode, parseFloat(e.target.value))
+                    }
+                    disabled={!isActive}
+                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 disabled:cursor-not-allowed"
+                  />
+                </div>
+              );
+            })}
+          </span>
         </div>
 
         {/* Preset-Buttons */}
@@ -250,52 +288,6 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
             >
               Shape
             </button>
-          </div>
-        </div>
-
-        {/* ✅ Embedding Gewichtungs-Slider */}
-        <div className="space-y-3 rounded-lg bg-white p-3">
-          <div className="text-sm font-medium text-gray-700">
-            Embedding Gewichtungen:
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {Object.entries(weights).map(([mode, value]) => {
-              const isActive = activeModes.has(mode);
-              const sliderId = `slider-${mode}`;
-
-              return (
-                <div
-                  key={mode}
-                  className={`space-y-1 ${!isActive ? 'opacity-40' : ''}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <label
-                      htmlFor={sliderId}
-                      className="text-xs capitalize text-gray-600"
-                    >
-                      {mode}:
-                    </label>
-                    <span className="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs">
-                      {value.toFixed(2)}
-                    </span>
-                  </div>
-                  <input
-                    id={sliderId}
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={value}
-                    onChange={(e) =>
-                      handleWeightChange(mode, parseFloat(e.target.value))
-                    }
-                    disabled={!isActive}
-                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 disabled:cursor-not-allowed"
-                  />
-                </div>
-              );
-            })}
           </div>
         </div>
 
