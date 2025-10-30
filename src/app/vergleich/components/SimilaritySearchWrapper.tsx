@@ -4,29 +4,18 @@ import React, { useState } from 'react';
 
 import { SimilarityService } from '@/src/actions/vergleich.service';
 import type { BahnInfo } from '@/types/bewegungsdaten.types';
-import type { SimilarityResult } from '@/types/similarity.types';
+import type {
+  SegmentGroup,
+  SimilarityResult,
+  TargetFeatures,
+} from '@/types/similarity.types';
 
 import SimilarityResults from './SimilarityResults';
 import SimilaritySearch from './SimilaritySearch';
+import { VergleichPlot } from './VergleichPlot';
 
 interface SimilaritySearchWrapperProps {
   bahnInfo?: BahnInfo[];
-}
-
-interface TargetFeatures {
-  segment_id: string;
-  bahn_id: string;
-  duration?: number;
-  length?: number;
-  median_twist_ist?: number;
-  median_acceleration_ist?: number;
-  movement_type?: string;
-}
-
-interface SegmentGroup {
-  target_segment: string;
-  target_segment_features?: TargetFeatures;
-  results: SimilarityResult[];
 }
 
 export default function SimilaritySearchWrapper({
@@ -45,7 +34,14 @@ export default function SimilaritySearchWrapper({
     id: string,
     limit: number,
     modes: string[],
-    weights: { joint: number; position: number; orientation: number },
+    weights: {
+      joint: number;
+      position: number;
+      orientation: number;
+      velocity: number;
+      acceleration: number;
+    },
+    prefilter_features: string[],
   ) => {
     setIsLoading(true);
     setError('');
@@ -57,7 +53,7 @@ export default function SimilaritySearchWrapper({
     try {
       await SimilarityService.searchSimilarityEmbedding(
         id,
-        { modes, weights, limit },
+        { modes, weights, limit, prefilter_features },
         {
           onBahnenFound: (results, targetFeatures) => {
             setBahnResults(results);
@@ -81,9 +77,30 @@ export default function SimilaritySearchWrapper({
   };
 
   return (
-    <div className="flex h-fullscreen">
-      <div className="flex flex-col w-full space-y-4 overflow-y-auto p-4">
+    <div className="flex flex-col">
+      <div className="w-full p-2">
         <SimilaritySearch onSearch={handleSearch} bahnInfo={bahnInfo} />
+        {/* Plot-Bereich - fest verankert rechts */}
+        <div className="my-2 flex gap-x-2 overflow-hidden">
+          {bahnResults.length > 0 && (
+            <VergleichPlot
+              mode="bahnen"
+              results={bahnResults}
+              isLoading={isLoading}
+              originalId={originalId}
+            />
+          )}
+
+          {segmentGroups.length > 2 && (
+            <VergleichPlot
+              mode="segmente"
+              results={bahnResults}
+              segmentGroups={segmentGroups}
+              isLoading={isLoading}
+              originalId={originalId}
+            />
+          )}
+        </div>
         <SimilarityResults
           results={bahnResults}
           isLoading={isLoading}

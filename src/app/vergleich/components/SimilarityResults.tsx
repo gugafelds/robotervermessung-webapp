@@ -1,35 +1,11 @@
 import Link from 'next/link';
 import React from 'react';
 
-interface SimilarityResult {
-  bahn_id?: string;
-  segment_id?: string;
-  similarity_score: number;
-  meta_value?: number;
-  duration?: number;
-  weight?: number;
-  length?: number;
-  movement_type?: string;
-  median_twist_ist?: number;
-  median_acceleration_ist?: number;
-  sidtw_average_distance?: number;
-}
-
-interface TargetFeatures {
-  segment_id: string;
-  bahn_id: string;
-  duration?: number;
-  length?: number;
-  median_twist_ist?: number;
-  median_acceleration_ist?: number;
-  movement_type?: string;
-}
-
-interface SegmentGroup {
-  target_segment: string;
-  target_segment_features?: TargetFeatures;
-  results: SimilarityResult[];
-}
+import type {
+  SegmentGroup,
+  SimilarityResult,
+  TargetFeatures,
+} from '@/types/similarity.types';
 
 interface SimilarityResultsProps {
   results: SimilarityResult[];
@@ -61,9 +37,9 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
 
   if (isLoading) {
     return (
-      <div className="w-full rounded-lg bg-white p-6 shadow-md">
+      <div className="w-full rounded-lg border border-gray-400 bg-white p-6">
         <div className="flex items-center justify-center py-8">
-          <div className="size-8 animate-spin rounded-full border-b-2 border-blue-600" />
+          <div className="size-8 animate-spin rounded-full border-b-2 border-blue-950" />
           <span className="ml-3 text-gray-600">Lade Bahn-Ähnlichkeiten...</span>
         </div>
       </div>
@@ -72,9 +48,9 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
 
   if (error) {
     return (
-      <div className="w-full rounded-lg bg-white p-6 shadow-md">
+      <div className="w-full rounded-lg border border-gray-400 bg-white p-6">
         <div className="py-4 text-center text-red-600">
-          <p className="font-medium">Fehler bei der Suche</p>
+          <p className="font-medium">Fehler bei der Suche!</p>
           <p className="mt-1 text-sm">{error}</p>
         </div>
       </div>
@@ -87,10 +63,12 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
     segmentGroups.length === 0
   ) {
     return (
-      <div className="w-full rounded-lg bg-white p-6 shadow-md">
+      <div className="w-full rounded-lg border border-gray-400 bg-white p-6">
         <div className="py-8 text-center text-gray-500">
-          <p>Keine Ergebnisse gefunden</p>
-          <p className="mt-1 text-sm">Versuchen Sie eine andere ID</p>
+          <p>
+            Gib eine Bahn- oder Segment-ID ein, um die Ähnlichkeiten zu
+            durchsuchen.
+          </p>
         </div>
       </div>
     );
@@ -102,15 +80,31 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
     return currentId.includes(originalId);
   };
 
-  const renderRows = (data: SimilarityResult[]) =>
-    data.map((result, index) => {
+  const renderRows = (data: SimilarityResult[]) => {
+    // ✅ Helper Funktionen für Profile
+    const formatVelocityProfile = (result: SimilarityResult) => {
+      if (!result.mean_twist_ist) return '-';
+      return `[${result.max_twist_ist?.toFixed(0) || '-'}, ${result.mean_twist_ist?.toFixed(0) || '-'}, ${result.std_twist_ist?.toFixed(0) || '-'}]`;
+    };
+
+    const formatPosition3D = (result: SimilarityResult) => {
+      if (!result.position_x) return '-';
+      return `[${result.position_x?.toFixed(0) || '-'}, ${result.position_y?.toFixed(0) || '-'}, ${result.position_z?.toFixed(0) || '-'}]`;
+    };
+
+    const formatAccelerationProfile = (result: SimilarityResult) => {
+      if (!result.mean_acceleration_ist) return '-';
+      return `[${result.min_acceleration_ist?.toFixed(0) || '-'}, ${result.max_acceleration_ist?.toFixed(0) || '-'}, ${result.mean_acceleration_ist?.toFixed(0) || '-'}, ${result.std_acceleration_ist?.toFixed(0) || '-'}]`;
+    };
+
+    return data.map((result, index) => {
       const isTarget = isTargetEntry(result);
       const id = result.segment_id || result.bahn_id || 'N/A';
       const type = id.includes('_') ? 'Segment' : 'Bahn';
       const uniqueKey = `${id}-${index}`;
 
       let rowClass = 'transition-colors hover:bg-gray-100';
-      if (isTarget) rowClass += ' border-l-4 border-blue-500 bg-blue-50';
+      if (isTarget) rowClass += ' border-t-4 border-blue-950 bg-blue-50';
       else if (index % 2 === 0) rowClass += ' bg-white';
       else rowClass += ' bg-gray-50';
 
@@ -158,6 +152,15 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
           <td className="whitespace-nowrap px-6 py-4 font-mono text-sm uppercase text-gray-900">
             {result.movement_type || '-'}
           </td>
+          <td className="whitespace-nowrap px-6 py-4 font-mono text-xs text-gray-900">
+            {formatVelocityProfile(result)}
+          </td>
+          <td className="whitespace-nowrap px-6 py-4 font-mono text-xs text-gray-900">
+            {formatAccelerationProfile(result)}
+          </td>
+          <td className="whitespace-nowrap px-6 py-4 font-mono text-xs text-gray-900">
+            {formatPosition3D(result)}
+          </td>
           <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
             {result.sidtw_average_distance ? (
               <span className="font-mono">
@@ -170,16 +173,27 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
         </tr>
       );
     });
+  };
 
   const featuresToResult = (f: TargetFeatures): SimilarityResult => ({
     bahn_id: f.segment_id.includes('_') ? f.bahn_id : f.segment_id,
     segment_id: f.segment_id,
     similarity_score: 0,
     duration: f.duration,
+    weight: f.weight,
     length: f.length,
     movement_type: f.movement_type,
-    median_twist_ist: f.median_twist_ist,
-    median_acceleration_ist: f.median_acceleration_ist,
+    mean_twist_ist: f.mean_twist_ist,
+    max_twist_ist: f.max_twist_ist,
+    std_twist_ist: f.std_twist_ist,
+    min_acceleration_ist: f.min_acceleration_ist,
+    max_acceleration_ist: f.max_acceleration_ist,
+    mean_acceleration_ist: f.mean_acceleration_ist,
+    std_acceleration_ist: f.std_acceleration_ist,
+    sidtw_average_distance: f.sidtw_average_distance,
+    position_x: f.position_x,
+    position_y: f.position_y,
+    position_z: f.position_z,
   });
 
   // 👉 Alle Zeilen in einem Array sammeln
@@ -200,7 +214,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
   }
 
   return (
-    <div className="flex flex-col overflow-y-auto rounded-lg border bg-white shadow-md">
+    <div className="flex flex-col overflow-y-auto rounded-lg border border-gray-400 bg-white shadow-md">
       <div className="bg-gray-50 px-6 py-4">
         <h3 className="text-lg font-medium text-gray-900">
           Ähnlichkeitsergebnisse
@@ -227,8 +241,8 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
       )}
 
       <div className="max-h-[70vh] overflow-auto border-t">
-        <table className="w-fit min-w-full table-auto divide-y divide-gray-200">
-          <thead className="sticky top-0 z-10 border-b-4 bg-gray-50 shadow-xl">
+        <table className="w-fit min-w-full table-auto">
+          <thead className="sticky top-0 border-b-2 bg-gray-50 shadow-md">
             <tr>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
                 ID
@@ -252,13 +266,20 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
                 Bewegungstyp
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
+                Geschwindigkeit [Max, Mean, Std]
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
+                Beschleunigung [Min, Max, Mean, Std]
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
+                Position [X, Y, Z]
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
                 Genauigkeit
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white text-center">
-            {allRows}
-          </tbody>
+          <tbody className="bg-white text-center">{allRows}</tbody>
         </table>
       </div>
     </div>

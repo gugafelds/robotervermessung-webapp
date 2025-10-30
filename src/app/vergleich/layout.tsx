@@ -24,14 +24,9 @@ export default async function VergleichLayout({
       initialPagination={initialPagination}
     >
       <main className="flex flex-col lg:flex-row">
-        <div className="h-fullscreen w-fit space-y-2 overflow-y-auto bg-white p-4 shadow-lg">
-          <div>
-            <h2 className="mb-4 text-xl font-bold text-gray-800">
-              Tools & Konfiguration
-            </h2>
-            <div className="space-y-2">
-              <MetadataUpload />
-            </div>
+        <div className="h-fullscreen w-fit space-y-2 overflow-y-auto bg-gray-100 p-4">
+          <div className="space-y-2">
+            <MetadataUpload />
           </div>
         </div>
 

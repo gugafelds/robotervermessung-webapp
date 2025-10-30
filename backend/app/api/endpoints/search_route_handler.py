@@ -1,7 +1,7 @@
-# backend/app/routers/search.py
+# backend/app/api/endpoints/search_route_handler.py
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Optional, Dict
 import logging
 from ...database import get_db
@@ -9,25 +9,6 @@ from ...utils.multi_modal_searcher import MultiModalSearcher
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-class SimilaritySearchRequest(BaseModel):
-    """Request Body für Similarity Search"""
-    target_id: str = Field(..., description="Target Bahn/Segment ID")
-    modes: Optional[List[str]] = Field(
-        None,
-        description="Embedding modes: 'joint', 'position', 'orientation'"
-    )
-    weights: Optional[Dict[str, float]] = Field(
-        None,
-        description="Weights für RRF Fusion, z.B. {'joint': 0.5, 'position': 0.3, 'orientation': 0.2}"
-    )
-    limit: int = Field(
-        10,
-        ge=1,
-        le=100,
-        description="Anzahl Ergebnisse"
-    )
 
 
 class SimilaritySearchResponse(BaseModel):
@@ -44,11 +25,17 @@ class SimilaritySearchResponse(BaseModel):
 @router.get("/similar/{target_id}")
 async def search_similar_get(
         target_id: str,
-        modes: Optional[str] = Query(None, description="Comma-separated: joint,position,orientation"),
+        modes: Optional[str] = Query(None, description="Comma-separated: joint,position,orientation,velocity,acceleration"),
         joint_weight: float = Query(0.0, ge=0.0, le=1.0),
         position_weight: float = Query(1.0, ge=0.0, le=1.0),
         orientation_weight: float = Query(0.0, ge=0.0, le=1.0),
+        velocity_weight: float = Query(0.0, ge=0.0, le=1.0),
+        acceleration_weight: float = Query(0.0, ge=0.0, le=1.0),
         limit: int = Query(10, ge=1, le=100),
+        prefilter_features: Optional[str] = Query(
+            None, 
+            description="Comma-separated prefilter features: length,duration,movement_type,position_3d"
+        ),
         conn=Depends(get_db)
 ):
     """
@@ -56,7 +43,7 @@ async def search_similar_get(
 
     **Beispiel:**
 ```
-    GET /search/similar/1760613717?joint_weight=0.5&position_weight=0.3&orientation_weight=0.2&limit=10
+    GET /search/similar/1760613717?joint_weight=0.5&position_weight=0.3&orientation_weight=0.2&limit=10&prefilter_features=length,duration
 ```
     """
     try:
@@ -69,8 +56,26 @@ async def search_similar_get(
         weights = {
             'joint': joint_weight,
             'position': position_weight,
-            'orientation': orientation_weight
+            'orientation': orientation_weight,
+            'velocity': velocity_weight,
+            'acceleration': acceleration_weight
         }
+
+        prefilter_features_list = []
+        
+        
+        if prefilter_features:
+            prefilter_features_list = [f.strip() for f in prefilter_features.split(',')]
+            
+            # Validation
+            allowed_features = {'length', 'duration', 'movement_type', 'position_3d', 'velocity_profile', 'acceleration_profile'}
+            invalid_features = [f for f in prefilter_features_list if f not in allowed_features]
+
+            if invalid_features:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid prefilter features: {invalid_features}. Allowed: {list(allowed_features)}"
+                )
 
         searcher = MultiModalSearcher(conn)
 
@@ -78,8 +83,8 @@ async def search_similar_get(
             target_id=target_id,
             modes=mode_list,
             weights=weights,
-            limit=limit
-
+            limit=limit,
+            prefilter_features=prefilter_features_list
         )
 
         if result.get('error'):

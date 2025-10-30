@@ -4,12 +4,12 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 
+import { MetadataService } from '@/src/actions/vergleich.service';
 import type {
   AvailableDate,
   MetadataCalculationRequest,
   MetadataStats,
-} from '@/src/actions/vergleich.service';
-import { MetadataService } from '@/src/actions/vergleich.service';
+} from '@/types/similarity.types';
 
 export const MetadataUpload: React.FC = () => {
   const [stats, setStats] = useState<MetadataStats | null>(null);
@@ -88,15 +88,15 @@ export const MetadataUpload: React.FC = () => {
   }, [selectedMode, bahnId, startDate, endDate, duplicateHandling, loadStats]);
 
   return (
-    <div className="mx-auto w-fit min-w-96 max-w-xl space-y-2 p-6">
+    <div className="mx-auto w-fit min-w-96 max-w-xl space-y-4 p-4">
       <div className="text-justify">
-        <h1 className="text-xl font-bold">Metadata</h1>
+        <h1 className="text-xl font-bold text-blue-950">Metadata</h1>
         <p className="text-gray-600">Aktueller Stand der Metadaten</p>
       </div>
 
       {/* Status Tabelle */}
       {stats && (
-        <div className="rounded-lg bg-gray-50 p-4 shadow-md">
+        <div className="rounded-lg border border-gray-400 bg-white p-4">
           <table className="w-full">
             <tbody className="space-y-1">
               <tr className="border-b">
@@ -123,7 +123,7 @@ export const MetadataUpload: React.FC = () => {
                   {stats.missing_metadata.toLocaleString()}
                 </td>
               </tr>
-              <tr className="border-b">
+              <tr>
                 <td className="py-2 font-medium text-gray-700">Abdeckung</td>
                 <td className="py-2 text-right">
                   <span className="font-semibold">
@@ -137,7 +137,7 @@ export const MetadataUpload: React.FC = () => {
       )}
 
       {/* Upload Optionen */}
-      <div className="rounded-lg bg-gray-50 p-4 shadow-md">
+      <div className="rounded-lg border border-gray-400 bg-white p-4">
         <h2 className="mb-4 text-lg font-semibold">Upload-Modus</h2>
 
         <div className="space-y-3">

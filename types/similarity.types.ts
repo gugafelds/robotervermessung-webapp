@@ -6,8 +6,11 @@ export interface EmbeddingSimilarityParams {
     joint: number;
     position: number;
     orientation: number;
+    velocity: number;
+    acceleration: number;
   };
-  limit: number; // Anzahl Ergebnisse (für Bahnen UND Segmente)
+  limit: number;
+  prefilter_features?: string[]; // Filter Features (für Bahnen UND Segmente)
 }
 
 export interface EmbeddingModeScore {
@@ -64,10 +67,20 @@ export interface EmbeddingSimilarityResult {
     segment_id: string;
     bahn_id: string;
     duration: number;
+    weight?: number;
     length: number;
-    median_twist_ist: number;
-    median_acceleration_ist: number;
-    movement_type: string;
+    movement_type?: string;
+    mean_twist_ist?: number;
+    max_twist_ist?: number;
+    std_twist_ist?: number;
+    mean_acceleration_ist?: number;
+    max_acceleration_ist?: number;
+    min_acceleration_ist?: number;
+    std_acceleration_ist?: number;
+    sidtw_average_distance?: number;
+    position_x?: number;
+    position_y?: number;
+    position_z?: number;
   };
 }
 
@@ -92,20 +105,37 @@ export interface SimilarityResult {
   weight?: number;
   length?: number;
   movement_type?: string;
-  median_twist_ist?: number;
-  median_acceleration_ist?: number;
+  mean_twist_ist?: number;
+  max_twist_ist?: number;
+  std_twist_ist?: number;
+  mean_acceleration_ist?: number;
+  max_acceleration_ist?: number;
+  min_acceleration_ist?: number;
+  std_acceleration_ist?: number;
   sidtw_average_distance?: number;
-  meta_value?: number;
+  position_x?: number;
+  position_y?: number;
+  position_z?: number;
 }
 
 export interface TargetFeatures {
   segment_id: string;
   bahn_id: string;
   duration?: number;
+  weight?: number;
   length?: number;
-  median_twist_ist?: number;
-  median_acceleration_ist?: number;
   movement_type?: string;
+  mean_twist_ist?: number;
+  max_twist_ist?: number;
+  std_twist_ist?: number;
+  mean_acceleration_ist?: number;
+  max_acceleration_ist?: number;
+  min_acceleration_ist?: number;
+  std_acceleration_ist?: number;
+  sidtw_average_distance?: number;
+  position_x?: number;
+  position_y?: number;
+  position_z?: number;
 }
 
 export interface SegmentGroup {
@@ -122,10 +152,20 @@ export interface HierarchicalSimilarityResponse {
     segment_id: string;
     bahn_id: string;
     duration?: number;
+    weight?: number;
     length?: number;
-    median_twist_ist?: number;
-    median_acceleration_ist?: number;
     movement_type?: string;
+    mean_twist_ist?: number;
+    max_twist_ist?: number;
+    std_twist_ist?: number;
+    mean_acceleration_ist?: number;
+    max_acceleration_ist?: number;
+    min_acceleration_ist?: number;
+    std_acceleration_ist?: number;
+    sidtw_average_distance?: number;
+    position_x?: number;
+    position_y?: number;
+    position_z?: number;
   };
   modes: string[];
   weights: {
@@ -141,10 +181,20 @@ export interface HierarchicalSimilarityResponse {
       segment_id: string;
       bahn_id: string;
       duration?: number;
+      weight?: number;
       length?: number;
-      median_twist_ist?: number;
-      median_acceleration_ist?: number;
       movement_type?: string;
+      mean_twist_ist?: number;
+      max_twist_ist?: number;
+      std_twist_ist?: number;
+      mean_acceleration_ist?: number;
+      max_acceleration_ist?: number;
+      min_acceleration_ist?: number;
+      std_acceleration_ist?: number;
+      sidtw_average_distance?: number;
+      position_x?: number;
+      position_y?: number;
+      position_z?: number;
     };
     similar_segments: {
       target: string;

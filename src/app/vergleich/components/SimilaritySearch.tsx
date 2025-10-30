@@ -13,7 +13,14 @@ type SimilaritySearchProps = {
     id: string,
     limit: number,
     modes: string[],
-    weights: { joint: number; position: number; orientation: number },
+    weights: {
+      position: number;
+      joint: number;
+      orientation: number;
+      velocity: number;
+      acceleration: number;
+    },
+    prefilterFeatures: string[],
   ) => void;
   bahnInfo?: BahnInfo[] | undefined;
 };
@@ -23,27 +30,29 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
   bahnInfo,
 }) => {
   const [id, setId] = useState('');
-  const [limit, setLimit] = useState(10); // ✅ Ein Limit für Bahnen + Segmente
+  const [limit, setLimit] = useState(5); // ✅ Ein Limit für Bahnen + Segmente
   const [showDropdown, setShowDropdown] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // ✅ NEU: Embedding Modi (welche Embeddings nutzen?)
   const [activeModes, setActiveModes] = useState<Set<string>>(
-    new Set(['joint', 'position', 'orientation']),
+    new Set(['position']),
   );
 
-  // ✅ NEU: Embedding Gewichtungen (statt Feature-Gewichtungen)
   const [weights, setWeights] = useState({
-    joint: 0.33,
-    position: 0.33,
-    orientation: 0.34,
+    position: 0.2,
+    joint: 0.2,
+    orientation: 0.2,
+    velocity: 0.2,
+    acceleration: 0.2,
   });
 
-  // Hole die letzten Bahn-IDs
+  const [prefilterFeatures, setPrefilterFeatures] = useState<Set<string>>(
+    new Set(['movement_type']),
+  );
+
   const recentBahnIds = bahnInfo ? bahnInfo.map((bahn) => bahn.bahnID) : [];
 
-  // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -60,31 +69,38 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ✅ NEU: Preset-Konfigurationen für Embeddings
   const presets = {
     balanced: {
-      joint: 0.33,
-      position: 0.33,
-      orientation: 0.34,
-      modes: ['joint', 'position', 'orientation'],
-    },
-    geometry: {
-      joint: 0.1,
-      position: 0.6,
-      orientation: 0.3,
-      modes: ['position', 'orientation'],
-    },
-    motion: {
-      joint: 0.7,
       position: 0.2,
-      orientation: 0.1,
-      modes: ['joint', 'position'],
+      joint: 0.2,
+      orientation: 0.2,
+      velocity: 0.2,
+      acceleration: 0.2,
+      modes: ['position', 'joint', 'orientation', 'velocity', 'acceleration'],
     },
     shape: {
+      position: 1.0,
       joint: 0.0,
-      position: 0.5,
-      orientation: 0.5,
-      modes: ['position', 'orientation'],
+      orientation: 0.0,
+      velocity: 0.0,
+      acceleration: 0.0,
+      modes: ['position'],
+    },
+    motion: {
+      position: 0.3,
+      joint: 0.8,
+      orientation: 0.3,
+      velocity: 0.0,
+      acceleration: 0.0,
+      modes: ['position', 'joint', 'orientation'],
+    },
+    intensity: {
+      position: 0.0,
+      joint: 0.3,
+      orientation: 0.0,
+      velocity: 0.6,
+      acceleration: 0.3,
+      modes: ['joint', 'velocity', 'acceleration'],
     },
   };
 
@@ -92,16 +108,26 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
     if (id.trim() && activeModes.size > 0) {
       // Normalisiere Gewichte basierend auf aktiven Modi
       const activeWeights = { ...weights };
-      const inactiveModes = ['joint', 'position', 'orientation'].filter(
-        (m) => !activeModes.has(m),
-      );
+      const inactiveModes = [
+        'position',
+        'joint',
+        'orientation',
+        'velocity',
+        'acceleration',
+      ].filter((m) => !activeModes.has(m));
 
       // Setze inaktive Modi auf 0
       inactiveModes.forEach((mode) => {
         activeWeights[mode as keyof typeof weights] = 0;
       });
 
-      onSearch(id.trim(), limit, Array.from(activeModes), activeWeights);
+      onSearch(
+        id.trim(),
+        limit,
+        Array.from(activeModes),
+        activeWeights,
+        Array.from(prefilterFeatures), // ✅ NEU
+      );
       setShowDropdown(false);
     }
   };
@@ -154,25 +180,39 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
     });
   };
 
+  const togglePrefilterFeature = (feature: string) => {
+    setPrefilterFeatures((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(feature)) {
+        newSet.delete(feature);
+      } else {
+        newSet.add(feature);
+      }
+      return newSet;
+    });
+  };
+
   const applyPreset = (presetName: keyof typeof presets) => {
     const preset = presets[presetName];
     setWeights({
-      joint: preset.joint,
       position: preset.position,
+      joint: preset.joint,
       orientation: preset.orientation,
+      velocity: preset.velocity,
+      acceleration: preset.acceleration,
     });
     setActiveModes(new Set(preset.modes));
   };
 
   return (
-    <div className="w-full rounded border border-gray-300 bg-gray-100 p-4">
+    <div className="w-full rounded-xl border border-gray-400 bg-gray-100 p-4">
       <div className="space-y-2">
         {/* Haupteingabe mit Dropdown */}
         <div className="relative">
           <input
             ref={inputRef}
             type="text"
-            placeholder="Bahn/Segment-ID eingeben..."
+            placeholder="Bahn-ID eingeben..."
             value={id}
             onChange={(e) => setId(e.target.value)}
             onKeyDown={handleKeyPress}
@@ -202,10 +242,16 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
           )}
         </div>
 
-        <div className="flex lg:flex-row items-center gap-8 rounded-lg bg-white p-3 sm:flex-col">
-          <div>Embedding Modi:</div>
+        <div className="flex items-center gap-8 rounded-lg bg-white p-3 text-sm sm:flex-col lg:flex-row">
+          <div>Modi:</div>
           <div className="w-fit gap-2 space-x-2">
-            {['joint', 'position', 'orientation'].map((mode) => (
+            {[
+              'position',
+              'joint',
+              'orientation',
+              'velocity',
+              'acceleration',
+            ].map((mode) => (
               <button
                 key={mode}
                 onClick={() => toggleMode(mode)}
@@ -246,7 +292,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
                     type="range"
                     min="0"
                     max="1"
-                    step="0.01"
+                    step="0.1"
                     value={value}
                     onChange={(e) =>
                       handleWeightChange(mode, parseFloat(e.target.value))
@@ -262,53 +308,89 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
 
         {/* Preset-Buttons */}
         <div className="space-y-2 rounded-lg bg-white p-3">
-          <div className="mb-2 text-sm font-medium text-gray-700">Presets:</div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => applyPreset('balanced')}
-              className="rounded-full bg-gray-200 px-3 py-1 text-xs transition-colors hover:bg-gray-300"
-            >
-              Balanced
-            </button>
-            <button
-              onClick={() => applyPreset('geometry')}
-              className="rounded-full bg-green-200 px-3 py-1 text-xs transition-colors hover:bg-green-300"
-            >
-              Geometry
-            </button>
-            <button
-              onClick={() => applyPreset('motion')}
-              className="rounded-full bg-blue-200 px-3 py-1 text-xs transition-colors hover:bg-blue-300"
-            >
-              Motion
-            </button>
-            <button
-              onClick={() => applyPreset('shape')}
-              className="rounded-full bg-purple-200 px-3 py-1 text-xs transition-colors hover:bg-purple-300"
-            >
-              Shape
-            </button>
-          </div>
-        </div>
+          <div className="flex flex-col items-center gap-6 sm:flex-row">
+            {/* Prefilter Features */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700">
+                Features:
+              </span>
+              {[
+                { key: 'length', label: 'Länge' },
+                { key: 'duration', label: 'Dauer' },
+                { key: 'movement_type', label: 'Bewegungstyp' },
+                { key: 'position_3d', label: 'Lage' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => togglePrefilterFeature(key)}
+                  className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                    prefilterFeatures.has(key)
+                      ? 'bg-green-500 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
 
-        {/* Limit Einstellungen */}
-        <div className="space-y-2 rounded-lg bg-white p-3">
-          <div className="flex items-center justify-between">
-            <label
-              htmlFor="limit"
-              className="text-sm font-medium text-gray-700"
-            >
-              Anzahl Ergebnisse (Bahnen + Segmente):
-            </label>
-            <input
-              id="limit"
-              type="number"
-              min="1"
-              max="100"
-              value={limit}
-              onChange={handleLimitChange}
-              className="w-16 rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+            {/* Vertikaler Separator */}
+            <div className="h-6 w-px bg-gray-300" />
+
+            {/* Presets */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700">
+                Presets:
+              </span>
+              <button
+                onClick={() => applyPreset('balanced')}
+                className="rounded-full bg-gray-200 px-3 py-1 text-xs transition-colors hover:bg-gray-300"
+              >
+                Balanced
+              </button>
+              <button
+                onClick={() => applyPreset('motion')}
+                className="rounded-full bg-blue-200 px-3 py-1 text-xs transition-colors hover:bg-blue-300"
+              >
+                Motion
+              </button>
+              <button
+                onClick={() => applyPreset('shape')}
+                className="rounded-full bg-purple-200 px-3 py-1 text-xs transition-colors hover:bg-purple-300"
+              >
+                Shape
+              </button>
+              <button
+                onClick={() => applyPreset('intensity')}
+                className="rounded-full bg-red-200 px-3 py-1 text-xs transition-colors hover:bg-red-300"
+              >
+                Intensity
+              </button>
+            </div>
+
+            {/* Vertikaler Separator */}
+            <div className="h-6 w-px bg-gray-300" />
+
+            {/* Limit Einstellungen */}
+            <div className=" rounded-lg bg-white p-3">
+              <div className="flex items-center justify-between space-x-2">
+                <label
+                  htmlFor="limit"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Anzahl Ergebnisse (Limit):
+                </label>
+                <input
+                  id="limit"
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={limit}
+                  onChange={handleLimitChange}
+                  className="w-16 rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+            </div>
           </div>
         </div>
 

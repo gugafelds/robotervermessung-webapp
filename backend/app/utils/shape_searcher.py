@@ -186,7 +186,9 @@ class ShapeSearcher:
             query = """
                 SELECT joint_embedding IS NOT NULL       as has_joint,
                        position_embedding IS NOT NULL    as has_position,
-                       orientation_embedding IS NOT NULL as has_orientation
+                       orientation_embedding IS NOT NULL as has_orientation,
+                       velocity_embedding IS NOT NULL    as has_velocity,
+                       acceleration_embedding IS NOT NULL as has_acceleration
                 FROM bewegungsdaten.bahn_embeddings
                 WHERE segment_id = $1
             """
@@ -199,7 +201,9 @@ class ShapeSearcher:
             return {
                 'joint': result['has_joint'],
                 'position': result['has_position'],
-                'orientation': result['has_orientation']
+                'orientation': result['has_orientation'],
+                'velocity': result['has_velocity'],
+                'acceleration': result['has_acceleration']
             }
 
         except Exception as e:

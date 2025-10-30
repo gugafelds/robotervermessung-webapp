@@ -19,13 +19,15 @@ logger = logging.getLogger(__name__)
 class MetadataCalculatorService:
     def __init__(self, db_pool: asyncpg.Pool):
         self.db_pool = db_pool
-        self.downsample_factor = 3
+        self.downsample_factor = 1
 
-        # ✅ NEU: EmbeddingCalculator initialisieren
+        # ✅ GEÄNDERT: EmbeddingCalculator mit velocity/acceleration
         self.embedding_calculator = EmbeddingCalculator(
-            joint_samples=50,
-            position_samples=50,
-            orientation_samples=30
+            joint_samples=50,         # 50 × 6 = 300
+            position_samples=100,     # 100 × 3 = 300
+            orientation_samples=50,   # 50 × 4 = 200
+            velocity_samples=100,     # 100 × 1 = 100
+            acceleration_samples=50   # 50 × 3 = 150
         )
 
     async def validate_datetime_input(self, date_string: str) -> Optional[int]:
@@ -169,7 +171,6 @@ class MetadataCalculatorService:
         Holt ALLE benötigten Daten für eine Bahn
         Inkl. Joint States und Orientation für Embeddings!
         """
-        # Bahn Info
         bahn_info_query = """
                           SELECT weight, start_time, end_time
                           FROM robotervermessung.bewegungsdaten.bahn_info
@@ -180,22 +181,21 @@ class MetadataCalculatorService:
         if not bahn_info:
             return None
 
-        # Segmente mit Position (für movement_type + length + duration + position embedding)
         segments_query = """
-                         SELECT segment_id,
-                                array_agg(x_soll ORDER BY timestamp) as x_data,
-                                array_agg(y_soll ORDER BY timestamp) as y_data,
-                                array_agg(z_soll ORDER BY timestamp) as z_data,
-                                MIN(timestamp)                       as min_timestamp,
-                                MAX(timestamp)                       as max_timestamp
-                         FROM robotervermessung.bewegungsdaten.bahn_position_soll
-                         WHERE bahn_id = $1
-                         GROUP BY segment_id
-                         ORDER BY segment_id \
-                         """
+            SELECT segment_id,
+                array_agg(x_soll ORDER BY timestamp) as x_data,
+                array_agg(y_soll ORDER BY timestamp) as y_data,
+                array_agg(z_soll ORDER BY timestamp) as z_data,
+                array_agg(timestamp ORDER BY timestamp) as timestamps,  -- ✅ NEU
+                MIN(timestamp) as min_timestamp,
+                MAX(timestamp) as max_timestamp
+            FROM robotervermessung.bewegungsdaten.bahn_position_soll
+            WHERE bahn_id = $1
+            GROUP BY segment_id
+            ORDER BY segment_id
+        """
         segments = await conn.fetch(segments_query, bahn_id)
 
-        # ✅ NEU: Joint States für Embeddings
         joint_query = f"""
             WITH numbered AS (
                 SELECT segment_id,
@@ -205,18 +205,17 @@ class MetadataCalculatorService:
                 WHERE bahn_id = $1
             )
             SELECT segment_id,
-                   array_agg(joint_1 ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as j1,
-                   array_agg(joint_2 ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as j2,
-                   array_agg(joint_3 ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as j3,
-                   array_agg(joint_4 ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as j4,
-                   array_agg(joint_5 ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as j5,
-                   array_agg(joint_6 ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as j6
+                   array_agg(joint_1 ORDER BY rn) as j1,
+                   array_agg(joint_2 ORDER BY rn) as j2,
+                   array_agg(joint_3 ORDER BY rn) as j3,
+                   array_agg(joint_4 ORDER BY rn) as j4,
+                   array_agg(joint_5 ORDER BY rn) as j5,
+                   array_agg(joint_6 ORDER BY rn) as j6
             FROM numbered
             GROUP BY segment_id
         """
         joints = await conn.fetch(joint_query, bahn_id)
 
-        # ✅ NEU: Orientation für Embeddings
         orientation_query = f"""
             WITH numbered AS (
                 SELECT segment_id, qw_soll, qx_soll, qy_soll, qz_soll,
@@ -225,10 +224,10 @@ class MetadataCalculatorService:
                 WHERE bahn_id = $1
             )
             SELECT segment_id,
-                   array_agg(qw_soll ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as qw,
-                   array_agg(qx_soll ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as qx,
-                   array_agg(qy_soll ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as qy,
-                   array_agg(qz_soll ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as qz
+                   array_agg(qw_soll ORDER BY rn) as qw,
+                   array_agg(qx_soll ORDER BY rn) as qx,
+                   array_agg(qy_soll ORDER BY rn) as qy,
+                   array_agg(qz_soll ORDER BY rn) as qz
             FROM numbered
             GROUP BY segment_id
         """
@@ -244,7 +243,7 @@ class MetadataCalculatorService:
                 WHERE bahn_id = $1
             )
             SELECT segment_id,
-                   array_agg(tcp_speed_ist ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as twist_values
+                   array_agg(tcp_speed_ist ORDER BY rn) as twist_values
             FROM numbered
             GROUP BY segment_id
         """
@@ -254,13 +253,13 @@ class MetadataCalculatorService:
         accel_query = f"""
             WITH numbered AS (
                 SELECT segment_id,
-                       tcp_accel_ist,
+                       tcp_accel_soll,
                        ROW_NUMBER() OVER (PARTITION BY segment_id ORDER BY timestamp) as rn
-                FROM robotervermessung.bewegungsdaten.bahn_accel_ist
+                FROM robotervermessung.bewegungsdaten.bahn_accel_soll
                 WHERE bahn_id = $1
             )
             SELECT segment_id,
-                   array_agg(tcp_accel_ist ORDER BY rn) FILTER (WHERE rn % {self.downsample_factor} = 1) as accel_values
+                   array_agg(tcp_accel_soll ORDER BY rn) as accel_values
             FROM numbered
             GROUP BY segment_id
         """
@@ -269,8 +268,8 @@ class MetadataCalculatorService:
         return {
             'bahn_info': bahn_info,
             'segments': segments,
-            'joints': {row['segment_id']: row for row in joints},  # ✅ NEU
-            'orientations': {row['segment_id']: row for row in orientations},  # ✅ NEU
+            'joints': {row['segment_id']: row for row in joints},  
+            'orientations': {row['segment_id']: row for row in orientations},  
             'twists': {row['segment_id']: row['twist_values'] for row in twists},
             'accels': {row['segment_id']: row['accel_values'] for row in accels}
         }
@@ -306,6 +305,8 @@ class MetadataCalculatorService:
             x_data = np.array(segment['x_data'])
             y_data = np.array(segment['y_data'])
             z_data = np.array(segment['z_data'])
+
+            centroid = self._calculate_3d_centroid(x_data, y_data, z_data)
 
             step = max(1, len(x_data) // 20)
             movement_type = self.detect_movement_type(
@@ -373,12 +374,21 @@ class MetadataCalculatorService:
                 'max_acceleration_ist': round(max_accel, 3),
                 'mean_acceleration_ist': round(mean_accel, 3),
                 'median_acceleration_ist': round(median_accel, 3),
-                'std_acceleration_ist': round(std_accel, 3)
+                'std_acceleration_ist': round(std_accel, 3),
+                'position_x': centroid['position_x'],
+                'position_y': centroid['position_y'],
+                'position_z': centroid['position_z']
             })
 
         # Gesamtbahn-Zeile (Aggregation über alle Segmente)
         if metadata_rows:
             total_movement_string = ''.join([mt[0].lower() for mt in segment_movement_types])
+
+            all_x = np.concatenate([np.array(seg['x_data']) for seg in bahn_data['segments']])
+            all_y = np.concatenate([np.array(seg['y_data']) for seg in bahn_data['segments']])
+            all_z = np.concatenate([np.array(seg['z_data']) for seg in bahn_data['segments']])
+            
+            total_centroid = self._calculate_3d_centroid(all_x, all_y, all_z)
 
             # Aggregiere Twist/Accel über alle Segmente
             all_twist = []
@@ -397,19 +407,22 @@ class MetadataCalculatorService:
                 'bahn_id': bahn_id,
                 'segment_id': bahn_id,  # Bahn-Level: segment_id = bahn_id
                 'movement_type': total_movement_string,
-                'duration': total_duration,
-                'weight': weight,
-                'length': total_length,
-                'min_twist_ist': float(min(all_twist)) if all_twist else 0.0,
-                'max_twist_ist': float(max(all_twist)) if all_twist else 0.0,
-                'mean_twist_ist': float(np.mean(all_twist)) if all_twist else 0.0,
-                'median_twist_ist': float(np.median(all_twist)) if all_twist else 0.0,
-                'std_twist_ist': float(np.std(all_twist)) if all_twist else 0.0,
-                'min_acceleration_ist': float(min(all_accel)) if all_accel else 0.0,
-                'max_acceleration_ist': float(max(all_accel)) if all_accel else 0.0,
-                'mean_acceleration_ist': float(np.mean(all_accel)) if all_accel else 0.0,
-                'median_acceleration_ist': float(np.median(all_accel)) if all_accel else 0.0,
-                'std_acceleration_ist': float(np.std(all_accel)) if all_accel else 0.0
+                'duration': round(total_duration, 3),
+                'weight': round(weight, 3),
+                'length': round(total_length, 3),
+                'min_twist_ist': round(float(min(all_twist)), 3) if all_twist else 0.0,
+                'max_twist_ist': round(float(max(all_twist)), 3) if all_twist else 0.0,
+                'mean_twist_ist': round(float(np.mean(all_twist)), 3) if all_twist else 0.0,
+                'median_twist_ist': round(float(np.median(all_twist)), 3) if all_twist else 0.0,
+                'std_twist_ist': round(float(np.std(all_twist)), 3) if all_twist else 0.0,
+                'min_acceleration_ist': round(float(min(all_accel)), 3) if all_accel else 0.0,
+                'max_acceleration_ist': round(float(max(all_accel)), 3) if all_accel else 0.0,
+                'mean_acceleration_ist': round(float(np.mean(all_accel)), 3) if all_accel else 0.0,
+                'median_acceleration_ist': round(float(np.median(all_accel)), 3) if all_accel else 0.0,
+                'std_acceleration_ist': round(float(np.std(all_accel)), 3) if all_accel else 0.0,
+                'position_x': round(float(total_centroid['position_x']), 3),
+                'position_y': round(float(total_centroid['position_y']), 3),
+                'position_z': round(float(total_centroid['position_z']), 3)
             }
 
             metadata_rows.append(total_metadata)
@@ -478,15 +491,38 @@ class MetadataCalculatorService:
             if joint_emb is None and pos_emb is None and ori_emb is None:
                 continue
 
+            vel_emb = None
+            acc_emb = None
+
+            if segment['x_data'] and len(segment['x_data']) > 2:
+                # Timestamps zu Sekunden konvertieren
+                timestamps = [float(t) / 1_000_000_000.0 for t in segment['timestamps']]
+                
+                vel_acc_data = [
+                    {
+                        'x_soll': segment['x_data'][i],
+                        'y_soll': segment['y_data'][i],
+                        'z_soll': segment['z_data'][i],
+                        'timestamp': timestamps[i]
+                    }
+                    for i in range(len(segment['x_data']))
+                ]
+                
+                # ✅ Ein Call für beide!
+                vel_emb, acc_emb = self.embedding_calculator.compute_velocity_and_acceleration_embeddings(vel_acc_data)
+
+            # Skip wenn keine Embeddings berechnet wurden
+            if all(x is None for x in [joint_emb, pos_emb, ori_emb, vel_emb, acc_emb]):
+                continue
+
             embedding_rows.append({
                 'segment_id': segment_id,
                 'bahn_id': bahn_id,
                 'joint_embedding': self._array_to_str(joint_emb) if joint_emb is not None else None,
                 'position_embedding': self._array_to_str(pos_emb) if pos_emb is not None else None,
                 'orientation_embedding': self._array_to_str(ori_emb) if ori_emb is not None else None,
-                'joint_sample_count': self.embedding_calculator.joint_samples,
-                'position_sample_count': self.embedding_calculator.position_samples,
-                'orientation_sample_count': self.embedding_calculator.orientation_samples
+                'velocity_embedding': self._array_to_str(vel_emb) if vel_emb is not None else None,  # ✅ NEU
+                'acceleration_embedding': self._array_to_str(acc_emb) if acc_emb is not None else None,  # ✅ NEU
             })
 
         # 2. Gesamtbahn (segment_id = bahn_id)
@@ -494,6 +530,7 @@ class MetadataCalculatorService:
         all_joint_data = []
         all_pos_data = []
         all_ori_data = []
+        all_vel_acc_data = []
 
         for segment in bahn_data['segments']:
             segment_id = segment['segment_id']
@@ -530,11 +567,28 @@ class MetadataCalculatorService:
                         'qy_soll': ori_raw['qy'][i],
                         'qz_soll': ori_raw['qz'][i]
                     })
+            
+        all_vel_acc_data = []
+
+        for segment in bahn_data['segments']:
+            if segment['x_data'] and len(segment['x_data']) > 2:
+                timestamps = [float(t) / 1_000_000_000.0 for t in segment['timestamps']]
+                
+                for i in range(len(segment['x_data'])):
+                    all_vel_acc_data.append({
+                        'x_soll': segment['x_data'][i],
+                        'y_soll': segment['y_data'][i],
+                        'z_soll': segment['z_data'][i],
+                        'timestamp': timestamps[i]
+                    })
 
         # Berechne Bahn-Level Embeddings
         bahn_joint_emb = self.embedding_calculator.compute_joint_embedding(all_joint_data) if all_joint_data else None
         bahn_pos_emb = self.embedding_calculator.compute_position_embedding(all_pos_data) if all_pos_data else None
         bahn_ori_emb = self.embedding_calculator.compute_orientation_embedding(all_ori_data) if all_ori_data else None
+        bahn_vel_emb, bahn_acc_emb = self.embedding_calculator.compute_velocity_and_acceleration_embeddings(
+            all_vel_acc_data
+        ) if len(all_vel_acc_data) > 2 else (None, None)
 
         if bahn_joint_emb is not None or bahn_pos_emb is not None or bahn_ori_emb is not None:
             embedding_rows.append({
@@ -543,9 +597,8 @@ class MetadataCalculatorService:
                 'joint_embedding': self._array_to_str(bahn_joint_emb) if bahn_joint_emb is not None else None,
                 'position_embedding': self._array_to_str(bahn_pos_emb) if bahn_pos_emb is not None else None,
                 'orientation_embedding': self._array_to_str(bahn_ori_emb) if bahn_ori_emb is not None else None,
-                'joint_sample_count': self.embedding_calculator.joint_samples,
-                'position_sample_count': self.embedding_calculator.position_samples,
-                'orientation_sample_count': self.embedding_calculator.orientation_samples
+                'velocity_embedding': self._array_to_str(bahn_vel_emb) if bahn_vel_emb is not None else None,
+                'acceleration_embedding': self._array_to_str(bahn_acc_emb) if bahn_acc_emb is not None else None,
             })
 
         return embedding_rows
@@ -600,6 +653,21 @@ class MetadataCalculatorService:
             result['error'] = str(e)
 
         return result
+    
+    @staticmethod
+    def _calculate_3d_centroid(x_data, y_data, z_data) -> Dict[str, float]:
+        """
+        Berechnet den 3D-Schwerpunkt (Centroid) der Bahn
+        
+        Returns:
+            Dict mit position_x, position_y, position_z
+        """
+        return {
+            'position_x': round(float(np.mean(x_data)), 3),
+            'position_y': round(float(np.mean(y_data)), 3),
+            'position_z': round(float(np.mean(z_data)), 3)
+        }
+
 
     async def batch_write_metadata(
             self,
@@ -618,7 +686,8 @@ class MetadataCalculatorService:
             'min_twist_ist', 'max_twist_ist', 'mean_twist_ist',
             'median_twist_ist', 'std_twist_ist',
             'min_acceleration_ist', 'max_acceleration_ist', 'mean_acceleration_ist',
-            'median_acceleration_ist', 'std_acceleration_ist'
+            'median_acceleration_ist', 'std_acceleration_ist',
+            'position_x', 'position_y', 'position_z'
         ]
 
         records = [
@@ -648,6 +717,8 @@ class MetadataCalculatorService:
 
         # Temp table
         await conn.execute("""
+                           DROP TABLE IF EXISTS temp_embeddings;
+
                            CREATE
                            TEMP TABLE temp_embeddings (
                 segment_id TEXT,
@@ -655,9 +726,8 @@ class MetadataCalculatorService:
                 joint_embedding TEXT,
                 position_embedding TEXT,
                 orientation_embedding TEXT,
-                joint_sample_count INTEGER,
-                position_sample_count INTEGER,
-                orientation_sample_count INTEGER
+                velocity_embedding TEXT,
+                acceleration_embedding TEXT
             )
                            """)
 
@@ -669,9 +739,8 @@ class MetadataCalculatorService:
                 row['joint_embedding'],
                 row['position_embedding'],
                 row['orientation_embedding'],
-                row['joint_sample_count'],
-                row['position_sample_count'],
-                row['orientation_sample_count']
+                row['velocity_embedding'],
+                row['acceleration_embedding']
             )
             for row in embedding_rows
         ]
@@ -681,8 +750,7 @@ class MetadataCalculatorService:
             records=records,
             columns=[
                 'segment_id', 'bahn_id', 'joint_embedding', 'position_embedding',
-                'orientation_embedding', 'joint_sample_count', 'position_sample_count',
-                'orientation_sample_count'
+                'orientation_embedding', 'velocity_embedding', 'acceleration_embedding'
             ]
         )
 
@@ -690,20 +758,17 @@ class MetadataCalculatorService:
         await conn.execute("""
                            INSERT INTO bewegungsdaten.bahn_embeddings
                            (segment_id, bahn_id, joint_embedding, position_embedding, orientation_embedding,
-                            joint_sample_count, position_sample_count, orientation_sample_count)
+                            velocity_embedding, acceleration_embedding)
                            SELECT segment_id,
                                   bahn_id,
-                                  joint_embedding::vector, position_embedding::vector, orientation_embedding::vector, joint_sample_count,
-                                  position_sample_count,
-                                  orientation_sample_count
+                                  joint_embedding::vector, position_embedding::vector, orientation_embedding::vector, velocity_embedding::vector, acceleration_embedding::vector
                            FROM temp_embeddings ON CONFLICT (segment_id) DO
                            UPDATE SET
                                joint_embedding = EXCLUDED.joint_embedding,
                                position_embedding = EXCLUDED.position_embedding,
                                orientation_embedding = EXCLUDED.orientation_embedding,
-                               joint_sample_count = EXCLUDED.joint_sample_count,
-                               position_sample_count = EXCLUDED.position_sample_count,
-                               orientation_sample_count = EXCLUDED.orientation_sample_count
+                               velocity_embedding = EXCLUDED.velocity_embedding,
+                               acceleration_embedding = EXCLUDED.acceleration_embedding
                            """)
 
         logger.info(f"✓ Wrote {len(records)} embedding rows to bahn_embeddings")

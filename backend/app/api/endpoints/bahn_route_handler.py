@@ -135,7 +135,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
                                     WHEN max_twist_ist >= 2500 THEN 6 \
                                     END AS bucket, \
                                 COUNT(*)
-                         FROM bewegungsdaten.bahn_meta
+                         FROM bewegungsdaten.bahn_metadata
                          WHERE bahn_id = segment_id
                            AND max_twist_ist IS NOT NULL
                          GROUP BY bucket
@@ -196,7 +196,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
                 SELECT MAX(i.sidtw_average_distance) as max_val
                 FROM auswertung.info_sidtw i
                 INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
-                WHERE i.bahn_id = i.segment_id
+                WHERE i.bahn_id != i.segment_id
                   AND i.sidtw_average_distance IS NOT NULL
                   AND b.source_data_ist = 'leica_at960'
             )
@@ -204,12 +204,12 @@ async def get_dashboard_data(conn=Depends(get_db)):
                 width_bucket(i.sidtw_average_distance, 
                     0, 
                     (SELECT max_val FROM sidtw_stats), 
-                    10
+                    8
                 ) AS bucket, 
                 COUNT(*)
             FROM auswertung.info_sidtw i
             INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
-            WHERE i.bahn_id = i.segment_id
+            WHERE i.bahn_id != i.segment_id
               AND i.sidtw_average_distance IS NOT NULL
               AND b.source_data_ist = 'leica_at960'
             GROUP BY bucket
@@ -220,7 +220,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
             SELECT MAX(sidtw_average_distance) 
             FROM auswertung.info_sidtw i
             INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
-            WHERE i.bahn_id = i.segment_id 
+            WHERE i.bahn_id != i.segment_id 
               AND i.sidtw_average_distance IS NOT NULL
               AND b.source_data_ist = 'leica_at960'
         """)
@@ -229,8 +229,8 @@ async def get_dashboard_data(conn=Depends(get_db)):
             "meta": {
                 "useRanges": True,
                 "min": 0,
-                "max": sidtw_max or 3.2475,
-                "numBuckets": 10,
+                "max": sidtw_max,
+                "numBuckets": 8,
                 "unit": "mm",
                 "label": "Genauigkeit"
             }
@@ -341,11 +341,11 @@ async def get_dashboard_sidtw_vs_parameters(conn=Depends(get_db)):
                 WITH sampled_data AS (SELECT info.sidtw_average_distance as sidtw, \
                                              bm.max_twist_ist            as velocity, \
                                              bm.max_acceleration_ist     as acceleration, \
-                                             bm.weight                   as weight, \
+                                             bi.weight                   as weight, \
                                              bi.stop_point               as stop_point, \
                                              bi.wait_time                as wait_time \
                                       FROM auswertung.info_sidtw info \
-                                               INNER JOIN bewegungsdaten.bahn_meta bm \
+                                               INNER JOIN bewegungsdaten.bahn_metadata bm \
                                                           ON info.bahn_id = bm.bahn_id \
                                                               AND info.bahn_id = bm.segment_id \
                                                               AND bm.bahn_id = bm.segment_id \
@@ -356,11 +356,11 @@ async def get_dashboard_sidtw_vs_parameters(conn=Depends(get_db)):
                                         AND bi.source_data_ist = 'leica_at960' \
                                         AND bm.max_twist_ist IS NOT NULL \
                                         AND bm.max_acceleration_ist IS NOT NULL \
-                                        AND bm.weight IS NOT NULL \
+                                        AND bi.weight IS NOT NULL \
                                         AND bi.stop_point IS NOT NULL \
                                         AND bi.wait_time IS NOT NULL \
                                       ORDER BY RANDOM()
-                    LIMIT 1000
+                    LIMIT 5000
                     )
                 SELECT * \
                 FROM sampled_data \
@@ -409,7 +409,7 @@ async def get_dashboard_workarea(conn=Depends(get_db)):
                          )
                          SELECT x_reached, y_reached, z_reached, sidtw_average_distance
                          FROM numbered_events
-                         WHERE rn % 7 = 0 \
+                         WHERE rn % 9 = 0 \
                          """
 
         workarea_rows = await conn.fetch(workarea_query)

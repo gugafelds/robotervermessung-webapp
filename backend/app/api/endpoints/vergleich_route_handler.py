@@ -6,7 +6,6 @@ from pydantic import BaseModel
 from ...database import get_db_pool
 from ...utils.metadata_calculator import MetadataCalculatorService
 from ...utils.background_tasks import (
-    process_segment_similarity_background,
     process_metadata_background,
     create_task_id,
     get_task_status,
@@ -283,39 +282,41 @@ async def get_metadata_stats(db_pool=Depends(get_db_pool)):
     """
     try:
         async with db_pool.acquire() as conn:
-            # Gesamtzahl Bahnen
+            # Gesamtzahl Bahnen in bahn_info
             total_bahns_query = """
-                                SELECT COUNT(DISTINCT bahn_id) as total_bahns
-                                FROM robotervermessung.bewegungsdaten.bahn_info \
-                                """
+                SELECT COUNT(DISTINCT bahn_id) as total_bahns
+                FROM robotervermessung.bewegungsdaten.bahn_info
+                WHERE source_data_ist = 'leica_at960'
+            """
             total_bahns = await conn.fetchval(total_bahns_query)
 
-            # Bahnen mit Metadaten
+            # Bahnen die in bahn_metadata existieren
             bahns_with_metadata_query = """
-                                        SELECT COUNT(DISTINCT bahn_id) as bahns_with_metadata
-                                        FROM robotervermessung.bewegungsdaten.bahn_metadata
-                                        WHERE segment_id = bahn_id -- Nur Gesamtbahn-Zeilen zählen \
-                                        """
+                SELECT COUNT(DISTINCT bahn_id) as bahns_with_metadata
+                FROM robotervermessung.bewegungsdaten.bahn_metadata
+            """
             bahns_with_metadata = await conn.fetchval(bahns_with_metadata_query)
 
-            # Gesamtzahl Metadaten-Zeilen
+            # Fehlende Bahnen (in bahn_info aber NICHT in bahn_metadata)
+            missing_bahns_query = """
+                SELECT COUNT(DISTINCT bi.bahn_id) as missing_bahns
+                FROM robotervermessung.bewegungsdaten.bahn_info bi
+                LEFT JOIN robotervermessung.bewegungsdaten.bahn_metadata bm 
+                    ON bi.bahn_id = bm.bahn_id
+                WHERE bi.source_data_ist = 'leica_at960'
+                AND bm.bahn_id IS NULL
+            """
+            missing_bahns = await conn.fetchval(missing_bahns_query)
+
+            # Gesamtzahl Metadaten-Zeilen (alle Segmente + Gesamtbahnen)
             total_metadata_rows_query = """
-                                        SELECT COUNT(*) as total_rows
-                                        FROM robotervermessung.bewegungsdaten.bahn_metadata \
-                                        """
+                SELECT COUNT(*) as total_rows
+                FROM robotervermessung.bewegungsdaten.bahn_metadata
+            """
             total_metadata_rows = await conn.fetchval(total_metadata_rows_query)
 
-            # Movement Type Verteilung
-            movement_type_query = """
-                                  SELECT movement_type, COUNT(*) as count
-                                  FROM robotervermessung.bewegungsdaten.bahn_metadata
-                                  WHERE segment_id != bahn_id -- Nur Segmente, nicht Gesamtbahn
-                                  GROUP BY movement_type
-                                  ORDER BY count DESC \
-                                  """
-            movement_types = await conn.fetch(movement_type_query)
+        
 
-            missing_bahns = total_bahns - bahns_with_metadata
             coverage_percent = (bahns_with_metadata / total_bahns * 100) if total_bahns > 0 else 0
 
             return {
@@ -324,7 +325,6 @@ async def get_metadata_stats(db_pool=Depends(get_db_pool)):
                 "missing_metadata": missing_bahns,
                 "coverage_percent": round(coverage_percent, 1),
                 "total_metadata_rows": total_metadata_rows,
-                "movement_type_distribution": [dict(row) for row in movement_types]
             }
 
     except Exception as e:

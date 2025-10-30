@@ -159,14 +159,24 @@ export class SimilarityService {
           'orientation_weight',
           params.weights.orientation.toString(),
         );
+        queryParams.append(
+          'velocity_weight',
+          params.weights.velocity.toString(),
+        );
+        queryParams.append(
+          'acceleration_weight',
+          params.weights.acceleration.toString(),
+        );
       }
 
       queryParams.append('limit', params.limit.toString());
 
-      console.log(
-        '🔍 API Call:',
-        `${this.BASE_URL}/api/search/similar/${targetId}?${queryParams.toString()}`,
-      );
+      if (params.prefilter_features && params.prefilter_features.length > 0) {
+        queryParams.append(
+          'prefilter_features',
+          params.prefilter_features.join(','),
+        );
+      }
 
       const response = await fetch(
         `${this.BASE_URL}/api/search/similar/${targetId}?${queryParams.toString()}`,
@@ -183,8 +193,6 @@ export class SimilarityService {
       }
 
       const data: HierarchicalSimilarityResponse = await response.json();
-      console.log('📦 API Response:', data);
-
       // ✅ 1. Target Bahn Features extrahieren
       let targetBahnFeatures: TargetFeatures | undefined;
       if (data.target_bahn_features) {
@@ -192,11 +200,22 @@ export class SimilarityService {
           segment_id: data.target_bahn_features.segment_id,
           bahn_id: data.target_bahn_features.bahn_id,
           duration: data.target_bahn_features.duration,
+          weight: data.target_bahn_features.weight,
           length: data.target_bahn_features.length,
-          median_twist_ist: data.target_bahn_features.median_twist_ist,
-          median_acceleration_ist:
-            data.target_bahn_features.median_acceleration_ist,
+          mean_twist_ist: data.target_bahn_features.mean_twist_ist,
+          max_twist_ist: data.target_bahn_features.max_twist_ist,
+          std_twist_ist: data.target_bahn_features.std_twist_ist,
+          mean_acceleration_ist:
+            data.target_bahn_features.mean_acceleration_ist,
+          max_acceleration_ist: data.target_bahn_features.max_acceleration_ist,
+          min_acceleration_ist: data.target_bahn_features.min_acceleration_ist,
+          std_acceleration_ist: data.target_bahn_features.std_acceleration_ist,
+          sidtw_average_distance:
+            data.target_bahn_features.sidtw_average_distance,
           movement_type: data.target_bahn_features.movement_type,
+          position_x: data.target_bahn_features.position_x,
+          position_y: data.target_bahn_features.position_y,
+          position_z: data.target_bahn_features.position_z,
         };
       }
 
@@ -206,8 +225,6 @@ export class SimilarityService {
           data.bahn_similarity.results,
           'bahn',
         );
-        console.log('✅ Bahn Results:', bahnResults);
-        console.log('✅ Target Bahn Features:', targetBahnFeatures);
         callbacks.onBahnenFound?.(bahnResults, targetBahnFeatures);
       }
 
@@ -222,13 +239,29 @@ export class SimilarityService {
                 segment_id: segmentGroup.target_segment_features.segment_id,
                 bahn_id: segmentGroup.target_segment_features.bahn_id,
                 duration: segmentGroup.target_segment_features.duration,
+                weight: segmentGroup.target_segment_features.weight,
                 length: segmentGroup.target_segment_features.length,
-                median_twist_ist:
-                  segmentGroup.target_segment_features.median_twist_ist,
-                median_acceleration_ist:
-                  segmentGroup.target_segment_features.median_acceleration_ist,
+                max_twist_ist:
+                  segmentGroup.target_segment_features.max_twist_ist,
+                mean_twist_ist:
+                  segmentGroup.target_segment_features.mean_twist_ist,
+                std_twist_ist:
+                  segmentGroup.target_segment_features.std_twist_ist,
+                mean_acceleration_ist:
+                  segmentGroup.target_segment_features.mean_acceleration_ist,
+                max_acceleration_ist:
+                  segmentGroup.target_segment_features.max_acceleration_ist,
+                min_acceleration_ist:
+                  segmentGroup.target_segment_features.min_acceleration_ist,
+                std_acceleration_ist:
+                  segmentGroup.target_segment_features.std_acceleration_ist,
+                sidtw_average_distance:
+                  segmentGroup.target_segment_features.sidtw_average_distance,
                 movement_type:
                   segmentGroup.target_segment_features.movement_type,
+                position_x: segmentGroup.target_segment_features.position_x,
+                position_y: segmentGroup.target_segment_features.position_y,
+                position_z: segmentGroup.target_segment_features.position_z,
               };
             }
 
@@ -242,11 +275,9 @@ export class SimilarityService {
             };
           },
         );
-        console.log('✅ Segment Groups:', segmentGroups);
         callbacks.onSegmentsFound?.(segmentGroups);
       }
     } catch (error) {
-      console.error('❌ API Error:', error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       callbacks.onError?.(errorMessage);
@@ -262,13 +293,20 @@ export class SimilarityService {
       segment_id: type === 'segment' ? result.segment_id : undefined,
       similarity_score: result.rrf_score || 0,
       duration: result.features?.duration || 0,
-      weight: 0,
+      weight: result.features?.weight || 0,
       length: result.features?.length || 0,
       movement_type: result.features?.movement_type || '',
-      median_twist_ist: result.features?.median_twist_ist || 0,
-      median_acceleration_ist: result.features?.median_acceleration_ist || 0,
-      sidtw_average_distance: undefined,
-      meta_value: result.rank,
+      mean_twist_ist: result.features?.mean_twist_ist || 0,
+      max_twist_ist: result.features?.max_twist_ist || 0,
+      std_twist_ist: result.features?.std_twist_ist || 0,
+      mean_acceleration_ist: result.features?.mean_acceleration_ist || 0,
+      max_acceleration_ist: result.features?.max_acceleration_ist || 0,
+      min_acceleration_ist: result.features?.min_acceleration_ist || 0,
+      std_acceleration_ist: result.features?.std_acceleration_ist || 0,
+      sidtw_average_distance: result.features?.sidtw_average_distance || 0,
+      position_x: result.features?.position_x || 0,
+      position_y: result.features?.position_y || 0,
+      position_z: result.features?.position_z || 0,
     }));
   }
 }

@@ -1,3 +1,4 @@
+/* eslint-disable no-await-in-loop */
 /* eslint-disable react/button-has-type */
 /* eslint-disable jsx-a11y/label-has-associated-control */
 
@@ -15,13 +16,13 @@ import {
   getSegmentEventsById,
   getSegmentPositionSollById,
 } from '@/src/actions/bewegungsdaten.service';
-import type { SimilarityResult } from '@/src/actions/vergleich.service';
 import { Typography } from '@/src/components/Typography';
 import { plotLayoutConfig } from '@/src/lib/plot-config';
 import type {
   BahnEvents,
   BahnPositionSoll,
 } from '@/types/bewegungsdaten.types';
+import type { SegmentGroup, SimilarityResult } from '@/types/similarity.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
@@ -48,6 +49,7 @@ interface SegmentOption {
 
 interface VergleichPlotProps {
   results: SimilarityResult[];
+  segmentGroups?: SegmentGroup[]; // ✅ NEU: Hierarchische Segment-Struktur
   isLoading: boolean;
   originalId: string;
   mode: 'bahnen' | 'segmente';
@@ -66,6 +68,7 @@ interface TrajectoryData {
 
 export const VergleichPlot: React.FC<VergleichPlotProps> = ({
   results,
+  segmentGroups,
   isLoading: searchLoading,
   originalId,
   mode,
@@ -116,16 +119,35 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
     [],
   );
 
-  // Separate Bahnen und Segmente aus den Ergebnissen
+  // ✅ NEU: Flatten hierarchische Segment-Struktur
   const { bahnResults, segmentResults } = useMemo(() => {
     const bahnen = results.filter(
       (result) => result.bahn_id && !result.segment_id?.includes('_'),
     );
-    const segmente = results.filter((result) =>
-      result.segment_id?.includes('_'),
-    );
+
+    // Flatten hierarchische Segment-Struktur
+    const segmente: SimilarityResult[] = [];
+    if (segmentGroups) {
+      segmentGroups.forEach((group) => {
+        // Original Segment
+        if (group.target_segment_features) {
+          segmente.push({
+            segment_id: group.target_segment,
+            bahn_id: group.target_segment_features.bahn_id,
+            similarity_score: 0,
+            duration: group.target_segment_features.duration,
+          });
+        }
+
+        // Ähnliche Segmente
+        group.results.forEach((result) => {
+          segmente.push(result);
+        });
+      });
+    }
+
     return { bahnResults: bahnen, segmentResults: segmente };
-  }, [results]);
+  }, [results, segmentGroups]);
 
   // Segment-Dropdown-Optionen (nur für Segmente-Modus)
   const segmentOptions = useMemo((): SegmentOption[] => {
@@ -238,165 +260,94 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
     setShowDropdown(false);
   };
 
-  // Berechne Bounds aus den geladenen Trajektorien
-  const calculateBounds = useCallback(() => {
-    if (trajectoryData.length === 0) return null;
+  // Lade Trajektorien
+  useEffect(() => {
+    const loadTrajectories = async () => {
+      if (uniqueIds.length === 0) return;
 
-    const dataForBounds = normalizeStartPoint
-      ? trajectoryData.map((t) => normalizeTrajectory(t))
-      : trajectoryData;
+      const newIds = uniqueIds.filter((id) => !loadedIds.has(id));
+      if (newIds.length === 0) return;
 
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
-    let minZ = Infinity;
-    let maxZ = -Infinity;
+      setIsLoadingPlot(true);
+      setError(null);
 
-    dataForBounds.forEach((trajectory) => {
-      // Aus Positionen
-      trajectory.positions.forEach((pos) => {
-        minX = Math.min(minX, pos.xSoll);
-        maxX = Math.max(maxX, pos.xSoll);
-        minY = Math.min(minY, pos.ySoll);
-        maxY = Math.max(maxY, pos.ySoll);
-        minZ = Math.min(minZ, pos.zSoll);
-        maxZ = Math.max(maxZ, pos.zSoll);
-      });
+      try {
+        const loadedTrajectories: TrajectoryData[] = [];
 
-      // Aus Events
-      trajectory.events.forEach((event) => {
-        minX = Math.min(minX, event.xReached);
-        maxX = Math.max(maxX, event.xReached);
-        minY = Math.min(minY, event.yReached);
-        maxY = Math.max(maxY, event.yReached);
-        minZ = Math.min(minZ, event.zReached);
-        maxZ = Math.max(maxZ, event.zReached);
-      });
-    });
+        for (const [index, id] of newIds.entries()) {
+          const isBahn = mode === 'bahnen';
+          const isOriginal = id === originalId || id.startsWith(originalId);
 
-    // 10% Padding hinzufügen
-    const paddingX = (maxX - minX) * 0.1;
-    const paddingY = (maxY - minY) * 0.1;
-    const paddingZ = (maxZ - minZ) * 0.1;
+          let positions: BahnPositionSoll[] = [];
+          let events: BahnEvents[] = [];
 
-    return {
-      x: [minX - paddingX, maxX + paddingX],
-      y: [minY - paddingY, maxY + paddingY],
-      z: [minZ - paddingZ, maxZ + paddingZ],
-    };
-  }, [normalizeStartPoint, normalizeTrajectory, trajectoryData]);
+          if (isBahn) {
+            positions = await getBahnPositionSollById(id);
+            events = await getBahnEventsById(id);
+          } else {
+            positions = await getSegmentPositionSollById(id);
+            events = await getSegmentEventsById(id);
+          }
 
-  // Lade Trajektorien-Daten
-  const loadTrajectoryData = useCallback(async () => {
-    if (uniqueIds.length === 0) {
-      setTrajectoryData([]);
-      setIsLoadingPlot(false);
-      return;
-    }
+          const sampledPositions = sampleEveryFifthPoint(positions);
 
-    // Prüfe ob wir diese IDs bereits geladen haben
-    const newIds = uniqueIds.filter((id) => !loadedIds.has(id));
-    if (newIds.length === 0) {
-      return; // Keine neuen IDs zu laden
-    }
-
-    setIsLoadingPlot(true);
-    setError(null);
-
-    try {
-      const trajectories: TrajectoryData[] = [];
-
-      // Parallel laden aller IDs
-      const trajectoryPromises = uniqueIds.map(async (id, i) => {
-        const isOriginal =
-          id === originalId ||
-          (mode === 'segmente' &&
-            id === `${originalId}_${selectedSegment.replace('segment_', '')}`);
-
-        // Finde zugehöriges Ergebnis für Similarity Score
-        const resultForId =
-          mode === 'bahnen'
-            ? bahnResults.find((r) => r.bahn_id === id)
-            : segmentResults.find((r) => r.segment_id === id);
-
-        try {
-          // API-Calls basierend auf Modus
-          const [positionsResult, eventsResult] =
+          // Finde Similarity Score
+          const result =
             mode === 'bahnen'
-              ? await Promise.all([
-                  getBahnPositionSollById(id),
-                  getBahnEventsById(id),
-                ])
-              : await Promise.all([
-                  getSegmentPositionSollById(id),
-                  getSegmentEventsById(id),
-                ]);
+              ? bahnResults.find((r) => r.bahn_id === id)
+              : segmentResults.find((r) => r.segment_id === id);
 
-          const sampledPositions = sampleEveryFifthPoint(positionsResult);
-
-          return {
+          loadedTrajectories.push({
             id,
             positions: sampledPositions,
-            events: eventsResult,
+            events,
             color: isOriginal
-              ? '#000000'
-              : TRAJECTORY_COLORS[i % TRAJECTORY_COLORS.length],
+              ? '#003560'
+              : TRAJECTORY_COLORS[index % TRAJECTORY_COLORS.length],
             name: isOriginal
               ? `${id} (Original)`
-              : `${id}${resultForId ? ` (${resultForId.similarity_score?.toFixed(3)})` : ''}`,
+              : `${id} (${result?.similarity_score?.toFixed(3) || 'N/A'})`,
             isOriginal,
-            similarityScore: resultForId?.similarity_score,
-          };
-        } catch {
-          return null;
+            similarityScore: result?.similarity_score,
+          });
         }
-      });
 
-      const trajectoryResults = await Promise.all(trajectoryPromises);
-      const validTrajectories = trajectoryResults.filter(
-        (t) => t !== null,
-      ) as TrajectoryData[];
+        setTrajectoryData((prev) => {
+          const existingIds = new Set(prev.map((t) => t.id));
+          const newTrajectories = loadedTrajectories.filter(
+            (t) => !existingIds.has(t.id),
+          );
+          return [...prev, ...newTrajectories];
+        });
 
-      trajectories.push(...validTrajectories);
+        setLoadedIds((prev) => new Set([...prev, ...newIds]));
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Unbekannter Fehler beim Laden',
+        );
+      } finally {
+        setIsLoadingPlot(false);
+      }
+    };
 
-      // Sortiere: Original zuerst, dann nach Similarity Score
-      trajectories.sort((a, b) => {
-        if (a.isOriginal) return -1;
-        if (b.isOriginal) return 1;
-        return (a.similarityScore || 0) - (b.similarityScore || 0);
-      });
-
-      setTrajectoryData(trajectories);
-      setLoadedIds(new Set(uniqueIds)); // Markiere als geladen
-    } catch (err) {
-      setError('Fehler beim Laden der Trajektorien');
-    } finally {
-      setIsLoadingPlot(false);
-    }
+    loadTrajectories();
   }, [
     uniqueIds,
     loadedIds,
-    originalId,
     mode,
-    selectedSegment,
+    originalId,
+    sampleEveryFifthPoint,
     bahnResults,
     segmentResults,
-    sampleEveryFifthPoint,
   ]);
 
-  // Effect für Daten laden
+  // Reset bei Modus- oder Segment-Wechsel
   useEffect(() => {
-    if (!searchLoading && uniqueIds.length > 0) {
-      loadTrajectoryData();
-    } else if (uniqueIds.length === 0) {
-      setTrajectoryData([]);
-      setLoadedIds(new Set());
-      setIsLoadingPlot(false);
-    }
-  }, [uniqueIds, searchLoading, loadTrajectoryData]);
+    setTrajectoryData([]);
+    setLoadedIds(new Set());
+  }, [mode, selectedSegment]);
 
-  // Erstelle Plot-Daten für alle Trajektorien
+  // Plot Data erstellen
   const createPlotData = useCallback((): Partial<PlotData>[] => {
     const plotData: Partial<PlotData>[] = [];
 
@@ -405,12 +356,12 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
       : trajectoryData;
 
     dataToPlot.forEach((trajectory) => {
-      // Soll-Trajectory (Linie)
+      // Trajektorie (Linie)
       if (trajectory.positions.length > 0) {
         plotData.push({
           type: 'scatter3d',
           mode: 'lines',
-          name: `${trajectory.name} (Soll)`,
+          name: trajectory.name,
           x: trajectory.positions.map((p) => p.xSoll),
           y: trajectory.positions.map((p) => p.ySoll),
           z: trajectory.positions.map((p) => p.zSoll),
@@ -466,11 +417,11 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
     return `3D-Position ${selectedSegmentLabel} (${trajectoryData.length} Segmente)`;
   };
 
-  const bounds = calculateBounds();
   const layout: Partial<Layout> = {
     ...plotLayoutConfig,
     title: getPlotTitle(),
-    autosize: true,
+    height: 600,
+    width: 600,
     scene: {
       camera: {
         up: { x: 0, y: 0, z: 1 },
@@ -483,22 +434,19 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
         title: 'X [mm]',
         showgrid: true,
         zeroline: true,
-        range: bounds?.x,
       },
       yaxis: {
         title: 'Y [mm]',
         showgrid: true,
         zeroline: true,
-        range: bounds?.y,
       },
       zaxis: {
         title: 'Z [mm]',
         showgrid: true,
         zeroline: true,
-        range: bounds?.z,
       },
     },
-    margin: { t: 60, b: 20, l: 20, r: 20 },
+    margin: { t: 50, b: 20, l: 20, r: 20 },
     showlegend: false,
     uirevision: 'true',
   };
@@ -506,7 +454,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
   // Loading states - GENAU WIE ORIGINAL
   if (searchLoading || isLoadingPlot) {
     return (
-      <div className="m-2 w-fit rounded-lg border border-gray-400 bg-gray-50 p-4 shadow-sm">
+      <div className="flex w-full flex-row justify-center rounded-lg border border-gray-400 bg-gray-50 p-2">
         <div className="flex flex-col items-center space-y-4 py-8">
           <div className="animate-spin">
             <Loader className="size-8" color="#003560" />
@@ -522,7 +470,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
   // Error state - GENAU WIE ORIGINAL
   if (error) {
     return (
-      <div className="m-2 w-fit rounded-lg border border-gray-400 bg-gray-50 p-4 shadow-sm">
+      <div className="flex w-full flex-row justify-center rounded-lg border border-gray-400 bg-gray-50 p-2 ">
         <div className="py-8 text-center">
           <Typography as="h5" className="mb-2 text-red-600">
             Fehler beim Laden
@@ -539,7 +487,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
   if (trajectoryData.length === 0) {
     return (
       <div
-        className={`m-2 w-fit rounded-lg border border-gray-400 bg-gray-50 p-4 shadow-sm ${className}`}
+        className={`flex w-full flex-row justify-center rounded-lg border border-gray-400 bg-gray-50 p-2  ${className}`}
       >
         <div className="py-8 text-center">
           <Typography as="h5" className="mb-2">
@@ -550,7 +498,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
           <Typography as="p" className="text-gray-600">
             {mode === 'bahnen'
               ? 'Führe eine Ähnlichkeitssuche durch, um Bahnen im 3D-Raum zu vergleichen.'
-              : 'Warte auf Segment-Ähnlichkeitsergebnisse aus dem Background-Task.'}
+              : 'Warte auf Segment-Ähnlichkeitsergebnisse.'}
           </Typography>
         </div>
       </div>
@@ -560,65 +508,13 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
   const plotData = createPlotData();
 
   return (
-    <div className="m-2 w-fit rounded-lg border border-gray-400 bg-gray-50 p-2 shadow-sm">
-      {/* Segment-Dropdown (nur im Segment-Modus) - NEU */}
-      {mode === 'segmente' && segmentOptions.length > 0 && (
-        <div className="mb-2 flex items-center justify-between rounded border bg-white p-2">
-          <Typography as="h6" className="font-medium text-gray-700">
-            Segment-Auswahl:
-          </Typography>
-
-          <div className="relative">
-            <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm hover:bg-gray-50"
-            >
-              {segmentOptions.find((opt) => opt.value === selectedSegment)
-                ?.label || 'Segment auswählen'}
-              <ChevronDownIcon className="size-4" />
-            </button>
-
-            {showDropdown && (
-              <div className="absolute right-0 top-10 z-10 w-40 rounded-md border bg-white shadow-lg">
-                {segmentOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => handleSegmentSelect(option.value)}
-                    className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 ${
-                      option.value === selectedSegment
-                        ? 'bg-blue-50 text-blue-600'
-                        : ''
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Normalisierungs-Toggle */}
-      <div className="mb-2 flex items-center justify-between rounded border bg-white p-2">
-        <label className="flex cursor-pointer items-center space-x-2">
-          <input
-            type="checkbox"
-            checked={normalizeStartPoint}
-            onChange={(e) => setNormalizeStartPoint(e.target.checked)}
-            className="rounded"
-          />
-          <div className="text-sm text-gray-700">Startpunkt normalisieren</div>
-        </label>
-      </div>
-
+    <div className="flex w-full flex-row justify-start rounded-lg border border-gray-400 bg-gray-50 p-2 ">
       {/* Plot - GENAU WIE ORIGINAL */}
       <Plot
         data={plotData}
         layout={layout}
         useResizeHandler
-        className="border border-gray-400"
-        style={{ width: '100%', height: '100%' }}
+        className="border border-gray-200"
         config={{
           displaylogo: false,
           modeBarButtonsToRemove: [
@@ -633,32 +529,81 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
         }}
       />
 
-      {/* Externe Legende - GENAU WIE ORIGINAL */}
-      {trajectoryData.length > 0 && (
-        <div className="mt-4 max-h-40 space-y-2 overflow-y-auto">
-          <div className="mb-2 text-sm font-medium text-gray-700">
-            Sichtbare {mode === 'bahnen' ? 'Bahnen' : 'Segmente'}:
+      <div className="m-4 flex flex-col">
+        {mode === 'segmente' && segmentOptions.length > 0 && (
+          <div className="flex justify-between rounded">
+            <div className="relative">
+              <button
+                onClick={() => setShowDropdown(!showDropdown)}
+                className="inline-flex items-center rounded-md border border-gray-300 bg-white p-2 text-sm hover:bg-gray-50"
+              >
+                {segmentOptions.find((opt) => opt.value === selectedSegment)
+                  ?.label || 'Segment auswählen'}
+                <ChevronDownIcon className="size-4" />
+              </button>
+
+              {showDropdown && (
+                <div className="absolute right-0 w-40 rounded-md border bg-white shadow-lg">
+                  {segmentOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleSegmentSelect(option.value)}
+                      className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 ${
+                        option.value === selectedSegment
+                          ? 'bg-blue-50 text-blue-600'
+                          : ''
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-          {trajectoryData.map((trajectory) => (
-            <label
-              key={trajectory.id}
-              className="flex cursor-pointer items-center space-x-2"
-            >
-              <input
-                type="checkbox"
-                checked={visibleTrajectories.has(trajectory.id)}
-                onChange={() => toggleVisibility(trajectory.id)}
-                className="rounded"
-              />
-              <div
-                className="h-2 w-4 rounded"
-                style={{ backgroundColor: trajectory.color }}
-              />
-              <span className="text-sm">{trajectory.name}</span>
-            </label>
-          ))}
+        )}
+        {/* Normalisierungs-Toggle */}
+        <div className="mt-4 flex flex-col justify-between rounded bg-gray-50">
+          <label className="flex cursor-pointer items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={normalizeStartPoint}
+              onChange={(e) => setNormalizeStartPoint(e.target.checked)}
+              className="rounded"
+            />
+            <div className="text-sm text-gray-700">
+              Startpunkt normalisieren
+            </div>
+          </label>
         </div>
-      )}
+
+        {/* Externe Legende - GENAU WIE ORIGINAL */}
+        {trajectoryData.length > 0 && (
+          <div className="mt-4 space-y-2 overflow-y-auto">
+            <div className="mb-2 text-sm font-medium text-gray-700">
+              Sichtbare {mode === 'bahnen' ? 'Bahnen' : 'Segmente'}:
+            </div>
+            {trajectoryData.map((trajectory) => (
+              <label
+                key={trajectory.id}
+                className="flex cursor-pointer items-center space-x-2"
+              >
+                <input
+                  type="checkbox"
+                  checked={visibleTrajectories.has(trajectory.id)}
+                  onChange={() => toggleVisibility(trajectory.id)}
+                  className="rounded"
+                />
+                <div
+                  className="h-2 w-4 rounded"
+                  style={{ backgroundColor: trajectory.color }}
+                />
+                <span className="text-sm">{trajectory.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
