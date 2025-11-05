@@ -13,7 +13,7 @@ import { Typography } from '@/src/components/Typography';
 import type { PerformerData } from '@/types/dashboard.types';
 
 interface DashboardClientProps {
-  filenamesCount: number;
+  segmentsCount: number;
   bahnenCount: number;
   medianSIDTW?: number;
   meanSIDTW?: number;
@@ -22,7 +22,7 @@ interface DashboardClientProps {
 }
 
 export default function DashboardClient({
-  filenamesCount,
+  segmentsCount,
   bahnenCount,
   medianSIDTW,
   meanSIDTW,
@@ -38,10 +38,7 @@ export default function DashboardClient({
             componentName="Roboterbahnen insgesamt"
             value={bahnenCount}
           />
-          <DataCard
-            componentName="Aufnahmendateien insgesamt"
-            value={filenamesCount}
-          />
+          <DataCard componentName="Segmente insgesamt" value={segmentsCount} />
           <AccuracyCard medianSIDTW={medianSIDTW} meanSIDTW={meanSIDTW} />
         </div>
         <DistributionCharts />

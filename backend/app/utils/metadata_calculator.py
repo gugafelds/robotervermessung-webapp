@@ -85,7 +85,7 @@ class MetadataCalculatorService:
                     FROM robotervermessung.bewegungsdaten.bahn_info bi
                              LEFT JOIN robotervermessung.bewegungsdaten.bahn_metadata bm
                                        ON bi.bahn_id = bm.bahn_id AND bi.bahn_id = bm.segment_id
-                    WHERE bm.segment_id IS NULL
+                    WHERE bm.segment_id IS NULL AND bi.source_data_ist = 'leica_at960' \
                     ORDER BY bi.bahn_id \
                     """
             rows = await conn.fetch(query)
@@ -754,22 +754,16 @@ class MetadataCalculatorService:
             ]
         )
 
-        # INSERT with conflict handling
         await conn.execute("""
-                           INSERT INTO bewegungsdaten.bahn_embeddings
-                           (segment_id, bahn_id, joint_embedding, position_embedding, orientation_embedding,
-                            velocity_embedding, acceleration_embedding)
-                           SELECT segment_id,
-                                  bahn_id,
-                                  joint_embedding::vector, position_embedding::vector, orientation_embedding::vector, velocity_embedding::vector, acceleration_embedding::vector
-                           FROM temp_embeddings ON CONFLICT (segment_id) DO
-                           UPDATE SET
-                               joint_embedding = EXCLUDED.joint_embedding,
-                               position_embedding = EXCLUDED.position_embedding,
-                               orientation_embedding = EXCLUDED.orientation_embedding,
-                               velocity_embedding = EXCLUDED.velocity_embedding,
-                               acceleration_embedding = EXCLUDED.acceleration_embedding
-                           """)
+                        INSERT INTO bewegungsdaten.bahn_embeddings
+                        (segment_id, bahn_id, joint_embedding, position_embedding, orientation_embedding,
+                        velocity_embedding, acceleration_embedding)
+                        SELECT segment_id,
+                            bahn_id,
+                            joint_embedding::vector, position_embedding::vector, orientation_embedding::vector, 
+                            velocity_embedding::vector, acceleration_embedding::vector
+                        FROM temp_embeddings
+                    """)
 
         logger.info(f"✓ Wrote {len(records)} embedding rows to bahn_embeddings")
 

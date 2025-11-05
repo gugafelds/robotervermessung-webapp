@@ -19,6 +19,7 @@ export interface Distribution {
 
 export interface PerformerData {
   bahn_id: number;
+  segment_id: number;
   sidtw_average_distance: number;
   weight: number;
   waypoints: number;
@@ -34,7 +35,7 @@ export interface PerformerData {
 }
 
 export interface DashboardData {
-  filenamesCount: number;
+  segmentsCount: number;
   bahnenCount: number;
   medianSIDTW?: number;
   meanSIDTW?: number;

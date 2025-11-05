@@ -163,6 +163,7 @@ export const Sidebar = () => {
         const weightMatch = part.match(/^(w|weight)=(\d*\.?\d+)$/i);
         const velMatch = part.match(/^(v|velocity)=(\d*\.?\d+)$/i);
         const dateMatch = part.match(/^d=(.+)$/i);
+        const sidtwMatch = part.match(/^(s|sidtw)=(\d*\.?\d+)$/i);
 
         if (eventMatch) {
           const [, , count] = eventMatch;
@@ -176,6 +177,9 @@ export const Sidebar = () => {
         } else if (dateMatch) {
           const [, dateValue] = dateMatch;
           params.recordingDate = dateValue;
+        } else if (sidtwMatch) {
+          const [, , distance] = sidtwMatch;
+          params.sidtwDistance = parseFloat(distance);
         } else if (!params.query) {
           params.query = part;
         }

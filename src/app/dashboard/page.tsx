@@ -9,7 +9,7 @@ import type { PerformerData } from '@/types/dashboard.types';
 import DashboardClient from './components/DashboardClient';
 
 interface BasicDashboardData {
-  filenamesCount: number;
+  segmentsCount: number;
   bahnenCount: number;
   medianSIDTW?: number;
   meanSIDTW?: number;
@@ -27,7 +27,7 @@ export default function DashboardPage() {
         setLoading(true);
         const dashboardResult = await getDashboardData();
         setData({
-          filenamesCount: dashboardResult.filenamesCount,
+          segmentsCount: dashboardResult.segmentsCount,
           bahnenCount: dashboardResult.bahnenCount,
           medianSIDTW: dashboardResult.medianSIDTW,
           meanSIDTW: dashboardResult.meanSIDTW,
@@ -58,7 +58,7 @@ export default function DashboardPage() {
   return (
     <div className="flex justify-center">
       <DashboardClient
-        filenamesCount={data.filenamesCount}
+        segmentsCount={data.segmentsCount}
         bahnenCount={data.bahnenCount}
         medianSIDTW={data.medianSIDTW}
         meanSIDTW={data.meanSIDTW}

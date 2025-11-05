@@ -108,6 +108,7 @@ export interface SearchBahnParams extends PaginationParams {
   weight?: number;
   settedVelocity?: number;
   recordingDate?: string;
+  sidtwDistance?: number;
 }
 
 export const searchBahnInfo = async (
@@ -134,6 +135,11 @@ export const searchBahnInfo = async (
       queryParams.append(
         'setted_velocity',
         searchParams.settedVelocity.toString(),
+      );
+    if (searchParams.sidtwDistance)
+      queryParams.append(
+        'sidtw_distance',
+        searchParams.sidtwDistance.toString(),
       );
     if (searchParams.recordingDate)
       queryParams.append('recording_date', searchParams.recordingDate);
