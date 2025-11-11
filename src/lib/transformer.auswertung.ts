@@ -11,6 +11,14 @@ import type {
   EAInfoRaw,
   EAPosition,
   EAPositionRaw,
+  QADInfo,
+  QADInfoRaw,
+  QADOrientation,
+  QADOrientationRaw,
+  QDTWInfo,
+  QDTWInfoRaw,
+  QDTWOrientation,
+  QDTWOrientationRaw,
   SIDTWInfo,
   SIDTWInfoRaw,
   SIDTWPosition,
@@ -62,7 +70,34 @@ export const transformSIDTWInfoResult = (
       SIDTWMaxDistance: bahn.sidtw_max_distance,
       SIDTWAvgDistance: bahn.sidtw_average_distance,
       SIDTWStdDeviation: bahn.sidtw_standard_deviation,
-      evaluation: bahn.evaluation,
+    }),
+  );
+};
+
+export const transformQADInfoResult = (bahnenRaw: QADInfoRaw[]): QADInfo[] => {
+  return bahnenRaw.map(
+    (bahn): QADInfo => ({
+      bahnID: bahn.bahn_id,
+      segmentID: bahn.segment_id,
+      QADMinDistance: bahn.qad_min_distance,
+      QADMaxDistance: bahn.qad_max_distance,
+      QADAvgDistance: bahn.qad_average_distance,
+      QADStdDeviation: bahn.qad_standard_deviation,
+    }),
+  );
+};
+
+export const transformQDTWInfoResult = (
+  bahnenRaw: QDTWInfoRaw[],
+): QDTWInfo[] => {
+  return bahnenRaw.map(
+    (bahn): QDTWInfo => ({
+      bahnID: bahn.bahn_id,
+      segmentID: bahn.segment_id,
+      QDTWMinDistance: bahn.qdtw_min_distance,
+      QDTWMaxDistance: bahn.qdtw_max_distance,
+      QDTWAvgDistance: bahn.qdtw_average_distance,
+      QDTWStdDeviation: bahn.qdtw_standard_deviation,
     }),
   );
 };
@@ -145,6 +180,44 @@ export const transformDTWDeviationResult = (
     DTWIstX: item.dtw_ist_x,
     DTWIstY: item.dtw_ist_y,
     DTWIstZ: item.dtw_ist_z,
+    pointsOrder: item.points_order,
+  }));
+};
+
+export const transformQDTWDeviationResult = (
+  data: QDTWOrientationRaw[],
+): QDTWOrientation[] => {
+  return data.map((item) => ({
+    bahnID: item.bahn_id,
+    segmentID: item.segment_id,
+    QDTWDistances: item.qdtw_distances,
+    QDTWSollX: item.qdtw_soll_x,
+    QDTWSollY: item.qdtw_soll_y,
+    QDTWSollZ: item.qdtw_soll_z,
+    QDTWSollW: item.qdtw_soll_w,
+    QDTWIstX: item.qdtw_ist_x,
+    QDTWIstY: item.qdtw_ist_y,
+    QDTWIstZ: item.qdtw_ist_z,
+    QDTWIstW: item.qdtw_ist_w,
+    pointsOrder: item.points_order,
+  }));
+};
+
+export const transformQADDeviationResult = (
+  data: QADOrientationRaw[],
+): QADOrientation[] => {
+  return data.map((item) => ({
+    bahnID: item.bahn_id,
+    segmentID: item.segment_id,
+    QADDistances: item.qad_distances,
+    QADSollX: item.qad_soll_x,
+    QADSollY: item.qad_soll_y,
+    QADSollZ: item.qad_soll_z,
+    QADSollW: item.qad_soll_w,
+    QADIstX: item.qad_ist_x,
+    QADIstY: item.qad_ist_y,
+    QADIstZ: item.qad_ist_z,
+    QADIstW: item.qad_ist_w,
     pointsOrder: item.points_order,
   }));
 };

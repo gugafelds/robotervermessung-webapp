@@ -23,7 +23,7 @@ class MultiModalSearcher:
         self.connection = connection
         self.shape = ShapeSearcher(connection)
         self.prefilter = FilterSearcher(connection)
-        self.ranker = RRFRanker(k=60)
+        self.ranker = RRFRanker(k=1)
 
     async def search_similar(
             self,
@@ -81,8 +81,6 @@ class MultiModalSearcher:
 
             # ===== PHASE 1: BAHN-LEVEL SEARCH =====
             logger.info(f"[Phase 1] Bahn-Level Search: {target_bahn_id} vs other Bahnen")
-            logger.info(f"[Pre-Filter] Features: {prefilter_features} !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!") 
-            logger.info(f"[Pre-Filter] Moddi: {modes} !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!") 
 
             bahn_results = await self._search_bahnen(
                 target_bahn_id=target_bahn_id,
@@ -249,9 +247,7 @@ class MultiModalSearcher:
                     'error': f"No embeddings available for bahn {target_bahn_id}",
                     'results': []
                 }
-            
-            logger.info(f"[Pre-Filter] Features: {prefilter_features} !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!") 
-            
+                        
             candidate_ids = None
             if prefilter_features:
                 logger.info(f"[Pre-Filter Bahn] Features: {prefilter_features}")
@@ -275,7 +271,7 @@ class MultiModalSearcher:
                 mode_results = await self.shape.search_by_embedding(
                     target_id=target_bahn_id,
                     mode=mode,
-                    limit=100,
+                    limit=limit,
                     candidate_ids=candidate_ids,
                     only_bahnen=True
                 )
@@ -350,7 +346,7 @@ class MultiModalSearcher:
                 mode_results = await self.shape.search_by_embedding(
                     target_id=target_segment_id,
                     mode=mode,
-                    limit=100,
+                    limit=limit,
                     candidate_ids=candidate_ids,
                     only_segments=True
                 )

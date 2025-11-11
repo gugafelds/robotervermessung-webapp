@@ -4,7 +4,10 @@ import { Loader } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 
-import { checkPositionDataAvailability } from '@/src/actions/auswertung.service';
+import {
+  checkOrientationDataAvailability,
+  checkPositionDataAvailability,
+} from '@/src/actions/auswertung.service';
 import { getBahnInfoById } from '@/src/actions/bewegungsdaten.service';
 import { DeviationsPlot } from '@/src/app/auswertung/components/DeviationsPlot';
 import { MetrikenPanel } from '@/src/app/auswertung/components/MetrikenPanel';
@@ -14,6 +17,7 @@ import { useTrajectory } from '@/src/providers/trajectory.provider';
 
 export function AuswertungWrapper() {
   const [hasDeviationData, setHasDeviationData] = useState(false);
+  const [hasOrientationData, setHasOrientationData] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   // Zentraler State für Segmentauswahl
@@ -38,6 +42,9 @@ export function AuswertungWrapper() {
       // Prüfe, ob Abweichungsdaten verfügbar sind
       const hasData = await checkPositionDataAvailability(id);
       setHasDeviationData(hasData);
+      const hasOrientationDataCheck =
+        await checkOrientationDataAvailability(id);
+      setHasOrientationData(hasOrientationDataCheck);
     } catch (error) {
       /* empty */
     } finally {
@@ -97,6 +104,7 @@ export function AuswertungWrapper() {
         />
         <DeviationsPlot
           hasDeviationData={hasDeviationData}
+          hasOrientationData={hasOrientationData}
           bahnId={id}
           selectedSegment={selectedSegment}
         />

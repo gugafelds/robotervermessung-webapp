@@ -17,9 +17,9 @@ class FilterSearcher:
 
     def __init__(self, connection: asyncpg.Connection):
         self.connection = connection
-        self.default_tolerance = 0.8  # ±10%
+        self.default_tolerance = 0.2  # ±10%
         self.movement_type_threshold = 0.9 # Mindest-Similarity für movement_type
-        self.profile_tolerance = 0.8 # ±5% für velocity/acceleration profiles
+        self.profile_tolerance = 0.2 # ±5% für velocity/acceleration profiles
     
     async def _filter_only_bahnen(self, segment_ids: List[str]) -> List[str]:
         """Filtert Liste: Nur Bahnen (segment_id = bahn_id)"""
@@ -221,7 +221,7 @@ class FilterSearcher:
                 velocity_keys = ['mean_twist_ist', 'max_twist_ist', 'std_twist_ist']
                 if all(target_features.get(k) for k in velocity_keys):
                     # ✅ Berechne absolute Toleranz von STD
-                    std_val = target_features['std_twist_ist']
+                    std_val = target_features['max_twist_ist']
                     absolute_tolerance = std_val * self.profile_tolerance
                     
                     for key in velocity_keys:
@@ -243,8 +243,8 @@ class FilterSearcher:
                 
                 if all(target_features.get(k) for k in accel_keys):
                     # ✅ Berechne absolute Toleranz von STD
-                    std_val = target_features['std_acceleration_ist']
-                    absolute_tolerance = std_val * self.profile_tolerance * 3
+                    std_val = target_features['max_acceleration_ist']
+                    absolute_tolerance = std_val * self.profile_tolerance
                     
                     for key in accel_keys:
                         val = target_features[key]

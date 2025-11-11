@@ -133,7 +133,7 @@ async def get_auswertung_info_by_id(
             query = """
             SELECT *
             FROM auswertung.{} 
-            WHERE bahn_id = $1 AND evaluation = 'position'
+            WHERE bahn_id = $1
             """.format(table_name)
 
             rows = await conn.fetch(query, bahn_id)
@@ -226,7 +226,7 @@ async def get_auswertung_info(
             query = f"""
             SELECT *
             FROM auswertung.{table_name}
-            WHERE bahn_id IN ({bahn_ids_list}) AND evaluation = 'position'
+            WHERE bahn_id IN ({bahn_ids_list})
             ORDER BY bahn_id
             """
 
@@ -416,6 +416,27 @@ async def check_deviation_data(bahn_id: str, conn=Depends(get_db)):
         logger.error(f"Error checking deviation data: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/has_orientation_data/{bahn_id}")
+@cache(expire=2400)
+async def check_orientation_data(bahn_id: str, conn=Depends(get_db)):
+    try:
+        query = """
+        SELECT 
+            CASE 
+                WHEN EXISTS (SELECT 1 FROM auswertung.orientation_qad WHERE bahn_id = $1) OR
+                     EXISTS (SELECT 1 FROM auswertung.orientation_qdtw WHERE bahn_id = $1)
+                THEN true
+                ELSE false
+            END as has_data
+        """
+
+        result = await conn.fetchrow(query, bahn_id)
+        return {"has_orientation_data": result['has_data']}
+
+    except Exception as e:
+        logger.error(f"Error checking orientation data: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/search")
 async def search_auswertung_bahn_ids(
@@ -522,4 +543,75 @@ async def search_auswertung_bahn_ids(
     except Exception as e:
         logger.error(f"Error searching Auswertung bahn info: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+    
+    
+@router.get("/orientation_qad/{bahn_id}")
+async def get_orientation_qad_by_id(bahn_id: str, conn=Depends(get_db)):
+    try:
+        query = """
+                SELECT 
+                    bahn_id,
+                    segment_id,
+                    qad_distances,
+                    qad_soll_x,
+                    qad_soll_y,
+                    qad_soll_z,
+                    qad_soll_w,
+                    qad_ist_x,
+                    qad_ist_y,
+                    qad_ist_z,
+                    qad_ist_w,
+                    points_order
+                FROM auswertung.orientation_qad 
+                WHERE bahn_id = $1
+                ORDER BY points_order ASC
+                """
 
+        rows = await conn.fetch(query, bahn_id)
+
+        if not rows:
+            raise HTTPException(status_code=404, detail=f"No QAD orientation data found for bahn_id {bahn_id}")
+
+        return {
+            "orientation_qad": [dict(row) for row in rows]
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching QAD orientation data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+@router.get("/orientation_qdtw/{bahn_id}")
+@cache(expire=2400)
+async def get_orientation_qdtw_by_id(bahn_id: str, conn=Depends(get_db)):
+    try:
+        query = """
+                SELECT 
+                    bahn_id,
+                    segment_id,
+                    qdtw_distances,
+                    qdtw_soll_x,
+                    qdtw_soll_y,
+                    qdtw_soll_z,
+                    qdtw_soll_w,
+                    qdtw_ist_x,
+                    qdtw_ist_y,
+                    qdtw_ist_z,
+                    qdtw_ist_w,
+                    points_order
+                FROM auswertung.orientation_qdtw 
+                WHERE bahn_id = $1
+                ORDER BY points_order ASC
+                """
+
+        rows = await conn.fetch(query, bahn_id)
+
+        if not rows:
+            raise HTTPException(status_code=404, detail=f"No QDTW deviation data found for bahn_id {bahn_id}")
+
+        return {
+            "orientation_qdtw": [dict(row) for row in rows]
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching qdtw deviation data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")

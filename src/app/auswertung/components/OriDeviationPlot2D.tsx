@@ -7,10 +7,8 @@ import React from 'react';
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 const methodColors = {
-  EA: { line: '#003560' },
-  DFD: { line: '#2a9d8f' },
-  DTW: { line: '#774936' },
-  SIDTW: { line: '#e63946' },
+  QAD: { line: '#003560' },
+  QDTW: { line: '#e63946' },
 };
 
 interface MetricState {
@@ -19,30 +17,24 @@ interface MetricState {
   visible: boolean;
 }
 
-interface PosDeviationPlot2DProps {
-  hasDeviationData: boolean;
+interface OriDeviationPlot2DProps {
+  hasOrientationData: boolean;
   selectedSegment: string;
   metrics: {
-    ea: MetricState;
-    dfd: MetricState;
-    sidtw: MetricState;
-    dtw: MetricState;
+    qad: MetricState;
+    qdtw: MetricState;
   };
-  currentEuclideanDeviation: any[];
-  currentDiscreteFrechetDeviation: any[];
-  currentSIDTWDeviation: any[];
-  currentDTWDeviation: any[];
+  currentQDTWDeviation: any[];
+  currentQADDeviation: any[];
   currentBahnInfo: any;
 }
 
-export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
-  hasDeviationData,
+export const OriDeviationPlot2D: React.FC<OriDeviationPlot2DProps> = ({
+  hasOrientationData,
   selectedSegment,
   metrics,
-  currentEuclideanDeviation,
-  currentDiscreteFrechetDeviation,
-  currentSIDTWDeviation,
-  currentDTWDeviation,
+  currentQDTWDeviation,
+  currentQADDeviation,
   currentBahnInfo,
 }) => {
   // Daten nach Segment filtern
@@ -66,10 +58,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
   };
 
   // Zeitarray generieren basierend auf pointsOrder
-  const getTimeArray = (
-    data: any[],
-    metricType: 'ea' | 'sidtw' | 'dtw' | 'dfd',
-  ) => {
+  const getTimeArray = (data: any[], metricType: 'qad' | 'qdtw') => {
     if (!data.length) return [];
 
     if (!currentBahnInfo?.startTime || !currentBahnInfo?.endTime) {
@@ -80,22 +69,22 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
     const endTime = new Date(currentBahnInfo.endTime).getTime();
     const duration = endTime - startTime;
 
-    const allEAData = currentEuclideanDeviation || [];
-    const totalPoints = Math.max(...allEAData.map((d) => d.pointsOrder));
+    const allQADData = currentQADDeviation || [];
+    const totalPoints = Math.max(...allQADData.map((d) => d.pointsOrder));
 
-    if (metricType === 'ea') {
+    if (metricType === 'qad') {
       return data.map((d) => {
         return ((d.pointsOrder / totalPoints) * duration) / 1000;
       });
     }
     // QDTW: interpoliere zwischen min und max pointsOrder des Segments
-    const filteredEA = filterDataBySegment(allEAData);
+    const filteredQAD = filterDataBySegment(allQADData);
 
-    const eaMinOrder = Math.min(...filteredEA.map((d) => d.pointsOrder));
-    const eaMaxOrder = Math.max(...filteredEA.map((d) => d.pointsOrder));
+    const qadMinOrder = Math.min(...filteredQAD.map((d) => d.pointsOrder));
+    const qadMaxOrder = Math.max(...filteredQAD.map((d) => d.pointsOrder));
 
-    const startTimeSeg = ((eaMinOrder / totalPoints) * duration) / 1000;
-    const endTimeSeg = ((eaMaxOrder / totalPoints) * duration) / 1000;
+    const startTimeSeg = ((qadMinOrder / totalPoints) * duration) / 1000;
+    const endTimeSeg = ((qadMaxOrder / totalPoints) * duration) / 1000;
 
     return data.map((_, i) => {
       return (
@@ -108,76 +97,39 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
   const create2DPlot = (): Partial<PlotData>[] => {
     const plots: Partial<PlotData>[] = [];
 
-    if (metrics.ea.isLoaded && metrics.ea.visible) {
-      const filteredData = filterDataBySegment(currentEuclideanDeviation);
-      const sortedEA = [...filteredData].sort(
+    if (metrics.qad.isLoaded && metrics.qad.visible) {
+      const filteredData = filterDataBySegment(currentQADDeviation);
+      const sortedQAD = [...filteredData].sort(
         (a, b) => a.pointsOrder - b.pointsOrder,
       );
-      const timePoints = getTimeArray(sortedEA, 'ea');
+      const timePoints = getTimeArray(sortedQAD, 'qad');
 
       plots.push({
         type: 'scatter',
         mode: 'lines',
-        name: 'Euklidischer Abstand',
+        name: 'QAD',
         x: timePoints,
-        y: sortedEA.map((d) => d.EADistances),
-        line: { color: methodColors.EA.line, width: 2 },
-        hovertemplate: 'Zeit: %{x:.2f}s<br>EA: %{y:.2f}mm<extra></extra>',
+        y: sortedQAD.map((d) => d.QADDistances),
+        line: { color: methodColors.QAD.line, width: 2 },
+        hovertemplate: 'Zeit: %{x:.2f}s<br>QAD: %{y:.2f}°<extra></extra>',
       });
     }
 
-    if (metrics.dfd.isLoaded && metrics.dfd.visible) {
-      const filteredData = filterDataBySegment(currentDiscreteFrechetDeviation);
-      const sortedDFD = [...filteredData].sort(
+    if (metrics.qdtw.isLoaded && metrics.qdtw.visible) {
+      const filteredData = filterDataBySegment(currentQDTWDeviation);
+      const sortedQDTW = [...filteredData].sort(
         (a, b) => a.pointsOrder - b.pointsOrder,
       );
-      const timePoints = getTimeArray(sortedDFD, 'dfd');
+      const timePoints = getTimeArray(sortedQDTW, 'qdtw');
 
       plots.push({
         type: 'scatter',
         mode: 'lines',
-        name: 'Diskrete Fréchet-Distanz',
+        name: 'QDTW',
         x: timePoints,
-        y: sortedDFD.map((d) => d.DFDDistances),
-        line: { color: methodColors.DFD.line, width: 2 },
-        hovertemplate: 'Zeit: %{x:.2f}s<br>DFD: %{y:.2f}mm<extra></extra>',
-      });
-    }
-
-    if (metrics.sidtw.isLoaded && metrics.sidtw.visible) {
-      const filteredData = filterDataBySegment(currentSIDTWDeviation);
-      const sortedSIDTW = [...filteredData].sort(
-        (a, b) => a.pointsOrder - b.pointsOrder,
-      );
-      const timePoints = getTimeArray(sortedSIDTW, 'sidtw');
-
-      plots.push({
-        type: 'scatter',
-        mode: 'lines',
-        name: 'SIDTW',
-        x: timePoints,
-        y: sortedSIDTW.map((d) => d.SIDTWDistances),
-        line: { color: methodColors.SIDTW.line, width: 2 },
-        hovertemplate: 'Zeit: %{x:.2f}s<br>SIDTW: %{y:.2f}mm<extra></extra>',
-      });
-    }
-
-    if (metrics.dtw.isLoaded && metrics.dtw.visible) {
-      const filteredData = filterDataBySegment(currentDTWDeviation);
-      const sortedDTW = [...filteredData].sort(
-        (a, b) => a.pointsOrder - b.pointsOrder,
-      );
-      const timePoints = getTimeArray(sortedDTW, 'dtw');
-
-      plots.push({
-        type: 'scatter',
-        mode: 'lines',
-        name: 'DTW',
-        x: timePoints,
-        y: sortedDTW.map((d) => d.DTWDistances),
-        line: { color: methodColors.DTW.line, width: 2 },
-        hovertemplate: 'Zeit: %{x:.2f}s<br>DTW: %{y:.2f}mm<extra></extra>',
-        uirevision: 'true',
+        y: sortedQDTW.map((d) => d.QDTWDistances),
+        line: { color: methodColors.QDTW.line, width: 2 },
+        hovertemplate: 'Zeit: %{x:.2f}s<br>QDTW: %{y:.2f}°<extra></extra>',
       });
     }
 
@@ -188,11 +140,11 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
   const get2DLayout = (): Partial<Layout> => ({
     title:
       selectedSegment === 'total'
-        ? 'Position (Gesamtmessung)'
-        : `Position (Segment ${selectedSegment.split('_')[1]})`,
+        ? 'Orientierung (Gesamtmessung)'
+        : `Orientierung (Segment ${selectedSegment.split('_')[1]})`,
     font: { family: 'Helvetica' },
     xaxis: { title: 'Zeit [s]' },
-    yaxis: { title: 'Abweichung [mm]' },
+    yaxis: { title: 'Abweichung [°]' },
     hovermode: 'x unified',
     height: 600,
     margin: { t: 40, b: 40, l: 60, r: 20 },
@@ -204,7 +156,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
     (m) => m.isLoaded && m.visible,
   );
 
-  if (!hasDeviationData) {
+  if (!hasOrientationData) {
     return null;
   }
 

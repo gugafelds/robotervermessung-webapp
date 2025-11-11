@@ -11,6 +11,10 @@ import {
   transformDTWInfoResult,
   transformEADeviationResult,
   transformEAInfoResult,
+  transformQADDeviationResult,
+  transformQADInfoResult,
+  transformQDTWDeviationResult,
+  transformQDTWInfoResult,
   transformSIDTWDeviationResult,
   transformSIDTWInfoResult,
 } from '@/src/lib/transformer.auswertung';
@@ -22,6 +26,10 @@ import type {
   DTWPositionRaw,
   EAPosition,
   EAPositionRaw,
+  QADOrientation,
+  QADOrientationRaw,
+  QDTWOrientation,
+  QDTWOrientationRaw,
   SIDTWPosition,
   SIDTWPositionRaw,
 } from '@/types/auswertung.types';
@@ -155,6 +163,8 @@ export const getAuswertungInfoById = async (
   info_sidtw: any[];
   info_dtw: any[];
   info_euclidean: any[];
+  info_qdtw: any[];
+  info_qad: any[];
 }> => {
   try {
     const result = await fetchFromAPI<{
@@ -166,6 +176,8 @@ export const getAuswertungInfoById = async (
       info_sidtw: transformSIDTWInfoResult(result.info_sidtw || []),
       info_dtw: transformDTWInfoResult(result.info_dtw || []),
       info_euclidean: transformEAInfoResult(result.info_euclidean || []),
+      info_qdtw: transformQDTWInfoResult(result.info_qdtw || []),
+      info_qad: transformQADInfoResult(result.info_qad || []),
     };
   } catch (error) {
     console.error(`Error fetching Auswertung info for ${id}:`, error);
@@ -174,6 +186,8 @@ export const getAuswertungInfoById = async (
       info_sidtw: [],
       info_dtw: [],
       info_euclidean: [],
+      info_qdtw: [],
+      info_qad: [],
     };
   }
 };
@@ -244,5 +258,48 @@ export const checkPositionDataAvailability = async (
     // eslint-disable-next-line no-console
     console.error('Error checking deviation data availability:', error);
     return false;
+  }
+};
+
+export const checkOrientationDataAvailability = async (
+  id: string,
+): Promise<boolean> => {
+  try {
+    const result = await fetchFromAPI<{ has_orientation_data: boolean }>(
+      `/auswertung/has_orientation_data/${id}`,
+    );
+    return result.has_orientation_data;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error checking orientation data availability:', error);
+    return false;
+  }
+};
+
+export const getQDTWOrientationById = async (
+  id: string,
+): Promise<QDTWOrientation[]> => {
+  try {
+    const result = await fetchFromAPI<{
+      orientation_qdtw: QDTWOrientationRaw[];
+    }>(`/auswertung/orientation_qdtw/${id}`);
+    return transformQDTWDeviationResult(result.orientation_qdtw);
+  } catch (error) {
+    console.error('Error fetching QDTW deviation data:', error);
+    throw error;
+  }
+};
+
+export const getQADOrientationById = async (
+  id: string,
+): Promise<QADOrientation[]> => {
+  try {
+    const result = await fetchFromAPI<{
+      orientation_qad: QADOrientationRaw[];
+    }>(`/auswertung/orientation_qad/${id}`);
+    return transformQADDeviationResult(result.orientation_qad);
+  } catch (error) {
+    console.error('Error fetching QAD orientation data:', error);
+    throw error;
   }
 };

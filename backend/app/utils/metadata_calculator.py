@@ -12,6 +12,8 @@ from pathlib import Path
 # Import EmbeddingCalculator
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from ..utils.embedding_calculator import EmbeddingCalculator
+from .binary_vector_writer import BinaryVectorWriter
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +25,17 @@ class MetadataCalculatorService:
 
         # ✅ GEÄNDERT: EmbeddingCalculator mit velocity/acceleration
         self.embedding_calculator = EmbeddingCalculator(
-            joint_samples=50,         # 50 × 6 = 300
-            position_samples=100,     # 100 × 3 = 300
-            orientation_samples=50,   # 50 × 4 = 200
-            velocity_samples=100,     # 100 × 1 = 100
-            acceleration_samples=50   # 50 × 3 = 150
+            joint_samples=150,         # 150 × 6 = 900
+            position_samples=300,     # 300 × 3 = 900
+            orientation_samples=150,   # 150 × 4 = 600
+            velocity_samples=100,     # 100 × 3 = 300
+            acceleration_samples=100   # 100 × 3 = 300
         )
+
+
+        DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/dbname")
+
+        self.binary_writer = BinaryVectorWriter(DATABASE_URL)
 
     async def validate_datetime_input(self, date_string: str) -> Optional[int]:
         """
@@ -518,11 +525,11 @@ class MetadataCalculatorService:
             embedding_rows.append({
                 'segment_id': segment_id,
                 'bahn_id': bahn_id,
-                'joint_embedding': self._array_to_str(joint_emb) if joint_emb is not None else None,
-                'position_embedding': self._array_to_str(pos_emb) if pos_emb is not None else None,
-                'orientation_embedding': self._array_to_str(ori_emb) if ori_emb is not None else None,
-                'velocity_embedding': self._array_to_str(vel_emb) if vel_emb is not None else None,  # ✅ NEU
-                'acceleration_embedding': self._array_to_str(acc_emb) if acc_emb is not None else None,  # ✅ NEU
+                'joint_embedding': joint_emb,
+                'position_embedding': pos_emb,
+                'orientation_embedding': ori_emb,
+                'velocity_embedding': vel_emb,
+                'acceleration_embedding': acc_emb,
             })
 
         # 2. Gesamtbahn (segment_id = bahn_id)
@@ -594,11 +601,11 @@ class MetadataCalculatorService:
             embedding_rows.append({
                 'segment_id': bahn_id,  # ✅ Bahn-Level: segment_id = bahn_id
                 'bahn_id': bahn_id,
-                'joint_embedding': self._array_to_str(bahn_joint_emb) if bahn_joint_emb is not None else None,
-                'position_embedding': self._array_to_str(bahn_pos_emb) if bahn_pos_emb is not None else None,
-                'orientation_embedding': self._array_to_str(bahn_ori_emb) if bahn_ori_emb is not None else None,
-                'velocity_embedding': self._array_to_str(bahn_vel_emb) if bahn_vel_emb is not None else None,
-                'acceleration_embedding': self._array_to_str(bahn_acc_emb) if bahn_acc_emb is not None else None,
+                'joint_embedding': bahn_joint_emb,
+                'position_embedding': bahn_pos_emb,
+                'orientation_embedding': bahn_ori_emb,
+                'velocity_embedding': bahn_vel_emb,
+                'acceleration_embedding': bahn_acc_emb
             })
 
         return embedding_rows
@@ -704,7 +711,39 @@ class MetadataCalculatorService:
 
         logger.info(f"✓ Wrote {len(records)} metadata rows to bahn_metadata")
 
+
     async def batch_write_embeddings(
+        self,
+        conn: asyncpg.Connection,
+        embedding_rows: List[Dict]
+    ):
+        """
+        ✅ GEÄNDERT: Nutzt Binary COPY statt Text Parsing
+        """
+        if not embedding_rows:
+            return
+        
+        # Konvertiere Strings zu numpy arrays
+        for row in embedding_rows:
+            for key in ['joint_embedding', 'position_embedding', 'orientation_embedding', 
+                       'velocity_embedding', 'acceleration_embedding']:
+                if row.get(key) is not None and isinstance(row[key], str):
+                    # Parse '[1.2,3.4,...]' → numpy array
+                    emb_str = row[key].strip('[]')
+                    values = [float(x) for x in emb_str.split(',')]
+                    row[key] = np.array(values, dtype=np.float32)
+        
+        # ✅ Binary COPY via psycopg3 (synchron, aber schnell!)
+        import asyncio
+        await asyncio.get_event_loop().run_in_executor(
+            None,  # Default executor
+            self.binary_writer.bulk_write_embeddings,
+            embedding_rows
+        )
+        
+        logger.info(f"✓ Wrote {len(embedding_rows)} embeddings via Binary COPY")
+
+    async def batch_write_embeddings_test(
             self,
             conn: asyncpg.Connection,
             embedding_rows: List[Dict]

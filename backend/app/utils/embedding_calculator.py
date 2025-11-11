@@ -49,13 +49,13 @@ class EmbeddingCalculator:
 
     def compute_position_embedding(self, data: List[Dict]) -> Optional[np.ndarray]:
         """
-        Position Embedding MIT Normalisierung auf Startpunkt
-        Returns: np.ndarray(300,)
+        ✅ Shape Embedding: Nur Form, NICHT absolute Position
+        
+        Findet ähnliche Formen unabhängig von Position im Arbeitsraum
         """
         if len(data) < 10:
             return None
 
-        # NumPy array (n_points, 3)
         traj = np.array([
             [r['x_soll'], r['y_soll'], r['z_soll']]
             for r in data
@@ -64,9 +64,16 @@ class EmbeddingCalculator:
         start_point = traj[0]
         traj_normalized = traj - start_point
 
-        # Resample + flatten + L2 normalize
+        centroid = np.mean(traj, axis=0)
+        traj_normalized = traj - centroid
+        
+        max_extent = np.max(np.abs(traj_normalized))
+        if max_extent > 1e-6:
+            traj_normalized = traj_normalized / max_extent  # [-1, 1]
+        
         resampled = self._resample(traj_normalized, self.position_samples)
         flat = resampled.flatten()
+        
         return self._l2_normalize(flat)
 
     def compute_orientation_embedding(self, data: List[Dict]) -> Optional[np.ndarray]:
@@ -165,19 +172,6 @@ class EmbeddingCalculator:
         """
         indices = np.linspace(0, len(trajectory) - 1, n_samples, dtype=int)
         return trajectory[indices]
-
-    def _resample_1d(self, signal: np.ndarray, n_samples: int) -> np.ndarray:
-        """
-        Resample 1D signal to n_samples
-        
-        Args:
-            signal: (n_points,) array
-            n_samples: target number of samples
-        Returns:
-            (n_samples,) array
-        """
-        indices = np.linspace(0, len(signal) - 1, n_samples, dtype=int)
-        return signal[indices]
 
     def _l2_normalize(self, vec: np.ndarray) -> np.ndarray:
         """

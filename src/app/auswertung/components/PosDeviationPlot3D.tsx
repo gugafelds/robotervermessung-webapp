@@ -15,9 +15,9 @@ const methodColors = {
     connection: 'rgba(0, 53, 96, 0.7)',
   },
   DFD: {
-    soll: '#e63946',
-    ist: '#ff6b6b',
-    connection: 'rgba(230, 57, 70, 0.7)',
+    soll: '#2a9d8f',
+    ist: '#54ccc0',
+    connection: 'rgba(42, 157, 143, 0.7)',
   },
   DTW: {
     soll: '#774936',
@@ -25,9 +25,9 @@ const methodColors = {
     connection: 'rgba(119, 73, 54, 0.7)',
   },
   SIDTW: {
-    soll: '#2a9d8f',
-    ist: '#54ccc0',
-    connection: 'rgba(42, 157, 143, 0.7)',
+    soll: '#e63946',
+    ist: '#ff6b6b',
+    connection: 'rgba(230, 57, 70, 0.7)',
   },
 };
 
@@ -65,13 +65,20 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
   const filterDataBySegment = (data: any[]) => {
     if (!data?.length) return [];
 
-    return data.filter((d) => {
-      if (selectedSegment === 'total') {
-        return d.bahnID === d.segmentID;
+    if (selectedSegment === 'total') {
+      // Alte Struktur: nur Zeilen wo bahnID === segmentID
+      // Neue Struktur: alle Zeilen der aktuellen Bahn
+      const hasOldStructure = data.some((d) => d.bahnID === d.segmentID);
+
+      if (hasOldStructure) {
+        return data.filter((d) => d.bahnID === d.segmentID);
       }
-      const segmentNum = selectedSegment.split('_')[1];
-      return d.segmentID === `${d.bahnID}_${segmentNum}`;
-    });
+      // Alle Segmente der Bahn
+      return data;
+    }
+
+    const segmentNum = selectedSegment.split('_')[1];
+    return data.filter((d) => d.segmentID === `${d.bahnID}_${segmentNum}`);
   };
 
   // Helper für 3D Traces

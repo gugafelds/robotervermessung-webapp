@@ -10,11 +10,15 @@ import {
   getDFDPositionById,
   getDTWPositionById,
   getEAPositionById,
+  getQADOrientationById,
+  getQDTWOrientationById,
   getSIDTWPositionById,
 } from '@/src/actions/auswertung.service';
 import { getBahnInfoById } from '@/src/actions/bewegungsdaten.service';
 import { PosDeviationPlot2D } from '@/src/app/auswertung/components/PosDeviationPlot2D';
 import { PosDeviationPlot3D } from '@/src/app/auswertung/components/PosDeviationPlot3D';
+
+import { OriDeviationPlot2D } from './OriDeviationPlot2D';
 
 interface MetricState {
   isLoaded: boolean;
@@ -24,12 +28,14 @@ interface MetricState {
 
 interface DeviationsPlotProps {
   hasDeviationData: boolean;
+  hasOrientationData: boolean;
   bahnId: string;
   selectedSegment: string;
 }
 
 export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   hasDeviationData,
+  hasOrientationData,
   bahnId,
   selectedSegment,
 }) => {
@@ -39,11 +45,15 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
     dfd: MetricState;
     sidtw: MetricState;
     dtw: MetricState;
+    qad: MetricState;
+    qdtw: MetricState;
   }>({
     ea: { isLoaded: false, isLoading: false, visible: false },
     dfd: { isLoaded: false, isLoading: false, visible: false },
     sidtw: { isLoaded: false, isLoading: false, visible: false },
     dtw: { isLoaded: false, isLoading: false, visible: false },
+    qad: { isLoaded: false, isLoading: false, visible: false },
+    qdtw: { isLoaded: false, isLoading: false, visible: false },
   });
 
   // Zentrale Daten States
@@ -54,12 +64,16 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
     useState<any[]>([]);
   const [currentSIDTWDeviation, setCurrentSIDTWDeviation] = useState<any[]>([]);
   const [currentDTWDeviation, setCurrentDTWDeviation] = useState<any[]>([]);
+  const [currentQADDeviation, setCurrentQADDeviation] = useState<any[]>([]);
+  const [currentQDTWDeviation, setCurrentQDTWDeviation] = useState<any[]>([]);
   const [currentBahnInfo, setCurrentBahnInfo] = useState<any>(null);
   const [currentAuswertungInfo, setCurrentAuswertungInfo] = useState<any>({
     info_euclidean: [],
     info_dfd: [],
     info_sidtw: [],
     info_dtw: [],
+    info_qdtw: [],
+    info_qad: [],
   });
 
   // Bahn-Info laden
@@ -91,7 +105,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
 
   // Zentrale Funktion zum Laden der Metrik-Daten
   const loadMetricData = useCallback(
-    async (metricType: 'ea' | 'dfd' | 'sidtw' | 'dtw') => {
+    async (metricType: 'ea' | 'dfd' | 'sidtw' | 'dtw' | 'qad' | 'qdtw') => {
       if (!bahnId) return;
 
       // Wenn bereits geladen, toggle visibility
@@ -131,6 +145,14 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
             data = await getDTWPositionById(bahnId);
             setCurrentDTWDeviation(data);
             break;
+          case 'qad':
+            data = await getQADOrientationById(bahnId);
+            setCurrentQADDeviation(data);
+            break;
+          case 'qdtw':
+            data = await getQDTWOrientationById(bahnId);
+            setCurrentQDTWDeviation(data);
+            break;
           default:
             throw new Error(`Unknown metric type: ${metricType}`);
         }
@@ -154,6 +176,8 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   const hasDFDData = currentAuswertungInfo.info_dfd.length > 0;
   const hasSIDTWData = currentAuswertungInfo.info_sidtw.length > 0;
   const hasDTWData = currentAuswertungInfo.info_dtw.length > 0;
+  const hasQADData = currentAuswertungInfo.info_qad?.length > 0;
+  const hasQDTWData = currentAuswertungInfo.info_qdtw?.length > 0;
 
   // Automatisch EA laden, wenn verfügbar
   useEffect(() => {
@@ -161,6 +185,12 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
       loadMetricData('ea');
     }
   }, [hasEAData, metrics.ea.isLoaded, metrics.ea.isLoading, loadMetricData]);
+
+  useEffect(() => {
+    if (hasQADData && !metrics.qad.isLoaded && !metrics.qad.isLoading) {
+      loadMetricData('qad');
+    }
+  }, [hasQADData, metrics.qad.isLoaded, metrics.qad.isLoading, loadMetricData]);
 
   const getButtonContent = (metric: MetricState, label: string) => {
     if (metric.isLoading) {
@@ -256,6 +286,30 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
             {getButtonContent(metrics.dfd, 'DFD')}
           </button>
         )}
+
+        {hasQADData && (
+          <button
+            onClick={() => loadMetricData('qad')}
+            disabled={metrics.qad.isLoading}
+            className={`inline-flex items-center space-x-2 rounded px-3 py-1 text-sm 
+              ${getButtonColorClass(metrics.qad)} 
+              disabled:bg-gray-300 disabled:text-gray-600`}
+          >
+            {getButtonContent(metrics.qad, 'QAD')}
+          </button>
+        )}
+
+        {hasQDTWData && (
+          <button
+            onClick={() => loadMetricData('qdtw')}
+            disabled={metrics.qdtw.isLoading}
+            className={`inline-flex items-center space-x-2 rounded px-3 py-1 text-sm 
+              ${getButtonColorClass(metrics.qdtw)} 
+              disabled:bg-gray-300 disabled:text-gray-600`}
+          >
+            {getButtonContent(metrics.qdtw, 'QDTW')}
+          </button>
+        )}
       </div>
 
       {/* Plots rendern nur wenn Daten geladen */}
@@ -281,6 +335,19 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
             currentDiscreteFrechetDeviation={currentDiscreteFrechetDeviation}
             currentSIDTWDeviation={currentSIDTWDeviation}
             currentDTWDeviation={currentDTWDeviation}
+          />
+        </div>
+      )}
+      {anyMetricLoaded && (
+        <div className="flex justify-items-stretch space-x-2">
+          <OriDeviationPlot2D
+            hasOrientationData={hasOrientationData}
+            selectedSegment={selectedSegment}
+            // Übergabe aller benötigten Daten und States
+            metrics={metrics}
+            currentQADDeviation={currentQADDeviation}
+            currentQDTWDeviation={currentQDTWDeviation}
+            currentBahnInfo={currentBahnInfo}
           />
         </div>
       )}

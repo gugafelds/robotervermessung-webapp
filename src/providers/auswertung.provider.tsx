@@ -22,6 +22,10 @@ import type {
   DTWPosition,
   EAInfo,
   EAPosition,
+  QADInfo,
+  QADOrientation,
+  QDTWInfo,
+  QDTWOrientation,
   SIDTWInfo,
   SIDTWPosition,
 } from '@/types/auswertung.types';
@@ -52,6 +56,14 @@ export interface AuswertungState {
   currentDiscreteFrechetDeviation: DFDPosition[];
   setCurrentDiscreteFrechetDeviation: React.Dispatch<
     React.SetStateAction<DFDPosition[]>
+  >;
+  currentQADDeviation: QADOrientation[];
+  setCurrentQADDeviation: React.Dispatch<
+    React.SetStateAction<QADOrientation[]>
+  >;
+  currentQDTWDeviation: QDTWOrientation[];
+  setCurrentQDTWDeviation: React.Dispatch<
+    React.SetStateAction<QDTWOrientation[]>
   >;
 
   // Paginierungseigenschaften
@@ -97,6 +109,8 @@ export const AuswertungProvider = ({
   const [currentEuclideanInfo, setCurrentEuclideanInfo] = useState<EAInfo[]>(
     [],
   );
+  const [currentQADInfo, setCurrentQADInfo] = useState<QADInfo[]>([]);
+  const [currentQDTWInfo, setCurrentQDTWInfo] = useState<QDTWInfo[]>([]);
 
   // Deviation Zustände
   const [currentSIDTWDeviation, setCurrentSIDTWDeviation] = useState<
@@ -109,6 +123,12 @@ export const AuswertungProvider = ({
     useState<DFDPosition[]>([]);
   const [currentEuclideanDeviation, setCurrentEuclideanDeviation] = useState<
     EAPosition[]
+  >([]);
+  const [currentQADDeviation, setCurrentQADDeviation] = useState<
+    QADOrientation[]
+  >([]);
+  const [currentQDTWDeviation, setCurrentQDTWDeviation] = useState<
+    QDTWOrientation[]
   >([]);
 
   // Aktualisiere den Hauptzustand
@@ -165,6 +185,8 @@ export const AuswertungProvider = ({
       setCurrentDTWInfo(infoResult.info_dtw);
       setCurrentDiscreteFrechetInfo(infoResult.info_dfd);
       setCurrentEuclideanInfo(infoResult.info_euclidean);
+      setCurrentQADInfo(infoResult.info_qad);
+      setCurrentQDTWInfo(infoResult.info_qdtw);
     } catch (error) {
       // Using error level for actual errors
       if (process.env.NODE_ENV !== 'production') {
@@ -207,6 +229,10 @@ export const AuswertungProvider = ({
       setCurrentDiscreteFrechetInfo,
       currentEuclideanInfo,
       setCurrentEuclideanInfo,
+      currentQADInfo,
+      setCurrentQADInfo,
+      currentQDTWInfo,
+      setCurrentQDTWInfo,
       currentSIDTWDeviation,
       setCurrentSIDTWDeviation,
       currentDTWDeviation,
@@ -215,6 +241,10 @@ export const AuswertungProvider = ({
       setCurrentDiscreteFrechetDeviation,
       currentEuclideanDeviation,
       setCurrentEuclideanDeviation,
+      currentQADDeviation,
+      setCurrentQADDeviation,
+      currentQDTWDeviation,
+      setCurrentQDTWDeviation,
     }),
     [
       auswertungBahnIDs,
@@ -225,10 +255,14 @@ export const AuswertungProvider = ({
       currentDTWInfo,
       currentDiscreteFrechetInfo,
       currentEuclideanInfo,
+      currentQADInfo,
+      currentQDTWInfo,
       currentSIDTWDeviation,
       currentDTWDeviation,
       currentDiscreteFrechetDeviation,
       currentEuclideanDeviation,
+      currentQADDeviation,
+      currentQDTWDeviation,
       loadPage,
       fetchInfoForBahnId,
       nextPage,

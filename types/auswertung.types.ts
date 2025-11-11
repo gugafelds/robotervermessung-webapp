@@ -53,7 +53,6 @@ export interface SIDTWInfoRaw {
   sidtw_max_distance: number;
   sidtw_average_distance: number;
   sidtw_standard_deviation: number;
-  evaluation: string;
 }
 
 export interface SIDTWInfo {
@@ -63,7 +62,6 @@ export interface SIDTWInfo {
   SIDTWMaxDistance: number;
   SIDTWAvgDistance: number;
   SIDTWStdDeviation: number;
-  evaluation: string;
 }
 
 export interface DTWInfoRaw {
@@ -84,6 +82,42 @@ export interface DTWInfo {
   DTWAvgDistance: number;
   DTWStdDeviation: number;
   evaluation: string;
+}
+
+export interface QDTWInfoRaw {
+  bahn_id: string;
+  segment_id: string;
+  qdtw_min_distance: number;
+  qdtw_max_distance: number;
+  qdtw_average_distance: number;
+  qdtw_standard_deviation: number;
+}
+
+export interface QDTWInfo {
+  bahnID: string;
+  segmentID: string;
+  QDTWMinDistance: number;
+  QDTWMaxDistance: number;
+  QDTWAvgDistance: number;
+  QDTWStdDeviation: number;
+}
+
+export interface QADInfoRaw {
+  bahn_id: string;
+  segment_id: string;
+  qad_min_distance: number;
+  qad_max_distance: number;
+  qad_average_distance: number;
+  qad_standard_deviation: number;
+}
+
+export interface QADInfo {
+  bahnID: string;
+  segmentID: string;
+  QADMinDistance: number;
+  QADMaxDistance: number;
+  QADAvgDistance: number;
+  QADStdDeviation: number;
 }
 
 export interface SIDTWPositionRaw {
@@ -135,6 +169,66 @@ export interface DTWPosition {
   DTWIstX: number;
   DTWIstY: number;
   DTWIstZ: number;
+  pointsOrder: number;
+}
+
+export interface QDTWOrientationRaw {
+  bahn_id: string;
+  segment_id: string;
+  qdtw_distances: number;
+  qdtw_soll_x: number;
+  qdtw_soll_y: number;
+  qdtw_soll_z: number;
+  qdtw_soll_w: number;
+  qdtw_ist_x: number;
+  qdtw_ist_y: number;
+  qdtw_ist_z: number;
+  qdtw_ist_w: number;
+  points_order: number;
+}
+
+export interface QDTWOrientation {
+  bahnID: string;
+  segmentID: string;
+  QDTWDistances: number;
+  QDTWSollX: number;
+  QDTWSollY: number;
+  QDTWSollZ: number;
+  QDTWSollW: number;
+  QDTWIstX: number;
+  QDTWIstY: number;
+  QDTWIstZ: number;
+  QDTWIstW: number;
+  pointsOrder: number;
+}
+
+export interface QADOrientationRaw {
+  bahn_id: string;
+  segment_id: string;
+  qad_distances: number;
+  qad_soll_x: number;
+  qad_soll_y: number;
+  qad_soll_z: number;
+  qad_soll_w: number;
+  qad_ist_x: number;
+  qad_ist_y: number;
+  qad_ist_z: number;
+  qad_ist_w: number;
+  points_order: number;
+}
+
+export interface QADOrientation {
+  bahnID: string;
+  segmentID: string;
+  QADDistances: number;
+  QADSollX: number;
+  QADSollY: number;
+  QADSollZ: number;
+  QADSollW: number;
+  QADIstX: number;
+  QADIstY: number;
+  QADIstZ: number;
+  QADIstW: number;
   pointsOrder: number;
 }
 

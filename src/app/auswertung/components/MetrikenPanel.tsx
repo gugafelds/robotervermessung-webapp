@@ -12,6 +12,8 @@ import type {
   DFDInfo,
   DTWInfo,
   EAInfo,
+  QADInfo,
+  QDTWInfo,
   SIDTWInfo,
 } from '@/types/auswertung.types';
 
@@ -40,6 +42,8 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
   const [dfdInfo, setDfdInfo] = useState<DFDInfo[]>([]);
   const [dtwInfo, setDtwInfo] = useState<DTWInfo[]>([]);
   const [sidtwInfo, setSidtwInfo] = useState<SIDTWInfo[]>([]);
+  const [qadInfo, setQadInfo] = useState<QADInfo[]>([]);
+  const [qdtwInfo, setQdtwInfo] = useState<QDTWInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch Auswertung info when component mounts or bahnId changes
@@ -55,6 +59,8 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
         setDfdInfo(infoResult.info_dfd || []);
         setDtwInfo(infoResult.info_dtw || []);
         setSidtwInfo(infoResult.info_sidtw || []);
+        setQadInfo(infoResult.info_qad || []);
+        setQdtwInfo(infoResult.info_qdtw || []);
       } catch (error) {
         console.error('Fehler beim Laden der Auswertungsinformationen:', error);
       } finally {
@@ -81,6 +87,8 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
       ...getAllSegmentNumbers(dfdInfo),
       ...getAllSegmentNumbers(dtwInfo),
       ...getAllSegmentNumbers(sidtwInfo),
+      ...getAllSegmentNumbers(qadInfo),
+      ...getAllSegmentNumbers(qdtwInfo),
     ];
 
     const options: SegmentOption[] = [
@@ -94,7 +102,7 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
     ];
 
     setSegmentOptions(options);
-  }, [eaInfo, dfdInfo, dtwInfo, sidtwInfo]);
+  }, [eaInfo, dfdInfo, dtwInfo, sidtwInfo, qadInfo, qdtwInfo]);
 
   // Handler für Segmentauswahl - verwendet den Parent Callback
   const handleSegmentSelect = (segment: string) => {
@@ -146,6 +154,8 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
   const dfdMetrics = calculateMetrics(dfdInfo, 'DFD');
   const dtwMetrics = calculateMetrics(dtwInfo, 'DTW');
   const sidtwMetrics = calculateMetrics(sidtwInfo, 'SIDTW');
+  const qadMetrics = calculateMetrics(qadInfo, 'QAD');
+  const qdtwMetrics = calculateMetrics(qdtwInfo, 'QDTW');
 
   if (isLoading) {
     return (
@@ -292,6 +302,74 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
           </tbody>
         </table>
       </div>
+
+      {qadMetrics && (
+        <Typography as="h2" className="mt-4">
+          Orientierung
+        </Typography>
+      )}
+
+      {qadMetrics && (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="pb-2 text-left font-semibold text-primary">
+                  Methode
+                </th>
+                <th className="pb-2 text-center font-semibold text-primary">
+                  Min.
+                </th>
+                <th className="pb-2 text-center font-semibold text-primary">
+                  Durchschnitt
+                </th>
+                <th className="pb-2 text-center font-semibold text-primary">
+                  Max.
+                </th>
+                <th className="pb-2 text-center font-semibold text-primary">
+                  Std. Abw.
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {qadMetrics && (
+                <tr className="border-b">
+                  <td className="py-3 text-primary">QAD</td>
+                  <td className="py-3 text-center text-primary">
+                    {formatNumber(qadMetrics.min)}
+                  </td>
+                  <td className="py-3 text-center text-primary">
+                    {formatNumber(qadMetrics.avg)}
+                  </td>
+                  <td className="py-3 text-center text-primary">
+                    {formatNumber(qadMetrics.max)}
+                  </td>
+                  <td className="py-3 text-center text-primary">
+                    {formatNumber(qadMetrics.std)}
+                  </td>
+                </tr>
+              )}
+              {qdtwMetrics && (
+                <tr className="border-b">
+                  <td className="py-3 text-primary">QDTW</td>
+                  <td className="py-3 text-center text-primary">
+                    {formatNumber(qdtwMetrics.min)}
+                  </td>
+                  <td className="py-3 text-center text-primary">
+                    {formatNumber(qdtwMetrics.avg)}
+                  </td>
+                  <td className="py-3 text-center text-primary">
+                    {formatNumber(qdtwMetrics.max)}
+                  </td>
+                  <td className="py-3 text-center text-primary">
+                    {formatNumber(qdtwMetrics.std)}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };
