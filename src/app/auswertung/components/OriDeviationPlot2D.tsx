@@ -7,7 +7,7 @@ import React from 'react';
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 const methodColors = {
-  QAD: { line: '#003560' },
+  QAD: { line: '#188b52ff' },
   QDTW: { line: '#e63946' },
 };
 
@@ -144,7 +144,7 @@ export const OriDeviationPlot2D: React.FC<OriDeviationPlot2DProps> = ({
         : `Orientierung (Segment ${selectedSegment.split('_')[1]})`,
     font: { family: 'Helvetica' },
     xaxis: { title: 'Zeit [s]' },
-    yaxis: { title: 'Abweichung [°]' },
+    yaxis: { title: 'Abweichung [°]', rangemode: 'tozero' },
     hovermode: 'x unified',
     height: 600,
     margin: { t: 40, b: 40, l: 60, r: 20 },

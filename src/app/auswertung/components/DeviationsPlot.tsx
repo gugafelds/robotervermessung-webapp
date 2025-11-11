@@ -40,18 +40,22 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   selectedSegment,
 }) => {
   // Zentrale States für alle Kontrollen
-  const [metrics, setMetrics] = useState<{
+  const [posMetrics, setPosMetrics] = useState<{
     ea: MetricState;
     dfd: MetricState;
     sidtw: MetricState;
     dtw: MetricState;
-    qad: MetricState;
-    qdtw: MetricState;
   }>({
     ea: { isLoaded: false, isLoading: false, visible: false },
     dfd: { isLoaded: false, isLoading: false, visible: false },
     sidtw: { isLoaded: false, isLoading: false, visible: false },
     dtw: { isLoaded: false, isLoading: false, visible: false },
+  });
+
+  const [oriMetrics, setOriMetrics] = useState<{
+    qad: MetricState;
+    qdtw: MetricState;
+  }>({
     qad: { isLoaded: false, isLoading: false, visible: false },
     qdtw: { isLoaded: false, isLoading: false, visible: false },
   });
@@ -104,13 +108,13 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   }, [bahnId, loadBahnInfo, loadAuswertungInfo]);
 
   // Zentrale Funktion zum Laden der Metrik-Daten
-  const loadMetricData = useCallback(
-    async (metricType: 'ea' | 'dfd' | 'sidtw' | 'dtw' | 'qad' | 'qdtw') => {
+  const loadPosMetricData = useCallback(
+    async (metricType: 'ea' | 'dfd' | 'sidtw' | 'dtw' ) => {
       if (!bahnId) return;
 
       // Wenn bereits geladen, toggle visibility
-      if (metrics[metricType].isLoaded) {
-        setMetrics((prev) => ({
+      if (posMetrics[metricType].isLoaded) {
+        setPosMetrics((prev) => ({
           ...prev,
           [metricType]: {
             ...prev[metricType],
@@ -121,7 +125,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
       }
 
       // Loading state setzen
-      setMetrics((prev) => ({
+      setPosMetrics((prev) => ({
         ...prev,
         [metricType]: { ...prev[metricType], isLoading: true },
       }));
@@ -145,6 +149,49 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
             data = await getDTWPositionById(bahnId);
             setCurrentDTWDeviation(data);
             break;
+          default:
+            throw new Error(`Unknown metric type: ${metricType}`);
+        }
+
+        setPosMetrics((prev) => ({
+          ...prev,
+          [metricType]: { isLoaded: true, isLoading: false, visible: true },
+        }));
+      } catch (error) {
+        setPosMetrics((prev) => ({
+          ...prev,
+          [metricType]: { ...prev[metricType], isLoading: false },
+        }));
+      }
+    },
+    [bahnId, posMetrics],
+  );
+
+  const loadOriMetricData = useCallback(
+    async (metricType: 'qad' | 'qdtw') => {
+      if (!bahnId) return;
+
+      // Wenn bereits geladen, toggle visibility
+      if (oriMetrics[metricType].isLoaded) {
+        setOriMetrics((prev) => ({
+          ...prev,
+          [metricType]: {
+            ...prev[metricType],
+            visible: !prev[metricType].visible,
+          },
+        }));
+        return;
+      }
+
+      // Loading state setzen
+      setOriMetrics((prev) => ({
+        ...prev,
+        [metricType]: { ...prev[metricType], isLoading: true },
+      }));
+
+      try {
+        let data;
+        switch (metricType) {
           case 'qad':
             data = await getQADOrientationById(bahnId);
             setCurrentQADDeviation(data);
@@ -157,18 +204,18 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
             throw new Error(`Unknown metric type: ${metricType}`);
         }
 
-        setMetrics((prev) => ({
+        setOriMetrics((prev) => ({
           ...prev,
           [metricType]: { isLoaded: true, isLoading: false, visible: true },
         }));
       } catch (error) {
-        setMetrics((prev) => ({
+        setOriMetrics((prev) => ({
           ...prev,
           [metricType]: { ...prev[metricType], isLoading: false },
         }));
       }
     },
-    [bahnId, metrics],
+    [bahnId, oriMetrics],
   );
 
   // Verfügbarkeit der Daten prüfen
@@ -176,21 +223,21 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   const hasDFDData = currentAuswertungInfo.info_dfd.length > 0;
   const hasSIDTWData = currentAuswertungInfo.info_sidtw.length > 0;
   const hasDTWData = currentAuswertungInfo.info_dtw.length > 0;
-  const hasQADData = currentAuswertungInfo.info_qad?.length > 0;
-  const hasQDTWData = currentAuswertungInfo.info_qdtw?.length > 0;
+  const hasQADData = currentAuswertungInfo.info_qad.length > 0;
+  const hasQDTWData = currentAuswertungInfo.info_qdtw.length > 0;
 
   // Automatisch EA laden, wenn verfügbar
   useEffect(() => {
-    if (hasEAData && !metrics.ea.isLoaded && !metrics.ea.isLoading) {
-      loadMetricData('ea');
+    if (hasEAData && !posMetrics.ea.isLoaded && !posMetrics.ea.isLoading) {
+      loadPosMetricData('ea');
     }
-  }, [hasEAData, metrics.ea.isLoaded, metrics.ea.isLoading, loadMetricData]);
+  }, [hasEAData, posMetrics.ea.isLoaded, posMetrics.ea.isLoading, loadPosMetricData]);
 
   useEffect(() => {
-    if (hasQADData && !metrics.qad.isLoaded && !metrics.qad.isLoading) {
-      loadMetricData('qad');
+    if (hasQADData && !oriMetrics.qad.isLoaded && !oriMetrics.qad.isLoading) {
+      loadOriMetricData('qad');
     }
-  }, [hasQADData, metrics.qad.isLoaded, metrics.qad.isLoading, loadMetricData]);
+  }, [hasQADData, oriMetrics.qad.isLoaded, oriMetrics.qad.isLoading, loadOriMetricData]);
 
   const getButtonContent = (metric: MetricState, label: string) => {
     if (metric.isLoading) {
@@ -214,7 +261,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
       return 'bg-primary text-white hover:bg-primary/80';
     }
     if (metric.visible) {
-      return 'bg-emerald-600 text-white hover:bg-emerald-700';
+      return 'bg-emerald-600 text-white hover:bg-red-700';
     }
     return 'bg-gray-500 text-white hover:bg-gray-600';
   };
@@ -232,94 +279,96 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
     );
   }
 
-  const anyMetricLoaded = Object.values(metrics).some((m) => m.isLoaded);
+  const posMetricLoaded = Object.values(posMetrics).some((m) => m.isLoaded);
+  const oriMetricLoaded = Object.values(oriMetrics).some((m) => m.isLoaded);
 
   return (
     <div className="w-full space-y-4 p-4">
       {/* Zentralisierte Kontrollen */}
       <div className="flex flex-wrap items-center gap-4 rounded-lg border bg-white p-4 shadow-sm">
-        <div>Verfügbare Metriken:</div>
+        <div>Position:</div>
         {hasEAData && (
           <button
-            onClick={() => loadMetricData('ea')}
-            disabled={metrics.ea.isLoading}
+            onClick={() => loadPosMetricData('ea')}
+            disabled={posMetrics.ea.isLoading}
             className={`inline-flex items-center space-x-2 rounded px-3 py-1 text-sm 
-              ${getButtonColorClass(metrics.ea)} 
+              ${getButtonColorClass(posMetrics.ea)} 
               disabled:bg-gray-300 disabled:text-gray-600`}
           >
-            {getButtonContent(metrics.ea, 'EA')}
+            {getButtonContent(posMetrics.ea, 'EA')}
           </button>
         )}
 
         {hasSIDTWData && (
           <button
-            onClick={() => loadMetricData('sidtw')}
-            disabled={metrics.sidtw.isLoading}
+            onClick={() => loadPosMetricData('sidtw')}
+            disabled={posMetrics.sidtw.isLoading}
             className={`inline-flex items-center space-x-2 rounded px-3 py-1 text-sm 
-              ${getButtonColorClass(metrics.sidtw)} 
+              ${getButtonColorClass(posMetrics.sidtw)} 
               disabled:bg-gray-300 disabled:text-gray-600`}
           >
-            {getButtonContent(metrics.sidtw, 'SIDTW')}
+            {getButtonContent(posMetrics.sidtw, 'SIDTW')}
           </button>
         )}
 
         {hasDTWData && (
           <button
-            onClick={() => loadMetricData('dtw')}
-            disabled={metrics.dtw.isLoading}
+            onClick={() => loadPosMetricData('dtw')}
+            disabled={posMetrics.dtw.isLoading}
             className={`inline-flex items-center space-x-2 rounded px-3 py-1 text-sm 
-              ${getButtonColorClass(metrics.dtw)} 
+              ${getButtonColorClass(posMetrics.dtw)} 
               disabled:bg-gray-300 disabled:text-gray-600`}
           >
-            {getButtonContent(metrics.dtw, 'DTW')}
+            {getButtonContent(posMetrics.dtw, 'DTW')}
           </button>
         )}
 
         {hasDFDData && (
           <button
-            onClick={() => loadMetricData('dfd')}
-            disabled={metrics.dfd.isLoading}
+            onClick={() => loadPosMetricData('dfd')}
+            disabled={posMetrics.dfd.isLoading}
             className={`inline-flex items-center space-x-2 rounded px-3 py-1 text-sm 
-              ${getButtonColorClass(metrics.dfd)} 
+              ${getButtonColorClass(posMetrics.dfd)} 
               disabled:bg-gray-300 disabled:text-gray-600`}
           >
-            {getButtonContent(metrics.dfd, 'DFD')}
+            {getButtonContent(posMetrics.dfd, 'DFD')}
           </button>
         )}
 
+        <div className='ml-2 border-l pl-6'>Orientierung:</div>
         {hasQADData && (
           <button
-            onClick={() => loadMetricData('qad')}
-            disabled={metrics.qad.isLoading}
+            onClick={() => loadOriMetricData('qad')}
+            disabled={oriMetrics.qad.isLoading}
             className={`inline-flex items-center space-x-2 rounded px-3 py-1 text-sm 
-              ${getButtonColorClass(metrics.qad)} 
+              ${getButtonColorClass(oriMetrics.qad)} 
               disabled:bg-gray-300 disabled:text-gray-600`}
           >
-            {getButtonContent(metrics.qad, 'QAD')}
+            {getButtonContent(oriMetrics.qad, 'QAD')}
           </button>
         )}
 
         {hasQDTWData && (
           <button
-            onClick={() => loadMetricData('qdtw')}
-            disabled={metrics.qdtw.isLoading}
+            onClick={() => loadOriMetricData('qdtw')}
+            disabled={oriMetrics.qdtw.isLoading}
             className={`inline-flex items-center space-x-2 rounded px-3 py-1 text-sm 
-              ${getButtonColorClass(metrics.qdtw)} 
+              ${getButtonColorClass(oriMetrics.qdtw)} 
               disabled:bg-gray-300 disabled:text-gray-600`}
           >
-            {getButtonContent(metrics.qdtw, 'QDTW')}
+            {getButtonContent(oriMetrics.qdtw, 'QDTW')}
           </button>
         )}
       </div>
 
       {/* Plots rendern nur wenn Daten geladen */}
-      {anyMetricLoaded && (
+      {posMetricLoaded && (
         <div className="flex justify-items-stretch space-x-2">
           <PosDeviationPlot2D
             hasDeviationData={hasDeviationData}
             selectedSegment={selectedSegment}
             // Übergabe aller benötigten Daten und States
-            metrics={metrics}
+            metrics={posMetrics}
             currentEuclideanDeviation={currentEuclideanDeviation}
             currentDiscreteFrechetDeviation={currentDiscreteFrechetDeviation}
             currentSIDTWDeviation={currentSIDTWDeviation}
@@ -330,7 +379,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
             hasDeviationData={hasDeviationData}
             selectedSegment={selectedSegment}
             // Übergabe aller benötigten Daten und States
-            metrics={metrics}
+            metrics={posMetrics}
             currentEuclideanDeviation={currentEuclideanDeviation}
             currentDiscreteFrechetDeviation={currentDiscreteFrechetDeviation}
             currentSIDTWDeviation={currentSIDTWDeviation}
@@ -338,13 +387,13 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
           />
         </div>
       )}
-      {anyMetricLoaded && (
+      {oriMetricLoaded && (
         <div className="flex justify-items-stretch space-x-2">
           <OriDeviationPlot2D
             hasOrientationData={hasOrientationData}
             selectedSegment={selectedSegment}
             // Übergabe aller benötigten Daten und States
-            metrics={metrics}
+            metrics={oriMetrics}
             currentQADDeviation={currentQADDeviation}
             currentQDTWDeviation={currentQDTWDeviation}
             currentBahnInfo={currentBahnInfo}

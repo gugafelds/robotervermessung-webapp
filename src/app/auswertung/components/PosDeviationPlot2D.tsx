@@ -192,7 +192,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
         : `Position (Segment ${selectedSegment.split('_')[1]})`,
     font: { family: 'Helvetica' },
     xaxis: { title: 'Zeit [s]' },
-    yaxis: { title: 'Abweichung [mm]' },
+    yaxis: { title: 'Abweichung [mm]', rangemode: 'tozero' },
     hovermode: 'x unified',
     height: 600,
     margin: { t: 40, b: 40, l: 60, r: 20 },
