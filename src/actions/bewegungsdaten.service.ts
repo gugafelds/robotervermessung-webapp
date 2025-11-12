@@ -101,7 +101,6 @@ export const getBahnInfo = async (
 export interface SearchBahnParams extends PaginationParams {
   query?: string;
   calibration?: boolean;
-  pickPlace?: boolean;
   pointsEvents?: number;
   weight?: number;
   settedVelocity?: number;
@@ -123,8 +122,6 @@ export const searchBahnInfo = async (
     }
     if (searchParams.calibration !== undefined)
       queryParams.append('calibration', searchParams.calibration.toString());
-    if (searchParams.pickPlace !== undefined)
-      queryParams.append('pick_place', searchParams.pickPlace.toString());
     if (searchParams.pointsEvents)
       queryParams.append('points_events', searchParams.pointsEvents.toString());
     if (searchParams.weight)

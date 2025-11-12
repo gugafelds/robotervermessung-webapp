@@ -219,7 +219,7 @@ const CSVUploadForm: React.FC = () => {
     <div className="flex items-center p-4">
       <form
         onSubmit={handleSubmit}
-        className="mb-4 w-full max-w-lg rounded-xl bg-gray-100 p-4 shadow-md"
+        className="mb-4 w-full max-w-lg rounded-md border border-gray-500 bg-gray-100 p-4"
       >
         {/* File Input */}
         <div className="mb-2">

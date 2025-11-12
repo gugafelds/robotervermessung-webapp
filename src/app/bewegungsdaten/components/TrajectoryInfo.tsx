@@ -24,7 +24,7 @@ const InfoRow: React.FC<InfoRowProps> = ({
   singleColumn = false,
 }) => (
   <div
-    className={`border-b border-gray-100 py-2 text-base ${
+    className={`border-b border-gray-200 py-2 text-base ${
       singleColumn ? 'flex flex-col' : 'flex justify-between'
     }`}
   >
@@ -45,7 +45,7 @@ interface InfoSectionProps {
 interface TrajectoryInfoProps {}
 
 const InfoSection: React.FC<InfoSectionProps> = ({ title, children }) => (
-  <div className="mb-5 rounded-lg border-l-4 border-primary bg-white p-5 shadow-md">
+  <div className="mb-5 rounded-lg border border-l-4 border-primary bg-white p-4">
     <h3 className="mb-4 text-xl font-bold text-primary">{title}</h3>
     {children}
   </div>

@@ -222,7 +222,6 @@ export function TrajectoryWrapper() {
           setCurrentBahnAccelSoll,
           'accel_soll',
         ).then(() => updateLoadingState('accelSoll', true)),
-
       ];
 
       // Ausführung in Prioritätsgruppen

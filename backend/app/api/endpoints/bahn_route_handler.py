@@ -13,7 +13,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
     try:
         # Bahnen und Segmente zählen - diese sind wichtig genug für exakte Zählung
         segments_count = await conn.fetchval(
-            "SELECT COUNT(DISTINCT segment_id) FROM bewegungsdaten.bahn_metadata"
+            "SELECT SUM(np_ereignisse) FROM bewegungsdaten.bahn_info WHERE source_data_ist = 'leica_at960'"
         )
 
         bahnen_count = await conn.fetchval(
@@ -484,7 +484,6 @@ async def get_bahn_info(
 @router.get("/bahn_search")
 async def search_bahn_info(
         query: str = Query(None, description="Suchbegriff für Freitext-Suche (Filename, ID, Datum)"),
-        pick_place: bool = Query(None, description="Nur Pick-and-Place-Läufe"),
         points_events: int = Query(None, description="Anzahl der Punktereignisse"),
         weight: float = Query(None, description="Gewicht"),
         setted_velocity: int = Query(None, description="Geschwindigkeit"),
@@ -527,11 +526,6 @@ async def search_bahn_info(
 
             # Alle Bedingungen mit OR verbinden
             base_query += f" AND ({' OR '.join(search_conditions)})"
-
-        if pick_place is not None:
-            base_query += f" AND b.pick_and_place = ${param_index}"
-            params.append(pick_place)
-            param_index += 1
 
         if points_events is not None:
             base_query += f" AND b.np_ereignisse = ${param_index}"

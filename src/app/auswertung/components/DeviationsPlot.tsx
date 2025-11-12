@@ -109,7 +109,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
 
   // Zentrale Funktion zum Laden der Metrik-Daten
   const loadPosMetricData = useCallback(
-    async (metricType: 'ea' | 'dfd' | 'sidtw' | 'dtw' ) => {
+    async (metricType: 'ea' | 'dfd' | 'sidtw' | 'dtw') => {
       if (!bahnId) return;
 
       // Wenn bereits geladen, toggle visibility
@@ -231,13 +231,23 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
     if (hasEAData && !posMetrics.ea.isLoaded && !posMetrics.ea.isLoading) {
       loadPosMetricData('ea');
     }
-  }, [hasEAData, posMetrics.ea.isLoaded, posMetrics.ea.isLoading, loadPosMetricData]);
+  }, [
+    hasEAData,
+    posMetrics.ea.isLoaded,
+    posMetrics.ea.isLoading,
+    loadPosMetricData,
+  ]);
 
   useEffect(() => {
     if (hasQADData && !oriMetrics.qad.isLoaded && !oriMetrics.qad.isLoading) {
       loadOriMetricData('qad');
     }
-  }, [hasQADData, oriMetrics.qad.isLoaded, oriMetrics.qad.isLoading, loadOriMetricData]);
+  }, [
+    hasQADData,
+    oriMetrics.qad.isLoaded,
+    oriMetrics.qad.isLoading,
+    loadOriMetricData,
+  ]);
 
   const getButtonContent = (metric: MetricState, label: string) => {
     if (metric.isLoading) {
@@ -268,13 +278,8 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
 
   if (!hasDeviationData) {
     return (
-      <div className="w-full">
-        <button
-          disabled
-          className="rounded bg-gray-300 px-4 py-2 text-gray-600"
-        >
-          Keine Abweichungsdaten verfügbar
-        </button>
+      <div className="m-4 rounded-lg border border-gray-500 bg-gray-200 p-6 text-center text-gray-500">
+        Keine Abweichungsdaten verfügbar
       </div>
     );
   }
@@ -285,7 +290,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   return (
     <div className="w-full space-y-4 p-4">
       {/* Zentralisierte Kontrollen */}
-      <div className="flex flex-wrap items-center gap-4 rounded-lg border bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center gap-4 rounded-lg border border-gray-500 bg-white p-4">
         <div>Position:</div>
         {hasEAData && (
           <button
@@ -335,7 +340,12 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
           </button>
         )}
 
-        <div className='ml-2 border-l pl-6'>Orientierung:</div>
+        {hasQADData ||
+          (hasQDTWData && (
+            <div className="ml-2 border-l border-gray-200 pl-6">
+              Orientierung:
+            </div>
+          ))}
         {hasQADData && (
           <button
             onClick={() => loadOriMetricData('qad')}

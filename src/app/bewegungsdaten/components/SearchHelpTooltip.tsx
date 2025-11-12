@@ -65,15 +65,15 @@ const SearchHelpTooltip = () => {
                 </h4>
                 <ul className="space-y-1 text-gray-600">
                   <li>
-                    • <code className="rounded bg-gray-100 px-1">pick</code>,{' '}
-                    <code className="rounded bg-gray-100 px-1">place</code>,{' '}
-                    <code className="rounded bg-gray-100 px-1">pick&place</code>{' '}
-                    - Pick&Place Läufe
-                  </li>
-                  <li>
                     • <code className="rounded bg-gray-100 px-1">n=5</code> oder{' '}
                     <code className="rounded bg-gray-100 px-1">np=5</code> -
                     Anzahl Segmente
+                  </li>
+                  <li>
+                    •{' '}
+                    <code className="rounded bg-gray-100 px-1">sidtw=0.5</code>{' '}
+                    oder <code className="rounded bg-gray-100 px-1">s=0.5</code>{' '}
+                    - SIDTW-Genauigkeit
                   </li>
                   <li>
                     • <code className="rounded bg-gray-100 px-1">w=2.5</code>{' '}

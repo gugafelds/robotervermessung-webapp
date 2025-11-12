@@ -1,6 +1,5 @@
 'use client';
 
-import { Loader } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 
@@ -12,13 +11,11 @@ import { getBahnInfoById } from '@/src/actions/bewegungsdaten.service';
 import { DeviationsPlot } from '@/src/app/auswertung/components/DeviationsPlot';
 import { MetrikenPanel } from '@/src/app/auswertung/components/MetrikenPanel';
 import { TrajectoryInfo } from '@/src/app/bewegungsdaten/components/TrajectoryInfo';
-import { Typography } from '@/src/components/Typography';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 
 export function AuswertungWrapper() {
   const [hasDeviationData, setHasDeviationData] = useState(false);
   const [hasOrientationData, setHasOrientationData] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
   // Zentraler State für Segmentauswahl
   const [selectedSegment, setSelectedSegment] = useState<string>('total');
@@ -36,7 +33,6 @@ export function AuswertungWrapper() {
   const loadBahnDetails = useCallback(async () => {
     if (!id) return;
 
-    setIsLoading(true);
     try {
       // Lade Bahn-Info direkt für diese ID
       // Prüfe, ob Abweichungsdaten verfügbar sind
@@ -47,8 +43,6 @@ export function AuswertungWrapper() {
       setHasOrientationData(hasOrientationDataCheck);
     } catch (error) {
       /* empty */
-    } finally {
-      setIsLoading(false);
     }
   }, [id]);
 
@@ -78,19 +72,6 @@ export function AuswertungWrapper() {
 
     fetchInfoData();
   }, [id, fetchInfoData, currentBahnInfo]);
-
-  if (isLoading) {
-    return (
-      <div className="flex h-fullscreen w-full flex-wrap justify-center overflow-scroll p-4">
-        <div className="my-10 flex size-fit flex-col items-center justify-center rounded-xl bg-gray-200 p-2 shadow-sm">
-          <div className="animate-spin">
-            <Loader className="mx-auto w-10" color="#003560" />
-          </div>
-          <Typography as="h5">Es lädt...</Typography>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>

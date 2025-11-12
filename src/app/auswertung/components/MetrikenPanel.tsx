@@ -159,7 +159,7 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
 
   if (isLoading) {
     return (
-      <div className="mb-6 rounded-lg border bg-white p-6 shadow-sm">
+      <div className="m-4 rounded-lg border border-gray-500 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-center">
           <div className="size-5 animate-spin rounded-full border-b-2 border-gray-900" />
           <span className="ml-2">Lade Metriken...</span>
@@ -170,16 +170,14 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
 
   if (!eaMetrics && !dfdMetrics && !dtwMetrics && !sidtwMetrics) {
     return (
-      <div className="mb-6 rounded-lg border bg-gray-200 p-6 shadow-sm">
-        <Typography as="p" className="text-center text-gray-500">
-          Keine Metriken verfügbar
-        </Typography>
+      <div className="m-4 rounded-lg border border-gray-500 bg-gray-200 p-6 text-center text-gray-500">
+        Keine Metriken verfügbar
       </div>
     );
   }
 
   return (
-    <div className="h-fit rounded-lg border bg-gray-100 p-6 shadow-sm">
+    <div className="mx-4 h-fit rounded-lg border border-gray-500 bg-white p-6">
       <div className="mb-3 flex items-center justify-between">
         <Typography as="h2">Position</Typography>
 
@@ -194,7 +192,7 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
           </button>
 
           {showDropdown && (
-            <div className="absolute right-0 top-10 z-10 w-48 rounded-md border bg-white shadow-lg">
+            <div className="absolute right-0 top-10 z-10 w-48 rounded-md border  bg-white shadow-lg">
               {segmentOptions.map((option) => (
                 <button
                   key={option.value}
@@ -212,27 +210,25 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b">
-              <th className="pb-2 text-left font-semibold text-primary">
-                Methode
-              </th>
-              <th className="pb-2 text-center font-semibold text-primary">
-                Min.
-              </th>
-              <th className="pb-2 text-center font-semibold text-primary">
-                Durchschnitt
-              </th>
-              <th className="pb-2 text-center font-semibold text-primary">
-                Max.
-              </th>
-              <th className="pb-2 text-center font-semibold text-primary">
-                Std. Abw.
-              </th>
-            </tr>
+            <th className="pb-2 text-left font-semibold text-primary">
+              Methode
+            </th>
+            <th className="pb-2 text-center font-semibold text-primary">
+              Min.
+            </th>
+            <th className="pb-2 text-center font-semibold text-primary">
+              Durchschnitt
+            </th>
+            <th className="pb-2 text-center font-semibold text-primary">
+              Max.
+            </th>
+            <th className="pb-2 text-center font-semibold text-primary">
+              Std. Abw.
+            </th>
           </thead>
           <tbody>
             {eaMetrics && (
-              <tr className="border-b">
+              <tr className="border-t">
                 <td className="py-3 text-primary">EA</td>
                 <td className="py-3 text-center text-primary">
                   {formatNumber(eaMetrics.min)}
@@ -249,7 +245,7 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
               </tr>
             )}
             {sidtwMetrics && (
-              <tr className="border-b">
+              <tr className="border-t">
                 <td className="py-3 text-primary">SIDTW</td>
                 <td className="py-3 text-center text-primary">
                   {formatNumber(sidtwMetrics.min)}
@@ -266,7 +262,7 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
               </tr>
             )}
             {dtwMetrics && (
-              <tr className="border-b">
+              <tr className="border-t">
                 <td className="py-3 text-primary">DTW</td>
                 <td className="py-3 text-center text-primary">
                   {formatNumber(dtwMetrics.min)}
@@ -283,7 +279,7 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
               </tr>
             )}
             {dfdMetrics && (
-              <tr className="border-b">
+              <tr className="border-t">
                 <td className="py-3 text-primary">DFD</td>
                 <td className="py-3 text-center text-primary">
                   {formatNumber(dfdMetrics.min)}
@@ -313,23 +309,21 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b">
-                <th className="pb-2 text-left font-semibold text-primary">
-                  Methode
-                </th>
-                <th className="pb-2 text-center font-semibold text-primary">
-                  Min.
-                </th>
-                <th className="pb-2 text-center font-semibold text-primary">
-                  Durchschnitt
-                </th>
-                <th className="pb-2 text-center font-semibold text-primary">
-                  Max.
-                </th>
-                <th className="pb-2 text-center font-semibold text-primary">
-                  Std. Abw.
-                </th>
-              </tr>
+              <th className="pb-2 text-left font-semibold text-primary">
+                Methode
+              </th>
+              <th className="pb-2 text-center font-semibold text-primary">
+                Min.
+              </th>
+              <th className="pb-2 text-center font-semibold text-primary">
+                Durchschnitt
+              </th>
+              <th className="pb-2 text-center font-semibold text-primary">
+                Max.
+              </th>
+              <th className="pb-2 text-center font-semibold text-primary">
+                Std. Abw.
+              </th>
             </thead>
             <tbody>
               {qadMetrics && (

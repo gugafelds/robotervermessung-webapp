@@ -210,7 +210,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
 
   return (
     <div className="w-1/2">
-      <div className="rounded-lg border bg-white p-4 shadow-sm">
+      <div className="rounded-lg border border-gray-500 bg-white p-4">
         {anyMetricVisible ? (
           <Plot
             data={create2DPlot()}

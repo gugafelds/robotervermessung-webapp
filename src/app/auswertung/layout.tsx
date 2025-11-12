@@ -21,7 +21,7 @@ export default async function AuswertungLayout({
       initialPagination={initialPagination}
     >
       <main className="flex flex-col lg:flex-row">
-        <Sidebar /> {/* ← Links: Sidebar */}
+        <Sidebar />
         {children}{' '}
       </main>
     </TrajectoryProvider>
