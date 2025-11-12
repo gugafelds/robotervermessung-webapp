@@ -49,7 +49,6 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
     currentBahnJointStates,
     currentBahnTwistSoll,
     currentBahnEvents,
-    currentBahnIMU,
   } = useTrajectory();
 
   const hasAnyPlotAvailable = Object.values(plotAvailability).some(Boolean);
@@ -113,7 +112,6 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
         <TCPAccelPlot
           currentBahnAccelIst={currentBahnAccelIst}
           currentBahnAccelSoll={currentBahnAccelSoll}
-          currentBahnIMU={currentBahnIMU}
         />
       )}
     </div>

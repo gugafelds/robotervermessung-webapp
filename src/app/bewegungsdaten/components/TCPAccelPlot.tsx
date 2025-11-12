@@ -7,7 +7,6 @@ import React from 'react';
 import type {
   BahnAccelIst,
   BahnAccelSoll,
-  BahnIMU,
 } from '@/types/bewegungsdaten.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -15,13 +14,11 @@ const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 interface TCPAccelerationPlotProps {
   currentBahnAccelIst: BahnAccelIst[];
   currentBahnAccelSoll: BahnAccelSoll[];
-  currentBahnIMU: BahnIMU[];
 }
 
 export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
   currentBahnAccelIst,
   currentBahnAccelSoll,
-  currentBahnIMU,
 }) => {
   const createTcpAccelPlot = () => {
     // Optimierte Berechnung von globalStartTime
@@ -38,13 +35,6 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
       // Check SOLL data
       if (currentBahnAccelSoll.length > 0) {
         currentBahnAccelSoll.forEach((bahn) => {
-          minTime = Math.min(minTime, Number(bahn.timestamp));
-        });
-      }
-
-      // Check IMU data
-      if (currentBahnIMU.length > 0) {
-        currentBahnIMU.forEach((bahn) => {
           minTime = Math.min(minTime, Number(bahn.timestamp));
         });
       }
@@ -70,14 +60,6 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
         )
       : [];
 
-    // Process IMU data
-    const hasIMUData = currentBahnIMU.length > 0;
-    const timestampsIMU = hasIMUData
-      ? currentBahnIMU.map(
-          (bahn) => (Number(bahn.timestamp) - globalStartTime) / 1e9,
-        )
-      : [];
-
     const getMaxTimeAccel = () => {
       let maxTime = 0;
 
@@ -87,10 +69,6 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
 
       if (hasSollData) {
         maxTime = Math.max(maxTime, ...timestampsSoll);
-      }
-
-      if (hasIMUData) {
-        maxTime = Math.max(maxTime, ...timestampsIMU);
       }
 
       return maxTime;
@@ -132,22 +110,6 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
         name: 'Soll-Beschleunigung',
       };
       plotData.push(sollPlot);
-    }
-
-    // Add IMU data
-    if (hasIMUData) {
-      const IMUPlot: Partial<PlotData> = {
-        type: 'scatter',
-        mode: 'lines',
-        x: timestampsIMU,
-        y: currentBahnIMU.map((bahn) => Math.abs(bahn.tcpAccelPi)), // Convert to mm/s²
-        line: {
-          color: 'darkred',
-          width: 4,
-        },
-        name: 'Sensehat-Beschleunigung',
-      };
-      plotData.push(IMUPlot);
     }
 
     return {

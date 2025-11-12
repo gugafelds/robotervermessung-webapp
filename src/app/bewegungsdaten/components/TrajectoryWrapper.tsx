@@ -8,7 +8,6 @@ import {
   getBahnAccelIstById,
   getBahnAccelSollById,
   getBahnEventsById,
-  getBahnIMUById,
   getBahnInfoById,
   getBahnJointStatesById,
   getBahnOrientationSollById,
@@ -65,7 +64,6 @@ interface DataLoadingState {
   twistSoll: boolean;
   jointStates: boolean;
   events: boolean;
-  imu: boolean;
 }
 
 export function TrajectoryWrapper() {
@@ -82,7 +80,6 @@ export function TrajectoryWrapper() {
     twistSoll: false,
     jointStates: false,
     events: false,
-    imu: false,
   });
   const [error, setError] = useState<string | null>(null);
   const [isTransformed, setIsTransformed] = useState(false);
@@ -112,7 +109,6 @@ export function TrajectoryWrapper() {
     setCurrentBahnTwistSoll,
     setCurrentBahnJointStates,
     setCurrentBahnEvents,
-    setCurrentBahnIMU,
   } = useTrajectory();
 
   const updateLoadingState = (key: keyof DataLoadingState, value: boolean) => {
@@ -227,11 +223,6 @@ export function TrajectoryWrapper() {
           'accel_soll',
         ).then(() => updateLoadingState('accelSoll', true)),
 
-        fetchDataWithCache(
-          () => getBahnIMUById(id),
-          setCurrentBahnIMU,
-          'imu',
-        ).then(() => updateLoadingState('imu', true)),
       ];
 
       // Ausführung in Prioritätsgruppen
@@ -253,7 +244,6 @@ export function TrajectoryWrapper() {
     setCurrentBahnAccelIst,
     setCurrentBahnTwistSoll,
     setCurrentBahnJointStates,
-    setCurrentBahnIMU,
   ]);
 
   useEffect(() => {

@@ -15,7 +15,6 @@ import type {
   BahnAccelIst,
   BahnAccelSoll,
   BahnEvents,
-  BahnIMU,
   BahnInfo,
   BahnJointStates,
   BahnOrientationSoll,
@@ -68,8 +67,6 @@ export interface TrajectoryState {
   setCurrentBahnPoseTrans: React.Dispatch<
     React.SetStateAction<BahnPoseTrans[]>
   >;
-  currentBahnIMU: BahnIMU[];
-  setCurrentBahnIMU: React.Dispatch<React.SetStateAction<BahnIMU[]>>;
 }
 
 type TrajectoryProviderProps = {
@@ -119,7 +116,6 @@ export const TrajectoryProvider = ({
   const [currentBahnPoseTrans, setCurrentBahnPoseTrans] = useState<
     BahnPoseTrans[]
   >([]);
-  const [currentBahnIMU, setCurrentBahnIMU] = useState<BahnIMU[]>([]);
 
   useEffect(() => {
     setBahnInfo(initialBahnInfo);
@@ -194,8 +190,6 @@ export const TrajectoryProvider = ({
       setCurrentBahnEvents,
       currentBahnPoseTrans,
       setCurrentBahnPoseTrans,
-      currentBahnIMU,
-      setCurrentBahnIMU,
     }),
     [
       bahnInfo,
@@ -215,7 +209,6 @@ export const TrajectoryProvider = ({
       currentBahnJointStates,
       currentBahnEvents,
       currentBahnPoseTrans,
-      currentBahnIMU,
     ],
   );
 

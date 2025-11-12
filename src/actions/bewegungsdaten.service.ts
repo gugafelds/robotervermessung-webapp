@@ -6,7 +6,6 @@ import {
   transformBahnAccelIstResult,
   transformBahnAccelSollResult,
   transformBahnEventsResult,
-  transformBahnIMUResult,
   transformBahnInfobyIDResult,
   transformBahnInfoResponse,
   transformBahnJointStatesResult,
@@ -21,7 +20,6 @@ import type {
   BahnAccelIst,
   BahnAccelSoll,
   BahnEvents,
-  BahnIMU,
   BahnInfo,
   BahnJointStates,
   BahnOrientationSoll,
@@ -331,17 +329,6 @@ export const getSegmentEventsById = async (
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error fetching Bahn events by ID:', error);
-    throw error;
-  }
-};
-
-export const getBahnIMUById = async (id: string): Promise<BahnIMU[]> => {
-  try {
-    const result = await fetchFromAPI(`/bahn/bahn_imu/${id}`, true);
-    return transformBahnIMUResult(result);
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Error fetching Bahn IMU by ID:', error);
     throw error;
   }
 };

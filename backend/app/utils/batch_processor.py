@@ -110,7 +110,6 @@ class BatchProcessor:
                 accel_soll_data = []
                 rapid_events_data = []
                 joint_data = []
-                imu_data = []
                 transf_data = []
 
                 all_bahn_ids = []
@@ -130,7 +129,6 @@ class BatchProcessor:
                     accel_soll_data.extend(data_set.get('ACCEL_SOLL_MAPPING', []))
                     rapid_events_data.extend(data_set.get('RAPID_EVENTS_MAPPING', []))
                     joint_data.extend(data_set.get('JOINT_MAPPING', []))
-                    imu_data.extend(data_set.get('IMU_MAPPING', []))
                     transf_data.extend(data_set.get('TRANSFORM_MAPPING', []))
 
                 # First check which bahn_ids already exist in each table
@@ -146,7 +144,6 @@ class BatchProcessor:
                     'bahn_accel_soll',
                     'bahn_events',
                     'bahn_joint_states',
-                    'bahn_imu',
                     'bahn_pose_trans',
                 ]
 
@@ -220,10 +217,6 @@ class BatchProcessor:
                     if record[0] not in existing_bahn_ids['bahn_joint_states']
                 ]
 
-                filtered_imu = [
-                    record for record in imu_data
-                    if record[0] not in existing_bahn_ids['bahn_imu']
-                ]
 
                 # Now insert all filtered data in a single transaction
                 try:
@@ -284,9 +277,6 @@ class BatchProcessor:
                             (filtered_joint, 'bahn_joint_states',
                              ['bahn_id', 'segment_id', 'timestamp', 'joint_1', 'joint_2', 'joint_3', 'joint_4',
                               'joint_5', 'joint_6', 'source_data_soll']),
-                            (filtered_imu, 'bahn_imu',
-                             ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_pi', 'tcp_angular_vel_pi',
-                              'source_data_ist'])
                         ]
 
                         # Insert each type of data
@@ -444,10 +434,6 @@ class BatchProcessor:
         columns = ['bahn_id', 'segment_id', 'timestamp', 'joint_1', 'joint_2', 'joint_3',
                    'joint_4', 'joint_5', 'joint_6', 'source_data_soll']
         await self.batch_insert_data(db_ops, conn, 'bahn_joint_states', data, columns)
-
-    async def batch_insert_imu_data(self, db_ops, conn, data):
-        columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_pi', 'tcp_angular_vel_pi', 'source_data_ist']
-        await self.batch_insert_data(db_ops, conn, 'bahn_imu', data, columns)
 
     async def batch_insert_transf_data(self, db_ops, conn, data):
         columns = ['bahn_id', 'segment_id', 'timestamp', 'x_trans', 'y_trans', 'z_trans',
