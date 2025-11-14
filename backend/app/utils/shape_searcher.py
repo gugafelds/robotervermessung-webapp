@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class ShapeSearcher:
     """
     Embedding-basierte Shape Similarity Search
-    Nutzt pgvector <-> operator für cosine distance
+    Nutzt pgvector <=> operator für cosine distance
     """
 
     def __init__(self, connection: asyncpg.Connection):
@@ -111,7 +111,7 @@ class ShapeSearcher:
                     SELECT 
                         e.segment_id,
                         m.bahn_id,
-                        e.{embedding_col} <-> $1::vector as distance
+                        e.{embedding_col} <=> $1::vector as distance
                     FROM bewegungsdaten.bahn_embeddings e
                     JOIN bewegungsdaten.bahn_metadata m ON e.segment_id = m.segment_id
                     WHERE {where_clause}
@@ -132,7 +132,7 @@ class ShapeSearcher:
                     SELECT 
                         e.segment_id,
                         m.bahn_id,
-                        e.{embedding_col} <-> $1::vector as distance
+                        e.{embedding_col} <=> $1::vector as distance
                     FROM bewegungsdaten.bahn_embeddings e
                     JOIN bewegungsdaten.bahn_metadata m ON e.segment_id = m.segment_id
                     WHERE {where_clause}

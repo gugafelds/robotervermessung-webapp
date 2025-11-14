@@ -48,28 +48,17 @@ class EmbeddingCalculator:
         return self._l2_normalize(flat)
 
     def compute_position_embedding(self, data: List[Dict]) -> Optional[np.ndarray]:
-        """
-        ✅ Shape Embedding: Nur Form, NICHT absolute Position
-        
-        Findet ähnliche Formen unabhängig von Position im Arbeitsraum
-        """
         if len(data) < 10:
             return None
 
-        traj = np.array([
-            [r['x_soll'], r['y_soll'], r['z_soll']]
-            for r in data
-        ], dtype=np.float32)
+        traj = np.array([[r['x_soll'], r['y_soll'], r['z_soll']] 
+                        for r in data], dtype=np.float32)
 
-        start_point = traj[0]
-        traj_normalized = traj - start_point
-
-        centroid = np.mean(traj, axis=0)
-        traj_normalized = traj - centroid
+        traj_normalized = traj - traj[0]
         
-        max_extent = np.max(np.abs(traj_normalized))
+        max_extent = np.max(np.linalg.norm(traj_normalized, axis=1))
         if max_extent > 1e-6:
-            traj_normalized = traj_normalized / max_extent  # [-1, 1]
+            traj_normalized = traj_normalized / max_extent
         
         resampled = self._resample(traj_normalized, self.position_samples)
         flat = resampled.flatten()
@@ -161,17 +150,21 @@ class EmbeddingCalculator:
 
     # Helper methods
     def _resample(self, trajectory: np.ndarray, n_samples: int) -> np.ndarray:
-        """
-        Resample trajectory to n_samples (for multi-dimensional data)
+        """Resample mit Interpolation statt Index-Selection"""
+        from scipy.interpolate import interp1d
         
-        Args:
-            trajectory: (n_points, n_dims) array
-            n_samples: target number of samples
-        Returns:
-            (n_samples, n_dims) array
-        """
-        indices = np.linspace(0, len(trajectory) - 1, n_samples, dtype=int)
-        return trajectory[indices]
+        n_points = len(trajectory)
+        if n_points <= n_samples:
+            # Padding wenn zu kurz
+            pad_length = n_samples - n_points
+            return np.pad(trajectory, ((0, pad_length), (0, 0)), mode='edge')
+        
+        # Interpolation
+        x_old = np.linspace(0, 1, n_points)
+        x_new = np.linspace(0, 1, n_samples)
+        
+        interpolator = interp1d(x_old, trajectory, axis=0, kind='linear')
+        return interpolator(x_new)
 
     def _l2_normalize(self, vec: np.ndarray) -> np.ndarray:
         """

@@ -17,9 +17,9 @@ class FilterSearcher:
 
     def __init__(self, connection: asyncpg.Connection):
         self.connection = connection
-        self.default_tolerance = 0.2  # ±10%
+        self.default_tolerance = 0.01  # ±10%
         self.movement_type_threshold = 0.9 # Mindest-Similarity für movement_type
-        self.profile_tolerance = 0.2 # ±5% für velocity/acceleration profiles
+        self.profile_tolerance = 0.01 # ±5% für velocity/acceleration profiles
     
     async def _filter_only_bahnen(self, segment_ids: List[str]) -> List[str]:
         """Filtert Liste: Nur Bahnen (segment_id = bahn_id)"""

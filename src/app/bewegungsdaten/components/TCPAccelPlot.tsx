@@ -4,10 +4,7 @@ import dynamic from 'next/dynamic';
 import type { Layout, PlotData } from 'plotly.js';
 import React from 'react';
 
-import type {
-  BahnAccelIst,
-  BahnAccelSoll,
-} from '@/types/bewegungsdaten.types';
+import type { BahnAccelIst, BahnAccelSoll } from '@/types/bewegungsdaten.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
