@@ -36,26 +36,7 @@ class CSVProcessor:
             # Pick&Place Metadaten extrahieren
             is_pickplace = "pickplace" in record_filename
             self.record_filename = record_filename
-            weight, velocity_picking, velocity_handling = None, None, None
             handling_height = None
-
-            if is_pickplace:
-                # Extrahiere Pick&Place Metadaten
-                for row in rows:
-                    if velocity_picking is None and row.get('Velocity Picking', '').strip():
-                        try:
-                            velocity_picking = float(row['Velocity Picking'])
-                        except ValueError:
-                            print(f"Warnung: Ungültiger Wert für Velocity Picking: {row['Velocity Picking']}")
-
-                    if velocity_handling is None and row.get('Velocity Handling', '').strip():
-                        try:
-                            velocity_handling = float(row['Velocity Handling'])
-                        except ValueError:
-                            print(f"Warnung: Ungültiger Wert für Velocity Handling: {row['Velocity Handling']}")
-
-                    if all(v is not None for v in [velocity_picking, velocity_handling, weight]):
-                        break
 
             # NEU: Teile die Daten in IST und SOLL Zeilen auf basierend auf den Spalten
             # IST-Spalten: timestamp, pv_x, pv_y, pv_z, ov_x, ov_y, ov_z, ov_w, pt_x, pt_y, pt_z, ot_x, ot_y, ot_z, ot_w,
@@ -503,7 +484,6 @@ class CSVProcessor:
                 if not has_data:
                     continue
 
-                calibration_run = "calibration_run" in record_filename
 
                 # Bestimme Zeitstempel der Bahn
                 all_timestamps = []
@@ -579,7 +559,6 @@ class CSVProcessor:
                     bahn_frequencies['frequency_twist_soll'],
                     bahn_frequencies['frequency_accel_ist'],
                     bahn_frequencies['frequency_joint'],
-                    calibration_run,
                     bahn_point_counts['np_pose_ist'],
                     bahn_point_counts['np_twist_ist'],
                     bahn_point_counts['np_accel_ist'],
@@ -588,9 +567,6 @@ class CSVProcessor:
                     bahn_point_counts['np_twist_soll'],
                     bahn_point_counts['np_jointstates'],
                     self.extract_tool_weight_from_filename(record_filename),
-                    handling_height,
-                    velocity_handling,
-                    velocity_picking,
                     is_pickplace,
                     matrix_info,
                     bahn_point_counts['np_accel_soll'],
@@ -602,10 +578,7 @@ class CSVProcessor:
 
                 if is_pickplace:
                     bahn_info_data = tuple(base_info + [
-                        weight,
                         handling_height,
-                        velocity_handling,
-                        velocity_picking,
                         is_pickplace,
                     ])
                 else:
