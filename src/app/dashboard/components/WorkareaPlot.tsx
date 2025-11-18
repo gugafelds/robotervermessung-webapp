@@ -202,7 +202,7 @@ function WorkareaPlotContent({
     : [];
 
   return (
-    <div className="flex flex-col justify-center rounded-2xl border bg-white p-4 shadow-md">
+    <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-4">
       <Typography as="h2" className="mb-2">
         Arbeitsraum
       </Typography>
@@ -384,7 +384,7 @@ export function WorkareaPlot({
 
   if (isLoading) {
     return (
-      <div className="flex flex-col justify-center rounded-2xl border bg-white p-4 shadow-md">
+      <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-4">
         <div className="flex h-96 items-center justify-center">
           <div className="text-center">
             <Loader className="mx-auto mb-4 size-12 animate-spin text-blue-950" />
@@ -397,7 +397,7 @@ export function WorkareaPlot({
 
   if (error) {
     return (
-      <div className="flex flex-col justify-center rounded-2xl border bg-white p-4 shadow-md">
+      <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-4">
         <div className="flex h-96 items-center justify-center">
           <div className="text-center text-red-600">
             <p className="mb-2 text-lg font-semibold">{error}</p>
@@ -415,7 +415,7 @@ export function WorkareaPlot({
 
   if (data.length === 0) {
     return (
-      <div className="flex flex-col justify-center rounded-2xl border bg-white p-4  shadow-md">
+      <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-4">
         <Typography as="h3" className="mb-4">
           Arbeitsraum-Erkundung
         </Typography>

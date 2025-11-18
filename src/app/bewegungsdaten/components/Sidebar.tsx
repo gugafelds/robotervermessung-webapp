@@ -201,7 +201,7 @@ export const Sidebar = () => {
   );
 
   return (
-    <div className="flex h-80 w-full flex-col bg-gray-100 px-4 py-2 lg:h-fullscreen lg:max-w-72">
+    <div className="flex h-80 w-full flex-col border-r border-gray-500 bg-gray-100 px-4 py-2 lg:h-fullscreen lg:max-w-72">
       <div className="flex-col align-middle">
         <div className="relative items-center justify-between">
           <div className={classNames('flex items-end gap-4 pl-1')}>

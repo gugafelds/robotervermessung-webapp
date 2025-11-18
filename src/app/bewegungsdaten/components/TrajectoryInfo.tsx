@@ -60,17 +60,17 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
 
   if (currentBahnInfo === null) {
     return (
-      <span className="flex flex-row justify-center p-10">
-        <Typography as="h2">keine Bahn gefunden</Typography>
+      <span className="flex h-full min-w-80 flex-row justify-center border-r border-gray-500 bg-gray-50 p-4 lg:h-fullscreen lg:overflow-scroll">
+        <Typography as="h5">Keine Bahn gefunden</Typography>
         <span>
-          <ErrorIcon className="mx-2 my-0.5 w-7 text-primary" />
+          <ErrorIcon className="mx-2 my-0.5 w-6 text-primary" />
         </span>
       </span>
     );
   }
 
   return (
-    <div className="flex h-full min-w-80 flex-col bg-gray-50 p-4 lg:h-fullscreen lg:overflow-scroll">
+    <div className="flex h-full min-w-80 flex-col border-r border-gray-500 bg-gray-50 p-4 lg:h-fullscreen lg:overflow-scroll">
       {currentBahnInfo && Object.keys(currentBahnInfo).length !== 0 && (
         <>
           {/* Bahn-ID und Dateiname prominent anzeigen */}

@@ -21,17 +21,16 @@ class TaskStatus:
 
 async def process_metadata_background(
         task_id: str,
-        service,  # MetadataCalculatorService instance
+        service,
         mode: str,
         bahn_ids: List[str],
         duplicate_handling: str
 ):
     """
-    Background Task für die Metadaten-Verarbeitung
-    ✅ AKTUALISIERT: Verarbeitet Metadata UND Embeddings gleichzeitig
+    Background Task mit Batch-Processing (100 Bahnen auf einmal)
     """
-
-    # Task Status initialisieren
+    BATCH_SIZE = 100
+    
     task_store[task_id] = {
         "status": TaskStatus.RUNNING,
         "started_at": datetime.now().isoformat(),
@@ -41,127 +40,81 @@ async def process_metadata_background(
         "failed_bahns": 0,
         "current_bahn": None,
         "errors": [],
-        "details": {
-            "mode": mode,
-            "duplicate_handling": duplicate_handling
-        }
+        "details": {"mode": mode, "duplicate_handling": duplicate_handling}
     }
 
-    # ✅ NEU: Hole Connection aus Pool für die gesamte Task
     async with service.db_pool.acquire() as conn:
         try:
-            logger.info(f"Starting background task {task_id} for {len(bahn_ids)} bahns (Metadata + Embeddings)")
+            logger.info(f"Starting task {task_id} for {len(bahn_ids)} bahns")
 
             # Duplikat-Behandlung
             if duplicate_handling == "replace":
-                existing_bahns = await service.check_existing_bahns(bahn_ids)
-                if existing_bahns:
-                    # ✅ Lösche SOWOHL Metadata ALS AUCH Embeddings
-                    deleted_metadata = await service.delete_existing_metadata(existing_bahns)
-                    deleted_embeddings = await service.delete_existing_embeddings(existing_bahns)
-                    logger.info(
-                        f"Deleted {deleted_metadata} metadata rows and {deleted_embeddings} embedding rows"
-                    )
-                    task_store[task_id]["details"]["deleted_metadata"] = deleted_metadata
-                    task_store[task_id]["details"]["deleted_embeddings"] = deleted_embeddings
-
+                existing = await service.check_existing_bahns(bahn_ids)
+                if existing:
+                    await service.delete_existing_metadata(existing)
+                    await service.delete_existing_embeddings(existing)
             elif duplicate_handling == "skip":
-                existing_bahns = await service.check_existing_bahns(bahn_ids)
-                bahn_ids = [bid for bid in bahn_ids if bid not in existing_bahns]
-                task_store[task_id]["details"]["skipped_existing"] = len(existing_bahns)
+                existing = await service.check_existing_bahns(bahn_ids)
+                bahn_ids = [b for b in bahn_ids if b not in existing]
                 task_store[task_id]["total_bahns"] = len(bahn_ids)
-                logger.info(
-                    f"Skipping {len(existing_bahns)} existing bahns, processing {len(bahn_ids)} new ones"
-                )
 
-            # In-Memory Processing mit Batch-Write für BEIDES
             successful_results = []
             failed_results = []
-            all_metadata_rows = []
-            all_embedding_rows = []
 
-            # Verarbeite alle Bahnen sequentiell
-            for bahn_id in bahn_ids:
-                task_store[task_id]["current_bahn"] = bahn_id
-
-                try:
-                    # ✅ Hole und verarbeite Bahn (gibt Metadata UND Embeddings zurück)
-                    # ✅ NEU: Übergebe Connection explizit
-                    result = await service.process_single_bahn(conn, bahn_id)
-
-                    if result.get('error'):
-                        failed_results.append(result)
+            # ✅ Batch-Processing
+            for batch_idx in range(0, len(bahn_ids), BATCH_SIZE):
+                batch = bahn_ids[batch_idx:batch_idx + BATCH_SIZE]
+                batch_metadata = []
+                batch_embeddings = []
+                
+                # Verarbeite Batch
+                for bahn_id in batch:
+                    task_store[task_id]["current_bahn"] = bahn_id
+                    
+                    try:
+                        result = await service.process_single_bahn(conn, bahn_id)
+                        
+                        if result.get('error'):
+                            failed_results.append(result)
+                            task_store[task_id]["failed_bahns"] += 1
+                        else:
+                            batch_metadata.extend(result['metadata'])
+                            batch_embeddings.extend(result['embeddings'])
+                            successful_results.append(result)
+                            task_store[task_id]["successful_bahns"] += 1
+                            
+                    except Exception as e:
+                        logger.error(f"Error {bahn_id}: {e}")
+                        failed_results.append({"bahn_id": bahn_id, "error": str(e)})
                         task_store[task_id]["failed_bahns"] += 1
-                        task_store[task_id]["errors"].append(f"{bahn_id}: {result['error']}")
-                    else:
-                        # Sammle Metadaten UND Embeddings
-                        all_metadata_rows.extend(result['metadata'])
-                        all_embedding_rows.extend(result['embeddings'])
-                        successful_results.append(result)
-                        task_store[task_id]["successful_bahns"] += 1
-
+                    
                     task_store[task_id]["processed_bahns"] += 1
-
-                    # Progress logging
-                    if task_store[task_id]["processed_bahns"] % 100 == 0:
-                        progress = (task_store[task_id]["processed_bahns"] / task_store[task_id]["total_bahns"]) * 100
-                        logger.info(
-                            f"Task {task_id} progress: {progress:.1f}% "
-                            f"({task_store[task_id]['processed_bahns']}/{task_store[task_id]['total_bahns']}) "
-                            f"- Metadata: {len(all_metadata_rows)}, Embeddings: {len(all_embedding_rows)}"
-                        )
-
-                except Exception as e:
-                    logger.error(f"Exception processing bahn_id {bahn_id}: {e}")
-                    failed_results.append({
-                        "bahn_id": bahn_id,
-                        "error": str(e)
-                    })
-                    task_store[task_id]["failed_bahns"] += 1
-                    task_store[task_id]["errors"].append(f"{bahn_id}: {str(e)}")
-                    task_store[task_id]["processed_bahns"] += 1
-
-            # ✅ Batch-Write: Schreibe ALLE Metadaten UND Embeddings auf einmal
-            # ✅ NEU: Übergebe Connection explizit
-            if all_metadata_rows or all_embedding_rows:
-                logger.info(
-                    f"Writing {len(all_metadata_rows)} metadata rows and "
-                    f"{len(all_embedding_rows)} embedding rows in batch..."
-                )
-                await service.batch_write_everything(
-                    conn,
-                    all_metadata_rows,
-                    all_embedding_rows
-                )
-                logger.info(f"Batch write completed successfully!")
+                
+                # ✅ Schreibe kompletten Batch
+                if batch_metadata or batch_embeddings:
+                    await service.batch_write_everything(conn, batch_metadata, batch_embeddings)
+                    logger.info(
+                        f"✓ Batch {batch_idx//BATCH_SIZE + 1} done: "
+                        f"{len(batch_metadata)} metadata, {len(batch_embeddings)} embeddings"
+                    )
 
             # Task abschließen
             task_store[task_id].update({
                 "status": TaskStatus.COMPLETED,
                 "completed_at": datetime.now().isoformat(),
-                "current_bahn": None,
                 "summary": {
                     "total_processed": len(bahn_ids),
                     "successful": len(successful_results),
-                    "failed": len(failed_results),
-                    "total_metadata_rows": len(all_metadata_rows),
-                    "total_embedding_rows": len(all_embedding_rows)
+                    "failed": len(failed_results)
                 }
             })
 
-            logger.info(
-                f"Task {task_id} completed successfully. "
-                f"{len(successful_results)}/{len(bahn_ids)} bahns processed. "
-                f"Metadata: {len(all_metadata_rows)}, Embeddings: {len(all_embedding_rows)}"
-            )
-
         except Exception as e:
-            logger.error(f"Task {task_id} failed with exception: {e}")
+            logger.error(f"Task {task_id} failed: {e}")
             task_store[task_id].update({
                 "status": TaskStatus.FAILED,
                 "failed_at": datetime.now().isoformat(),
-                "error": str(e),
-                "current_bahn": None
+                "error": str(e)
             })
 
 def create_task_id(type) -> str:

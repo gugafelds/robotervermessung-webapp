@@ -32,7 +32,7 @@ function AccuracyTimelineContent({ data }: AccuracyTimelineContentProps) {
   const maxValues = data.map((d) => d.max_sidtw);
 
   return (
-    <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+    <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
       <Typography as="h2" className="mb-2">
         Genauigkeitsentwicklung
       </Typography>
@@ -178,7 +178,7 @@ export function AccuracyTimeline() {
   // Loading State
   if (isLoading) {
     return (
-      <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+      <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
           Genauigkeitsentwicklung
         </Typography>
@@ -195,7 +195,7 @@ export function AccuracyTimeline() {
   // Error State
   if (error) {
     return (
-      <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+      <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
           Genauigkeitsentwicklung
         </Typography>
@@ -217,7 +217,7 @@ export function AccuracyTimeline() {
   // Empty State
   if (data.length === 0) {
     return (
-      <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+      <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
           Genauigkeitsentwicklung
         </Typography>

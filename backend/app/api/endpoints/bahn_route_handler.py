@@ -53,7 +53,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
                                                 FROM auswertung.info_sidtw i
                                                 INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
                                                 LEFT JOIN bewegungsdaten.bahn_metadata m ON i.segment_id = m.segment_id
-                                                WHERE i.bahn_id != i.segment_id
+                                                WHERE i.bahn_id = i.segment_id
                                                 AND i.sidtw_average_distance IS NOT NULL
                                                 AND b.source_data_ist = 'leica_at960'
                                                 ORDER BY i.sidtw_average_distance ASC 
@@ -74,7 +74,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
                                                 FROM auswertung.info_sidtw i
                                                          INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
                                                          LEFT JOIN bewegungsdaten.bahn_metadata m ON i.segment_id = m.segment_id
-                                                WHERE i.bahn_id != i.segment_id
+                                                WHERE i.bahn_id = i.segment_id
                                                 AND i.sidtw_average_distance IS NOT NULL
                                                 AND b.source_data_ist = 'leica_at960'
                                                 ORDER BY i.sidtw_average_distance DESC 

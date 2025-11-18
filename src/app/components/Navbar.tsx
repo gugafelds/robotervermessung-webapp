@@ -13,7 +13,7 @@ export const Navbar = () => {
   const pathname = usePathname();
 
   return (
-    <header className="h-fit bg-gray-200 md:h-fit lg:h-fit">
+    <header className="h-fit border-b border-gray-500 bg-gray-200 md:h-fit lg:h-fit">
       <div className="flex flex-row flex-wrap items-center gap-10 px-6 py-4">
         <Link href="/">
           <div className="items-center rounded-md p-2">

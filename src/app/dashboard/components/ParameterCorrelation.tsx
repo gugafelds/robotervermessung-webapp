@@ -165,7 +165,7 @@ function ParameterCorrelationContent({
   const worstBinIndex = binMedians.indexOf(Math.max(...binMedians));
 
   return (
-    <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+    <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
       <Typography as="h2" className="mb-2">
         Einflussfaktoren auf Genauigkeit
       </Typography>
@@ -292,7 +292,7 @@ export function ParameterCorrelation() {
   // Loading State
   if (isLoading) {
     return (
-      <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+      <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
           Einflussfaktoren auf Genauigkeit
         </Typography>
@@ -309,7 +309,7 @@ export function ParameterCorrelation() {
   // Error State
   if (error) {
     return (
-      <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+      <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
           Einflussfaktoren auf Genauigkeit
         </Typography>
@@ -331,7 +331,7 @@ export function ParameterCorrelation() {
   // Empty State
   if (data.length === 0) {
     return (
-      <div className="flex flex-col justify-center rounded-2xl border bg-white p-6 shadow-md">
+      <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
           Einflussfaktoren auf Genauigkeit
         </Typography>

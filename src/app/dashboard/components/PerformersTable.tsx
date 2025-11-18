@@ -81,7 +81,7 @@ export function PerformersTable({
   );
 
   return (
-    <div className="flex flex-col justify-center space-y-8 rounded-2xl border bg-white p-6 shadow-md">
+    <div className="flex flex-col justify-center space-y-8 rounded-2xl border border-gray-500 bg-white p-6">
       {renderTable(bestPerformers, 'Die 5 besten', 'text-green-600')}
       {renderTable(worstPerformers, 'Die 5 schlechtesten', 'text-red-600')}
     </div>

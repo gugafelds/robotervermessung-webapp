@@ -19,8 +19,9 @@ logger = logging.getLogger(__name__)
 
 
 class MetadataCalculatorService:
-    def __init__(self, db_pool: asyncpg.Pool):
+    def __init__(self, db_pool: asyncpg.Pool, skip_embeddings: bool = True):
         self.db_pool = db_pool
+        self.skip_embeddings = skip_embeddings
         self.downsample_factor = 1
 
         # ✅ GEÄNDERT: EmbeddingCalculator mit velocity/acceleration
@@ -645,7 +646,10 @@ class MetadataCalculatorService:
             result['metadata'] = metadata_rows
 
             # 3. Berechne Embeddings IN MEMORY
-            embedding_rows = self._calculate_all_embeddings_in_memory(bahn_id, bahn_data)
+            if not self.skip_embeddings:
+                embedding_rows = self._calculate_all_embeddings_in_memory(bahn_id, bahn_data)
+            else:
+                embedding_rows = []
             result['embeddings'] = embedding_rows
 
             result['segments_processed'] = len(metadata_rows) - 1
@@ -816,4 +820,6 @@ class MetadataCalculatorService:
         ✅ NEU: Schreibt SOWOHL Metadaten ALS AUCH Embeddings mit expliziter Connection
         """
         await self.batch_write_metadata(conn, metadata_rows)
-        await self.batch_write_embeddings(conn, embedding_rows)
+        
+        if embedding_rows:  # Nur schreiben wenn vorhanden
+            await self.batch_write_embeddings(conn, embedding_rows)

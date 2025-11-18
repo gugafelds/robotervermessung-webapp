@@ -96,7 +96,7 @@ function DistributionChartsContent({
     : sortedData.map((d) => d.bucket);
 
   return (
-    <div className="flex flex-col justify-center rounded-2xl border bg-white p-4 shadow-md">
+    <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-4">
       <Typography as="h2">Datenverteilung</Typography>
       {/* Tab Navigation */}
       <div className="mb-6 flex flex-wrap gap-4 border-b">
@@ -183,7 +183,7 @@ export function DistributionCharts() {
   // Loading State
   if (isLoading) {
     return (
-      <div className="flex flex-col justify-center rounded-2xl border bg-white p-4 shadow-md">
+      <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-4">
         <Typography as="h2">Datenverteilung</Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center">
@@ -197,7 +197,7 @@ export function DistributionCharts() {
 
   if (error || !stats) {
     return (
-      <div className="flex flex-col justify-center rounded-2xl border bg-white p-2 shadow-md">
+      <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-2">
         <Typography as="h2">Datenverteilung</Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center text-red-600">
