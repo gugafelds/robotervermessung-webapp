@@ -188,7 +188,8 @@ class ShapeSearcher:
                        position_embedding IS NOT NULL    as has_position,
                        orientation_embedding IS NOT NULL as has_orientation,
                        velocity_embedding IS NOT NULL    as has_velocity,
-                       acceleration_embedding IS NOT NULL as has_acceleration
+                       acceleration_embedding IS NOT NULL as has_acceleration,
+                       metadata_embedding IS NOT NULL    as has_metadata
                 FROM bewegungsdaten.bahn_embeddings
                 WHERE segment_id = $1
             """
@@ -203,9 +204,10 @@ class ShapeSearcher:
                 'position': result['has_position'],
                 'orientation': result['has_orientation'],
                 'velocity': result['has_velocity'],
-                'acceleration': result['has_acceleration']
+                'acceleration': result['has_acceleration'],
+                'metadata': result['has_metadata']
             }
 
         except Exception as e:
             logger.error(f"Error checking embeddings for {target_id}: {e}")
-            return {'joint': False, 'position': False, 'orientation': False}
+            return {'joint': False, 'position': False, 'orientation': False, 'velocity': False, 'acceleration': False, 'metadata': False}

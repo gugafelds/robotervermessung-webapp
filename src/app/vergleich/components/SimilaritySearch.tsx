@@ -19,6 +19,7 @@ type SimilaritySearchProps = {
       orientation: number;
       velocity: number;
       acceleration: number;
+      metadata: number;
     },
     prefilterFeatures: string[],
   ) => void;
@@ -45,6 +46,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
     orientation: 0.2,
     velocity: 0.2,
     acceleration: 0.2,
+    metadata: 0.2,
   });
 
   const [prefilterFeatures, setPrefilterFeatures] = useState<Set<string>>(
@@ -76,7 +78,15 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
       orientation: 0.2,
       velocity: 0.2,
       acceleration: 0.2,
-      modes: ['position', 'joint', 'orientation', 'velocity', 'acceleration'],
+      metadata: 0.2,
+      modes: [
+        'position',
+        'joint',
+        'orientation',
+        'velocity',
+        'acceleration',
+        'metadata',
+      ],
     },
     shape: {
       position: 1.0,
@@ -84,6 +94,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
       orientation: 0.0,
       velocity: 0.0,
       acceleration: 0.0,
+      metadata: 0.0,
       modes: ['position'],
     },
     motion: {
@@ -92,6 +103,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
       orientation: 0.3,
       velocity: 0.0,
       acceleration: 0.0,
+      metadata: 0.0,
       modes: ['position', 'joint', 'orientation'],
     },
     intensity: {
@@ -100,6 +112,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
       orientation: 0.0,
       velocity: 0.6,
       acceleration: 0.3,
+      metadata: 0.0,
       modes: ['joint', 'velocity', 'acceleration'],
     },
   };
@@ -114,6 +127,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
         'orientation',
         'velocity',
         'acceleration',
+        'metadata',
       ].filter((m) => !activeModes.has(m));
 
       // Setze inaktive Modi auf 0
@@ -200,6 +214,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
       orientation: preset.orientation,
       velocity: preset.velocity,
       acceleration: preset.acceleration,
+      metadata: preset.metadata,
     });
     setActiveModes(new Set(preset.modes));
   };
@@ -251,6 +266,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
               'orientation',
               'velocity',
               'acceleration',
+              'metadata',
             ].map((mode) => (
               <button
                 key={mode}

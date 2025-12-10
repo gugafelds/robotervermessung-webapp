@@ -42,7 +42,7 @@ class MultiModalSearcher:
         try:
             # Defaults
             if modes is None:
-                modes = ['joint', 'position', 'orientation', 'velocity', 'acceleration']
+                modes = ['joint', 'position', 'orientation', 'velocity', 'acceleration', 'metadata']
 
             if weights is None:
                 weights = {mode: 1.0 / len(modes) for mode in modes}
@@ -73,11 +73,11 @@ class MultiModalSearcher:
                 'metadata': {}
             }
             
-            if 'velocity' in modes:
-                prefilter_features.append('velocity_profile')
+            #if 'velocity' in modes:
+            #    prefilter_features.append('velocity_profile')
 
-            if 'acceleration' in modes:
-                prefilter_features.append('acceleration_profile')
+            #if 'acceleration' in modes:
+            #    prefilter_features.append('acceleration_profile')
 
             # ===== PHASE 1: BAHN-LEVEL SEARCH =====
             logger.info(f"[Phase 1] Bahn-Level Search: {target_bahn_id} vs other Bahnen")

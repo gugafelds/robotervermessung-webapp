@@ -76,8 +76,8 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
     info_dfd: [],
     info_sidtw: [],
     info_dtw: [],
-    info_qdtw: [],
-    info_qad: [],
+    qdtw_info: [],
+    qad_info: [],
   });
 
   // Bahn-Info laden
@@ -223,8 +223,8 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   const hasDFDData = currentAuswertungInfo.info_dfd.length > 0;
   const hasSIDTWData = currentAuswertungInfo.info_sidtw.length > 0;
   const hasDTWData = currentAuswertungInfo.info_dtw.length > 0;
-  const hasQADData = currentAuswertungInfo.info_qad.length > 0;
-  const hasQDTWData = currentAuswertungInfo.info_qdtw.length > 0;
+  const hasQADData = currentAuswertungInfo.qad_info?.length > 0;
+  const hasQDTWData = currentAuswertungInfo.qdtw_info?.length > 0;
 
   // Automatisch EA laden, wenn verfügbar
   useEffect(() => {

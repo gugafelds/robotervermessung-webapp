@@ -8,6 +8,7 @@ export interface EmbeddingSimilarityParams {
     orientation: number;
     velocity: number;
     acceleration: number;
+    metadata: number;
   };
   limit: number;
   prefilter_features?: string[]; // Filter Features (für Bahnen UND Segmente)
@@ -62,6 +63,9 @@ export interface EmbeddingSimilarityResult {
     joint?: EmbeddingModeScore;
     position?: EmbeddingModeScore;
     orientation?: EmbeddingModeScore;
+    velocity?: EmbeddingModeScore;
+    acceleration?: EmbeddingModeScore;
+    metadata?: EmbeddingModeScore;
   };
   features?: {
     segment_id: string;
@@ -93,6 +97,9 @@ export interface BahnSimilarityResponse {
       joint: number;
       position: number;
       orientation: number;
+      velocity: number;
+      acceleration: number;
+      metadata: number;
     };
   };
 }
@@ -172,6 +179,9 @@ export interface HierarchicalSimilarityResponse {
     joint: number;
     position: number;
     orientation: number;
+    velocity: number;
+    acceleration: number;
+    metadata: number;
   };
   bahn_similarity: BahnSimilarityResponse;
   segment_similarity: {
@@ -205,6 +215,9 @@ export interface HierarchicalSimilarityResponse {
           joint: number;
           position: number;
           orientation: number;
+          velocity: number;
+          acceleration: number;
+          metadata: number;
         };
       };
     };

@@ -35,7 +35,7 @@ async def get_auswertung_info_overview(
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'auswertung' 
-        AND table_name LIKE 'info_%'
+        AND  table_name LIKE '%info%'
         """
 
         tables = await conn.fetch(table_query)
@@ -116,7 +116,7 @@ async def get_auswertung_info_by_id(
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'auswertung' 
-        AND table_name LIKE 'info_%'
+        AND table_name LIKE '%info%'
         """
 
         tables = await conn.fetch(table_query)
@@ -423,8 +423,8 @@ async def check_orientation_data(bahn_id: str, conn=Depends(get_db)):
         query = """
         SELECT 
             CASE 
-                WHEN EXISTS (SELECT 1 FROM auswertung.orientation_qad WHERE bahn_id = $1) OR
-                     EXISTS (SELECT 1 FROM auswertung.orientation_qdtw WHERE bahn_id = $1)
+                WHEN EXISTS (SELECT 1 FROM auswertung.qad_evaluation WHERE bahn_id = $1) OR
+                     EXISTS (SELECT 1 FROM auswertung.qdtw_evaluation WHERE bahn_id = $1)
                 THEN true
                 ELSE false
             END as has_data
@@ -545,8 +545,8 @@ async def search_auswertung_bahn_ids(
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
     
     
-@router.get("/orientation_qad/{bahn_id}")
-async def get_orientation_qad_by_id(bahn_id: str, conn=Depends(get_db)):
+@router.get("/qad_evaluation/{bahn_id}")
+async def get_qad_evaluation_by_id(bahn_id: str, conn=Depends(get_db)):
     try:
         query = """
                 SELECT 
@@ -562,7 +562,7 @@ async def get_orientation_qad_by_id(bahn_id: str, conn=Depends(get_db)):
                     qad_ist_z,
                     qad_ist_w,
                     points_order
-                FROM auswertung.orientation_qad 
+                FROM auswertung.qad_evaluation 
                 WHERE bahn_id = $1
                 ORDER BY points_order ASC
                 """
@@ -573,16 +573,16 @@ async def get_orientation_qad_by_id(bahn_id: str, conn=Depends(get_db)):
             raise HTTPException(status_code=404, detail=f"No QAD orientation data found for bahn_id {bahn_id}")
 
         return {
-            "orientation_qad": [dict(row) for row in rows]
+            "qad_evaluation": [dict(row) for row in rows]
         }
 
     except Exception as e:
         logger.error(f"Error fetching QAD orientation data: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
-@router.get("/orientation_qdtw/{bahn_id}")
+@router.get("/qdtw_evaluation/{bahn_id}")
 @cache(expire=2400)
-async def get_orientation_qdtw_by_id(bahn_id: str, conn=Depends(get_db)):
+async def get_qdtw_evaluation_by_id(bahn_id: str, conn=Depends(get_db)):
     try:
         query = """
                 SELECT 
@@ -598,7 +598,7 @@ async def get_orientation_qdtw_by_id(bahn_id: str, conn=Depends(get_db)):
                     qdtw_ist_z,
                     qdtw_ist_w,
                     points_order
-                FROM auswertung.orientation_qdtw 
+                FROM auswertung.qdtw_evaluation 
                 WHERE bahn_id = $1
                 ORDER BY points_order ASC
                 """
@@ -609,7 +609,7 @@ async def get_orientation_qdtw_by_id(bahn_id: str, conn=Depends(get_db)):
             raise HTTPException(status_code=404, detail=f"No QDTW deviation data found for bahn_id {bahn_id}")
 
         return {
-            "orientation_qdtw": [dict(row) for row in rows]
+            "qdtw_evaluation": [dict(row) for row in rows]
         }
 
     except Exception as e:

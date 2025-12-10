@@ -16,7 +16,7 @@ class RRFRanker:
     Paper: "Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning Methods"
     """
 
-    def __init__(self, k: int = 60):
+    def __init__(self, k: int = 50):
         """
         Args:
             k: RRF constant (default: 60, aus dem Paper)

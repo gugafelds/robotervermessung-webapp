@@ -25,12 +25,13 @@ class SimilaritySearchResponse(BaseModel):
 @router.get("/similar/{target_id}")
 async def search_similar_get(
         target_id: str,
-        modes: Optional[str] = Query(None, description="Comma-separated: joint,position,orientation,velocity,acceleration"),
+        modes: Optional[str] = Query(None, description="Comma-separated: joint,position,orientation,velocity,acceleration,metadata"),
         joint_weight: float = Query(0.0, ge=0.0, le=1.0),
         position_weight: float = Query(1.0, ge=0.0, le=1.0),
         orientation_weight: float = Query(0.0, ge=0.0, le=1.0),
         velocity_weight: float = Query(0.0, ge=0.0, le=1.0),
         acceleration_weight: float = Query(0.0, ge=0.0, le=1.0),
+        metadata_weight: float = Query(0.0, ge=0.0, le=1.0),
         limit: int = Query(10, ge=1, le=100),
         prefilter_features: Optional[str] = Query(
             None, 
@@ -58,7 +59,8 @@ async def search_similar_get(
             'position': position_weight,
             'orientation': orientation_weight,
             'velocity': velocity_weight,
-            'acceleration': acceleration_weight
+            'acceleration': acceleration_weight,
+            'metadata': metadata_weight
         }
 
         prefilter_features_list = []

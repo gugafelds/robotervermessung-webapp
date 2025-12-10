@@ -185,8 +185,8 @@ export const AuswertungProvider = ({
       setCurrentDTWInfo(infoResult.info_dtw);
       setCurrentDiscreteFrechetInfo(infoResult.info_dfd);
       setCurrentEuclideanInfo(infoResult.info_euclidean);
-      setCurrentQADInfo(infoResult.info_qad);
-      setCurrentQDTWInfo(infoResult.info_qdtw);
+      setCurrentQADInfo(infoResult.qad_info);
+      setCurrentQDTWInfo(infoResult.qdtw_info);
     } catch (error) {
       // Using error level for actual errors
       if (process.env.NODE_ENV !== 'production') {

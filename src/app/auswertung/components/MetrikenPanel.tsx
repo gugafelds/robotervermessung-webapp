@@ -59,8 +59,8 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
         setDfdInfo(infoResult.info_dfd || []);
         setDtwInfo(infoResult.info_dtw || []);
         setSidtwInfo(infoResult.info_sidtw || []);
-        setQadInfo(infoResult.info_qad || []);
-        setQdtwInfo(infoResult.info_qdtw || []);
+        setQadInfo(infoResult.qad_info || []);
+        setQdtwInfo(infoResult.qdtw_info || []);
       } catch (error) {
         console.error('Fehler beim Laden der Auswertungsinformationen:', error);
       } finally {

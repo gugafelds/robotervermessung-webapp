@@ -167,6 +167,10 @@ export class SimilarityService {
           'acceleration_weight',
           params.weights.acceleration.toString(),
         );
+        queryParams.append(
+          'metadata_weight',
+          params.weights.metadata.toString(),
+        );
       }
 
       queryParams.append('limit', params.limit.toString());

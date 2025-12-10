@@ -40,6 +40,7 @@ export default function SimilaritySearchWrapper({
       orientation: number;
       velocity: number;
       acceleration: number;
+      metadata: number;
     },
     prefilter_features: string[],
   ) => {

@@ -19,20 +19,18 @@ logger = logging.getLogger(__name__)
 
 
 class MetadataCalculatorService:
-    def __init__(self, db_pool: asyncpg.Pool, skip_embeddings: bool = True):
+    def __init__(self, db_pool: asyncpg.Pool, skip_embeddings: bool = False):
         self.db_pool = db_pool
         self.skip_embeddings = skip_embeddings
         self.downsample_factor = 1
 
         # ✅ GEÄNDERT: EmbeddingCalculator mit velocity/acceleration
         self.embedding_calculator = EmbeddingCalculator(
-            joint_samples=150,         # 150 × 6 = 900
-            position_samples=300,     # 300 × 3 = 900
-            orientation_samples=150,   # 150 × 4 = 600
-            velocity_samples=100,     # 100 × 3 = 300
-            acceleration_samples=100   # 100 × 3 = 300
-        )
-
+        joint_samples=300,         # 50 coarse + 250 fine = 300 samples → 1800D
+        position_samples=300,      # 50 coarse + 250 fine = 300 samples → 900D
+        orientation_samples=100,    # 100 × 4 = 400D (bleibt wie gehabt)
+        velocity_samples=100,      # 100 × 3 = 300D (mit Glättung!)
+     )
 
         DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/dbname")
 
@@ -85,19 +83,41 @@ class MetadataCalculatorService:
             rows = await conn.fetch(query, start_date, end_date)
             return [row['bahn_id'] for row in rows]
 
-    async def get_all_missing_bahn_ids(self) -> List[str]:
-        """Ermittelt alle bahn_ids die noch keine Metadaten haben"""
+    async def get_all_missing_bahn_ids(self) -> tuple[List[str], List[str]]:
+        """
+        Ermittelt fehlende Metadaten UND Embeddings
+        
+        Returns:
+            (missing_metadata_ids, missing_embedding_ids)
+        """
         async with self.db_pool.acquire() as conn:
-            query = """
-                    SELECT DISTINCT bi.bahn_id
-                    FROM robotervermessung.bewegungsdaten.bahn_info bi
-                             LEFT JOIN robotervermessung.bewegungsdaten.bahn_metadata bm
-                                       ON bi.bahn_id = bm.bahn_id AND bi.bahn_id = bm.segment_id
-                    WHERE bm.segment_id IS NULL AND bi.source_data_ist = 'leica_at960' \
-                    ORDER BY bi.bahn_id \
-                    """
-            rows = await conn.fetch(query)
-            return [row['bahn_id'] for row in rows]
+            # Bahnen ohne Metadaten
+            metadata_query = """
+                SELECT DISTINCT bi.bahn_id
+                FROM robotervermessung.bewegungsdaten.bahn_info bi
+                LEFT JOIN robotervermessung.bewegungsdaten.bahn_metadata bm
+                    ON bi.bahn_id = bm.bahn_id AND bi.bahn_id = bm.segment_id
+                WHERE bm.segment_id IS NULL 
+                AND bi.source_data_ist = 'leica_at960'
+                ORDER BY bi.bahn_id
+            """
+            metadata_rows = await conn.fetch(metadata_query)
+            missing_metadata = [row['bahn_id'] for row in metadata_rows]
+            
+            # Bahnen ohne Embeddings (aber MIT Metadaten!)
+            embedding_query = """
+                SELECT DISTINCT bm.bahn_id
+                FROM robotervermessung.bewegungsdaten.bahn_metadata bm
+                LEFT JOIN robotervermessung.bewegungsdaten.bahn_embeddings be
+                    ON bm.bahn_id = be.bahn_id AND bm.segment_id = be.segment_id
+                WHERE be.segment_id IS NULL
+                AND bm.bahn_id = bm.segment_id
+                ORDER BY bm.bahn_id
+            """
+            embedding_rows = await conn.fetch(embedding_query)
+            missing_embeddings = [row['bahn_id'] for row in embedding_rows]
+            
+            return missing_metadata, missing_embeddings
 
     async def check_existing_bahns(self, bahn_ids: List[str]) -> List[str]:
         """Prüft welche bahn_ids bereits Metadaten haben"""
@@ -519,8 +539,18 @@ class MetadataCalculatorService:
                 # ✅ Ein Call für beide!
                 vel_emb, acc_emb = self.embedding_calculator.compute_velocity_and_acceleration_embeddings(vel_acc_data)
 
+            meta_emb = None
+
+            # Finde die Metadata-Zeile für dieses Segment
+            segment_metadata = next(
+                (m for m in bahn_data.get('metadata_rows', []) if m['segment_id'] == segment_id), 
+                None
+            )
+            if segment_metadata:
+                meta_emb = self.embedding_calculator.compute_metadata_embedding(segment_metadata)
+
             # Skip wenn keine Embeddings berechnet wurden
-            if all(x is None for x in [joint_emb, pos_emb, ori_emb, vel_emb, acc_emb]):
+            if all(x is None for x in [joint_emb, pos_emb, ori_emb, vel_emb, acc_emb, meta_emb]):
                 continue
 
             embedding_rows.append({
@@ -531,6 +561,7 @@ class MetadataCalculatorService:
                 'orientation_embedding': ori_emb,
                 'velocity_embedding': vel_emb,
                 'acceleration_embedding': acc_emb,
+                'metadata_embedding': meta_emb
             })
 
         # 2. Gesamtbahn (segment_id = bahn_id)
@@ -589,6 +620,16 @@ class MetadataCalculatorService:
                         'z_soll': segment['z_data'][i],
                         'timestamp': timestamps[i]
                     })
+        
+        bahn_meta_emb = None
+        bahn_metadata = next(
+            (m for m in bahn_data.get('metadata_rows', []) if m['segment_id'] == bahn_id), 
+            None
+        )
+
+        if bahn_metadata:
+            bahn_meta_emb = self.embedding_calculator.compute_metadata_embedding(bahn_metadata)
+
 
         # Berechne Bahn-Level Embeddings
         bahn_joint_emb = self.embedding_calculator.compute_joint_embedding(all_joint_data) if all_joint_data else None
@@ -606,7 +647,8 @@ class MetadataCalculatorService:
                 'position_embedding': bahn_pos_emb,
                 'orientation_embedding': bahn_ori_emb,
                 'velocity_embedding': bahn_vel_emb,
-                'acceleration_embedding': bahn_acc_emb
+                'acceleration_embedding': bahn_acc_emb,
+                'metadata_embedding': bahn_meta_emb
             })
 
         return embedding_rows
@@ -617,9 +659,11 @@ class MetadataCalculatorService:
         return '[' + ','.join(str(x) for x in arr.tolist()) + ']'
 
     async def process_single_bahn(
-            self,
-            conn: asyncpg.Connection,
-            bahn_id: str
+        self,
+        conn: asyncpg.Connection,
+        bahn_id: str,
+        compute_metadata: bool = True,  # ✅ NEU
+        compute_embeddings: bool = True  # ✅ NEU
     ) -> Dict:
         """
         ✅ NEU: Wie process_single_bahn_in_memory, aber mit expliziter Connection
@@ -634,30 +678,30 @@ class MetadataCalculatorService:
         }
 
         try:
-            # 1. Hole ALLE Daten für diese Bahn
             bahn_data = await self._fetch_all_bahn_data(conn, bahn_id)
 
             if not bahn_data:
                 result['error'] = 'Keine Daten gefunden'
                 return result
 
-            # 2. Verarbeite Metadaten IN MEMORY
-            metadata_rows = self._calculate_all_metadata_in_memory(bahn_id, bahn_data)
-            result['metadata'] = metadata_rows
-
-            # 3. Berechne Embeddings IN MEMORY
-            if not self.skip_embeddings:
-                embedding_rows = self._calculate_all_embeddings_in_memory(bahn_id, bahn_data)
+            # 1. Metadaten (optional)
+            if compute_metadata:
+                metadata_rows = self._calculate_all_metadata_in_memory(bahn_id, bahn_data)
+                result['metadata'] = metadata_rows
+                result['segments_processed'] = len(metadata_rows) - 1
             else:
-                embedding_rows = []
-            result['embeddings'] = embedding_rows
+                # ✅ Lade existierende Metadaten aus DB (für Embedding-Berechnung!)
+                metadata_rows = await self._load_existing_metadata(conn, bahn_id)
+                result['segments_processed'] = len(metadata_rows) - 1
 
-            result['segments_processed'] = len(metadata_rows) - 1
-
-            #logger.info(
-            #    f"Bahn {bahn_id}: {len(metadata_rows)} metadata rows, "
-            #    f"{len(embedding_rows)} embedding rows"
-            #)
+            # 2. Embeddings (optional)
+            if compute_embeddings:
+                if not self.skip_embeddings:
+                    bahn_data['metadata_rows'] = metadata_rows  # ✅ Hinzufügen zu bahn_data
+                    embedding_rows = self._calculate_all_embeddings_in_memory(bahn_id, bahn_data)
+                    result['embeddings'] = embedding_rows
+                else:
+                    embedding_rows = []
 
         except Exception as e:
             logger.error(f"Fehler bei Verarbeitung bahn_id {bahn_id}: {e}")
@@ -678,7 +722,23 @@ class MetadataCalculatorService:
             'position_y': round(float(np.mean(y_data)), 3),
             'position_z': round(float(np.mean(z_data)), 3)
         }
-
+    
+    async def _load_existing_metadata(self, conn: asyncpg.Connection, bahn_id: str) -> List[Dict]:
+        """
+        ✅ NEU: Lädt existierende Metadaten aus DB
+        """
+        query = """
+            SELECT bahn_id, segment_id, movement_type, duration, weight, length,
+                min_twist_ist, max_twist_ist, mean_twist_ist, 
+                median_twist_ist, std_twist_ist,
+                min_acceleration_ist, max_acceleration_ist, mean_acceleration_ist,
+                median_acceleration_ist, std_acceleration_ist
+            FROM robotervermessung.bewegungsdaten.bahn_metadata
+            WHERE bahn_id = $1
+            ORDER BY segment_id
+        """
+        rows = await conn.fetch(query, bahn_id)
+        return [dict(row) for row in rows]
 
     async def batch_write_metadata(
             self,
@@ -730,7 +790,7 @@ class MetadataCalculatorService:
         # Konvertiere Strings zu numpy arrays
         for row in embedding_rows:
             for key in ['joint_embedding', 'position_embedding', 'orientation_embedding', 
-                       'velocity_embedding', 'acceleration_embedding']:
+                       'velocity_embedding', 'acceleration_embedding', 'metadata_embedding']:
                 if row.get(key) is not None and isinstance(row[key], str):
                     # Parse '[1.2,3.4,...]' → numpy array
                     emb_str = row[key].strip('[]')
@@ -770,7 +830,8 @@ class MetadataCalculatorService:
                 position_embedding TEXT,
                 orientation_embedding TEXT,
                 velocity_embedding TEXT,
-                acceleration_embedding TEXT
+                acceleration_embedding TEXT,
+                metadata_embedding TEXT
             )
                            """)
 
@@ -783,7 +844,8 @@ class MetadataCalculatorService:
                 row['position_embedding'],
                 row['orientation_embedding'],
                 row['velocity_embedding'],
-                row['acceleration_embedding']
+                row['acceleration_embedding'],
+                row['metadata_embedding']
             )
             for row in embedding_rows
         ]
@@ -793,18 +855,18 @@ class MetadataCalculatorService:
             records=records,
             columns=[
                 'segment_id', 'bahn_id', 'joint_embedding', 'position_embedding',
-                'orientation_embedding', 'velocity_embedding', 'acceleration_embedding'
+                'orientation_embedding', 'velocity_embedding', 'acceleration_embedding', 'metadata_embedding'
             ]
         )
 
         await conn.execute("""
                         INSERT INTO bewegungsdaten.bahn_embeddings
                         (segment_id, bahn_id, joint_embedding, position_embedding, orientation_embedding,
-                        velocity_embedding, acceleration_embedding)
+                        velocity_embedding, acceleration_embedding, metadata_embedding)
                         SELECT segment_id,
                             bahn_id,
                             joint_embedding::vector, position_embedding::vector, orientation_embedding::vector, 
-                            velocity_embedding::vector, acceleration_embedding::vector
+                            velocity_embedding::vector, acceleration_embedding::vector, metadata_embedding::vector
                         FROM temp_embeddings
                     """)
 
@@ -823,3 +885,20 @@ class MetadataCalculatorService:
         
         if embedding_rows:  # Nur schreiben wenn vorhanden
             await self.batch_write_embeddings(conn, embedding_rows)
+    
+    async def check_existing_embeddings(self, bahn_ids: List[str]) -> List[str]:
+        """
+        ✅ NEU: Prüft welche bahn_ids bereits Embeddings haben
+        """
+        if not bahn_ids:
+            return []
+
+        async with self.db_pool.acquire() as conn:
+            query = """
+                SELECT DISTINCT bahn_id
+                FROM robotervermessung.bewegungsdaten.bahn_embeddings
+                WHERE bahn_id = ANY($1::text[])
+                AND segment_id = bahn_id
+            """
+            rows = await conn.fetch(query, bahn_ids)
+            return [row['bahn_id'] for row in rows]

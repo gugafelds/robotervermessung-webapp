@@ -163,8 +163,8 @@ export const getAuswertungInfoById = async (
   info_sidtw: any[];
   info_dtw: any[];
   info_euclidean: any[];
-  info_qdtw: any[];
-  info_qad: any[];
+  qdtw_info: any[];
+  qad_info: any[];
 }> => {
   try {
     const result = await fetchFromAPI<{
@@ -176,8 +176,8 @@ export const getAuswertungInfoById = async (
       info_sidtw: transformSIDTWInfoResult(result.info_sidtw || []),
       info_dtw: transformDTWInfoResult(result.info_dtw || []),
       info_euclidean: transformEAInfoResult(result.info_euclidean || []),
-      info_qdtw: transformQDTWInfoResult(result.info_qdtw || []),
-      info_qad: transformQADInfoResult(result.info_qad || []),
+      qdtw_info: transformQDTWInfoResult(result.qdtw_info || []),
+      qad_info: transformQADInfoResult(result.qad_info || []),
     };
   } catch (error) {
     console.error(`Error fetching Auswertung info for ${id}:`, error);
@@ -186,8 +186,8 @@ export const getAuswertungInfoById = async (
       info_sidtw: [],
       info_dtw: [],
       info_euclidean: [],
-      info_qdtw: [],
-      info_qad: [],
+      qdtw_info: [],
+      qad_info: [],
     };
   }
 };
@@ -281,9 +281,9 @@ export const getQDTWOrientationById = async (
 ): Promise<QDTWOrientation[]> => {
   try {
     const result = await fetchFromAPI<{
-      orientation_qdtw: QDTWOrientationRaw[];
-    }>(`/auswertung/orientation_qdtw/${id}`);
-    return transformQDTWDeviationResult(result.orientation_qdtw);
+      qdtw_evaluation: QDTWOrientationRaw[];
+    }>(`/auswertung/qdtw_evaluation/${id}`);
+    return transformQDTWDeviationResult(result.qdtw_evaluation);
   } catch (error) {
     console.error('Error fetching QDTW deviation data:', error);
     throw error;
@@ -295,9 +295,9 @@ export const getQADOrientationById = async (
 ): Promise<QADOrientation[]> => {
   try {
     const result = await fetchFromAPI<{
-      orientation_qad: QADOrientationRaw[];
-    }>(`/auswertung/orientation_qad/${id}`);
-    return transformQADDeviationResult(result.orientation_qad);
+      qad_evaluation: QADOrientationRaw[];
+    }>(`/auswertung/qad_evaluation/${id}`);
+    return transformQADDeviationResult(result.qad_evaluation);
   } catch (error) {
     console.error('Error fetching QAD orientation data:', error);
     throw error;

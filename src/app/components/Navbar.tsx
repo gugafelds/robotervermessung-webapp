@@ -57,7 +57,7 @@ export const Navbar = () => {
               pathname.includes('bahn-vergleich') ? 'bg-gray-300' : ''
             }`}
           >
-            Bahnvergleich
+            Ähnlichkeitssuche
           </Typography>
         </Link>
         <Link href="/hochladen">
