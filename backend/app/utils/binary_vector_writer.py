@@ -38,7 +38,6 @@ class BinaryVectorWriter:
                 - position_embedding: np.ndarray oder None
                 - orientation_embedding: np.ndarray oder None
                 - velocity_embedding: np.ndarray oder None
-                - acceleration_embedding: np.ndarray oder None
                 - metadata_embedding: np.ndarray oder None
         
         Returns:
@@ -64,12 +63,12 @@ class BinaryVectorWriter:
             with cur.copy(
                 "COPY bewegungsdaten.bahn_embeddings "
                 "(segment_id, bahn_id, joint_embedding, position_embedding, "
-                "orientation_embedding, velocity_embedding, acceleration_embedding, metadata_embedding) "
+                "orientation_embedding, velocity_embedding, metadata_embedding) "
                 "FROM STDIN WITH (FORMAT BINARY)"
             ) as copy:
                 
                 # Set types für Binary Copy
-                copy.set_types(['text', 'text', 'vector', 'vector', 'vector', 'vector', 'vector', 'vector'])
+                copy.set_types(['text', 'text', 'vector', 'vector', 'vector', 'vector', 'vector'])
                 
                 for i, row in enumerate(embedding_rows):
                     # Konvertiere zu numpy arrays (falls noch Strings)
@@ -77,7 +76,6 @@ class BinaryVectorWriter:
                     pos_emb = self._to_numpy(row.get('position_embedding'))
                     ori_emb = self._to_numpy(row.get('orientation_embedding'))
                     vel_emb = self._to_numpy(row.get('velocity_embedding'))
-                    acc_emb = self._to_numpy(row.get('acceleration_embedding'))
                     meta_emb = self._to_numpy(row.get('metadata_embedding'))
                     
                     copy.write_row([
@@ -87,7 +85,6 @@ class BinaryVectorWriter:
                         pos_emb,
                         ori_emb,
                         vel_emb,
-                        acc_emb,
                         meta_emb
                     ])
                     

@@ -26,10 +26,10 @@ class MetadataCalculatorService:
 
         # ✅ GEÄNDERT: EmbeddingCalculator mit velocity/acceleration
         self.embedding_calculator = EmbeddingCalculator(
-        joint_samples=300,         # 50 coarse + 250 fine = 300 samples → 1800D
-        position_samples=300,      # 50 coarse + 250 fine = 300 samples → 900D
-        orientation_samples=100,    # 100 × 4 = 400D (bleibt wie gehabt)
-        velocity_samples=100,      # 100 × 3 = 300D (mit Glättung!)
+        joint_samples=25,         # 50 coarse + 250 fine = 300 samples → 1800D
+        position_samples=25,      # 50 coarse + 250 fine = 300 samples → 900D
+        orientation_samples=25,    # 25 × 4 = 100D (bleibt wie gehabt)
+        velocity_samples=25,      # 25 × 3 = 75D (mit Glättung!)
      )
 
         DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/dbname")
@@ -520,13 +520,12 @@ class MetadataCalculatorService:
                 continue
 
             vel_emb = None
-            acc_emb = None
 
             if segment['x_data'] and len(segment['x_data']) > 2:
                 # Timestamps zu Sekunden konvertieren
                 timestamps = [float(t) / 1_000_000_000.0 for t in segment['timestamps']]
                 
-                vel_acc_data = [
+                vel_data = [
                     {
                         'x_soll': segment['x_data'][i],
                         'y_soll': segment['y_data'][i],
@@ -537,7 +536,7 @@ class MetadataCalculatorService:
                 ]
                 
                 # ✅ Ein Call für beide!
-                vel_emb, acc_emb = self.embedding_calculator.compute_velocity_and_acceleration_embeddings(vel_acc_data)
+                vel_emb = self.embedding_calculator.compute_velocity_embeddings(vel_data)
 
             meta_emb = None
 
@@ -550,7 +549,7 @@ class MetadataCalculatorService:
                 meta_emb = self.embedding_calculator.compute_metadata_embedding(segment_metadata)
 
             # Skip wenn keine Embeddings berechnet wurden
-            if all(x is None for x in [joint_emb, pos_emb, ori_emb, vel_emb, acc_emb, meta_emb]):
+            if all(x is None for x in [joint_emb, pos_emb, ori_emb, vel_emb, meta_emb]):
                 continue
 
             embedding_rows.append({
@@ -560,7 +559,6 @@ class MetadataCalculatorService:
                 'position_embedding': pos_emb,
                 'orientation_embedding': ori_emb,
                 'velocity_embedding': vel_emb,
-                'acceleration_embedding': acc_emb,
                 'metadata_embedding': meta_emb
             })
 
@@ -569,7 +567,7 @@ class MetadataCalculatorService:
         all_joint_data = []
         all_pos_data = []
         all_ori_data = []
-        all_vel_acc_data = []
+        all_vel_data = []
 
         for segment in bahn_data['segments']:
             segment_id = segment['segment_id']
@@ -607,14 +605,14 @@ class MetadataCalculatorService:
                         'qz_soll': ori_raw['qz'][i]
                     })
             
-        all_vel_acc_data = []
+        all_vel_data = []
 
         for segment in bahn_data['segments']:
             if segment['x_data'] and len(segment['x_data']) > 2:
                 timestamps = [float(t) / 1_000_000_000.0 for t in segment['timestamps']]
                 
                 for i in range(len(segment['x_data'])):
-                    all_vel_acc_data.append({
+                    all_vel_data.append({
                         'x_soll': segment['x_data'][i],
                         'y_soll': segment['y_data'][i],
                         'z_soll': segment['z_data'][i],
@@ -635,9 +633,7 @@ class MetadataCalculatorService:
         bahn_joint_emb = self.embedding_calculator.compute_joint_embedding(all_joint_data) if all_joint_data else None
         bahn_pos_emb = self.embedding_calculator.compute_position_embedding(all_pos_data) if all_pos_data else None
         bahn_ori_emb = self.embedding_calculator.compute_orientation_embedding(all_ori_data) if all_ori_data else None
-        bahn_vel_emb, bahn_acc_emb = self.embedding_calculator.compute_velocity_and_acceleration_embeddings(
-            all_vel_acc_data
-        ) if len(all_vel_acc_data) > 2 else (None, None)
+        bahn_vel_emb = self.embedding_calculator.compute_velocity_embeddings(all_vel_data) if all_vel_data else None
 
         if bahn_joint_emb is not None or bahn_pos_emb is not None or bahn_ori_emb is not None:
             embedding_rows.append({
@@ -647,7 +643,6 @@ class MetadataCalculatorService:
                 'position_embedding': bahn_pos_emb,
                 'orientation_embedding': bahn_ori_emb,
                 'velocity_embedding': bahn_vel_emb,
-                'acceleration_embedding': bahn_acc_emb,
                 'metadata_embedding': bahn_meta_emb
             })
 
@@ -790,7 +785,7 @@ class MetadataCalculatorService:
         # Konvertiere Strings zu numpy arrays
         for row in embedding_rows:
             for key in ['joint_embedding', 'position_embedding', 'orientation_embedding', 
-                       'velocity_embedding', 'acceleration_embedding', 'metadata_embedding']:
+                       'velocity_embedding', 'metadata_embedding']:
                 if row.get(key) is not None and isinstance(row[key], str):
                     # Parse '[1.2,3.4,...]' → numpy array
                     emb_str = row[key].strip('[]')
@@ -830,7 +825,6 @@ class MetadataCalculatorService:
                 position_embedding TEXT,
                 orientation_embedding TEXT,
                 velocity_embedding TEXT,
-                acceleration_embedding TEXT,
                 metadata_embedding TEXT
             )
                            """)
@@ -844,7 +838,6 @@ class MetadataCalculatorService:
                 row['position_embedding'],
                 row['orientation_embedding'],
                 row['velocity_embedding'],
-                row['acceleration_embedding'],
                 row['metadata_embedding']
             )
             for row in embedding_rows
@@ -855,18 +848,18 @@ class MetadataCalculatorService:
             records=records,
             columns=[
                 'segment_id', 'bahn_id', 'joint_embedding', 'position_embedding',
-                'orientation_embedding', 'velocity_embedding', 'acceleration_embedding', 'metadata_embedding'
+                'orientation_embedding', 'velocity_embedding', 'metadata_embedding'
             ]
         )
 
         await conn.execute("""
                         INSERT INTO bewegungsdaten.bahn_embeddings
                         (segment_id, bahn_id, joint_embedding, position_embedding, orientation_embedding,
-                        velocity_embedding, acceleration_embedding, metadata_embedding)
+                        velocity_embedding, metadata_embedding)
                         SELECT segment_id,
                             bahn_id,
                             joint_embedding::vector, position_embedding::vector, orientation_embedding::vector, 
-                            velocity_embedding::vector, acceleration_embedding::vector, metadata_embedding::vector
+                            velocity_embedding::vector, metadata_embedding::vector
                         FROM temp_embeddings
                     """)
 

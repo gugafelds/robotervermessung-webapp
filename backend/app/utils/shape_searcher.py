@@ -60,19 +60,19 @@ class ShapeSearcher:
             mode: str,
             limit: int = 100,
             candidate_ids: Optional[List[str]] = None,
-            only_bahnen: bool = False,  # ✅ NEU!
-            only_segments: bool = False  # ✅ NEU!
+            only_bahnen: bool = False,
+            only_segments: bool = False
     ) -> List[Dict]:
         """
         Sucht ähnliche Bahnen/Segmente basierend auf Embedding
 
         Args:
             target_id: Target ID
-            mode: 'joint', 'position', 'orientation'
+            mode: 'joint', 'position', 'orientation', 'velocity', 'metadata'
             limit: Max Ergebnisse
             candidate_ids: Optional Pre-Filter Liste
-            only_bahnen: Nur Bahnen (segment_id = bahn_id)  # ✅ NEU!
-            only_segments: Nur Segmente (segment_id != bahn_id)  # ✅ NEU!
+            only_bahnen: Nur Bahnen (segment_id = bahn_id)
+            only_segments: Nur Segmente (segment_id != bahn_id)
 
         Returns:
             List[Dict] mit segment_id, bahn_id, distance, rank
@@ -93,7 +93,7 @@ class ShapeSearcher:
                 f"e.{embedding_col} IS NOT NULL"
             ]
 
-            # ✅ Filter für Bahnen/Segmente
+            # Filter für Bahnen/Segmente
             if only_bahnen:
                 where_conditions.append("m.segment_id = m.bahn_id")
             elif only_segments:
@@ -101,7 +101,10 @@ class ShapeSearcher:
 
             where_clause = " AND ".join(where_conditions)
 
-            # 3. Query
+            # ⭐ 3. SET HNSW parameter ERST (außerhalb der Query)
+            await self.connection.execute("SET LOCAL hnsw.ef_search = 200")
+
+            # 4. Query
             if candidate_ids is not None and len(candidate_ids) > 0:
                 # Mit Kandidaten-Filter
                 where_conditions.append("e.segment_id = ANY($3)")
@@ -147,7 +150,7 @@ class ShapeSearcher:
                     limit
                 )
 
-            # 4. Format Results
+            # 5. Format Results
             ranked_results = []
             for rank, row in enumerate(results, start=1):
                 ranked_results.append({
@@ -188,7 +191,6 @@ class ShapeSearcher:
                        position_embedding IS NOT NULL    as has_position,
                        orientation_embedding IS NOT NULL as has_orientation,
                        velocity_embedding IS NOT NULL    as has_velocity,
-                       acceleration_embedding IS NOT NULL as has_acceleration,
                        metadata_embedding IS NOT NULL    as has_metadata
                 FROM bewegungsdaten.bahn_embeddings
                 WHERE segment_id = $1
@@ -197,17 +199,28 @@ class ShapeSearcher:
             result = await self.connection.fetchrow(query, target_id)
 
             if not result:
-                return {'joint': False, 'position': False, 'orientation': False}
+                return {
+                    'joint': False, 
+                    'position': False, 
+                    'orientation': False, 
+                    'velocity': False, 
+                    'metadata': False
+                }
 
             return {
                 'joint': result['has_joint'],
                 'position': result['has_position'],
                 'orientation': result['has_orientation'],
                 'velocity': result['has_velocity'],
-                'acceleration': result['has_acceleration'],
                 'metadata': result['has_metadata']
             }
 
         except Exception as e:
             logger.error(f"Error checking embeddings for {target_id}: {e}")
-            return {'joint': False, 'position': False, 'orientation': False, 'velocity': False, 'acceleration': False, 'metadata': False}
+            return {
+                'joint': False, 
+                'position': False, 
+                'orientation': False, 
+                'velocity': False, 
+                'metadata': False
+            }

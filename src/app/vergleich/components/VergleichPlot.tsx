@@ -89,7 +89,7 @@ export const VergleichPlot: React.FC<VergleichPlotProps> = ({
 
   // Hilfsfunktion um jeden 13. Punkt zu nehmen
   const sampleEveryFifthPoint = useCallback(<T,>(data: T[]): T[] => {
-    return data.filter((_, index) => index % 1 === 0);
+    return data.filter((_, index) => index % 13 === 0);
   }, []);
 
   const normalizeTrajectory = useCallback(

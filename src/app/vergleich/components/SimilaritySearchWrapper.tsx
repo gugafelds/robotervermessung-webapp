@@ -29,6 +29,8 @@ export default function SimilaritySearchWrapper({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [originalId, setOriginalId] = useState('');
+  const [showPlots, setShowPlots] = useState(false);
+  const hasResults = bahnResults.length > 0 || segmentGroups.length > 0;
 
   const handleSearch = async (
     id: string,
@@ -39,7 +41,6 @@ export default function SimilaritySearchWrapper({
       position: number;
       orientation: number;
       velocity: number;
-      acceleration: number;
       metadata: number;
     },
     prefilter_features: string[],
@@ -80,28 +81,38 @@ export default function SimilaritySearchWrapper({
   return (
     <div className="flex flex-col">
       <div className="w-full p-2">
-        <SimilaritySearch onSearch={handleSearch} bahnInfo={bahnInfo} />
-        {/* Plot-Bereich - fest verankert rechts */}
-        <div className="my-2 flex gap-x-2 overflow-hidden">
-          {bahnResults.length > 0 && (
-            <VergleichPlot
-              mode="bahnen"
-              results={bahnResults}
-              isLoading={isLoading}
-              originalId={originalId}
-            />
-          )}
+        <SimilaritySearch
+          onSearch={handleSearch}
+          bahnInfo={bahnInfo}
+          showPlots={showPlots} // ⭐ NEU
+          onTogglePlots={() => setShowPlots(!showPlots)} // ⭐ NEU
+          hasResults={hasResults} // ⭐ NEU
+        />
 
-          {segmentGroups.length > 2 && (
-            <VergleichPlot
-              mode="segmente"
-              results={bahnResults}
-              segmentGroups={segmentGroups}
-              isLoading={isLoading}
-              originalId={originalId}
-            />
-          )}
-        </div>
+        {/* Plot-Bereich - nur rendern wenn showPlots = true */}
+        {showPlots && (
+          <div className="my-2 flex gap-x-2 overflow-hidden">
+            {bahnResults.length > 0 && (
+              <VergleichPlot
+                mode="bahnen"
+                results={bahnResults}
+                isLoading={isLoading}
+                originalId={originalId}
+              />
+            )}
+
+            {segmentGroups.length > 2 && (
+              <VergleichPlot
+                mode="segmente"
+                results={bahnResults}
+                segmentGroups={segmentGroups}
+                isLoading={isLoading}
+                originalId={originalId}
+              />
+            )}
+          </div>
+        )}
+
         <SimilarityResults
           results={bahnResults}
           isLoading={isLoading}

@@ -18,17 +18,22 @@ type SimilaritySearchProps = {
       joint: number;
       orientation: number;
       velocity: number;
-      acceleration: number;
       metadata: number;
     },
     prefilterFeatures: string[],
   ) => void;
   bahnInfo?: BahnInfo[] | undefined;
+  showPlots: boolean; // ⭐ NEU
+  onTogglePlots: () => void; // ⭐ NEU
+  hasResults: boolean; // ⭐ NEU
 };
 
 const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
   onSearch,
   bahnInfo,
+  showPlots,
+  onTogglePlots,
+  hasResults,
 }) => {
   const [id, setId] = useState('');
   const [limit, setLimit] = useState(5); // ✅ Ein Limit für Bahnen + Segmente
@@ -45,7 +50,6 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
     joint: 0.2,
     orientation: 0.2,
     velocity: 0.2,
-    acceleration: 0.2,
     metadata: 0.2,
   });
 
@@ -77,23 +81,14 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
       joint: 0.2,
       orientation: 0.2,
       velocity: 0.2,
-      acceleration: 0.2,
       metadata: 0.2,
-      modes: [
-        'position',
-        'joint',
-        'orientation',
-        'velocity',
-        'acceleration',
-        'metadata',
-      ],
+      modes: ['position', 'joint', 'orientation', 'velocity', 'metadata'],
     },
     shape: {
       position: 1.0,
       joint: 0.0,
       orientation: 0.0,
       velocity: 0.0,
-      acceleration: 0.0,
       metadata: 0.0,
       modes: ['position'],
     },
@@ -102,7 +97,6 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
       joint: 0.8,
       orientation: 0.3,
       velocity: 0.0,
-      acceleration: 0.0,
       metadata: 0.0,
       modes: ['position', 'joint', 'orientation'],
     },
@@ -111,9 +105,8 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
       joint: 0.3,
       orientation: 0.0,
       velocity: 0.6,
-      acceleration: 0.3,
       metadata: 0.0,
-      modes: ['joint', 'velocity', 'acceleration'],
+      modes: ['joint', 'velocity'],
     },
   };
 
@@ -126,7 +119,6 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
         'joint',
         'orientation',
         'velocity',
-        'acceleration',
         'metadata',
       ].filter((m) => !activeModes.has(m));
 
@@ -213,7 +205,6 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
       joint: preset.joint,
       orientation: preset.orientation,
       velocity: preset.velocity,
-      acceleration: preset.acceleration,
       metadata: preset.metadata,
     });
     setActiveModes(new Set(preset.modes));
@@ -260,26 +251,21 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
         <div className="flex items-center gap-8 rounded-lg bg-white p-3 text-sm sm:flex-col lg:flex-row">
           <div>Modi:</div>
           <div className="w-fit gap-2 space-x-2">
-            {[
-              'position',
-              'joint',
-              'orientation',
-              'velocity',
-              'acceleration',
-              'metadata',
-            ].map((mode) => (
-              <button
-                key={mode}
-                onClick={() => toggleMode(mode)}
-                className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                  activeModes.has(mode)
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                {mode.charAt(0).toUpperCase() + mode.slice(1)}
-              </button>
-            ))}
+            {['position', 'joint', 'orientation', 'velocity', 'metadata'].map(
+              (mode) => (
+                <button
+                  key={mode}
+                  onClick={() => toggleMode(mode)}
+                  className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                    activeModes.has(mode)
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </button>
+              ),
+            )}
           </div>
           <div className="text-sm font-medium text-gray-700">Gewichtungen:</div>
           <span className="flex w-fit flex-col gap-3 sm:flex-row">
@@ -406,6 +392,17 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
                   className="w-16 rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
               </div>
+            </div>
+
+            <div>
+              {hasResults && (
+                <button
+                  onClick={onTogglePlots}
+                  className="w-full rounded-lg border-2 border-blue-600 bg-red-50 p-2 font-medium text-blue-600 transition-colors hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {showPlots ? '3D-Plots ausblenden' : '3D-Plots anzeigen'}
+                </button>
+              )}
             </div>
           </div>
         </div>

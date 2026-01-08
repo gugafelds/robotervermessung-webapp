@@ -15,10 +15,10 @@ class EmbeddingCalculator:
 
     def __init__(
             self,
-            joint_samples: int = 50,        # 50 × 6 = 300
-            position_samples: int = 100,    # 100 × 3 = 300
-            orientation_samples: int = 50,  # 50 × 4 = 200
-            velocity_samples: int = 100,    # 100 × 3 = 300
+            joint_samples: int = 25,        # 25 × 6 = 150
+            position_samples: int = 25,     # 25 × 3 = 75
+            orientation_samples: int = 25,  # 25 × 4 = 100
+            velocity_samples: int = 25,     # 25 × 3 = 75
     ):
         self.joint_samples = joint_samples
         self.position_samples = position_samples
@@ -36,13 +36,13 @@ class EmbeddingCalculator:
             for r in data
         ], dtype=np.float32)
         
-        # Multi-Scale: coarse (50) + fine (250) = 300 samples
-        coarse = self._resample(traj, 50)  # 50 × 6 = 300
-        fine = self._resample(traj, 250)   # 250 × 6 = 1500
+        # Multi-Scale: coarse (5) + fine (20) = 25 samples
+        coarse = self._resample(traj, 5)   # 5 × 6 = 30
+        fine = self._resample(traj, 20)    # 20 × 6 = 120
         
         # Concatenate + flatten
-        combined = np.vstack([coarse, fine])  # (300, 6)
-        flat = combined.flatten()  # (1800,)
+        combined = np.vstack([coarse, fine])  # (25, 6)
+        flat = combined.flatten()  # (150,) ← Total Dims!
         
         return self._l2_normalize(flat)
 
@@ -63,20 +63,20 @@ class EmbeddingCalculator:
         if max_extent > 1e-6:
             traj_normalized = traj_normalized / max_extent
         
-        # Multi-Scale: coarse (50) + fine (250) = 300 samples
-        coarse = self._resample(traj_normalized, 50)  # 50 × 3 = 150
-        fine = self._resample(traj_normalized, 250)   # 250 × 3 = 750
+        # Multi-Scale: coarse (5) + fine (20) = 25 samples
+        coarse = self._resample(traj_normalized, 5)   # 5 × 3 = 15
+        fine = self._resample(traj_normalized, 20)    # 20 × 3 = 60
         
         # Concatenate + flatten
-        combined = np.vstack([coarse, fine])  # (300, 3)
-        flat = combined.flatten()  # (900,)
+        combined = np.vstack([coarse, fine])  # (25, 3)
+        flat = combined.flatten()  # (75,) ← Total Dims!
         
         return self._l2_normalize(flat)
 
     def compute_orientation_embedding(self, data: List[Dict]) -> Optional[np.ndarray]:
         """
-        Args: List[Dict] mit qw_soll, qx_soll, qy_soll, qz_soll
-        Returns: np.ndarray(200,)
+        Multi-Scale: 5 coarse + 20 fine = 25 samples
+        Returns: np.ndarray(100,)  # 25 × 4 = 100
         """
         if len(data) < 10:
             return None
@@ -86,23 +86,23 @@ class EmbeddingCalculator:
             for r in data
         ], dtype=np.float32)
 
-        resampled = self._resample(traj, self.orientation_samples)
-        flat = resampled.flatten()
+        # Multi-Scale: coarse (5) + fine (20) = 25 samples
+        coarse = self._resample(traj, 5)   # 5 × 4 = 20
+        fine = self._resample(traj, 20)    # 20 × 4 = 80
+        
+        # Concatenate + flatten
+        combined = np.vstack([coarse, fine])  # (25, 4)
+        flat = combined.flatten()  # (100,)
+        
         return self._l2_normalize(flat)
 
-    def compute_velocity_embedding(self, data: List[Dict]) -> Optional[np.ndarray]:
-        """
-        Legacy method - ruft die neue kombinierte Methode auf
-        """
-        vel_emb, _ = self.compute_velocity_and_acceleration_embeddings(data)
-        return vel_emb
-    
-    def compute_velocity_and_acceleration_embeddings(
+    def compute_velocity_embeddings(
             self, 
             data: List[Dict]
-    ) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+    ) -> Optional[np.ndarray]:
         """
-        ✅ OPTIMIERT: Berechnet Velocity UND Acceleration mit Glättung
+        ✅ OPTIMIERT: Multi-Scale 5 coarse + 20 fine
+        Velocity: 25 × 3 = 75 dims
         """
         if len(data) < 10:
             return None, None
@@ -115,10 +115,10 @@ class EmbeddingCalculator:
         
         timestamps = np.array([r['timestamp'] for r in data], dtype=np.float64)
         
-        # ⭐ NEU: Savitzky-Golay Filter für Position (glättet vor Ableitung!)
+        # ⭐ Savitzky-Golay Filter für Position
         from scipy.signal import savgol_filter
         
-        window_length = min(33, len(positions) // 2 * 2 + 1)  # Muss ungerade sein
+        window_length = min(33, len(positions) // 2 * 2 + 1)
         if window_length < 5:
             window_length = 5
         
@@ -148,41 +148,20 @@ class EmbeddingCalculator:
                 polyorder=2
             )
         
-        # Velocity Embedding
-        vel_resampled = self._resample(velocity_smooth, self.velocity_samples)
-        vel_flat = vel_resampled.flatten()
+        # Multi-Scale: coarse (5) + fine (20) = 25 samples
+        coarse = self._resample(velocity_smooth, 5)   # 5 × 3 = 15
+        fine = self._resample(velocity_smooth, 20)    # 20 × 3 = 60
+        
+        # Concatenate + flatten
+        combined = np.vstack([coarse, fine])  # (25, 3)
+        vel_flat = combined.flatten()  # (75,)
         vel_embedding = self._l2_normalize(vel_flat)
-        
-        # ✅ Acceleration aus geglätteter Velocity
-        acceleration_embedding = None
-        if len(velocity_smooth) >= 2:
-            delta_vel = np.diff(velocity_smooth, axis=0)
-            delta_time2 = np.diff(timestamps[1:])
-            delta_time2 = np.where(delta_time2 == 0, 1e-9, delta_time2)
-            acceleration = delta_vel / delta_time2[:, np.newaxis]
-            
-        
-        return vel_embedding, acceleration_embedding
+                
+        return vel_embedding
+
     
     def compute_metadata_embedding(self, metadata: Dict) -> Optional[np.ndarray]:
-        """
-        Berechnet Metadata Embedding (14D)
-        
-        Args:
-            metadata: Dict mit keys:
-                - movement_type: str ('linear', 'circular', 'll', etc.)
-                - length: float (mm)
-                - min_twist_ist, max_twist_ist, mean_twist_ist, 
-                median_twist_ist, std_twist_ist: float (mm/s)
-                - min_acceleration_ist, max_acceleration_ist, 
-                mean_acceleration_ist, median_acceleration_ist, 
-                std_acceleration_ist: float (mm/s²)
-        
-        Returns:
-            np.ndarray(14,) - normalisierter Metadata-Vektor
-        """
-        
-        # === 1. Movement Type Encoding ===
+        # Movement Type
         movement_str = metadata.get('movement_type', '').lower()
         linear_count = movement_str.count('l') + ('linear' in movement_str)
         circular_count = movement_str.count('c') + ('circular' in movement_str)
@@ -195,12 +174,15 @@ class EmbeddingCalculator:
             linear_ratio = 0.0
             circular_ratio = 0.0
         
-        # === 2. Length Normalisierung ===
+        # Length & Duration
         length = metadata.get('length', 0.0)
         length_norm = np.clip(length / 9000.0, 0, 1)
         
-        # === 3. Twist Stats (symmetrisch um 0) ===
-        twist_max = 3500.0
+        duration = metadata.get('duration', 0.0)
+        duration_norm = np.clip(duration / 25.0, 0, 1)
+        
+        # Twist Stats
+        twist_max = 3100.0  # ⭐ GEÄNDERT von 3500
         min_twist = metadata.get('min_twist_ist', 0.0)
         max_twist = metadata.get('max_twist_ist', 0.0)
         mean_twist = metadata.get('mean_twist_ist', 0.0)
@@ -213,8 +195,8 @@ class EmbeddingCalculator:
         median_twist_norm = np.clip((median_twist + twist_max) / (2 * twist_max), 0, 1)
         std_twist_norm = np.clip(std_twist / twist_max, 0, 1)
         
-        # === 4. Acceleration Stats (symmetrisch um 0) ===
-        accel_max = 25000.0
+        # Acceleration Stats
+        accel_max = 10200.0  # ⭐ GEÄNDERT von 25000
         min_accel = metadata.get('min_acceleration_ist', 0.0)
         max_accel = metadata.get('max_acceleration_ist', 0.0)
         mean_accel = metadata.get('mean_acceleration_ist', 0.0)
@@ -227,11 +209,12 @@ class EmbeddingCalculator:
         median_accel_norm = np.clip((median_accel + accel_max) / (2 * accel_max), 0, 1)
         std_accel_norm = np.clip(std_accel / accel_max, 0, 1)
         
-        # === 5. Zusammensetzen ===
+        # Zusammensetzen (13D)
         features = np.array([
             linear_ratio,
             circular_ratio,
             length_norm,
+            duration_norm,  # ⭐ NEU
             min_twist_norm,
             max_twist_norm,
             mean_twist_norm,
@@ -244,7 +227,6 @@ class EmbeddingCalculator:
             std_accel_norm
         ], dtype=np.float32)
         
-        # === 6. L2 Normalisierung ===
         return self._l2_normalize(features)
 
     # Helper methods

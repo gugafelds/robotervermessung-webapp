@@ -127,8 +127,7 @@ export const MetadataService = {
 
 // Similarity Service
 export class SimilarityService {
-  private static readonly BASE_URL =
-    process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  private static readonly BASE_URL = '';
 
   static async searchSimilarityEmbedding(
     targetId: string,
@@ -162,10 +161,6 @@ export class SimilarityService {
         queryParams.append(
           'velocity_weight',
           params.weights.velocity.toString(),
-        );
-        queryParams.append(
-          'acceleration_weight',
-          params.weights.acceleration.toString(),
         );
         queryParams.append(
           'metadata_weight',

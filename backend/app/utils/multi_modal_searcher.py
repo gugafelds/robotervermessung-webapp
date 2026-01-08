@@ -42,7 +42,7 @@ class MultiModalSearcher:
         try:
             # Defaults
             if modes is None:
-                modes = ['joint', 'position', 'orientation', 'velocity', 'acceleration', 'metadata']
+                modes = ['joint', 'position', 'orientation', 'velocity', 'metadata']
 
             if weights is None:
                 weights = {mode: 1.0 / len(modes) for mode in modes}

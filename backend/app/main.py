@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from backend.app.api.endpoints import similarity_search_route_handler
 from .api.endpoints import bahn_route_handler, auswertung_route_handler, vergleich_route_handler, hochladen_route_handler, search_route_handler
 from .database import init_db
 from fastapi_cache import FastAPICache
@@ -46,6 +48,8 @@ app.include_router(hochladen_route_handler.router, prefix="/api/hochladen", tags
 app.include_router(auswertung_route_handler.router, prefix="/api/auswertung", tags=["auswertung"])
 app.include_router(vergleich_route_handler.router, prefix="/api/vergleich", tags=["vergleich"])
 app.include_router(search_route_handler.router, prefix="/api/search", tags=["search"])
+app.include_router(similarity_search_route_handler.router, prefix="/api/two-stage", tags=["two-stage"])
+
 # Transformation Router nur einbinden wenn MATLAB aktiv ist
 #if USE_MATLAB:
 #    app.include_router(transformation_route_handler.router, prefix="/api/transform", tags=["transform"])

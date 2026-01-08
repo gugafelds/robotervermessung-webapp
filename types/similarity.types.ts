@@ -7,7 +7,6 @@ export interface EmbeddingSimilarityParams {
     position: number;
     orientation: number;
     velocity: number;
-    acceleration: number;
     metadata: number;
   };
   limit: number;
