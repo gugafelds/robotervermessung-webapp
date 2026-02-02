@@ -15,15 +15,9 @@ class EmbeddingCalculator:
 
     def __init__(
             self,
-            joint_samples: int = 25,        # 25 × 6 = 150
-            position_samples: int = 25,     # 25 × 3 = 75
-            orientation_samples: int = 25,  # 25 × 4 = 100
-            velocity_samples: int = 25,     # 25 × 3 = 75
+            n_samples: int = 10
     ):
-        self.joint_samples = joint_samples
-        self.position_samples = position_samples
-        self.orientation_samples = orientation_samples
-        self.velocity_samples = velocity_samples
+        self.n_samples = n_samples
 
     def compute_joint_embedding(self, data: List[Dict]) -> Optional[np.ndarray]:
         if len(data) < 10:
@@ -36,13 +30,8 @@ class EmbeddingCalculator:
             for r in data
         ], dtype=np.float32)
         
-        # Multi-Scale: coarse (5) + fine (20) = 25 samples
-        coarse = self._resample(traj, 5)   # 5 × 6 = 30
-        fine = self._resample(traj, 20)    # 20 × 6 = 120
-        
-        # Concatenate + flatten
-        combined = np.vstack([coarse, fine])  # (25, 6)
-        flat = combined.flatten()  # (150,) ← Total Dims!
+        resampled = self._resample(traj, self.n_samples)
+        flat = resampled.flatten()
         
         return self._l2_normalize(flat)
 
@@ -63,62 +52,54 @@ class EmbeddingCalculator:
         if max_extent > 1e-6:
             traj_normalized = traj_normalized / max_extent
         
-        # Multi-Scale: coarse (5) + fine (20) = 25 samples
-        coarse = self._resample(traj_normalized, 5)   # 5 × 3 = 15
-        fine = self._resample(traj_normalized, 20)    # 20 × 3 = 60
-        
-        # Concatenate + flatten
-        combined = np.vstack([coarse, fine])  # (25, 3)
-        flat = combined.flatten()  # (75,) ← Total Dims!
+        resampled = self._resample(traj, self.n_samples)
+        flat = resampled.flatten()
         
         return self._l2_normalize(flat)
 
     def compute_orientation_embedding(self, data: List[Dict]) -> Optional[np.ndarray]:
-        """
-        Multi-Scale: 5 coarse + 20 fine = 25 samples
-        Returns: np.ndarray(100,)  # 25 × 4 = 100
-        """
         if len(data) < 10:
             return None
 
-        traj = np.array([
-            [r['qw_soll'], r['qx_soll'], r['qy_soll'], r['qz_soll']]
+        # Quaternions extrahieren [qx, qy, qz, qw] für scipy
+        quats = np.array([
+            [r['qx_soll'], r['qy_soll'], r['qz_soll'], r['qw_soll']]
             for r in data
         ], dtype=np.float32)
-
-        # Multi-Scale: coarse (5) + fine (20) = 25 samples
-        coarse = self._resample(traj, 5)   # 5 × 4 = 20
-        fine = self._resample(traj, 20)    # 20 × 4 = 80
         
-        # Concatenate + flatten
-        combined = np.vstack([coarse, fine])  # (25, 4)
-        flat = combined.flatten()  # (100,)
+        # Zu Rotation Vectors konvertieren (3D)
+        from scipy.spatial.transform import Rotation
+        rot_vectors = Rotation.from_quat(quats).as_rotvec()
+        
+        # Relativ zum Start normalisieren
+        rot_vectors_normalized = rot_vectors - rot_vectors[0]
+        
+        resampled = self._resample(rot_vectors_normalized, self.n_samples)
+        flat = resampled.flatten()
         
         return self._l2_normalize(flat)
 
     def compute_velocity_embeddings(
-            self, 
-            data: List[Dict]
+        self, 
+        data: List[Dict]
     ) -> Optional[np.ndarray]:
-        """
-        ✅ OPTIMIERT: Multi-Scale 5 coarse + 20 fine
-        Velocity: 25 × 3 = 75 dims
-        """
         if len(data) < 10:
-            return None, None
+            return None
 
-        # Position und Zeit extrahieren
+        # Position extrahieren
         positions = np.array([
             [r['x_soll'], r['y_soll'], r['z_soll']]
             for r in data
         ], dtype=np.float32)
         
-        timestamps = np.array([r['timestamp'] for r in data], dtype=np.float64)
+        # Künstliche Zeitstempel (gleichmäßig 0 bis 1, wie MATLAB)
+        n_points = len(positions)
+        timestamps = np.linspace(0, 1, n_points)
         
-        # ⭐ Savitzky-Golay Filter für Position
+        # Savitzky-Golay Filter für Position
         from scipy.signal import savgol_filter
         
-        window_length = min(33, len(positions) // 2 * 2 + 1)
+        window_length = min(33, n_points // 2 * 2 + 1)
         if window_length < 5:
             window_length = 5
         
@@ -130,17 +111,18 @@ class EmbeddingCalculator:
                 polyorder=3
             )
         
-        # ✅ Velocity aus geglätteter Position
+        # Velocity aus geglätteter Position
         delta_pos = np.diff(positions_smooth, axis=0)
         delta_time = np.diff(timestamps)
         delta_time = np.where(delta_time == 0, 1e-9, delta_time)
         velocity = delta_pos / delta_time[:, np.newaxis]
         
-        velocity_smooth = np.zeros_like(velocity)
+        # Velocity nochmal glätten
         vel_window = min(33, len(velocity) // 2 * 2 + 1)
         if vel_window < 5:
             vel_window = 5
             
+        velocity_smooth = np.zeros_like(velocity)
         for dim in range(3):
             velocity_smooth[:, dim] = savgol_filter(
                 velocity[:, dim], 
@@ -148,16 +130,10 @@ class EmbeddingCalculator:
                 polyorder=2
             )
         
-        # Multi-Scale: coarse (5) + fine (20) = 25 samples
-        coarse = self._resample(velocity_smooth, 5)   # 5 × 3 = 15
-        fine = self._resample(velocity_smooth, 20)    # 20 × 3 = 60
+        resampled = self._resample(velocity_smooth, self.n_samples)
+        flat = resampled.flatten()
         
-        # Concatenate + flatten
-        combined = np.vstack([coarse, fine])  # (25, 3)
-        vel_flat = combined.flatten()  # (75,)
-        vel_embedding = self._l2_normalize(vel_flat)
-                
-        return vel_embedding
+        return self._l2_normalize(flat)
 
     
     def compute_metadata_embedding(self, metadata: Dict) -> Optional[np.ndarray]:

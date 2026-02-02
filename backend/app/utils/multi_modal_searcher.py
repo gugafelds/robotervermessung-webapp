@@ -23,7 +23,7 @@ class MultiModalSearcher:
         self.connection = connection
         self.shape = ShapeSearcher(connection)
         self.prefilter = FilterSearcher(connection)
-        self.ranker = RRFRanker(k=10)
+        self.ranker = RRFRanker(k=60)
 
     async def search_similar(
             self,

@@ -26,10 +26,7 @@ class MetadataCalculatorService:
 
         # ✅ GEÄNDERT: EmbeddingCalculator mit velocity/acceleration
         self.embedding_calculator = EmbeddingCalculator(
-        joint_samples=25,         # 50 coarse + 250 fine = 300 samples → 1800D
-        position_samples=25,      # 50 coarse + 250 fine = 300 samples → 900D
-        orientation_samples=25,    # 25 × 4 = 100D (bleibt wie gehabt)
-        velocity_samples=25,      # 25 × 3 = 75D (mit Glättung!)
+        n_samples=10
      )
 
         DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/dbname")

@@ -77,6 +77,7 @@ class ShapeSearcher:
         Returns:
             List[Dict] mit segment_id, bahn_id, distance, rank
         """
+
         try:
             # 1. Hole Target Embedding
             target_embedding = await self.get_target_embedding(target_id, mode)
@@ -95,14 +96,16 @@ class ShapeSearcher:
 
             # Filter für Bahnen/Segmente
             if only_bahnen:
-                where_conditions.append("m.segment_id = m.bahn_id")
+                where_conditions.append("e.segment_id = e.bahn_id")
+                lambda_factor = 1
             elif only_segments:
-                where_conditions.append("m.segment_id != m.bahn_id")
+                where_conditions.append("e.segment_id != e.bahn_id")
+                lambda_factor = 1
 
             where_clause = " AND ".join(where_conditions)
 
             # ⭐ 3. SET HNSW parameter ERST (außerhalb der Query)
-            await self.connection.execute("SET LOCAL hnsw.ef_search = 200")
+            await self.connection.execute("SET LOCAL hnsw.ef_search = 100;")
 
             # 4. Query
             if candidate_ids is not None and len(candidate_ids) > 0:
@@ -113,10 +116,9 @@ class ShapeSearcher:
                 query = f"""
                     SELECT 
                         e.segment_id,
-                        m.bahn_id,
+                        e.bahn_id,
                         e.{embedding_col} <=> $1::vector as distance
                     FROM bewegungsdaten.bahn_embeddings e
-                    JOIN bewegungsdaten.bahn_metadata m ON e.segment_id = m.segment_id
                     WHERE {where_clause}
                     ORDER BY distance
                     LIMIT $4
@@ -127,17 +129,16 @@ class ShapeSearcher:
                     target_embedding,
                     target_id,
                     candidate_ids,
-                    limit
+                    limit*lambda_factor
                 )
             else:
                 # Full Search
                 query = f"""
                     SELECT 
                         e.segment_id,
-                        m.bahn_id,
+                        e.bahn_id,
                         e.{embedding_col} <=> $1::vector as distance
                     FROM bewegungsdaten.bahn_embeddings e
-                    JOIN bewegungsdaten.bahn_metadata m ON e.segment_id = m.segment_id
                     WHERE {where_clause}
                     ORDER BY distance
                     LIMIT $3
@@ -147,7 +148,7 @@ class ShapeSearcher:
                     query,
                     target_embedding,
                     target_id,
-                    limit
+                    limit*lambda_factor
                 )
 
             # 5. Format Results
