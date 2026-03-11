@@ -41,40 +41,40 @@ export interface BahnInfo {
 
 export interface BahnInfoRaw {
   id: number;
-  bahn_id: string;
+  traj_id: string;
   robot_model: string;
-  bahnplanung: string;
+  path_planning: string;
   recording_date: string;
   start_time: string;
   end_time: string;
-  source_data_ist: string;
-  source_data_soll: string;
+  source_data_act: string;
+  source_data_cmd: string;
   record_filename: string;
-  np_ereignisse: number;
-  frequency_pose_ist: number;
-  frequency_position_soll: number;
-  frequency_orientation_soll: number;
-  frequency_twist_ist: number;
-  frequency_twist_soll: number;
-  frequency_accel_ist: number;
-  frequency_joint_states: number;
+  number_setpoints: number;
+  freq_pose_act: number;
+  freq_position_cmd: number;
+  freq_orientation_cmd: number;
+  freq_vel_act: number;
+  freq_vel_cmd: number;
+  freq_accel_act: number;
+  freq_joint_states: number;
   calibration_run: boolean;
-  np_pose_ist: number;
-  np_twist_ist: number;
-  np_accel_ist: number;
-  np_accel_soll: number;
-  np_pos_soll: number;
-  np_orient_soll: number;
-  np_twist_soll: number;
-  np_jointstates: number;
+  number_pose_act: number;
+  number_vel_act: number;
+  number_accel_act: number;
+  number_accel_cmd: number;
+  number_position_cmd: number;
+  number_orientation_cmd: number;
+  number_vel_cmd: number;
+  number_joint_states: number;
   weight: number;
   handling_height: string;
   velocity_picking: string;
   velocity_handling: string;
-  frequency_imu: number;
+  freq_imu: number;
   pick_and_place: boolean;
-  np_imu: number;
-  frequency_accel_soll: number;
+  number_imu: number;
+  freq_accel_cmd: number;
   setted_velocity: number;
   stop_point: number;
   wait_time: number;
@@ -97,17 +97,17 @@ export interface BahnPoseIst {
 
 export interface BahnPoseIstRaw {
   id: number;
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   timestamp: string;
-  x_ist: number;
-  y_ist: number;
-  z_ist: number;
-  qx_ist: number;
-  qy_ist: number;
-  qz_ist: number;
-  qw_ist: number;
-  source_data_ist: string;
+  x_raw_act: number;
+  y_raw_act: number;
+  z_raw_act: number;
+  qx_raw_act: number;
+  qy_raw_act: number;
+  qz_raw_act: number;
+  qw_raw_act: number;
+  source_data_raw_act: string;
 }
 
 export interface BahnTwistIst {
@@ -120,10 +120,10 @@ export interface BahnTwistIst {
 
 export interface BahnTwistIstRaw {
   id: number;
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   timestamp: string;
-  tcp_speed_ist: number;
+  tcp_vel_act: number;
 }
 
 export interface BahnAccelIst {
@@ -136,10 +136,10 @@ export interface BahnAccelIst {
 
 export interface BahnAccelIstRaw {
   id: number;
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   timestamp: string;
-  tcp_accel_ist: number;
+  tcp_accel_act: number;
 }
 
 export interface BahnAccelSoll {
@@ -152,10 +152,10 @@ export interface BahnAccelSoll {
 
 export interface BahnAccelSollRaw {
   id: number;
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   timestamp: string;
-  tcp_accel_soll: number;
+  tcp_accel_cmd: number;
 }
 
 export interface BahnIMU {
@@ -168,12 +168,12 @@ export interface BahnIMU {
 }
 
 export interface BahnIMURaw {
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   timestamp: string;
   tcp_accel_pi: number;
   tcp_angular_vel_pi: number;
-  source_data_ist: string;
+  source_data_act: string;
 }
 
 export interface BahnPositionSoll {
@@ -189,13 +189,13 @@ export interface BahnPositionSoll {
 
 export interface BahnPositionSollRaw {
   id: number;
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   timestamp: string;
-  x_soll: number;
-  y_soll: number;
-  z_soll: number;
-  source_data_soll: string;
+  x_cmd: number;
+  y_cmd: number;
+  z_cmd: number;
+  source_data_cmd: string;
 }
 
 // Interfaces
@@ -213,14 +213,14 @@ export interface BahnOrientationSoll {
 
 export interface BahnOrientationSollRaw {
   id: number;
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   timestamp: string;
-  qx_soll: number;
-  qy_soll: number;
-  qz_soll: number;
-  qw_soll: number;
-  source_data_soll: string;
+  qx_cmd: number;
+  qy_cmd: number;
+  qz_cmd: number;
+  qw_cmd: number;
+  source_data_cmd: string;
 }
 
 export interface BahnTwistSoll {
@@ -234,11 +234,11 @@ export interface BahnTwistSoll {
 
 export interface BahnTwistSollRaw {
   id: number;
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   timestamp: string;
-  tcp_speed_soll: number;
-  source_data_soll: string;
+  tcp_vel_cmd: number;
+  source_data_cmd: string;
 }
 
 export interface BahnJointStates {
@@ -257,8 +257,8 @@ export interface BahnJointStates {
 
 export interface BahnJointStatesRaw {
   id: number;
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   timestamp: string;
   joint_1: number;
   joint_2: number;
@@ -266,7 +266,7 @@ export interface BahnJointStatesRaw {
   joint_4: number;
   joint_5: number;
   joint_6: number;
-  source_data_soll: string;
+  source_data_cmd: string;
 }
 
 export interface BahnEvents {
@@ -286,8 +286,8 @@ export interface BahnEvents {
 
 export interface BahnEventsRaw {
   id: number;
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   timestamp: string;
   x_reached: number;
   y_reached: number;
@@ -296,7 +296,7 @@ export interface BahnEventsRaw {
   qy_reached: number;
   qz_reached: number;
   qw_reached: number;
-  source_data_soll: string;
+  source_data_cmd: string;
 }
 
 export interface BahnPoseTrans {
@@ -314,15 +314,15 @@ export interface BahnPoseTrans {
 }
 
 export interface BahnPoseTransRaw {
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   timestamp: string;
-  x_trans: number;
-  y_trans: number;
-  z_trans: number;
-  qx_trans: number;
-  qy_trans: number;
-  qz_trans: number;
-  qw_trans: number;
+  x_act: number;
+  y_act: number;
+  z_act: number;
+  qx_act: number;
+  qy_act: number;
+  qz_act: number;
+  qw_act: number;
   calibration_id: string;
 }

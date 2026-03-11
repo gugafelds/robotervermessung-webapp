@@ -1,8 +1,8 @@
 import type { BahnInfo } from '@/types/bewegungsdaten.types';
 
 export interface DFDInfoRaw {
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   dfd_min_distance: number;
   dfd_max_distance: number;
   dfd_average_distance: number;
@@ -21,15 +21,15 @@ export interface DFDInfo {
 }
 
 export interface DFDPositionRaw {
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   dfd_distances: number;
-  dfd_soll_x: number;
-  dfd_soll_y: number;
-  dfd_soll_z: number;
-  dfd_ist_x: number;
-  dfd_ist_y: number;
-  dfd_ist_z: number;
+  dfd_cmd_x: number;
+  dfd_cmd_y: number;
+  dfd_cmd_z: number;
+  dfd_act_x: number;
+  dfd_act_y: number;
+  dfd_act_z: number;
   points_order: number;
 }
 
@@ -47,8 +47,8 @@ export interface DFDPosition {
 }
 
 export interface SIDTWInfoRaw {
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   sidtw_min_distance: number;
   sidtw_max_distance: number;
   sidtw_average_distance: number;
@@ -65,8 +65,8 @@ export interface SIDTWInfo {
 }
 
 export interface DTWInfoRaw {
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   dtw_min_distance: number;
   dtw_max_distance: number;
   dtw_average_distance: number;
@@ -85,8 +85,8 @@ export interface DTWInfo {
 }
 
 export interface QDTWInfoRaw {
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   qdtw_min_distance: number;
   qdtw_max_distance: number;
   qdtw_average_distance: number;
@@ -103,12 +103,12 @@ export interface QDTWInfo {
 }
 
 export interface QADInfoRaw {
-  bahn_id: string;
-  segment_id: string;
-  qad_min_distance: number;
-  qad_max_distance: number;
-  qad_average_distance: number;
-  qad_standard_deviation: number;
+  traj_id: string;
+  seg_id: string;
+  gd_min_distance: number;
+  gd_max_distance: number;
+  gd_average_distance: number;
+  gd_standard_deviation: number;
 }
 
 export interface QADInfo {
@@ -121,15 +121,15 @@ export interface QADInfo {
 }
 
 export interface SIDTWPositionRaw {
-  bahn_id: string;
-  segment_id: string;
-  sidtw_distances: number;
-  sidtw_soll_x: number;
-  sidtw_soll_y: number;
-  sidtw_soll_z: number;
-  sidtw_ist_x: number;
-  sidtw_ist_y: number;
-  sidtw_ist_z: number;
+  traj_id: string;
+  seg_id: string;
+  sidtw_deviation: number;
+  sidtw_cmd_x: number;
+  sidtw_cmd_y: number;
+  sidtw_cmd_z: number;
+  sidtw_act_x: number;
+  sidtw_act_y: number;
+  sidtw_act_z: number;
   points_order: number;
 }
 
@@ -147,15 +147,15 @@ export interface SIDTWPosition {
 }
 
 export interface DTWPositionRaw {
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   dtw_distances: number;
-  dtw_soll_x: number;
-  dtw_soll_y: number;
-  dtw_soll_z: number;
-  dtw_ist_x: number;
-  dtw_ist_y: number;
-  dtw_ist_z: number;
+  dtw_cmd_x: number;
+  dtw_cmd_y: number;
+  dtw_cmd_z: number;
+  dtw_act_x: number;
+  dtw_act_y: number;
+  dtw_act_z: number;
   points_order: number;
 }
 
@@ -173,17 +173,17 @@ export interface DTWPosition {
 }
 
 export interface QDTWOrientationRaw {
-  bahn_id: string;
-  segment_id: string;
-  qdtw_distances: number;
-  qdtw_soll_x: number;
-  qdtw_soll_y: number;
-  qdtw_soll_z: number;
-  qdtw_soll_w: number;
-  qdtw_ist_x: number;
-  qdtw_ist_y: number;
-  qdtw_ist_z: number;
-  qdtw_ist_w: number;
+  traj_id: string;
+  seg_id: string;
+  qdtw_deviation: number;
+  qdtw_cmd_x: number;
+  qdtw_cmd_y: number;
+  qdtw_cmd_z: number;
+  qdtw_cmd_w: number;
+  qdtw_act_x: number;
+  qdtw_act_y: number;
+  qdtw_act_z: number;
+  qdtw_act_w: number;
   points_order: number;
 }
 
@@ -203,17 +203,17 @@ export interface QDTWOrientation {
 }
 
 export interface QADOrientationRaw {
-  bahn_id: string;
-  segment_id: string;
-  qad_distances: number;
-  qad_soll_x: number;
-  qad_soll_y: number;
-  qad_soll_z: number;
-  qad_soll_w: number;
-  qad_ist_x: number;
-  qad_ist_y: number;
-  qad_ist_z: number;
-  qad_ist_w: number;
+  traj_id: string;
+  seg_id: string;
+  gd_deviation: number;
+  gd_cmd_x: number;
+  gd_cmd_y: number;
+  gd_cmd_z: number;
+  gd_cmd_w: number;
+  gd_act_x: number;
+  gd_act_y: number;
+  gd_act_z: number;
+  gd_act_w: number;
   points_order: number;
 }
 
@@ -233,8 +233,8 @@ export interface QADOrientation {
 }
 
 export interface EAInfoRaw {
-  bahn_id: string;
-  segment_id: string;
+  traj_id: string;
+  seg_id: string;
   euclidean_min_distance: number;
   euclidean_max_distance: number;
   euclidean_average_distance: number;
@@ -253,15 +253,15 @@ export interface EAInfo {
 }
 
 export interface EAPositionRaw {
-  bahn_id: string;
-  segment_id: string;
-  euclidean_distances: number;
-  ea_soll_x: number;
-  ea_soll_y: number;
-  ea_soll_z: number;
-  ea_ist_x: number;
-  ea_ist_y: number;
-  ea_ist_z: number;
+  traj_id: string;
+  seg_id: string;
+  ed_deviation: number;
+  ed_cmd_x: number;
+  ed_cmd_y: number;
+  ed_cmd_z: number;
+  ed_act_x: number;
+  ed_act_y: number;
+  ed_act_z: number;
   points_order: number;
 }
 
@@ -283,11 +283,9 @@ export interface AuswertungBahnIDs {
 }
 
 export interface AuswertungInfo {
-  bahn_info: BahnInfo[];
+  traj_info: BahnInfo[];
   auswertung_info: {
-    info_dfd: DFDInfo[];
     info_sidtw: SIDTWInfo[];
-    info_dtw: DTWInfo[];
     info_euclidean: EAInfo[];
   };
 }

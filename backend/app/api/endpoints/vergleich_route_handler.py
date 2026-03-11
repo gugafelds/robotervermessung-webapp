@@ -284,26 +284,26 @@ async def get_metadata_stats(db_pool=Depends(get_db_pool)):
         async with db_pool.acquire() as conn:
             # Gesamtzahl Bahnen in bahn_info
             total_bahns_query = """
-                SELECT COUNT(DISTINCT bahn_id) as total_bahns
-                FROM robotervermessung.bewegungsdaten.bahn_info
-                WHERE source_data_ist = 'leica_at960'
+                SELECT COUNT(DISTINCT traj_id) as total_bahns
+                FROM rmpd.motion.traj_info
+                WHERE source_data_act = 'leica_at960'
             """
             total_bahns = await conn.fetchval(total_bahns_query)
 
             # Bahnen die in bahn_metadata existieren
             bahns_with_metadata_query = """
-                SELECT COUNT(DISTINCT bahn_id) as bahns_with_metadata
-                FROM robotervermessung.bewegungsdaten.bahn_metadata
+                SELECT COUNT(DISTINCT traj_id) as bahns_with_metadata
+                FROM rmpd.motion.traj_metadata
             """
             bahns_with_metadata = await conn.fetchval(bahns_with_metadata_query)
 
             # Fehlende Bahnen (in bahn_info aber NICHT in bahn_metadata)
             missing_bahns_query = """
                 SELECT COUNT(DISTINCT bi.bahn_id) as missing_bahns
-                FROM robotervermessung.bewegungsdaten.bahn_info bi
-                LEFT JOIN robotervermessung.bewegungsdaten.bahn_metadata bm 
+                FROM rmpd.motion.traj_info bi
+                LEFT JOIN rmpd.motion.traj_metadata bm 
                     ON bi.bahn_id = bm.bahn_id
-                WHERE bi.source_data_ist = 'leica_at960'
+                WHERE bi.source_data_act = 'leica_at960'
                 AND bm.bahn_id IS NULL
             """
             missing_bahns = await conn.fetchval(missing_bahns_query)
@@ -311,7 +311,7 @@ async def get_metadata_stats(db_pool=Depends(get_db_pool)):
             # Gesamtzahl Metadaten-Zeilen (alle Segmente + Gesamtbahnen)
             total_metadata_rows_query = """
                 SELECT COUNT(*) as total_rows
-                FROM robotervermessung.bewegungsdaten.bahn_metadata
+                FROM rmpd.motion.traj_metadata
             """
             total_metadata_rows = await conn.fetchval(total_metadata_rows_query)
 
@@ -340,7 +340,7 @@ async def get_available_dates(db_pool=Depends(get_db_pool)):
         async with db_pool.acquire() as conn:
             query = """
                     SELECT DISTINCT LEFT (recording_date, 10) as date
-                    FROM robotervermessung.bewegungsdaten.bahn_info
+                    FROM rmpd.motion.traj_info
                     WHERE recording_date IS NOT NULL
                     ORDER BY LEFT (recording_date, 10) DESC \
                     """

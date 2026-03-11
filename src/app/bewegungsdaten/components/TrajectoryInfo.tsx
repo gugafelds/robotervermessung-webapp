@@ -54,7 +54,7 @@ const InfoSection: React.FC<InfoSectionProps> = ({ title, children }) => (
 export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
   const { currentBahnInfo } = useTrajectory();
   const pathname = usePathname();
-
+  
   // Prüfe, ob wir uns auf der Auswertungsseite befinden
   const isOnAuswertungPage = pathname.includes('/auswertung');
 
@@ -68,7 +68,7 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
       </span>
     );
   }
-
+  
   return (
     <div className="flex h-full min-w-80 flex-col border-r border-gray-500 bg-gray-50 p-4 lg:h-fullscreen lg:overflow-scroll">
       {currentBahnInfo && Object.keys(currentBahnInfo).length !== 0 && (

@@ -13,70 +13,71 @@ async def get_dashboard_data(conn=Depends(get_db)):
     try:
         # Bahnen und Segmente zählen - diese sind wichtig genug für exakte Zählung
         segments_count = await conn.fetchval(
-            "SELECT SUM(np_ereignisse) FROM bewegungsdaten.bahn_info WHERE source_data_ist = 'leica_at960'"
+            "SELECT SUM(np_ereignisse) FROM motion.traj_info WHERE source_data_act = 'leica_at960'"
         )
 
         bahnen_count = await conn.fetchval(
-            "SELECT COUNT(DISTINCT bahn_id) FROM bewegungsdaten.bahn_info WHERE source_data_ist = 'leica_at960'"
+            "SELECT COUNT(DISTINCT traj_id) FROM motion.traj_info WHERE source_data_act = 'leica_at960'"
         )
 
         median_sidtw = await conn.fetchval("""
                                            SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY sidtw_average_distance)
-                                           FROM auswertung.info_sidtw i
-                                               INNER JOIN bewegungsdaten.bahn_info b
-                                           ON i.bahn_id = b.bahn_id
-                                           WHERE i.bahn_id = i.segment_id
+                                           FROM evaluation.sidtw_info i
+                                               INNER JOIN motion.traj_info b
+                                           ON i.traj_id = b.traj_id
+                                           WHERE i.traj_id = i.seg_id
                                              AND i.sidtw_average_distance IS NOT NULL
-                                             AND b.source_data_ist = 'leica_at960'
+                                             AND b.source_data_act = 'leica_at960'
                                            """)
 
         mean_sidtw = await conn.fetchval("""
                                          SELECT AVG(sidtw_average_distance)
-                                         FROM auswertung.info_sidtw i
-                                                  INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
-                                         WHERE i.bahn_id = i.segment_id
-                                           AND i.sidtw_average_distance IS NOT NULL
-                                           AND b.source_data_ist = 'leica_at960'
+                                         FROM evaluation.sidtw_info i
+                                               INNER JOIN motion.traj_info b
+                                           ON i.traj_id = b.traj_id
+                                           WHERE i.traj_id = i.seg_id
+                                             AND i.sidtw_average_distance IS NOT NULL
+                                             AND b.source_data_act = 'leica_at960'
                                          """)
 
         # Top 5 Best Performers
         best_performers_raw = await conn.fetch("""
-                                                SELECT i.bahn_id,
-                                                    i.segment_id,
+                                                SELECT i.traj_id,
+                                                    i.seg_id,
                                                     i.sidtw_average_distance,
                                                     b.weight,
-                                                    b.np_ereignisse as waypoints,
+                                                    b.number_setpoints as waypoints,
                                                     b.stop_point,
                                                     b.wait_time,
-                                                    m.max_twist_ist as max_velocity,
-                                                    m.max_acceleration_ist as max_acceleration
-                                                FROM auswertung.info_sidtw i
-                                                INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
-                                                LEFT JOIN bewegungsdaten.bahn_metadata m ON i.segment_id = m.segment_id
-                                                WHERE i.bahn_id = i.segment_id
+                                                    m.max_vel_act as max_velocity,
+                                                    m.max_accel_act as max_acceleration
+                                                FROM evaluation.sidtw_info i
+                                                INNER JOIN motion.traj_info b ON i.traj_id = b.traj_id
+                                                LEFT JOIN motion.traj_metadata m ON i.seg_id = m.seg_id
+                                                WHERE i.traj_id = i.seg_id
                                                 AND i.sidtw_average_distance IS NOT NULL
-                                                AND b.source_data_ist = 'leica_at960'
+                                                AND b.source_data_act = 'leica_at960'
                                                 ORDER BY i.sidtw_average_distance ASC 
                                                 LIMIT 5
                                             """)
 
         # Top 5 Worst Performers
         worst_performers_raw = await conn.fetch("""
-                                                SELECT i.bahn_id,
-                                                       i.segment_id,
-                                                       i.sidtw_average_distance,
-                                                       b.weight,
-                                                       b.np_ereignisse        as waypoints,
-                                                       b.stop_point,
-                                                       b.wait_time,
-                                                       m.max_twist_ist        as max_velocity,
-                                                       m.max_acceleration_ist as max_acceleration
-                                                FROM auswertung.info_sidtw i
-                                                         INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
-                                                         LEFT JOIN bewegungsdaten.bahn_metadata m ON i.segment_id = m.segment_id
-                                                WHERE i.bahn_id = i.segment_id
+                                                SELECT i.traj_id,
+                                                    i.seg_id,
+                                                    i.sidtw_average_distance,
+                                                    b.weight,
+                                                    b.number_setpoints as waypoints,
+                                                    b.stop_point,
+                                                    b.wait_time,
+                                                    m.max_vel_act as max_velocity,
+                                                    m.max_accel_act as max_acceleration
+                                                FROM evaluation.sidtw_info i
+                                                INNER JOIN motion.traj_info b ON i.traj_id = b.traj_id
+                                                LEFT JOIN motion.traj_metadata m ON i.seg_id = m.seg_id
+                                                WHERE i.traj_id = i.seg_id
                                                 AND i.sidtw_average_distance IS NOT NULL
-                                                AND b.source_data_ist = 'leica_at960'
+                                                AND b.source_data_act = 'leica_at960'
                                                 ORDER BY i.sidtw_average_distance DESC 
                                                 LIMIT 5
                                             """)
@@ -85,15 +86,15 @@ async def get_dashboard_data(conn=Depends(get_db)):
         best_performers = []
         for perf in best_performers_raw:
             trajectory = await conn.fetch("""
-                                            SELECT x_soll, y_soll, z_soll
-                                            FROM bewegungsdaten.bahn_position_soll
-                                            WHERE bahn_id = $1 AND segment_id = $2
+                                            SELECT x_cmd, y_cmd, z_cmd
+                                            FROM motion.traj_position_cmd
+                                            WHERE traj_id = $1 AND seg_id = $2
                                             ORDER BY timestamp  
-                                        """, perf["bahn_id"], perf["segment_id"])
+                                        """, perf["traj_id"], perf["seg_id"])
 
             best_performers.append({
-                "bahn_id": perf["bahn_id"],
-                "segment_id": perf["segment_id"],
+                "traj_id": perf["traj_id"],
+                "seg_id": perf["seg_id"],
                 "sidtw_average_distance": perf["sidtw_average_distance"],
                 "weight": perf["weight"],
                 "waypoints": perf["waypoints"],
@@ -101,21 +102,21 @@ async def get_dashboard_data(conn=Depends(get_db)):
                 "wait_time": perf["wait_time"],
                 "max_velocity": perf["max_velocity"],
                 "max_acceleration": perf["max_acceleration"],
-                "trajectory": [{"x": p["x_soll"], "y": p["y_soll"], "z": p["z_soll"]} for p in trajectory]
+                "trajectory": [{"x": p["x_cmd"], "y": p["y_cmd"], "z": p["z_cmd"]} for p in trajectory]
             })
 
         worst_performers = []
         for perf in worst_performers_raw:
             trajectory = await conn.fetch("""
-                                            SELECT x_soll, y_soll, z_soll
-                                            FROM bewegungsdaten.bahn_position_soll
-                                            WHERE bahn_id = $1 AND segment_id = $2
+                                            SELECT x_cmd, y_cmd, z_cmd
+                                            FROM motion.traj_position_cmd
+                                            WHERE traj_id = $1 AND seg_id = $2
                                             ORDER BY timestamp  
-                                        """, perf["bahn_id"], perf["segment_id"])
+                                        """, perf["traj_id"], perf["seg_id"])
 
             worst_performers.append({
-                "bahn_id": perf["bahn_id"],
-                "segment_id": perf["segment_id"],
+                "traj_id": perf["traj_id"],
+                "seg_id": perf["seg_id"],
                 "sidtw_average_distance": perf["sidtw_average_distance"],
                 "weight": perf["weight"],
                 "waypoints": perf["waypoints"],
@@ -123,7 +124,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
                 "wait_time": perf["wait_time"],
                 "max_velocity": perf["max_velocity"],
                 "max_acceleration": perf["max_acceleration"],
-                "trajectory": [{"x": p["x_soll"], "y": p["y_soll"], "z": p["z_soll"]} for p in trajectory]
+                "trajectory": [{"x": p["x_cmd"], "y": p["y_cmd"], "z": p["z_cmd"]} for p in trajectory]
             })
 
         stats = {}
@@ -131,18 +132,18 @@ async def get_dashboard_data(conn=Depends(get_db)):
         # Velocity Distribution - mit festen Buckets
         velocity_query = """
                          SELECT CASE \
-                                    WHEN max_twist_ist < 500 THEN 1 \
-                                    WHEN max_twist_ist >= 500 AND max_twist_ist < 1000 THEN 2 \
-                                    WHEN max_twist_ist >= 1000 AND max_twist_ist < 1500 THEN 3 \
-                                    WHEN max_twist_ist >= 1500 AND max_twist_ist < 2000 THEN 4 \
-                                    WHEN max_twist_ist >= 2000 AND max_twist_ist < 2500 THEN 5 \
-                                    WHEN max_twist_ist >= 2500 AND max_twist_ist < 3000 THEN 6 \
-                                    WHEN max_twist_ist >= 3000 THEN 7 \
+                                    WHEN max_vel_act < 500 THEN 1 \
+                                    WHEN max_vel_act >= 500 AND max_vel_act < 1000 THEN 2 \
+                                    WHEN max_vel_act >= 1000 AND max_vel_act < 1500 THEN 3 \
+                                    WHEN max_vel_act >= 1500 AND max_vel_act < 2000 THEN 4 \
+                                    WHEN max_vel_act >= 2000 AND max_vel_act < 2500 THEN 5 \
+                                    WHEN max_vel_act >= 2500 AND max_vel_act < 3000 THEN 6 \
+                                    WHEN max_vel_act >= 3000 THEN 7 \
                                     END AS bucket, \
                                 COUNT(*)
-                         FROM bewegungsdaten.bahn_metadata
-                         WHERE bahn_id != segment_id
-                           AND max_twist_ist IS NOT NULL
+                         FROM motion.traj_metadata
+                         WHERE traj_id != seg_id
+                           AND max_vel_act IS NOT NULL
                          GROUP BY bucket
                          ORDER BY bucket \
                          """
@@ -162,8 +163,8 @@ async def get_dashboard_data(conn=Depends(get_db)):
         # Weight Distribution
         weight_query = """
             SELECT weight AS bucket, COUNT(*)
-            FROM bewegungsdaten.bahn_info
-                WHERE source_data_ist = 'leica_at960'
+            FROM motion.traj_info
+                WHERE source_data_act = 'leica_at960'
             GROUP BY bucket
             ORDER BY bucket
         """
@@ -179,9 +180,9 @@ async def get_dashboard_data(conn=Depends(get_db)):
 
         # Waypoint Distribution
         waypoints_query = """
-            SELECT np_ereignisse AS bucket, COUNT(*)
-            FROM bewegungsdaten.bahn_info
-                WHERE source_data_ist = 'leica_at960'
+            SELECT number_setpoints AS bucket, COUNT(*)
+            FROM motion.traj_info
+                WHERE source_data_act = 'leica_at960'
             GROUP BY bucket
             ORDER BY bucket
         """
@@ -199,11 +200,11 @@ async def get_dashboard_data(conn=Depends(get_db)):
         sidtw_query = """
             WITH sidtw_stats AS (
                 SELECT MAX(i.sidtw_average_distance) as max_val
-                FROM auswertung.info_sidtw i
-                INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
-                WHERE i.bahn_id != i.segment_id
+                FROM evaluation.sidtw_info i
+                INNER JOIN motion.traj_info b ON i.traj_id = b.traj_id
+                WHERE i.traj_id != i.seg_id
                   AND i.sidtw_average_distance IS NOT NULL
-                  AND b.source_data_ist = 'leica_at960'
+                  AND b.source_data_act = 'leica_at960'
             )
             SELECT 
                 width_bucket(i.sidtw_average_distance, 
@@ -212,22 +213,22 @@ async def get_dashboard_data(conn=Depends(get_db)):
                     8
                 ) AS bucket, 
                 COUNT(*)
-            FROM auswertung.info_sidtw i
-            INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
-            WHERE i.bahn_id != i.segment_id
+            FROM evaluation.sidtw_info i
+            INNER JOIN motion.traj_info b ON i.traj_id = b.traj_id
+            WHERE i.traj_id != i.seg_id
               AND i.sidtw_average_distance IS NOT NULL
-              AND b.source_data_ist = 'leica_at960'
+              AND b.source_data_act = 'leica_at960'
             GROUP BY bucket
             ORDER BY bucket
         """
         sidtw_rows = await conn.fetch(sidtw_query)
         sidtw_max = await conn.fetchval("""
             SELECT MAX(sidtw_average_distance) 
-            FROM auswertung.info_sidtw i
-            INNER JOIN bewegungsdaten.bahn_info b ON i.bahn_id = b.bahn_id
-            WHERE i.bahn_id != i.segment_id 
+            FROM evaluation.sidtw_info i
+            INNER JOIN motion.traj_info b ON i.traj_id = b.traj_id
+            WHERE i.traj_id != i.seg_id 
               AND i.sidtw_average_distance IS NOT NULL
-              AND b.source_data_ist = 'leica_at960'
+              AND b.source_data_act = 'leica_at960'
         """)
         stats["performanceSIDTWDistribution"] = {
             "data": [{"bucket": r["bucket"], "count": r["count"]} for r in sidtw_rows],
@@ -244,7 +245,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
         # Stop Point Distribution
         stop_query = """
             SELECT stop_point AS bucket, COUNT(*)
-            FROM bewegungsdaten.bahn_info
+            FROM motion.traj_info
             WHERE stop_point IS NOT NULL
             GROUP BY bucket
             ORDER BY bucket
@@ -262,7 +263,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
         # Wait Time Distribution
         wait_query = """
             SELECT wait_time AS bucket, COUNT(*)
-            FROM bewegungsdaten.bahn_info
+            FROM motion.traj_info
             WHERE wait_time IS NOT NULL
             GROUP BY bucket
             ORDER BY bucket
@@ -303,10 +304,10 @@ async def get_dashboard_sidtw_timeline(conn=Depends(get_db)):
         query = """
                 SELECT
                     DATE (bi.recording_date) as date, AVG (info.sidtw_average_distance) as avg_sidtw, MIN (info.sidtw_average_distance) as min_sidtw, MAX (info.sidtw_average_distance) as max_sidtw, COUNT (*) as count
-                FROM bewegungsdaten.bahn_info bi
-                    INNER JOIN auswertung.info_sidtw info
-                ON bi.bahn_id = info.bahn_id
-                    AND bi.bahn_id = info.segment_id
+                FROM motion.traj_info bi
+                    INNER JOIN evaluation.sidtw_info info
+                ON bi.traj_id = info.traj_id
+                    AND bi.traj_id = info.seg_id
                 WHERE
                     bi.recording_date IS NOT NULL
                   AND info.sidtw_average_distance IS NOT NULL
@@ -344,23 +345,23 @@ async def get_dashboard_sidtw_vs_parameters(conn=Depends(get_db)):
     try:
         query = """
                 WITH sampled_data AS (SELECT info.sidtw_average_distance as sidtw, \
-                                             bm.max_twist_ist            as velocity, \
-                                             bm.max_acceleration_ist     as acceleration, \
+                                             bm.max_vel_act           as velocity, \
+                                             bm.max_accel_act     as acceleration, \
                                              bi.weight                   as weight, \
                                              bi.stop_point               as stop_point, \
                                              bi.wait_time                as wait_time \
-                                      FROM auswertung.info_sidtw info \
-                                               INNER JOIN bewegungsdaten.bahn_metadata bm \
-                                                          ON info.bahn_id = bm.bahn_id \
-                                                              AND info.bahn_id = bm.segment_id \
-                                                              AND bm.bahn_id = bm.segment_id \
-                                               INNER JOIN bewegungsdaten.bahn_info bi \
-                                                          ON info.bahn_id = bi.bahn_id \
-                                      WHERE info.bahn_id = info.segment_id \
+                                      FROM evaluation.sidtw_info info \
+                                               INNER JOIN motion.traj_metadata bm \
+                                                          ON info.traj_id = bm.traj_id \
+                                                              AND info.traj_id = bm.seg_id \
+                                                              AND bm.traj_id = bm.seg_id \
+                                               INNER JOIN motion.traj_info bi \
+                                                          ON info.traj_id = bi.traj_id \
+                                      WHERE info.traj_id = info.seg_id \
                                         AND info.sidtw_average_distance IS NOT NULL \
-                                        AND bi.source_data_ist = 'leica_at960' \
-                                        AND bm.max_twist_ist IS NOT NULL \
-                                        AND bm.max_acceleration_ist IS NOT NULL \
+                                        AND bi.source_data_act = 'leica_at960' \
+                                        AND bm.max_vel_act IS NOT NULL \
+                                        AND bm.max_accel_act IS NOT NULL \
                                         AND bi.weight IS NOT NULL \
                                         AND bi.stop_point IS NOT NULL \
                                         AND bi.wait_time IS NOT NULL \
@@ -401,11 +402,11 @@ async def get_dashboard_workarea(conn=Depends(get_db)):
                                                          be.y_reached, \
                                                          be.z_reached, \
                                                          s.sidtw_average_distance, \
-                                                         ROW_NUMBER() OVER (PARTITION BY be.bahn_id ORDER BY be.timestamp) as rn \
-                                                  FROM bewegungsdaten.bahn_events be \
-                                                           JOIN auswertung.info_sidtw s ON be.bahn_id = s.bahn_id \
-                                                           JOIN bewegungsdaten.bahn_info bi ON be.bahn_id = bi.bahn_id \
-                                                  WHERE s.bahn_id <> s.segment_id \
+                                                         ROW_NUMBER() OVER (PARTITION BY be.traj_id ORDER BY be.timestamp) as rn \
+                                                  FROM motion.traj_setpoints be \
+                                                           JOIN evaluation.sidtw_info s ON be.traj_id = s.traj_id \
+                                                           JOIN motion.traj_info bi ON be.traj_id = bi.traj_id \
+                                                  WHERE s.traj_id <> s.seg_id \
                                                     AND s.sidtw_average_distance IS NOT NULL \
                                                     AND be.x_reached IS NOT NULL \
                                                     AND be.y_reached IS NOT NULL \
@@ -437,7 +438,7 @@ async def get_dashboard_workarea(conn=Depends(get_db)):
 
 ########################## BEWEGUNGSDATEN #########################################
 
-@router.get("/bahn_info")
+@router.get("/traj_info")
 async def get_bahn_info(
         page: int = Query(1, ge=1, description="Seitennummer"),
         page_size: int = Query(20, ge=1, le=100, description="Anzahl der Einträge pro Seite"),
@@ -448,11 +449,11 @@ async def get_bahn_info(
         offset = (page - 1) * page_size
 
         # Zähle die Gesamtanzahl der Einträge für die Metadaten
-        count_query = "SELECT COUNT(*) FROM bewegungsdaten.bahn_info"
+        count_query = "SELECT COUNT(*) FROM motion.traj_info"
         total_count = await conn.fetchval(count_query)
 
         # Abfrage mit LIMIT und OFFSET für Pagination
-        query = "SELECT * FROM bewegungsdaten.bahn_info ORDER BY recording_date DESC LIMIT $1 OFFSET $2"
+        query = "SELECT * FROM motion.traj_info ORDER BY recording_date DESC LIMIT $1 OFFSET $2"
         rows = await conn.fetch(query, page_size, offset)
 
         bahn_info_list = [dict(row) for row in rows]
@@ -481,7 +482,7 @@ async def get_bahn_info(
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 
-@router.get("/bahn_search")
+@router.get("/traj_search")
 async def search_bahn_info(
         query: str = Query(None, description="Suchbegriff für Freitext-Suche (Filename, ID, Datum)"),
         points_events: int = Query(None, description="Anzahl der Punktereignisse"),
@@ -497,8 +498,8 @@ async def search_bahn_info(
         # Basis-Query erstellen
         base_query = """
                         SELECT b.*, i.sidtw_average_distance 
-                        FROM bewegungsdaten.bahn_info b
-                        LEFT JOIN auswertung.info_sidtw i ON b.bahn_id = i.bahn_id AND i.bahn_id = i.segment_id
+                        FROM motion.traj_info b
+                        LEFT JOIN evaluation.sidtw_info i ON b.traj_id = i.traj_id AND i.traj_id = i.seg_id
                         WHERE 1=1
                     """
         params = []
@@ -510,7 +511,7 @@ async def search_bahn_info(
             search_conditions = []
 
             # bahn_id (teilweise Übereinstimmung)
-            search_conditions.append(f"b.bahn_id ILIKE ${param_index}")
+            search_conditions.append(f"b.traj_id ILIKE ${param_index}")
             params.append(f"%{query}%")
             param_index += 1
 
@@ -528,7 +529,7 @@ async def search_bahn_info(
             base_query += f" AND ({' OR '.join(search_conditions)})"
 
         if points_events is not None:
-            base_query += f" AND b.np_ereignisse = ${param_index}"
+            base_query += f" AND b.number_setpoints = ${param_index}"
             params.append(points_events)
             param_index += 1
 
@@ -620,12 +621,12 @@ async def search_bahn_info(
         logger.error(f"Error searching Bahn info: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
-@router.get("/bahn_info/{bahn_id}")
+@router.get("/traj_info/{bahn_id}")
 @cache(expire=24000)
 async def get_bahn_info_by_id(bahn_id: str, conn = Depends(get_db)):
     try:
         bahn_info = await conn.fetchrow(
-            "SELECT * FROM bewegungsdaten.bahn_info WHERE bahn_id = $1",
+            "SELECT * FROM motion.traj_info WHERE traj_id = $1",
             bahn_id
         )
         if bahn_info is None:
@@ -642,8 +643,8 @@ async def check_transformed_data(bahn_id: str, conn = Depends(get_db)):
         exists = await conn.fetchval("""
             SELECT EXISTS (
                 SELECT 1 
-                FROM bewegungsdaten.bahn_pose_trans 
-                WHERE bahn_id = $1
+                FROM motion.traj_pose_act_raw 
+                WHERE traj_id = $1
                 LIMIT 1
             )
         """, bahn_id)
@@ -652,121 +653,121 @@ async def check_transformed_data(bahn_id: str, conn = Depends(get_db)):
         logger.error(f"Error checking transformed data: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/bahn_pose_ist/{bahn_id}")
+@router.get("/traj_pose_act/{bahn_id}")
 @cache(expire=2400)
 async def get_bahn_pose_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM bewegungsdaten.bahn_pose_ist WHERE bahn_id = $1 ORDER BY timestamp ASC",
+        "SELECT * FROM motion.traj_pose_act WHERE traj_id = $1 ORDER BY timestamp ASC",
         bahn_id
     )
     return [dict(row) for row in rows]
 
-@router.get("/bahn_pose_trans/{bahn_id}")
+@router.get("/traj_pose_act_raw/{bahn_id}")
 @cache(expire=2400)
 async def get_bahn_pose_trans_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM bewegungsdaten.bahn_pose_trans WHERE bahn_id = $1 ORDER BY timestamp ASC",
+        "SELECT * FROM motion.traj_pose_act_raw WHERE traj_id = $1 ORDER BY timestamp ASC",
         bahn_id
     )
     return [dict(row) for row in rows]
 
 
-@router.get("/bahn_twist_ist/{bahn_id}")
+@router.get("/traj_vel_act/{bahn_id}")
 @cache(expire=2400)
 async def get_bahn_twist_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM bewegungsdaten.bahn_twist_ist WHERE bahn_id = $1 ORDER BY timestamp ASC",
+        "SELECT * FROM motion.traj_vel_act WHERE traj_id = $1 ORDER BY timestamp ASC",
         bahn_id
     )
     return [dict(row) for row in rows]
 
-@router.get("/bahn_accel_ist/{bahn_id}")
+@router.get("/traj_accel_act/{bahn_id}")
 @cache(expire=2400)
 async def get_bahn_accel_ist_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM bewegungsdaten.bahn_accel_ist WHERE bahn_id = $1 ORDER BY timestamp ASC",
+        "SELECT * FROM motion.traj_accel_act WHERE traj_id = $1 ORDER BY timestamp ASC",
         bahn_id
     )
     return [dict(row) for row in rows]
 
-@router.get("/bahn_accel_soll/{bahn_id}")
+@router.get("/traj_accel_cmd/{bahn_id}")
 @cache(expire=2400)
 async def get_bahn_accel_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM bewegungsdaten.bahn_accel_soll WHERE bahn_id = $1 ORDER BY timestamp ASC",
+        "SELECT * FROM motion.traj_accel_cmd WHERE traj_id = $1 ORDER BY timestamp ASC",
         bahn_id
     )
     return [dict(row) for row in rows]
 
-@router.get("/bahn_position_soll/{bahn_id}")
+@router.get("/traj_position_cmd/{bahn_id}")
 @cache(expire=2400)
 async def get_bahn_position_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM bewegungsdaten.bahn_position_soll WHERE bahn_id = $1 ORDER BY timestamp ASC",
+        "SELECT * FROM motion.traj_position_cmd WHERE traj_id = $1 ORDER BY timestamp ASC",
         bahn_id
     )
     return [dict(row) for row in rows]
 
-@router.get("/segment_position_soll/{segment_id}")
+@router.get("/seg_position_cmd/{segment_id}")
 @cache(expire=2400)
 async def get_segment_position_soll_by_id(segment_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM bewegungsdaten.bahn_position_soll WHERE segment_id = $1 ORDER BY timestamp ASC",
+        "SELECT * FROM motion.traj_position_cmd WHERE seg_id = $1 ORDER BY timestamp ASC",
         segment_id
     )
     return [dict(row) for row in rows]
 
 
-@router.get("/bahn_orientation_soll/{bahn_id}")
+@router.get("/traj_orientation_cmd/{bahn_id}")
 @cache(expire=2400)
 async def get_bahn_orientation_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM bewegungsdaten.bahn_orientation_soll WHERE bahn_id = $1 ORDER BY timestamp ASC",
+        "SELECT * FROM motion.traj_orientation_cmd WHERE traj_id = $1 ORDER BY timestamp ASC",
         bahn_id
     )
     return [dict(row) for row in rows]
 
-@router.get("/bahn_twist_soll/{bahn_id}")
+@router.get("/traj_vel_cmd/{bahn_id}")
 @cache(expire=2400)
 async def get_bahn_twist_soll_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT timestamp, tcp_speed_soll FROM bewegungsdaten.bahn_twist_soll WHERE bahn_id = $1 ORDER BY timestamp ASC",
+        "SELECT timestamp, tcp_vel_cmd FROM motion.traj_vel_cmd WHERE traj_id = $1 ORDER BY timestamp ASC",
         bahn_id
     )
     return [dict(row) for row in rows]
 
-@router.get("/bahn_joint_states/{bahn_id}")
+@router.get("/traj_joint_states/{bahn_id}")
 @cache(expire=2400)
 async def get_bahn_joint_states_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM bewegungsdaten.bahn_joint_states WHERE bahn_id = $1 ORDER BY timestamp ASC",
+        "SELECT * FROM motion.traj_joint_states WHERE traj_id = $1 ORDER BY timestamp ASC",
         bahn_id
     )
     return [dict(row) for row in rows]
 
-@router.get("/bahn_events/{bahn_id}")
+@router.get("/traj_setpoints/{bahn_id}")
 @cache(expire=2400)
 async def get_bahn_events_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM bewegungsdaten.bahn_events WHERE bahn_id = $1 ORDER BY timestamp ASC",
+        "SELECT * FROM motion.traj_setpoints WHERE traj_id = $1 ORDER BY timestamp ASC",
         bahn_id
     )
     return [dict(row) for row in rows]
 
-@router.get("/segment_events/{segment_id}")
+@router.get("/seg_setpoints/{segment_id}")
 @cache(expire=2400)
 async def get_segment_events_by_id(segment_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM bewegungsdaten.bahn_events WHERE segment_id = $1 ORDER BY timestamp ASC",
+        "SELECT * FROM motion.traj_setpoints WHERE seg_id = $1 ORDER BY timestamp ASC",
         segment_id
     )
     return [dict(row) for row in rows]
 
-@router.get("/bahn_imu/{bahn_id}")
+@router.get("/traj_imu/{bahn_id}")
 @cache(expire=2400)
 async def get_bahn_imu_by_id(bahn_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM bewegungsdaten.bahn_imu WHERE bahn_id = $1 ORDER BY timestamp ASC",
+        "SELECT * FROM motion.traj_imu WHERE traj_id = $1 ORDER BY timestamp ASC",
         bahn_id
     )
     return [dict(row) for row in rows]

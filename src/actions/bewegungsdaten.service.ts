@@ -86,7 +86,7 @@ export const getBahnInfo = async (
 
     // API-Anfrage mit Paginierungsparametern
     const result = await fetchFromAPI(
-      `/bahn/bahn_info?${queryParams.toString()}`,
+      `/bahn/traj_info?${queryParams.toString()}`,
     );
 
     // Transformiere die Antwort von snake_case zu camelCase
@@ -143,12 +143,12 @@ export const searchBahnInfo = async (
     if (searchParams.pageSize)
       queryParams.append('page_size', searchParams.pageSize.toString());
 
-    const apiUrl = `/bahn/bahn_search?${queryParams.toString()}`;
+    const apiUrl = `/bahn/traj_search?${queryParams.toString()}`;
     console.log('API-Anfrage:', apiUrl);
 
     // API-Anfrage mit Suchparametern
     const result = await fetchFromAPI(apiUrl);
-    console.log('API-Ergebnis erhalten:', result.bahn_info?.length, 'Einträge');
+    console.log('API-Ergebnis erhalten:', result.traj_info?.length, 'Einträge');
 
     // Transformiere die Antwort
     return transformBahnInfoResponse(result);
@@ -161,7 +161,7 @@ export const searchBahnInfo = async (
 
 export const getBahnInfoById = async (id: string): Promise<BahnInfo> => {
   try {
-    const result = await fetchFromAPI(`/bahn/bahn_info/${id}`);
+    const result = await fetchFromAPI(`/bahn/traj_info?traj_id=${id}`);
     return transformBahnInfobyIDResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -174,7 +174,7 @@ export const getBahnPoseIstById = async (
   id: string,
 ): Promise<BahnPoseIst[]> => {
   try {
-    const result = await fetchFromAPI(`/bahn/bahn_pose_ist/${id}`, true);
+    const result = await fetchFromAPI(`/bahn/traj_pose_act_raw/${id}`, true);
     return transformBahnPoseIstResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -187,7 +187,7 @@ export const getBahnPoseTransById = async (
   id: string,
 ): Promise<BahnPoseTrans[]> => {
   try {
-    const result = await fetchFromAPI(`/bahn/bahn_pose_trans/${id}`, true);
+    const result = await fetchFromAPI(`/bahn/traj_pose_act/${id}`, true);
     return transformBahnPoseTransResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -200,7 +200,7 @@ export const getBahnTwistIstById = async (
   id: string,
 ): Promise<BahnTwistIst[]> => {
   try {
-    const result = await fetchFromAPI(`/bahn/bahn_twist_ist/${id}`, true);
+    const result = await fetchFromAPI(`/bahn/traj_vel_act/${id}`, true);
     return transformBahnTwistIstResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -213,7 +213,7 @@ export const getBahnAccelIstById = async (
   id: string,
 ): Promise<BahnAccelIst[]> => {
   try {
-    const result = await fetchFromAPI(`/bahn/bahn_accel_ist/${id}`, true);
+    const result = await fetchFromAPI(`/bahn/traj_accel_act/${id}`, true);
     return transformBahnAccelIstResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -226,7 +226,7 @@ export const getBahnAccelSollById = async (
   id: string,
 ): Promise<BahnAccelSoll[]> => {
   try {
-    const result = await fetchFromAPI(`/bahn/bahn_accel_soll/${id}`, true);
+    const result = await fetchFromAPI(`/bahn/traj_accel_cmd/${id}`, true);
     return transformBahnAccelSollResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -239,7 +239,7 @@ export const getBahnPositionSollById = async (
   id: string,
 ): Promise<BahnPositionSoll[]> => {
   try {
-    const result = await fetchFromAPI(`/bahn/bahn_position_soll/${id}`, true);
+    const result = await fetchFromAPI(`/bahn/traj_position_cmd/${id}`, true);
     return transformBahnPositionSollResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -253,7 +253,7 @@ export const getSegmentPositionSollById = async (
 ): Promise<BahnPositionSoll[]> => {
   try {
     const result = await fetchFromAPI(
-      `/bahn/segment_position_soll/${id}`,
+      `/bahn/seg_position_cmd/${id}`,
       true,
     );
     return transformBahnPositionSollResult(result);
@@ -269,7 +269,7 @@ export const getBahnOrientationSollById = async (
 ): Promise<BahnOrientationSoll[]> => {
   try {
     const result = await fetchFromAPI(
-      `/bahn/bahn_orientation_soll/${id}`,
+      `/bahn/traj_orientation_cmd/${id}`,
       true,
     );
     return transformBahnOrientationSollResult(result);
@@ -284,7 +284,7 @@ export const getBahnTwistSollById = async (
   id: string,
 ): Promise<BahnTwistSoll[]> => {
   try {
-    const result = await fetchFromAPI(`/bahn/bahn_twist_soll/${id}`, true);
+    const result = await fetchFromAPI(`/bahn/traj_vel_cmd/${id}`, true);
     return transformBahnTwistSollResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -297,7 +297,7 @@ export const getBahnJointStatesById = async (
   id: string,
 ): Promise<BahnJointStates[]> => {
   try {
-    const result = await fetchFromAPI(`/bahn/bahn_joint_states/${id}`, true);
+    const result = await fetchFromAPI(`/bahn/traj_joint_states/${id}`, true);
     return transformBahnJointStatesResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -308,7 +308,7 @@ export const getBahnJointStatesById = async (
 
 export const getBahnEventsById = async (id: string): Promise<BahnEvents[]> => {
   try {
-    const result = await fetchFromAPI(`/bahn/bahn_events/${id}`, true);
+    const result = await fetchFromAPI(`/bahn/traj_setpoints/${id}`, true);
     return transformBahnEventsResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -321,7 +321,7 @@ export const getSegmentEventsById = async (
   id: string,
 ): Promise<BahnEvents[]> => {
   try {
-    const result = await fetchFromAPI(`/bahn/bahn_events/${id}`, true);
+    const result = await fetchFromAPI(`/bahn/traj_setpoints/${id}`, true);
     return transformBahnEventsResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console

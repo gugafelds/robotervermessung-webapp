@@ -8,8 +8,6 @@ const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 const methodColors = {
   EA: { line: '#003560' },
-  DFD: { line: '#2a9d8f' },
-  DTW: { line: '#774936' },
   SIDTW: { line: '#e63946' },
 };
 
@@ -24,14 +22,10 @@ interface PosDeviationPlot2DProps {
   selectedSegment: string;
   metrics: {
     ea: MetricState;
-    dfd: MetricState;
     sidtw: MetricState;
-    dtw: MetricState;
   };
   currentEuclideanDeviation: any[];
-  currentDiscreteFrechetDeviation: any[];
   currentSIDTWDeviation: any[];
-  currentDTWDeviation: any[];
   currentBahnInfo: any;
 }
 
@@ -40,9 +34,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
   selectedSegment,
   metrics,
   currentEuclideanDeviation,
-  currentDiscreteFrechetDeviation,
   currentSIDTWDeviation,
-  currentDTWDeviation,
   currentBahnInfo,
 }) => {
   // Daten nach Segment filtern
@@ -68,7 +60,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
   // Zeitarray generieren basierend auf pointsOrder
   const getTimeArray = (
     data: any[],
-    metricType: 'ea' | 'sidtw' | 'dtw' | 'dfd',
+    metricType: 'ea' | 'sidtw',
   ) => {
     if (!data.length) return [];
 
@@ -125,7 +117,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
         hovertemplate: 'Zeit: %{x:.2f}s<br>EA: %{y:.2f}mm<extra></extra>',
       });
     }
-
+ /*
     if (metrics.dfd.isLoaded && metrics.dfd.visible) {
       const filteredData = filterDataBySegment(currentDiscreteFrechetDeviation);
       const sortedDFD = [...filteredData].sort(
@@ -142,7 +134,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
         line: { color: methodColors.DFD.line, width: 2 },
         hovertemplate: 'Zeit: %{x:.2f}s<br>DFD: %{y:.2f}mm<extra></extra>',
       });
-    }
+    }*/
 
     if (metrics.sidtw.isLoaded && metrics.sidtw.visible) {
       const filteredData = filterDataBySegment(currentSIDTWDeviation);
@@ -161,7 +153,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
         hovertemplate: 'Zeit: %{x:.2f}s<br>SIDTW: %{y:.2f}mm<extra></extra>',
       });
     }
-
+/*
     if (metrics.dtw.isLoaded && metrics.dtw.visible) {
       const filteredData = filterDataBySegment(currentDTWDeviation);
       const sortedDTW = [...filteredData].sort(
@@ -179,7 +171,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
         hovertemplate: 'Zeit: %{x:.2f}s<br>DTW: %{y:.2f}mm<extra></extra>',
         uirevision: 'true',
       });
-    }
+    }*/
 
     return plots;
   };

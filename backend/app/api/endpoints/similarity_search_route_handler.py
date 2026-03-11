@@ -145,21 +145,21 @@ async def get_stage1_candidates(
     
     # Simple position-based search for now
     query = """
-        SELECT segment_id, 
+        SELECT seg_id, 
                position_embedding <=> (
                    SELECT position_embedding 
-                   FROM robotervermessung.bewegungsdaten.bahn_embeddings 
-                   WHERE segment_id = $1
+                   FROM rmpd.motion.traj_embeddings 
+                   WHERE seg_id = $1
                ) as distance
-        FROM robotervermessung.bewegungsdaten.bahn_embeddings
-        WHERE segment_id = bahn_id  -- Only full trajectories
+        FROM rmpd.motion.traj_embeddings
+        WHERE seg_id = traj_id  -- Only full trajectories
         AND position_embedding IS NOT NULL
         ORDER BY distance
         LIMIT $2
     """
     
     rows = await conn.fetch(query, target_id, k)
-    return [row['segment_id'] for row in rows]
+    return [row['seg_id'] for row in rows]
 
 
 def calculate_pruning_efficiency(

@@ -14,16 +14,6 @@ const methodColors = {
     ist: '#0066b8',
     connection: 'rgba(0, 53, 96, 0.7)',
   },
-  DFD: {
-    soll: '#2a9d8f',
-    ist: '#54ccc0',
-    connection: 'rgba(42, 157, 143, 0.7)',
-  },
-  DTW: {
-    soll: '#774936',
-    ist: '#a47551',
-    connection: 'rgba(119, 73, 54, 0.7)',
-  },
   SIDTW: {
     soll: '#e63946',
     ist: '#ff6b6b',
@@ -42,14 +32,10 @@ interface PosDeviationPlot3DProps {
   selectedSegment: string;
   metrics: {
     ea: MetricState;
-    dfd: MetricState;
     sidtw: MetricState;
-    dtw: MetricState;
   };
   currentEuclideanDeviation: any[];
-  currentDiscreteFrechetDeviation: any[];
   currentSIDTWDeviation: any[];
-  currentDTWDeviation: any[];
 }
 
 export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
@@ -57,9 +43,7 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
   selectedSegment,
   metrics,
   currentEuclideanDeviation,
-  currentDiscreteFrechetDeviation,
   currentSIDTWDeviation,
-  currentDTWDeviation,
 }) => {
   // Daten nach Segment filtern
   const filterDataBySegment = (data: any[]) => {
@@ -84,7 +68,7 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
   // Helper für 3D Traces
   const addMethodTraces = (
     data: any[],
-    methodName: 'EA' | 'DFD' | 'SIDTW' | 'DTW',
+    methodName: 'EA' | 'SIDTW',
     colors: any,
   ): Partial<PlotData>[] => {
     const filteredData = filterDataBySegment(data);
@@ -185,19 +169,6 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
       );
     }
     if (
-      metrics.dfd.isLoaded &&
-      metrics.dfd.visible &&
-      currentDiscreteFrechetDeviation?.length
-    ) {
-      plotData = plotData.concat(
-        addMethodTraces(
-          currentDiscreteFrechetDeviation,
-          'DFD',
-          methodColors.DFD,
-        ),
-      );
-    }
-    if (
       metrics.sidtw.isLoaded &&
       metrics.sidtw.visible &&
       currentSIDTWDeviation?.length
@@ -206,34 +177,17 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
         addMethodTraces(currentSIDTWDeviation, 'SIDTW', methodColors.SIDTW),
       );
     }
-    if (
-      metrics.dtw.isLoaded &&
-      metrics.dtw.visible &&
-      currentDTWDeviation?.length
-    ) {
-      plotData = plotData.concat(
-        addMethodTraces(currentDTWDeviation, 'DTW', methodColors.DTW),
-      );
-    }
 
     const firstVisibleData =
       metrics.ea.isLoaded &&
       metrics.ea.visible &&
       currentEuclideanDeviation?.length
         ? currentEuclideanDeviation
-        : metrics.dfd.isLoaded &&
-            metrics.dfd.visible &&
-            currentDiscreteFrechetDeviation?.length
-          ? currentDiscreteFrechetDeviation
-          : metrics.sidtw.isLoaded &&
-              metrics.sidtw.visible &&
-              currentSIDTWDeviation?.length
-            ? currentSIDTWDeviation
-            : metrics.dtw.isLoaded &&
-                metrics.dtw.visible &&
-                currentDTWDeviation?.length
-              ? currentDTWDeviation
-              : null;
+        : metrics.sidtw.isLoaded &&
+          metrics.sidtw.visible &&
+          currentSIDTWDeviation?.length
+        ? currentSIDTWDeviation
+        : null;
 
     if (firstVisibleData) {
       const filteredData = filterDataBySegment(firstVisibleData);
@@ -247,13 +201,7 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
 
         // Ermittle das Feld-Präfix der ersten sichtbaren Metrik
         const methodPrefix =
-          metrics.ea.isLoaded && metrics.ea.visible
-            ? 'EA'
-            : metrics.dfd.isLoaded && metrics.dfd.visible
-              ? 'DFD'
-              : metrics.sidtw.isLoaded && metrics.sidtw.visible
-                ? 'SIDTW'
-                : 'DTW';
+          metrics.ea.isLoaded && metrics.ea.visible ? 'EA' : 'SIDTW';
 
         // Startpunkt (grün)
         plotData.push({

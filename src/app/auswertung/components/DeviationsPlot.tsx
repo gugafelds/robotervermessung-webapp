@@ -7,8 +7,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 
 import {
   getAuswertungInfoById,
-  getDFDPositionById,
-  getDTWPositionById,
   getEAPositionById,
   getQADOrientationById,
   getQDTWOrientationById,
@@ -42,14 +40,10 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   // Zentrale States für alle Kontrollen
   const [posMetrics, setPosMetrics] = useState<{
     ea: MetricState;
-    dfd: MetricState;
     sidtw: MetricState;
-    dtw: MetricState;
   }>({
     ea: { isLoaded: false, isLoading: false, visible: false },
-    dfd: { isLoaded: false, isLoading: false, visible: false },
     sidtw: { isLoaded: false, isLoading: false, visible: false },
-    dtw: { isLoaded: false, isLoading: false, visible: false },
   });
 
   const [oriMetrics, setOriMetrics] = useState<{
@@ -64,18 +58,13 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   const [currentEuclideanDeviation, setCurrentEuclideanDeviation] = useState<
     any[]
   >([]);
-  const [currentDiscreteFrechetDeviation, setCurrentDiscreteFrechetDeviation] =
-    useState<any[]>([]);
   const [currentSIDTWDeviation, setCurrentSIDTWDeviation] = useState<any[]>([]);
-  const [currentDTWDeviation, setCurrentDTWDeviation] = useState<any[]>([]);
   const [currentQADDeviation, setCurrentQADDeviation] = useState<any[]>([]);
   const [currentQDTWDeviation, setCurrentQDTWDeviation] = useState<any[]>([]);
   const [currentBahnInfo, setCurrentBahnInfo] = useState<any>(null);
   const [currentAuswertungInfo, setCurrentAuswertungInfo] = useState<any>({
     info_euclidean: [],
-    info_dfd: [],
     info_sidtw: [],
-    info_dtw: [],
     qdtw_info: [],
     qad_info: [],
   });
@@ -109,7 +98,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
 
   // Zentrale Funktion zum Laden der Metrik-Daten
   const loadPosMetricData = useCallback(
-    async (metricType: 'ea' | 'dfd' | 'sidtw' | 'dtw') => {
+    async (metricType: 'ea' | 'sidtw') => {
       if (!bahnId) return;
 
       // Wenn bereits geladen, toggle visibility
@@ -137,17 +126,9 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
             data = await getEAPositionById(bahnId);
             setCurrentEuclideanDeviation(data);
             break;
-          case 'dfd':
-            data = await getDFDPositionById(bahnId);
-            setCurrentDiscreteFrechetDeviation(data);
-            break;
           case 'sidtw':
             data = await getSIDTWPositionById(bahnId);
             setCurrentSIDTWDeviation(data);
-            break;
-          case 'dtw':
-            data = await getDTWPositionById(bahnId);
-            setCurrentDTWDeviation(data);
             break;
           default:
             throw new Error(`Unknown metric type: ${metricType}`);
@@ -220,9 +201,9 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
 
   // Verfügbarkeit der Daten prüfen
   const hasEAData = currentAuswertungInfo.info_euclidean.length > 0;
-  const hasDFDData = currentAuswertungInfo.info_dfd.length > 0;
+  //const hasDFDData = currentAuswertungInfo.info_dfd.length > 0;
   const hasSIDTWData = currentAuswertungInfo.info_sidtw.length > 0;
-  const hasDTWData = currentAuswertungInfo.info_dtw.length > 0;
+  //const hasDTWData = currentAuswertungInfo.info_dtw.length > 0;
   const hasQADData = currentAuswertungInfo.qad_info?.length > 0;
   const hasQDTWData = currentAuswertungInfo.qdtw_info?.length > 0;
 
@@ -316,7 +297,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
           </button>
         )}
 
-        {hasDTWData && (
+        {/*hasDTWData && (
           <button
             onClick={() => loadPosMetricData('dtw')}
             disabled={posMetrics.dtw.isLoading}
@@ -326,9 +307,9 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
           >
             {getButtonContent(posMetrics.dtw, 'DTW')}
           </button>
-        )}
+        )*/}
 
-        {hasDFDData && (
+        {/*hasDFDData && (
           <button
             onClick={() => loadPosMetricData('dfd')}
             disabled={posMetrics.dfd.isLoading}
@@ -338,7 +319,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
           >
             {getButtonContent(posMetrics.dfd, 'DFD')}
           </button>
-        )}
+        )*/}
 
         {hasQADData ||
           (hasQDTWData && (
@@ -380,9 +361,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
             // Übergabe aller benötigten Daten und States
             metrics={posMetrics}
             currentEuclideanDeviation={currentEuclideanDeviation}
-            currentDiscreteFrechetDeviation={currentDiscreteFrechetDeviation}
             currentSIDTWDeviation={currentSIDTWDeviation}
-            currentDTWDeviation={currentDTWDeviation}
             currentBahnInfo={currentBahnInfo}
           />
           <PosDeviationPlot3D
@@ -391,9 +370,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
             // Übergabe aller benötigten Daten und States
             metrics={posMetrics}
             currentEuclideanDeviation={currentEuclideanDeviation}
-            currentDiscreteFrechetDeviation={currentDiscreteFrechetDeviation}
             currentSIDTWDeviation={currentSIDTWDeviation}
-            currentDTWDeviation={currentDTWDeviation}
           />
         </div>
       )}

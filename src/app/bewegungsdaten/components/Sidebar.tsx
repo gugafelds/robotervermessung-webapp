@@ -157,7 +157,7 @@ export const Sidebar = () => {
         params.query = part;
       } else {
         // Alle Pattern gleichzeitig prüfen
-        const eventMatch = part.match(/^(n|np)=(\d+)$/i);
+        const eventMatch = part.match(/^(n|number)=(\d+)$/i);
         const weightMatch = part.match(/^(w|weight)=(\d*\.?\d+)$/i);
         const velMatch = part.match(/^(v|velocity)=(\d*\.?\d+)$/i);
         const dateMatch = part.match(/^d=(.+)$/i);

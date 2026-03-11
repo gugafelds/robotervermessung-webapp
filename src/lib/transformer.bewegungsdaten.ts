@@ -23,13 +23,13 @@ import type {
   BahnTwistIstRaw,
   BahnTwistSoll,
   BahnTwistSollRaw,
-} from '@/types/bewegungsdaten.types';
+} from "@/types/bewegungsdaten.types";
 import type {
   BahnInfoResponse,
   BahnInfoResponseRaw,
   PaginationResult,
   PaginationResultRaw,
-} from '@/types/pagination.types';
+} from "@/types/pagination.types";
 
 export const transformBahnInfoResult = (
   bahnenRaw: BahnInfoRaw[],
@@ -37,40 +37,40 @@ export const transformBahnInfoResult = (
   return bahnenRaw.map(
     (bahn): BahnInfo => ({
       _id: bahn.id,
-      bahnID: bahn.bahn_id,
+      bahnID: bahn.traj_id,
       robotModel: bahn.robot_model,
-      bahnplanung: bahn.bahnplanung,
+      bahnplanung: bahn.path_planning,
       recordingDate: bahn.recording_date,
       startTime: bahn.start_time,
       endTime: bahn.end_time,
-      sourceDataIst: bahn.source_data_ist,
-      sourceDataSoll: bahn.source_data_soll,
+      sourceDataIst: bahn.source_data_act,
+      sourceDataSoll: bahn.source_data_cmd,
       recordFilename: bahn.record_filename,
-      numberPointsEvents: bahn.np_ereignisse,
-      frequencyPoseIst: bahn.frequency_pose_ist,
-      frequencyPositionSoll: bahn.frequency_position_soll,
-      frequencyOrientationSoll: bahn.frequency_orientation_soll,
-      frequencyTwistIst: bahn.frequency_twist_ist,
-      frequencyTwistSoll: bahn.frequency_twist_soll,
-      frequencyAccelIst: bahn.frequency_accel_ist,
-      frequencyJointStates: bahn.frequency_joint_states,
+      numberPointsEvents: bahn.number_setpoints,
+      frequencyPoseIst: bahn.freq_pose_act,
+      frequencyPositionSoll: bahn.freq_position_cmd,
+      frequencyOrientationSoll: bahn.freq_orientation_cmd,
+      frequencyTwistIst: bahn.freq_vel_act,
+      frequencyTwistSoll: bahn.freq_vel_cmd,
+      frequencyAccelIst: bahn.freq_accel_act,
+      frequencyJointStates: bahn.freq_joint_states,
       calibrationRun: bahn.calibration_run,
-      numberPointsPoseIst: bahn.np_pose_ist,
-      numberPointsTwistIst: bahn.np_twist_ist,
-      numberPointsAccelIst: bahn.np_accel_ist,
-      numberPointsPosSoll: bahn.np_pos_soll,
-      numberPointsOrientSoll: bahn.np_orient_soll,
-      numberPointsTwistSoll: bahn.np_twist_soll,
-      numberPointsJointStates: bahn.np_jointstates,
+      numberPointsPoseIst: bahn.number_pose_act,
+      numberPointsTwistIst: bahn.number_vel_act,
+      numberPointsAccelIst: bahn.number_accel_act,
+      numberPointsPosSoll: bahn.number_position_cmd,
+      numberPointsOrientSoll: bahn.number_orientation_cmd,
+      numberPointsTwistSoll: bahn.number_vel_cmd,
+      numberPointsJointStates: bahn.number_joint_states,
       weight: bahn.weight,
       handlingHeight: bahn.handling_height,
       velocityPicking: bahn.velocity_picking,
       velocityHandling: bahn.velocity_handling,
-      frequencyIMU: bahn.frequency_imu,
+      frequencyIMU: bahn.freq_imu,
       pickAndPlaceRun: bahn.pick_and_place,
-      numberPointsIMU: bahn.np_imu,
-      numberPointsAccelSoll: bahn.np_accel_soll,
-      frequencyAccelSoll: bahn.frequency_accel_soll,
+      numberPointsIMU: bahn.number_imu,
+      numberPointsAccelSoll: bahn.number_accel_cmd,
+      frequencyAccelSoll: bahn.freq_accel_cmd,
       settedVelocity: bahn.setted_velocity,
       stopPoint: bahn.stop_point,
       waitTime: bahn.wait_time,
@@ -82,40 +82,40 @@ export const transformBahnInfobyIDResult = (
   bahnRaw: BahnInfoRaw,
 ): BahnInfo => ({
   _id: bahnRaw.id,
-  bahnID: bahnRaw.bahn_id,
+  bahnID: bahnRaw.traj_id,
   robotModel: bahnRaw.robot_model,
-  bahnplanung: bahnRaw.bahnplanung,
+  bahnplanung: bahnRaw.path_planning,
   recordingDate: bahnRaw.recording_date,
   startTime: bahnRaw.start_time,
   endTime: bahnRaw.end_time,
-  sourceDataIst: bahnRaw.source_data_ist,
-  sourceDataSoll: bahnRaw.source_data_soll,
+  sourceDataIst: bahnRaw.source_data_act,
+  sourceDataSoll: bahnRaw.source_data_cmd,
   recordFilename: bahnRaw.record_filename,
-  numberPointsEvents: bahnRaw.np_ereignisse,
-  frequencyPoseIst: bahnRaw.frequency_pose_ist,
-  frequencyPositionSoll: bahnRaw.frequency_position_soll,
-  frequencyOrientationSoll: bahnRaw.frequency_orientation_soll,
-  frequencyTwistIst: bahnRaw.frequency_twist_ist,
-  frequencyTwistSoll: bahnRaw.frequency_twist_soll,
-  frequencyAccelIst: bahnRaw.frequency_accel_ist,
-  frequencyJointStates: bahnRaw.frequency_joint_states,
+  numberPointsEvents: bahnRaw.number_setpoints,
+  frequencyPoseIst: bahnRaw.freq_pose_act,
+  frequencyPositionSoll: bahnRaw.freq_position_cmd,
+  frequencyOrientationSoll: bahnRaw.freq_orientation_cmd,
+  frequencyTwistIst: bahnRaw.freq_vel_act,
+  frequencyTwistSoll: bahnRaw.freq_vel_cmd,
+  frequencyAccelIst: bahnRaw.freq_accel_act,
+  frequencyJointStates: bahnRaw.freq_joint_states,
   calibrationRun: bahnRaw.calibration_run,
-  numberPointsPoseIst: bahnRaw.np_pose_ist,
-  numberPointsTwistIst: bahnRaw.np_twist_ist,
-  numberPointsAccelIst: bahnRaw.np_accel_ist,
-  numberPointsPosSoll: bahnRaw.np_pos_soll,
-  numberPointsOrientSoll: bahnRaw.np_orient_soll,
-  numberPointsTwistSoll: bahnRaw.np_twist_soll,
-  numberPointsJointStates: bahnRaw.np_jointstates,
+  numberPointsPoseIst: bahnRaw.number_pose_act,
+  numberPointsTwistIst: bahnRaw.number_vel_act,
+  numberPointsAccelIst: bahnRaw.number_accel_act,
+  numberPointsPosSoll: bahnRaw.number_position_cmd,
+  numberPointsOrientSoll: bahnRaw.number_orientation_cmd,
+  numberPointsTwistSoll: bahnRaw.number_vel_cmd,
+  numberPointsJointStates: bahnRaw.number_joint_states,
   weight: bahnRaw.weight,
   handlingHeight: bahnRaw.handling_height,
   velocityPicking: bahnRaw.velocity_picking,
   velocityHandling: bahnRaw.velocity_handling,
-  frequencyIMU: bahnRaw.frequency_imu,
+  frequencyIMU: bahnRaw.freq_imu,
   pickAndPlaceRun: bahnRaw.pick_and_place,
-  numberPointsIMU: bahnRaw.np_imu,
-  numberPointsAccelSoll: bahnRaw.np_accel_soll,
-  frequencyAccelSoll: bahnRaw.frequency_accel_soll,
+  numberPointsIMU: bahnRaw.number_imu,
+  numberPointsAccelSoll: bahnRaw.number_accel_cmd,
+  frequencyAccelSoll: bahnRaw.freq_accel_cmd,
   settedVelocity: bahnRaw.setted_velocity,
   stopPoint: bahnRaw.stop_point,
   waitTime: bahnRaw.wait_time,
@@ -127,17 +127,17 @@ export const transformBahnPoseIstResult = (
   return bahnenPoseIstRaw.map(
     (bahn): BahnPoseIst => ({
       _id: bahn.id,
-      bahnID: bahn.bahn_id,
-      segmentID: bahn.segment_id,
+      bahnID: bahn.traj_id,
+      segmentID: bahn.seg_id,
       timestamp: bahn.timestamp,
-      xIst: bahn.x_ist,
-      yIst: bahn.y_ist,
-      zIst: bahn.z_ist,
-      qxIst: bahn.qx_ist,
-      qyIst: bahn.qy_ist,
-      qzIst: bahn.qz_ist,
-      qwIst: bahn.qw_ist,
-      sourceDataIst: bahn.source_data_ist,
+      xIst: bahn.x_raw_act,
+      yIst: bahn.y_raw_act,
+      zIst: bahn.z_raw_act,
+      qxIst: bahn.qx_raw_act,
+      qyIst: bahn.qy_raw_act,
+      qzIst: bahn.qz_raw_act,
+      qwIst: bahn.qw_raw_act,
+      sourceDataIst: bahn.source_data_raw_act,
     }),
   );
 };
@@ -169,16 +169,16 @@ export const transformBahnPoseTransResult = (
 ): BahnPoseTrans[] => {
   return bahnenPoseTransRaw.map(
     (bahn): BahnPoseTrans => ({
-      bahnID: bahn.bahn_id,
-      segmentID: bahn.segment_id,
+      bahnID: bahn.traj_id,
+      segmentID: bahn.seg_id,
       timestamp: bahn.timestamp,
-      xTrans: bahn.x_trans,
-      yTrans: bahn.y_trans,
-      zTrans: bahn.z_trans,
-      qxTrans: bahn.qx_trans,
-      qyTrans: bahn.qy_trans,
-      qzTrans: bahn.qz_trans,
-      qwTrans: bahn.qw_trans,
+      xTrans: bahn.x_act,
+      yTrans: bahn.y_act,
+      zTrans: bahn.z_act,
+      qxTrans: bahn.qx_act,
+      qyTrans: bahn.qy_act,
+      qzTrans: bahn.qz_act,
+      qwTrans: bahn.qw_act,
       calibrationID: bahn.calibration_id,
     }),
   );
@@ -190,10 +190,10 @@ export const transformBahnTwistIstResult = (
   return bahnenTwistIstRaw.map(
     (bahn): BahnTwistIst => ({
       id: bahn.id,
-      bahnId: bahn.bahn_id,
-      segmentId: bahn.segment_id,
+      bahnId: bahn.traj_id,
+      segmentId: bahn.seg_id,
       timestamp: bahn.timestamp,
-      tcpSpeedIst: bahn.tcp_speed_ist,
+      tcpSpeedIst: bahn.tcp_vel_act,
     }),
   );
 };
@@ -204,10 +204,10 @@ export const transformBahnAccelIstResult = (
   return bahnenAccelIstRaw.map(
     (bahn): BahnAccelIst => ({
       id: bahn.id,
-      bahnId: bahn.bahn_id,
-      segmentId: bahn.segment_id,
+      bahnId: bahn.traj_id,
+      segmentId: bahn.seg_id,
       timestamp: bahn.timestamp,
-      tcpAccelIst: bahn.tcp_accel_ist,
+      tcpAccelIst: bahn.tcp_accel_act,
     }),
   );
 };
@@ -218,10 +218,10 @@ export const transformBahnAccelSollResult = (
   return bahnenAccelSollRaw.map(
     (bahn): BahnAccelSoll => ({
       id: bahn.id,
-      bahnId: bahn.bahn_id,
-      segmentId: bahn.segment_id,
+      bahnId: bahn.traj_id,
+      segmentId: bahn.seg_id,
       timestamp: bahn.timestamp,
-      tcpAccelSoll: bahn.tcp_accel_soll,
+      tcpAccelSoll: bahn.tcp_accel_cmd,
     }),
   );
 };
@@ -232,13 +232,13 @@ export const transformBahnPositionSollResult = (
   return bahnenPositionSollRaw.map(
     (bahn): BahnPositionSoll => ({
       id: bahn.id,
-      bahnId: bahn.bahn_id,
-      segmentId: bahn.segment_id,
+      bahnId: bahn.traj_id,
+      segmentId: bahn.seg_id,
       timestamp: bahn.timestamp,
-      xSoll: bahn.x_soll,
-      ySoll: bahn.y_soll,
-      zSoll: bahn.z_soll,
-      sourceDataSoll: bahn.source_data_soll,
+      xSoll: bahn.x_cmd,
+      ySoll: bahn.y_cmd,
+      zSoll: bahn.z_cmd,
+      sourceDataSoll: bahn.source_data_cmd,
     }),
   );
 };
@@ -249,14 +249,14 @@ export const transformBahnOrientationSollResult = (
   return bahnenOrientationSollRaw.map(
     (bahn): BahnOrientationSoll => ({
       id: bahn.id,
-      bahnId: bahn.bahn_id,
-      segmentId: bahn.segment_id,
+      bahnId: bahn.traj_id,
+      segmentId: bahn.seg_id,
       timestamp: bahn.timestamp,
-      qxSoll: bahn.qx_soll,
-      qySoll: bahn.qy_soll,
-      qzSoll: bahn.qz_soll,
-      qwSoll: bahn.qw_soll,
-      sourceDataSoll: bahn.source_data_soll,
+      qxSoll: bahn.qx_cmd,
+      qySoll: bahn.qy_cmd,
+      qzSoll: bahn.qz_cmd,
+      qwSoll: bahn.qw_cmd,
+      sourceDataSoll: bahn.source_data_cmd,
     }),
   );
 };
@@ -267,11 +267,11 @@ export const transformBahnTwistSollResult = (
   return bahnenTwistSollRaw.map(
     (bahn): BahnTwistSoll => ({
       id: bahn.id,
-      bahnId: bahn.bahn_id,
-      segmentId: bahn.segment_id,
+      bahnId: bahn.traj_id,
+      segmentId: bahn.seg_id,
       timestamp: bahn.timestamp,
-      tcpSpeedSoll: bahn.tcp_speed_soll,
-      sourceDataSoll: bahn.source_data_soll,
+      tcpSpeedSoll: bahn.tcp_vel_cmd,
+      sourceDataSoll: bahn.source_data_cmd,
     }),
   );
 };
@@ -281,12 +281,12 @@ export const transformBahnIMUResult = (
 ): BahnIMU[] => {
   return bahnenIMURaw.map(
     (bahn): BahnIMU => ({
-      bahnId: bahn.bahn_id,
-      segmentId: bahn.segment_id,
+      bahnId: bahn.traj_id,
+      segmentId: bahn.seg_id,
       timestamp: bahn.timestamp,
       tcpAccelPi: bahn.tcp_accel_pi,
       tcpAngularVelPi: bahn.tcp_angular_vel_pi,
-      sourceDataIst: bahn.source_data_ist,
+      sourceDataIst: bahn.source_data_act,
     }),
   );
 };
@@ -297,8 +297,8 @@ export const transformBahnJointStatesResult = (
   return bahnJointStatesRaw.map(
     (bahn): BahnJointStates => ({
       id: bahn.id,
-      bahnId: bahn.bahn_id,
-      segmentId: bahn.segment_id,
+      bahnId: bahn.traj_id,
+      segmentId: bahn.seg_id,
       timestamp: bahn.timestamp,
       joint1: bahn.joint_1,
       joint2: bahn.joint_2,
@@ -306,7 +306,7 @@ export const transformBahnJointStatesResult = (
       joint4: bahn.joint_4,
       joint5: bahn.joint_5,
       joint6: bahn.joint_6,
-      sourceDataSoll: bahn.source_data_soll,
+      sourceDataSoll: bahn.source_data_cmd,
     }),
   );
 };
@@ -317,8 +317,8 @@ export const transformBahnEventsResult = (
   return bahnEventsRaw.map(
     (event): BahnEvents => ({
       id: event.id,
-      bahnId: event.bahn_id,
-      segmentId: event.segment_id,
+      bahnId: event.traj_id,
+      segmentId: event.seg_id,
       timestamp: event.timestamp,
       xReached: event.x_reached,
       yReached: event.y_reached,
@@ -327,7 +327,7 @@ export const transformBahnEventsResult = (
       qyReached: event.qy_reached,
       qzReached: event.qz_reached,
       qwReached: event.qw_reached,
-      sourceDataSoll: event.source_data_soll,
+      sourceDataSoll: event.source_data_cmd,
     }),
   );
 };

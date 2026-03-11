@@ -5,10 +5,6 @@
 // React Hook für Service
 
 import {
-  transformDFDDeviationResult,
-  transformDFDInfoResult,
-  transformDTWDeviationResult,
-  transformDTWInfoResult,
   transformEADeviationResult,
   transformEAInfoResult,
   transformQADDeviationResult,
@@ -20,10 +16,6 @@ import {
 } from '@/src/lib/transformer.auswertung';
 import { transformBahnInfoResult } from '@/src/lib/transformer.bewegungsdaten';
 import type {
-  DFDPosition,
-  DFDPositionRaw,
-  DTWPosition,
-  DTWPositionRaw,
   EAPosition,
   EAPositionRaw,
   QADOrientation,
@@ -159,9 +151,7 @@ export const getAuswertungBahnIDs = async (
 export const getAuswertungInfoById = async (
   id: string,
 ): Promise<{
-  info_dfd: any[];
   info_sidtw: any[];
-  info_dtw: any[];
   info_euclidean: any[];
   qdtw_info: any[];
   qad_info: any[];
@@ -169,22 +159,18 @@ export const getAuswertungInfoById = async (
   try {
     const result = await fetchFromAPI<{
       [key: string]: any[];
-    }>(`/auswertung/auswertung_info/${id}`);
+    }>(`/auswertung/evaluation_info/${id}`);
 
     return {
-      info_dfd: transformDFDInfoResult(result.info_dfd || []),
-      info_sidtw: transformSIDTWInfoResult(result.info_sidtw || []),
-      info_dtw: transformDTWInfoResult(result.info_dtw || []),
-      info_euclidean: transformEAInfoResult(result.info_euclidean || []),
+      info_sidtw: transformSIDTWInfoResult(result.sidtw_info || []),
+      info_euclidean: transformEAInfoResult(result.ed_info || []),
       qdtw_info: transformQDTWInfoResult(result.qdtw_info || []),
-      qad_info: transformQADInfoResult(result.qad_info || []),
+      qad_info: transformQADInfoResult(result.gd_info || []),
     };
   } catch (error) {
-    console.error(`Error fetching Auswertung info for ${id}:`, error);
+    console.error(`Error fetching evaluation info for ${id}:`, error);
     return {
-      info_dfd: [],
       info_sidtw: [],
-      info_dtw: [],
       info_euclidean: [],
       qdtw_info: [],
       qad_info: [],
@@ -196,7 +182,7 @@ export const getEAPositionById = async (id: string): Promise<EAPosition[]> => {
   try {
     const result = await fetchFromAPI<{
       position_euclidean: EAPositionRaw[];
-    }>(`/auswertung/position_euclidean/${id}`);
+    }>(`/auswertung/ed_evaluation/${id}`);
     return transformEADeviationResult(result.position_euclidean);
   } catch (error) {
     console.error('Error fetching Euclidean deviation data:', error);
@@ -204,7 +190,7 @@ export const getEAPositionById = async (id: string): Promise<EAPosition[]> => {
   }
 };
 
-export const getDFDPositionById = async (
+/*export const getDFDPositionById = async (
   id: string,
 ): Promise<DFDPosition[]> => {
   try {
@@ -216,14 +202,14 @@ export const getDFDPositionById = async (
     console.error('Error fetching DFD deviation data:', error);
     throw error;
   }
-};
+};*/
 
 export const getSIDTWPositionById = async (
   id: string,
 ): Promise<SIDTWPosition[]> => {
   try {
     const result = await fetchFromAPI<{ position_sidtw: SIDTWPositionRaw[] }>(
-      `/auswertung/position_sidtw/${id}`,
+      `/auswertung/sidtw_evaluation/${id}`,
     );
     return transformSIDTWDeviationResult(result.position_sidtw);
   } catch (error) {
@@ -232,7 +218,7 @@ export const getSIDTWPositionById = async (
   }
 };
 
-export const getDTWPositionById = async (
+/*export const getDTWPositionById = async (
   id: string,
 ): Promise<DTWPosition[]> => {
   try {
@@ -244,7 +230,7 @@ export const getDTWPositionById = async (
     console.error('Error fetching DTW deviation data:', error);
     throw error;
   }
-};
+};*/
 
 export const checkPositionDataAvailability = async (
   id: string,
@@ -295,9 +281,9 @@ export const getQADOrientationById = async (
 ): Promise<QADOrientation[]> => {
   try {
     const result = await fetchFromAPI<{
-      qad_evaluation: QADOrientationRaw[];
-    }>(`/auswertung/qad_evaluation/${id}`);
-    return transformQADDeviationResult(result.qad_evaluation);
+      gd_evaluation: QADOrientationRaw[];
+    }>(`/auswertung/gd_evaluation/${id}`);
+    return transformQADDeviationResult(result.gd_evaluation);
   } catch (error) {
     console.error('Error fetching QAD orientation data:', error);
     throw error;

@@ -9,8 +9,6 @@ import { getAuswertungInfoById } from '@/src/actions/auswertung.service';
 import { Typography } from '@/src/components/Typography';
 import { formatNumber } from '@/src/lib/functions';
 import type {
-  DFDInfo,
-  DTWInfo,
   EAInfo,
   QADInfo,
   QDTWInfo,
@@ -39,8 +37,6 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
   const [segmentOptions, setSegmentOptions] = useState<SegmentOption[]>([]);
 
   const [eaInfo, setEaInfo] = useState<EAInfo[]>([]);
-  const [dfdInfo, setDfdInfo] = useState<DFDInfo[]>([]);
-  const [dtwInfo, setDtwInfo] = useState<DTWInfo[]>([]);
   const [sidtwInfo, setSidtwInfo] = useState<SIDTWInfo[]>([]);
   const [qadInfo, setQadInfo] = useState<QADInfo[]>([]);
   const [qdtwInfo, setQdtwInfo] = useState<QDTWInfo[]>([]);
@@ -56,8 +52,6 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
         const infoResult = await getAuswertungInfoById(bahnId);
 
         setEaInfo(infoResult.info_euclidean || []);
-        setDfdInfo(infoResult.info_dfd || []);
-        setDtwInfo(infoResult.info_dtw || []);
         setSidtwInfo(infoResult.info_sidtw || []);
         setQadInfo(infoResult.qad_info || []);
         setQdtwInfo(infoResult.qdtw_info || []);
@@ -84,8 +78,6 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
 
     const allSegments = [
       ...getAllSegmentNumbers(eaInfo),
-      ...getAllSegmentNumbers(dfdInfo),
-      ...getAllSegmentNumbers(dtwInfo),
       ...getAllSegmentNumbers(sidtwInfo),
       ...getAllSegmentNumbers(qadInfo),
       ...getAllSegmentNumbers(qdtwInfo),
@@ -102,7 +94,7 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
     ];
 
     setSegmentOptions(options);
-  }, [eaInfo, dfdInfo, dtwInfo, sidtwInfo, qadInfo, qdtwInfo]);
+  }, [eaInfo, sidtwInfo, qadInfo, qdtwInfo]);
 
   // Handler für Segmentauswahl - verwendet den Parent Callback
   const handleSegmentSelect = (segment: string) => {
@@ -151,8 +143,6 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
   };
 
   const eaMetrics = calculateMetrics(eaInfo, 'EA');
-  const dfdMetrics = calculateMetrics(dfdInfo, 'DFD');
-  const dtwMetrics = calculateMetrics(dtwInfo, 'DTW');
   const sidtwMetrics = calculateMetrics(sidtwInfo, 'SIDTW');
   const qadMetrics = calculateMetrics(qadInfo, 'QAD');
   const qdtwMetrics = calculateMetrics(qdtwInfo, 'QDTW');
@@ -168,7 +158,7 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
     );
   }
 
-  if (!eaMetrics && !dfdMetrics && !dtwMetrics && !sidtwMetrics) {
+  if (!eaMetrics && !sidtwMetrics) {
     return (
       <div className="m-4 rounded-lg border border-gray-500 bg-gray-200 p-6 text-center text-gray-500">
         Keine Metriken verfügbar
@@ -261,7 +251,7 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
                 </td>
               </tr>
             )}
-            {dtwMetrics && (
+            {/*dtwMetrics && (
               <tr className="border-t">
                 <td className="py-3 text-primary">DTW</td>
                 <td className="py-3 text-center text-primary">
@@ -277,8 +267,8 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
                   {formatNumber(dtwMetrics.std)}
                 </td>
               </tr>
-            )}
-            {dfdMetrics && (
+            )*/}
+            {/*dfdMetrics && (
               <tr className="border-t">
                 <td className="py-3 text-primary">DFD</td>
                 <td className="py-3 text-center text-primary">
@@ -294,7 +284,7 @@ export const MetrikenPanel: React.FC<MetrikenPanelProps> = ({
                   {formatNumber(dfdMetrics.std)}
                 </td>
               </tr>
-            )}
+            )*/}
           </tbody>
         </table>
       </div>
