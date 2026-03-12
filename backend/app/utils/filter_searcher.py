@@ -28,7 +28,7 @@ class FilterSearcher:
         
         query = """
             SELECT segment_id
-            FROM bewegungsdaten.bahn_metadata
+            FROM motion.bahn_metadata
             WHERE segment_id = ANY($1)
             AND segment_id = bahn_id
         """
@@ -42,7 +42,7 @@ class FilterSearcher:
         
         query = """
             SELECT segment_id
-            FROM bewegungsdaten.bahn_metadata
+            FROM motion.bahn_metadata
             WHERE segment_id = ANY($1)
             AND segment_id != bahn_id
         """
@@ -112,7 +112,7 @@ class FilterSearcher:
                     position_x,
                     position_y,
                     position_z
-                FROM bewegungsdaten.bahn_metadata
+                FROM motion.bahn_metadata
                 WHERE segment_id = $1
             """
 
@@ -181,7 +181,7 @@ class FilterSearcher:
                 logger.info(f"No prefilter features selected, returning all candidates")
                 query = """
                     SELECT segment_id
-                    FROM bewegungsdaten.bahn_metadata
+                    FROM motion.bahn_metadata
                     WHERE segment_id != $1
                 """
                 results = await self.connection.fetch(query, target_id)
@@ -299,7 +299,7 @@ class FilterSearcher:
             # 4. SQL Query
             query = f"""
                 SELECT segment_id{', movement_type' if use_movement_type else ''}
-                FROM bewegungsdaten.bahn_metadata
+                FROM motion.bahn_metadata
                 WHERE {where_clause}
             """
 

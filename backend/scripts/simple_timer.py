@@ -29,7 +29,7 @@ async def get_random_bahn_ids(pool, n=20):
     async with pool.acquire() as conn:
         query = """
             SELECT bahn_id
-            FROM bewegungsdaten.bahn_metadata
+            FROM motion.bahn_metadata
             WHERE segment_id = bahn_id
             ORDER BY RANDOM()
             LIMIT $1

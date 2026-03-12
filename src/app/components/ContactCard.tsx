@@ -9,18 +9,19 @@ export const ContactCard = () => {
   return (
     <section className="mx-auto my-8 h-fit max-w-lg flex-row items-start text-balance rounded-lg bg-gray-100 text-justify shadow-md">
       <div className="p-4">
-        <Typography as="h1">Kontakt</Typography>
+        <Typography as="h1">Contact</Typography>
 
         <div className="mt-2 text-xl font-extrabold">
-          Gustavo Barros, M. Sc. <br />
+          Gustavo Barros, M.Sc. <br />
         </div>
 
         <Typography as="h5">
-          Lehrstuhl für Produktionssysteme <br />
-          Ruhr-Universität Bochum <br />
-          Industriestraße 38C Raum 02/38 <br />
+          Chair of Production Systems <br />
+          Ruhr University Bochum <br />
+          Industriestraße 38C Room 02/38 <br />
         </Typography>
       </div>
+
       <div className="flex flex-row sm:ml-auto">
         <Link
           className="items-center rounded-bl-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300"
@@ -31,9 +32,10 @@ export const ContactCard = () => {
             src="/lps.png"
             width={60}
             height={60}
-            alt="LPS-Logo"
+            alt="LPS Logo"
           />
         </Link>
+
         <Link
           className="items-center p-1 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300"
           href="https://github.com/gugafelds"
@@ -43,7 +45,7 @@ export const ContactCard = () => {
             src="/github.png"
             width={35}
             height={30}
-            alt="Github-Logo"
+            alt="GitHub Logo"
           />
         </Link>
       </div>

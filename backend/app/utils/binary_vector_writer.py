@@ -50,7 +50,7 @@ class BinaryVectorWriter:
         try:
             # Connection mit autocommit
             conn = psycopg.connect(self.db_url, autocommit=True)
-            conn.execute("SET search_path TO bewegungsdaten;")
+            conn.execute("SET search_path TO motion;")
             
             # Register vector type
             register_vector(conn)
@@ -61,7 +61,7 @@ class BinaryVectorWriter:
             cur = conn.cursor()
             
             with cur.copy(
-                "COPY bewegungsdaten.bahn_embeddings "
+                "COPY motion.bahn_embeddings "
                 "(segment_id, bahn_id, joint_embedding, position_embedding, "
                 "orientation_embedding, velocity_embedding, metadata_embedding) "
                 "FROM STDIN WITH (FORMAT BINARY)"

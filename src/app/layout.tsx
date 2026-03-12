@@ -9,9 +9,9 @@ import { Navbar } from '@/src/app/components/Navbar';
 const inter = Inter({ subsets: ['latin'], display: 'swap' });
 
 export const metadata: Metadata = {
-  title: 'Robotervermessung',
+  title: 'Robot Motion and Performance Database',
   description:
-    'Web-App zur Robotervermessungsdatenbank (Analyse & Visualisierung)',
+    'Web platform for the analysis and visualization of industrial robot motion and performance data.',
 };
 
 export const viewport: Viewport = {

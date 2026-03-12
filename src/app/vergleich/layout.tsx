@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { getBahnInfo } from '@/src/actions/bewegungsdaten.service';
+import { getBahnInfo } from '@/src/actions/motion.service';
 import { MetadataUpload } from '@/src/app/vergleich/components/MetaDataUpload';
 import { TrajectoryProvider } from '@/src/providers/trajectory.provider';
 

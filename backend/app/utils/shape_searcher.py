@@ -36,7 +36,7 @@ class ShapeSearcher:
 
             query = f"""
                 SELECT {embedding_col}
-                FROM bewegungsdaten.bahn_embeddings
+                FROM motion.bahn_embeddings
                 WHERE segment_id = $1
             """
 
@@ -118,7 +118,7 @@ class ShapeSearcher:
                         e.segment_id,
                         e.bahn_id,
                         e.{embedding_col} <=> $1::vector as distance
-                    FROM bewegungsdaten.bahn_embeddings e
+                    FROM motion.bahn_embeddings e
                     WHERE {where_clause}
                     ORDER BY distance
                     LIMIT $4
@@ -138,7 +138,7 @@ class ShapeSearcher:
                         e.segment_id,
                         e.bahn_id,
                         e.{embedding_col} <=> $1::vector as distance
-                    FROM bewegungsdaten.bahn_embeddings e
+                    FROM motion.bahn_embeddings e
                     WHERE {where_clause}
                     ORDER BY distance
                     LIMIT $3
@@ -193,7 +193,7 @@ class ShapeSearcher:
                        orientation_embedding IS NOT NULL as has_orientation,
                        velocity_embedding IS NOT NULL    as has_velocity,
                        metadata_embedding IS NOT NULL    as has_metadata
-                FROM bewegungsdaten.bahn_embeddings
+                FROM motion.bahn_embeddings
                 WHERE segment_id = $1
             """
 

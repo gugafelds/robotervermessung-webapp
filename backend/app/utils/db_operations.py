@@ -15,7 +15,7 @@ class DatabaseOperations:
             raise
 
     async def check_bahn_id_exists(self, conn, table_name, bahn_id):
-        query = f"SELECT COUNT(*) FROM bewegungsdaten.{table_name} WHERE bahn_id = $1"
+        query = f"SELECT COUNT(*) FROM motion.{table_name} WHERE bahn_id = $1"
         return await conn.fetchval(query, bahn_id) > 0
 
     async def copy_data_to_table(self, conn, table_name, data, columns=None):
@@ -38,7 +38,7 @@ class DatabaseOperations:
             await conn.copy_records_to_table(
                 table_name,
                 records=converted_records,
-                schema_name='bewegungsdaten',
+                schema_name='motion',
                 columns=columns
             )
 
@@ -357,7 +357,7 @@ async def check_bahn_ids_exist(conn, table_name, bahn_ids):
 
     try:
         query = f"""
-        SELECT DISTINCT bahn_id FROM bewegungsdaten.{table_name} 
+        SELECT DISTINCT bahn_id FROM motion.{table_name} 
         WHERE bahn_id = ANY($1::text[])
         """
         rows = await conn.fetch(query, bahn_ids)

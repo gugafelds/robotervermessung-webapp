@@ -13,7 +13,7 @@ import React, {
 import {
   getAuswertungBahnIDs,
   getAuswertungInfoById,
-} from '@/src/actions/auswertung.service';
+} from '@/src/actions/evaluation.service';
 import type {
   AuswertungBahnIDs,
   DFDInfo,
@@ -28,7 +28,7 @@ import type {
   QDTWOrientation,
   SIDTWInfo,
   SIDTWPosition,
-} from '@/types/auswertung.types';
+} from '@/types/evaluation.types';
 import type { AuswertungIDsResponse } from '@/types/pagination.types';
 
 export interface AuswertungState {

@@ -17,9 +17,10 @@ export const Navbar = () => {
       <div className="flex flex-row flex-wrap items-center gap-10 px-6 py-4">
         <Link href="/">
           <div className="items-center rounded-md p-2">
-            <Typography as="h1">Robotervermessung</Typography>
+            <Typography as="h1">RMPD</Typography>
           </div>
         </Link>
+
         <Link href="/dashboard">
           <Typography
             as="h2"
@@ -30,46 +31,51 @@ export const Navbar = () => {
             Dashboard
           </Typography>
         </Link>
-        <Link href="/bewegungsdaten">
+
+        <Link href="/motion">
           <Typography
             as="h2"
             className={`my-0 items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300 ${
-              pathname.includes('bewegungsdaten') ? 'bg-gray-300' : ''
+              pathname.includes('motion') ? 'bg-gray-300' : ''
             }`}
           >
-            Bewegungsdaten
+            Motion
           </Typography>
         </Link>
-        <Link href="/auswertung">
+
+        <Link href="/evaluation">
           <Typography
             as="h2"
             className={`my-0 items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300 ${
-              pathname.includes('auswertung') ? 'bg-gray-300' : ''
+              pathname.includes('evaluation') ? 'bg-gray-300' : ''
             }`}
           >
-            Auswertung
+            Evaluation
           </Typography>
         </Link>
-        <Link href="/vergleich">
+
+        <Link href="/comparison">
           <Typography
             as="h2"
             className={`my-0 items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300 ${
-              pathname.includes('bahn-vergleich') ? 'bg-gray-300' : ''
+              pathname.includes('comparison') ? 'bg-gray-300' : ''
             }`}
           >
-            Ähnlichkeitssuche
+            Similarity Search
           </Typography>
         </Link>
-        <Link href="/hochladen">
+
+        <Link href="/upload">
           <Typography
             as="h2"
             className={`my-0 items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300 ${
-              pathname.includes('hochladen') ? 'bg-gray-300' : ''
+              pathname.includes('upload') ? 'bg-gray-300' : ''
             }`}
           >
-            Hochladen
+            Upload
           </Typography>
         </Link>
+
         <Link
           className="ml-auto"
           href="https://www.lps.ruhr-uni-bochum.de/lps/index.html.de"
@@ -79,7 +85,7 @@ export const Navbar = () => {
             src="/lps.png"
             width={70}
             height={70}
-            alt="LPS-Logo"
+            alt="LPS Logo"
           />
         </Link>
       </div>

@@ -153,7 +153,7 @@ class MultiModalSearcher:
         try:
             query = """
                     SELECT bahn_id
-                    FROM bewegungsdaten.bahn_metadata
+                    FROM motion.bahn_metadata
                     WHERE segment_id = $1 \
                     """
             result = await self.connection.fetchrow(query, target_id)
@@ -167,7 +167,7 @@ class MultiModalSearcher:
         try:
             query = """
                     SELECT segment_id
-                    FROM bewegungsdaten.bahn_metadata
+                    FROM motion.bahn_metadata
                     WHERE bahn_id = $1
                       AND segment_id != bahn_id
                     ORDER BY segment_id \
@@ -205,8 +205,8 @@ class MultiModalSearcher:
                     bm.position_y,
                     bm.position_z,
                     si.sidtw_average_distance
-                FROM bewegungsdaten.bahn_metadata bm
-                LEFT JOIN auswertung.info_sidtw si 
+                FROM motion.bahn_metadata bm
+                LEFT JOIN evaluation.info_sidtw si 
                     ON bm.segment_id = si.segment_id
                 WHERE bm.segment_id = $1
             """
@@ -400,8 +400,8 @@ class MultiModalSearcher:
                     bm.position_y,
                     bm.position_z,
                     si.sidtw_average_distance
-                FROM bewegungsdaten.bahn_metadata bm
-                LEFT JOIN auswertung.info_sidtw si 
+                FROM motion.bahn_metadata bm
+                LEFT JOIN evaluation.info_sidtw si 
                     ON bm.segment_id = si.segment_id
                 WHERE bm.segment_id = ANY ($1)
             """

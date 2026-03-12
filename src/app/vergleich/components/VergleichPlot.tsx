@@ -15,13 +15,13 @@ import {
   getBahnPositionSollById,
   getSegmentEventsById,
   getSegmentPositionSollById,
-} from '@/src/actions/bewegungsdaten.service';
+} from '@/src/actions/motion.service';
 import { Typography } from '@/src/components/Typography';
 import { plotLayoutConfig } from '@/src/lib/plot-config';
 import type {
   BahnEvents,
   BahnPositionSoll,
-} from '@/types/bewegungsdaten.types';
+} from '@/types/motion.types';
 import type { SegmentGroup, SimilarityResult } from '@/types/similarity.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });

@@ -6,7 +6,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 
-import type { BahnInfo } from '@/types/bewegungsdaten.types';
+import type { BahnInfo } from '@/types/motion.types';
 
 type SimilaritySearchProps = {
   onSearch: (
@@ -57,7 +57,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
     new Set(['movement_type']),
   );
 
-  const recentBahnIds = bahnInfo ? bahnInfo.map((bahn) => bahn.bahnID) : [];
+  const recentBahnIds = bahnInfo ? bahnInfo.map((bahn) => bahn.trajID) : [];
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

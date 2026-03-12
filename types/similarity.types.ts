@@ -154,7 +154,6 @@ export interface HierarchicalSimilarityResponse {
   target_id: string;
   target_bahn_id: string;
   target_bahn_features?: {
-    // ✅ NEU!
     segment_id: string;
     bahn_id: string;
     duration?: number;
@@ -186,7 +185,6 @@ export interface HierarchicalSimilarityResponse {
   segment_similarity: {
     target_segment: string;
     target_segment_features?: {
-      // ✅ NEU!
       segment_id: string;
       bahn_id: string;
       duration?: number;

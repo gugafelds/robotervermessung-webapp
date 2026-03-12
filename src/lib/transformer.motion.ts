@@ -1,0 +1,297 @@
+import type {
+  TrajAccelAct,
+  TrajAccelActRaw,
+  TrajAccelCmd,
+  TrajAccelCmdRaw,
+  TrajSetpoints,
+  TrajSetpointsRaw,
+  TrajIMU,
+  TrajIMURaw,
+  TrajInfo,
+  TrajInfoRaw,
+  TrajJointStates,
+  TrajJointStatesRaw,
+  TrajOrientationCmd,
+  TrajOrientationCmdRaw,
+  TrajPoseAct,
+  TrajPoseActRaw,
+  TrajPoseTrans,
+  TrajPoseTransRaw,
+  TrajPositionCmd,
+  TrajPositionCmdRaw,
+  TrajVelAct,
+  TrajVelActRaw,
+  TrajVelCmd,
+  TrajVelCmdRaw,
+} from "@/types/motion.types";
+import type {
+  TrajInfoResponse,
+  TrajInfoResponseRaw,
+  PaginationResult,
+  PaginationResultRaw,
+} from "@/types/pagination.types";
+
+export const transformTrajInfoResult = (
+  bahnenRaw: TrajInfoRaw[],
+): TrajInfo[] => {
+  return bahnenRaw.map(
+    (bahn): TrajInfo => ({
+      trajID: bahn.traj_id,
+      robotModel: bahn.robot_model,
+      pathPlanning: bahn.path_planning,
+      recordingDate: bahn.recording_date,
+      startTime: bahn.start_time,
+      endTime: bahn.end_time,
+      sourceDataAct: bahn.source_data_act,
+      sourceDataCmd: bahn.source_data_cmd,
+      recordFilename: bahn.record_filename,
+      numberSetpoints: bahn.number_setpoints,
+      frequencyPoseAct: bahn.freq_pose_act,
+      frequencyPositionCmd: bahn.freq_position_cmd,
+      frequencyOrientationCmd: bahn.freq_orientation_cmd,
+      frequencyVelAct: bahn.freq_vel_act,
+      frequencyVelCmd: bahn.freq_vel_cmd,
+      frequencyAccelAct: bahn.freq_accel_act,
+      frequencyJointStates: bahn.freq_joint_states,
+      calibrationRun: bahn.calibration_run,
+      numberPointsPoseAct: bahn.number_pose_act,
+      numberPointsVelAct: bahn.number_vel_act,
+      numberPointsAccelAct: bahn.number_accel_act,
+      numberPointsPosCmd: bahn.number_position_cmd,
+      numberPointsOrientCmd: bahn.number_orientation_cmd,
+      numberPointsVelCmd: bahn.number_vel_cmd,
+      numberPointsJointStates: bahn.number_joint_states,
+      weight: bahn.weight,
+      numberPointsAccelCmd: bahn.number_accel_cmd,
+      frequencyAccelCmd: bahn.freq_accel_cmd,
+      settedVelocity: bahn.setted_velocity,
+        transfMatrix: bahn.transformation_matrix,
+      stopPoint: bahn.stop_point,
+      waitTime: bahn.wait_time,
+    }),
+  );
+};
+
+export const transformTrajInfobyIDResult = (
+  bahnRaw: TrajInfoRaw,
+): TrajInfo => ({
+  trajID: bahnRaw.traj_id,
+  robotModel: bahnRaw.robot_model,
+  pathPlanning: bahnRaw.path_planning,
+  recordingDate: bahnRaw.recording_date,
+  startTime: bahnRaw.start_time,
+  endTime: bahnRaw.end_time,
+  sourceDataAct: bahnRaw.source_data_act,
+  sourceDataCmd: bahnRaw.source_data_cmd,
+  recordFilename: bahnRaw.record_filename,
+  numberSetpoints: bahnRaw.number_setpoints,
+  frequencyPoseAct: bahnRaw.freq_pose_act,
+  frequencyPositionCmd: bahnRaw.freq_position_cmd,
+  frequencyOrientationCmd: bahnRaw.freq_orientation_cmd,
+  frequencyVelAct: bahnRaw.freq_vel_act,
+  frequencyVelCmd: bahnRaw.freq_vel_cmd,
+  frequencyAccelAct: bahnRaw.freq_accel_act,
+  frequencyJointStates: bahnRaw.freq_joint_states,
+  calibrationRun: bahnRaw.calibration_run,
+  numberPointsPoseAct: bahnRaw.number_pose_act,
+  numberPointsVelAct: bahnRaw.number_vel_act,
+  numberPointsAccelAct: bahnRaw.number_accel_act,
+  numberPointsPosCmd: bahnRaw.number_position_cmd,
+  numberPointsOrientCmd: bahnRaw.number_orientation_cmd,
+  numberPointsVelCmd: bahnRaw.number_vel_cmd,
+  numberPointsJointStates: bahnRaw.number_joint_states,
+  weight: bahnRaw.weight,
+  numberPointsAccelCmd: bahnRaw.number_accel_cmd,
+  frequencyAccelCmd: bahnRaw.freq_accel_cmd,
+  settedVelocity: bahnRaw.setted_velocity,
+  stopPoint: bahnRaw.stop_point,
+  waitTime: bahnRaw.wait_time,
+    transfMatrix: bahnRaw.transformation_matrix,
+});
+
+export const transformTrajPoseActResult = (
+  bahnenPoseActRaw: TrajPoseActRaw[],
+): TrajPoseAct[] => {
+  return bahnenPoseActRaw.map(
+    (bahn): TrajPoseAct => ({
+      bahnID: bahn.traj_id,
+      segmentID: bahn.seg_id,
+      timestamp: bahn.timestamp,
+      xAct: bahn.x_raw_act,
+      yAct: bahn.y_raw_act,
+      zAct: bahn.z_raw_act,
+      qxAct: bahn.qx_raw_act,
+      qyAct: bahn.qy_raw_act,
+      qzAct: bahn.qz_raw_act,
+      qwAct: bahn.qw_raw_act,
+      sourceDataAct: bahn.source_data_raw_act,
+    }),
+  );
+};
+
+export const transformPaginationResult = (
+  paginationRaw: PaginationResultRaw,
+): PaginationResult => {
+  return {
+    total: paginationRaw.total,
+    page: paginationRaw.page,
+    pageSize: paginationRaw.page_size,
+    totalPages: paginationRaw.total_pages,
+    hasNext: paginationRaw.has_next,
+    hasPrevious: paginationRaw.has_previous,
+  };
+};
+// Transformiere die gesamte API-Antwort
+export const transformTrajInfoResponse = (
+  response: TrajInfoResponseRaw,
+): TrajInfoResponse => {
+  return {
+    trajInfo: transformTrajInfoResult(response.traj_info),
+    pagination: transformPaginationResult(response.pagination),
+  };
+};
+
+export const transformTrajPoseTransResult = (
+  bahnenPoseTransRaw: TrajPoseTransRaw[],
+): TrajPoseTrans[] => {
+  return bahnenPoseTransRaw.map(
+    (bahn): TrajPoseTrans => ({
+      bahnID: bahn.traj_id,
+      segmentID: bahn.seg_id,
+      timestamp: bahn.timestamp,
+      xTrans: bahn.x_act,
+      yTrans: bahn.y_act,
+      zTrans: bahn.z_act,
+      qxTrans: bahn.qx_act,
+      qyTrans: bahn.qy_act,
+      qzTrans: bahn.qz_act,
+      qwTrans: bahn.qw_act,
+      calibrationID: bahn.calibration_id,
+    }),
+  );
+};
+
+export const transformTrajVelActResult = (
+  bahnenVelActRaw: TrajVelActRaw[],
+): TrajVelAct[] => {
+  return bahnenVelActRaw.map(
+    (bahn): TrajVelAct => ({
+      trajID: bahn.traj_id,
+      segID: bahn.seg_id,
+      timestamp: bahn.timestamp,
+      tcpSpeedAct: bahn.tcp_vel_act,
+    }),
+  );
+};
+
+export const transformTrajAccelActResult = (
+  bahnenAccelActRaw: TrajAccelActRaw[],
+): TrajAccelAct[] => {
+  return bahnenAccelActRaw.map(
+    (bahn): TrajAccelAct => ({
+      trajID: bahn.traj_id,
+      segID: bahn.seg_id,
+      timestamp: bahn.timestamp,
+      tcpAccelAct: bahn.tcp_accel_act,
+    }),
+  );
+};
+
+export const transformTrajAccelCmdResult = (
+  bahnenAccelCmdRaw: TrajAccelCmdRaw[],
+): TrajAccelCmd[] => {
+  return bahnenAccelCmdRaw.map(
+    (bahn): TrajAccelCmd => ({
+      trajID: bahn.traj_id,
+      segID: bahn.seg_id,
+      timestamp: bahn.timestamp,
+      tcpAccelCmd: bahn.tcp_accel_cmd,
+    }),
+  );
+};
+
+export const transformTrajPositionCmdResult = (
+  bahnenPositionCmdRaw: TrajPositionCmdRaw[],
+): TrajPositionCmd[] => {
+  return bahnenPositionCmdRaw.map(
+    (bahn): TrajPositionCmd => ({
+      trajID: bahn.traj_id,
+      segID: bahn.seg_id,
+      timestamp: bahn.timestamp,
+      xCmd: bahn.x_cmd,
+      yCmd: bahn.y_cmd,
+      zCmd: bahn.z_cmd,
+      sourceDataCmd: bahn.source_data_cmd,
+    }),
+  );
+};
+
+export const transformTrajOrientationCmdResult = (
+  bahnenOrientationCmdRaw: TrajOrientationCmdRaw[],
+): TrajOrientationCmd[] => {
+  return bahnenOrientationCmdRaw.map(
+    (bahn): TrajOrientationCmd => ({
+      trajID: bahn.traj_id,
+      segID: bahn.seg_id,
+      timestamp: bahn.timestamp,
+      qxCmd: bahn.qx_cmd,
+      qyCmd: bahn.qy_cmd,
+      qzCmd: bahn.qz_cmd,
+      qwCmd: bahn.qw_cmd,
+      sourceDataCmd: bahn.source_data_cmd,
+    }),
+  );
+};
+
+export const transformTrajVelCmdResult = (
+  bahnenVelCmdRaw: TrajVelCmdRaw[],
+): TrajVelCmd[] => {
+  return bahnenVelCmdRaw.map(
+    (bahn): TrajVelCmd => ({
+      trajID: bahn.traj_id,
+      segID: bahn.seg_id,
+      timestamp: bahn.timestamp,
+      tcpSpeedCmd: bahn.tcp_vel_cmd,
+      sourceDataCmd: bahn.source_data_cmd,
+    }),
+  );
+};
+
+export const transformTrajJointStatesResult = (
+  bahnJointStatesRaw: TrajJointStatesRaw[],
+): TrajJointStates[] => {
+  return bahnJointStatesRaw.map(
+    (bahn): TrajJointStates => ({
+      trajID: bahn.traj_id,
+      segID: bahn.seg_id,
+      timestamp: bahn.timestamp,
+      joint1: bahn.joint_1,
+      joint2: bahn.joint_2,
+      joint3: bahn.joint_3,
+      joint4: bahn.joint_4,
+      joint5: bahn.joint_5,
+      joint6: bahn.joint_6,
+      sourceDataCmd: bahn.source_data_cmd,
+    }),
+  );
+};
+
+export const transformTrajSetpointsResult = (
+  trajSetpointsRaw: TrajSetpointsRaw[],
+): TrajSetpoints[] => {
+  return trajSetpointsRaw.map(
+    (event): TrajSetpoints => ({
+      trajID: event.traj_id,
+      segID: event.seg_id,
+      timestamp: event.timestamp,
+      xReached: event.x_reached,
+      yReached: event.y_reached,
+      zReached: event.z_reached,
+      qxReached: event.qx_reached,
+      qyReached: event.qy_reached,
+      qzReached: event.qz_reached,
+      qwReached: event.qw_reached,
+      sourceDataCmd: event.source_data_cmd,
+    }),
+  );
+};

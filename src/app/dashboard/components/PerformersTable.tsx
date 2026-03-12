@@ -49,13 +49,13 @@ export function PerformersTable({
               </tr>
             ) : (
               data.map((performer) => (
-                <tr key={performer.bahn_id} className="hover:bg-gray-50">
+                <tr key={performer.traj_id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <Link
-                      href={`/bewegungsdaten/${performer.bahn_id}`}
+                      href={`/motion/${performer.traj_id}`}
                       className="font-medium text-blue-600 hover:underline"
                     >
-                      {performer.bahn_id}
+                      {performer.traj_id}
                     </Link>
                   </td>
                   <td className={`px-4 py-3 font-semibold ${colorClass}`}>

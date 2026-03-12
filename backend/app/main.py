@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.endpoints import similarity_search_route_handler
-from .api.endpoints import bahn_route_handler, auswertung_route_handler, vergleich_route_handler, hochladen_route_handler, search_route_handler
+from .api.endpoints import traj_route_handler, evaluation_route_handler, vergleich_route_handler, hochladen_route_handler, search_route_handler
 from .database import init_db
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
@@ -43,9 +43,9 @@ app.add_middleware(
 )
 
 # Include the router for Bahn-related endpoints
-app.include_router(bahn_route_handler.router, prefix="/api/bahn", tags=["bahn"])
-app.include_router(hochladen_route_handler.router, prefix="/api/hochladen", tags=["hochladen"])
-app.include_router(auswertung_route_handler.router, prefix="/api/auswertung", tags=["auswertung"])
+app.include_router(traj_route_handler.router, prefix="/api/traj", tags=["traj"])
+app.include_router(hochladen_route_handler.router, prefix="/api/upload", tags=["upload"])
+app.include_router(evaluation_route_handler.router, prefix="/api/evaluation", tags=["eval"])
 app.include_router(vergleich_route_handler.router, prefix="/api/vergleich", tags=["vergleich"])
 app.include_router(search_route_handler.router, prefix="/api/search", tags=["search"])
 app.include_router(similarity_search_route_handler.router, prefix="/api/two-stage", tags=["two-stage"])

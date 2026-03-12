@@ -70,7 +70,7 @@ class MetadataCalculatorService:
 
             query = """
                     SELECT bahn_id
-                    FROM robotervermessung.bewegungsdaten.bahn_info
+                    FROM robotervermessung.motion.bahn_info
                     WHERE LEFT (recording_date \
                         , 10) BETWEEN $1 \
                       AND $2
@@ -91,8 +91,8 @@ class MetadataCalculatorService:
             # Bahnen ohne Metadaten
             metadata_query = """
                 SELECT DISTINCT bi.bahn_id
-                FROM robotervermessung.bewegungsdaten.bahn_info bi
-                LEFT JOIN robotervermessung.bewegungsdaten.bahn_metadata bm
+                FROM robotervermessung.motion.bahn_info bi
+                LEFT JOIN robotervermessung.motion.bahn_metadata bm
                     ON bi.bahn_id = bm.bahn_id AND bi.bahn_id = bm.segment_id
                 WHERE bm.segment_id IS NULL 
                 AND bi.source_data_ist = 'leica_at960'
@@ -104,8 +104,8 @@ class MetadataCalculatorService:
             # Bahnen ohne Embeddings (aber MIT Metadaten!)
             embedding_query = """
                 SELECT DISTINCT bm.bahn_id
-                FROM robotervermessung.bewegungsdaten.bahn_metadata bm
-                LEFT JOIN robotervermessung.bewegungsdaten.bahn_embeddings be
+                FROM robotervermessung.motion.bahn_metadata bm
+                LEFT JOIN robotervermessung.motion.bahn_embeddings be
                     ON bm.bahn_id = be.bahn_id AND bm.segment_id = be.segment_id
                 WHERE be.segment_id IS NULL
                 AND bm.bahn_id = bm.segment_id
@@ -124,7 +124,7 @@ class MetadataCalculatorService:
         async with self.db_pool.acquire() as conn:
             query = """
                     SELECT DISTINCT bahn_id
-                    FROM robotervermessung.bewegungsdaten.bahn_metadata
+                    FROM robotervermessung.motion.bahn_metadata
                     WHERE bahn_id = ANY ($1::text[]) \
                     """
             rows = await conn.fetch(query, bahn_ids)
@@ -138,7 +138,7 @@ class MetadataCalculatorService:
         async with self.db_pool.acquire() as conn:
             query = """
                     DELETE \
-                    FROM robotervermessung.bewegungsdaten.bahn_metadata
+                    FROM robotervermessung.motion.bahn_metadata
                     WHERE bahn_id = ANY ($1::text[]) \
                     """
             result = await conn.execute(query, bahn_ids)
@@ -152,7 +152,7 @@ class MetadataCalculatorService:
         async with self.db_pool.acquire() as conn:
             query = """
                     DELETE \
-                    FROM robotervermessung.bewegungsdaten.bahn_embeddings
+                    FROM robotervermessung.motion.bahn_embeddings
                     WHERE bahn_id = ANY ($1::text[]) \
                     """
             result = await conn.execute(query, bahn_ids)
@@ -198,7 +198,7 @@ class MetadataCalculatorService:
         """
         bahn_info_query = """
                           SELECT weight, start_time, end_time
-                          FROM robotervermessung.bewegungsdaten.bahn_info
+                          FROM robotervermessung.motion.bahn_info
                           WHERE bahn_id = $1 \
                           """
         bahn_info = await conn.fetchrow(bahn_info_query, bahn_id)
@@ -214,7 +214,7 @@ class MetadataCalculatorService:
                 array_agg(timestamp ORDER BY timestamp) as timestamps,  -- ✅ NEU
                 MIN(timestamp) as min_timestamp,
                 MAX(timestamp) as max_timestamp
-            FROM robotervermessung.bewegungsdaten.bahn_position_soll
+            FROM robotervermessung.motion.bahn_position_soll
             WHERE bahn_id = $1
             GROUP BY segment_id
             ORDER BY segment_id
@@ -226,7 +226,7 @@ class MetadataCalculatorService:
                 SELECT segment_id,
                        joint_1, joint_2, joint_3, joint_4, joint_5, joint_6,
                        ROW_NUMBER() OVER (PARTITION BY segment_id ORDER BY timestamp) as rn
-                FROM robotervermessung.bewegungsdaten.bahn_joint_states
+                FROM robotervermessung.motion.bahn_joint_states
                 WHERE bahn_id = $1
             )
             SELECT segment_id,
@@ -245,7 +245,7 @@ class MetadataCalculatorService:
             WITH numbered AS (
                 SELECT segment_id, qw_soll, qx_soll, qy_soll, qz_soll,
                        ROW_NUMBER() OVER (PARTITION BY segment_id ORDER BY timestamp) as rn
-                FROM robotervermessung.bewegungsdaten.bahn_orientation_soll
+                FROM robotervermessung.motion.bahn_orientation_soll
                 WHERE bahn_id = $1
             )
             SELECT segment_id,
@@ -264,7 +264,7 @@ class MetadataCalculatorService:
                 SELECT segment_id,
                        tcp_speed_ist,
                        ROW_NUMBER() OVER (PARTITION BY segment_id ORDER BY timestamp) as rn
-                FROM robotervermessung.bewegungsdaten.bahn_twist_ist
+                FROM robotervermessung.motion.bahn_twist_ist
                 WHERE bahn_id = $1
             )
             SELECT segment_id,
@@ -280,7 +280,7 @@ class MetadataCalculatorService:
                 SELECT segment_id,
                        tcp_accel_soll,
                        ROW_NUMBER() OVER (PARTITION BY segment_id ORDER BY timestamp) as rn
-                FROM robotervermessung.bewegungsdaten.bahn_accel_soll
+                FROM robotervermessung.motion.bahn_accel_soll
                 WHERE bahn_id = $1
             )
             SELECT segment_id,
@@ -725,7 +725,7 @@ class MetadataCalculatorService:
                 median_twist_ist, std_twist_ist,
                 min_acceleration_ist, max_acceleration_ist, mean_acceleration_ist,
                 median_acceleration_ist, std_acceleration_ist
-            FROM robotervermessung.bewegungsdaten.bahn_metadata
+            FROM robotervermessung.motion.bahn_metadata
             WHERE bahn_id = $1
             ORDER BY segment_id
         """
@@ -762,7 +762,7 @@ class MetadataCalculatorService:
             'bahn_metadata',
             records=records,
             columns=columns,
-            schema_name='bewegungsdaten'
+            schema_name='motion'
         )
 
         logger.info(f"✓ Wrote {len(records)} metadata rows to bahn_metadata")
@@ -850,7 +850,7 @@ class MetadataCalculatorService:
         )
 
         await conn.execute("""
-                        INSERT INTO bewegungsdaten.bahn_embeddings
+                        INSERT INTO motion.bahn_embeddings
                         (segment_id, bahn_id, joint_embedding, position_embedding, orientation_embedding,
                         velocity_embedding, metadata_embedding)
                         SELECT segment_id,
@@ -886,7 +886,7 @@ class MetadataCalculatorService:
         async with self.db_pool.acquire() as conn:
             query = """
                 SELECT DISTINCT bahn_id
-                FROM robotervermessung.bewegungsdaten.bahn_embeddings
+                FROM robotervermessung.motion.bahn_embeddings
                 WHERE bahn_id = ANY($1::text[])
                 AND segment_id = bahn_id
             """

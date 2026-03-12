@@ -10,68 +10,68 @@ import React, {
   useState,
 } from 'react';
 
-import { getBahnInfo } from '@/src/actions/bewegungsdaten.service';
+import { getTrajInfo } from '@/src/actions/motion.service';
 import type {
-  BahnAccelIst,
-  BahnAccelSoll,
-  BahnEvents,
-  BahnInfo,
-  BahnJointStates,
-  BahnOrientationSoll,
-  BahnPoseIst,
-  BahnPoseTrans,
-  BahnPositionSoll,
-  BahnTwistIst,
-  BahnTwistSoll,
-} from '@/types/bewegungsdaten.types';
+  TrajAccelAct,
+  TrajAccelCmd,
+  TrajSetpoints,
+  TrajInfo,
+  TrajJointStates,
+  TrajOrientationCmd,
+  TrajPoseAct,
+  TrajPoseTrans,
+  TrajPositionCmd,
+  TrajVelAct,
+  TrajVelCmd,
+} from '@/types/motion.types';
 import type { PaginationResult } from '@/types/pagination.types';
 
 export interface TrajectoryState {
-  bahnInfo: BahnInfo[];
+  bahnInfo: TrajInfo[];
   pagination: PaginationResult | null;
   currentPage: number;
   loadPage: (page: number) => Promise<void>;
   nextPage: () => Promise<void>;
   prevPage: () => Promise<void>;
-  currentBahnInfo: BahnInfo | null;
-  setCurrentBahnInfo: React.Dispatch<React.SetStateAction<BahnInfo | null>>;
-  currentBahnPoseIst: BahnPoseIst[];
-  setCurrentBahnPoseIst: React.Dispatch<React.SetStateAction<BahnPoseIst[]>>;
-  currentBahnTwistIst: BahnTwistIst[];
-  setCurrentBahnTwistIst: React.Dispatch<React.SetStateAction<BahnTwistIst[]>>;
-  currentBahnAccelIst: BahnAccelIst[];
-  setCurrentBahnAccelIst: React.Dispatch<React.SetStateAction<BahnAccelIst[]>>;
-  currentBahnAccelSoll: BahnAccelSoll[];
-  setCurrentBahnAccelSoll: React.Dispatch<
-    React.SetStateAction<BahnAccelSoll[]>
+  currentTrajInfo: TrajInfo | null;
+  setCurrentTrajInfo: React.Dispatch<React.SetStateAction<TrajInfo | null>>;
+  currentTrajPoseAct: TrajPoseAct[];
+  setCurrentTrajPoseAct: React.Dispatch<React.SetStateAction<TrajPoseAct[]>>;
+  currentTrajVelAct: TrajVelAct[];
+  setCurrentTrajVelAct: React.Dispatch<React.SetStateAction<TrajVelAct[]>>;
+  currentTrajAccelAct: TrajAccelAct[];
+  setCurrentTrajAccelAct: React.Dispatch<React.SetStateAction<TrajAccelAct[]>>;
+  currentTrajAccelCmd: TrajAccelCmd[];
+  setCurrentTrajAccelCmd: React.Dispatch<
+    React.SetStateAction<TrajAccelCmd[]>
   >;
-  currentBahnPositionSoll: BahnPositionSoll[];
-  setCurrentBahnPositionSoll: React.Dispatch<
-    React.SetStateAction<BahnPositionSoll[]>
+  currentTrajPositionCmd: TrajPositionCmd[];
+  setCurrentTrajPositionCmd: React.Dispatch<
+    React.SetStateAction<TrajPositionCmd[]>
   >;
-  currentBahnOrientationSoll: BahnOrientationSoll[];
-  setCurrentBahnOrientationSoll: React.Dispatch<
-    React.SetStateAction<BahnOrientationSoll[]>
+  currentTrajOrientationCmd: TrajOrientationCmd[];
+  setCurrentTrajOrientationCmd: React.Dispatch<
+    React.SetStateAction<TrajOrientationCmd[]>
   >;
-  currentBahnTwistSoll: BahnTwistSoll[];
-  setCurrentBahnTwistSoll: React.Dispatch<
-    React.SetStateAction<BahnTwistSoll[]>
+  currentTrajVelCmd: TrajVelCmd[];
+  setCurrentTrajVelCmd: React.Dispatch<
+    React.SetStateAction<TrajVelCmd[]>
   >;
-  currentBahnJointStates: BahnJointStates[];
-  setCurrentBahnJointStates: React.Dispatch<
-    React.SetStateAction<BahnJointStates[]>
+  currentTrajJointStates: TrajJointStates[];
+  setCurrentTrajJointStates: React.Dispatch<
+    React.SetStateAction<TrajJointStates[]>
   >;
-  currentBahnEvents: BahnEvents[];
-  setCurrentBahnEvents: React.Dispatch<React.SetStateAction<BahnEvents[]>>;
-  currentBahnPoseTrans: BahnPoseTrans[];
-  setCurrentBahnPoseTrans: React.Dispatch<
-    React.SetStateAction<BahnPoseTrans[]>
+  currentTrajSetpoints: TrajSetpoints[];
+  setCurrentTrajSetpoints: React.Dispatch<React.SetStateAction<TrajSetpoints[]>>;
+  currentTrajPoseTrans: TrajPoseTrans[];
+  setCurrentTrajPoseTrans: React.Dispatch<
+    React.SetStateAction<TrajPoseTrans[]>
   >;
 }
 
 type TrajectoryProviderProps = {
   children: ReactNode;
-  initialBahnInfo: BahnInfo[];
+  initialTrajInfo: TrajInfo[];
   initialPagination: PaginationResult;
 };
 
@@ -79,48 +79,48 @@ const TrajectoryContext = createContext<TrajectoryState>({} as TrajectoryState);
 
 export const TrajectoryProvider = ({
   children,
-  initialBahnInfo,
+  initialTrajInfo,
   initialPagination,
 }: TrajectoryProviderProps) => {
-  const [bahnInfo, setBahnInfo] = useState<BahnInfo[]>(initialBahnInfo);
+  const [bahnInfo, setTrajInfo] = useState<TrajInfo[]>(initialTrajInfo);
   const [pagination, setPagination] = useState<PaginationResult | null>(
     initialPagination,
   );
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [currentBahnInfo, setCurrentBahnInfo] = useState<BahnInfo | null>(null);
-  const [currentBahnPoseIst, setCurrentBahnPoseIst] = useState<BahnPoseIst[]>(
+  const [currentTrajInfo, setCurrentTrajInfo] = useState<TrajInfo | null>(null);
+  const [currentTrajPoseAct, setCurrentTrajPoseAct] = useState<TrajPoseAct[]>(
     [],
   );
-  const [currentBahnTwistIst, setCurrentBahnTwistIst] = useState<
-    BahnTwistIst[]
+  const [currentTrajVelAct, setCurrentTrajVelAct] = useState<
+    TrajVelAct[]
   >([]);
-  const [currentBahnAccelIst, setCurrentBahnAccelIst] = useState<
-    BahnAccelIst[]
+  const [currentTrajAccelAct, setCurrentTrajAccelAct] = useState<
+    TrajAccelAct[]
   >([]);
-  const [currentBahnAccelSoll, setCurrentBahnAccelSoll] = useState<
-    BahnAccelSoll[]
+  const [currentTrajAccelCmd, setCurrentTrajAccelCmd] = useState<
+    TrajAccelCmd[]
   >([]);
-  const [currentBahnPositionSoll, setCurrentBahnPositionSoll] = useState<
-    BahnPositionSoll[]
+  const [currentTrajPositionCmd, setCurrentTrajPositionCmd] = useState<
+    TrajPositionCmd[]
   >([]);
-  const [currentBahnOrientationSoll, setCurrentBahnOrientationSoll] = useState<
-    BahnOrientationSoll[]
+  const [currentTrajOrientationCmd, setCurrentTrajOrientationCmd] = useState<
+    TrajOrientationCmd[]
   >([]);
-  const [currentBahnTwistSoll, setCurrentBahnTwistSoll] = useState<
-    BahnTwistSoll[]
+  const [currentTrajVelCmd, setCurrentTrajVelCmd] = useState<
+    TrajVelCmd[]
   >([]);
-  const [currentBahnJointStates, setCurrentBahnJointStates] = useState<
-    BahnJointStates[]
+  const [currentTrajJointStates, setCurrentTrajJointStates] = useState<
+    TrajJointStates[]
   >([]);
-  const [currentBahnEvents, setCurrentBahnEvents] = useState<BahnEvents[]>([]);
-  const [currentBahnPoseTrans, setCurrentBahnPoseTrans] = useState<
-    BahnPoseTrans[]
+  const [currentTrajSetpoints, setCurrentTrajSetpoints] = useState<TrajSetpoints[]>([]);
+  const [currentTrajPoseTrans, setCurrentTrajPoseTrans] = useState<
+    TrajPoseTrans[]
   >([]);
 
   useEffect(() => {
-    setBahnInfo(initialBahnInfo);
+    setTrajInfo(initialTrajInfo);
     setPagination(initialPagination);
-  }, [initialBahnInfo, initialPagination]);
+  }, [initialTrajInfo, initialPagination]);
 
   // Funktion zum Laden einer bestimmten Seite - mit useCallback
   const loadPage = useCallback(
@@ -130,13 +130,13 @@ export const TrajectoryProvider = ({
       }
 
       try {
-        const { bahnInfo: newBahnInfo, pagination: newPagination } =
-          await getBahnInfo({
+        const { bahnInfo: newTrajInfo, pagination: newPagination } =
+          await getTrajInfo({
             page,
             pageSize: pagination.pageSize,
           });
 
-        setBahnInfo(newBahnInfo);
+        setTrajInfo(newTrajInfo);
         setPagination(newPagination);
         setCurrentPage(page);
       } catch (error) {
@@ -168,28 +168,28 @@ export const TrajectoryProvider = ({
       loadPage,
       nextPage,
       prevPage,
-      currentBahnInfo,
-      setCurrentBahnInfo,
-      currentBahnPoseIst,
-      setCurrentBahnPoseIst,
-      currentBahnTwistIst,
-      setCurrentBahnTwistIst,
-      currentBahnAccelIst,
-      setCurrentBahnAccelIst,
-      currentBahnAccelSoll,
-      setCurrentBahnAccelSoll,
-      currentBahnPositionSoll,
-      setCurrentBahnPositionSoll,
-      currentBahnOrientationSoll,
-      setCurrentBahnOrientationSoll,
-      currentBahnTwistSoll,
-      setCurrentBahnTwistSoll,
-      currentBahnJointStates,
-      setCurrentBahnJointStates,
-      currentBahnEvents,
-      setCurrentBahnEvents,
-      currentBahnPoseTrans,
-      setCurrentBahnPoseTrans,
+      currentTrajInfo,
+      setCurrentTrajInfo,
+      currentTrajPoseAct,
+      setCurrentTrajPoseAct,
+      currentTrajVelAct,
+      setCurrentTrajVelAct,
+      currentTrajAccelAct,
+      setCurrentTrajAccelAct,
+      currentTrajAccelCmd,
+      setCurrentTrajAccelCmd,
+      currentTrajPositionCmd,
+      setCurrentTrajPositionCmd,
+      currentTrajOrientationCmd,
+      setCurrentTrajOrientationCmd,
+      currentTrajVelCmd,
+      setCurrentTrajVelCmd,
+      currentTrajJointStates,
+      setCurrentTrajJointStates,
+      currentTrajSetpoints,
+      setCurrentTrajSetpoints,
+      currentTrajPoseTrans,
+      setCurrentTrajPoseTrans,
     }),
     [
       bahnInfo,
@@ -198,17 +198,17 @@ export const TrajectoryProvider = ({
       loadPage,
       nextPage,
       prevPage,
-      currentBahnInfo,
-      currentBahnPoseIst,
-      currentBahnTwistIst,
-      currentBahnAccelIst,
-      currentBahnAccelSoll,
-      currentBahnPositionSoll,
-      currentBahnOrientationSoll,
-      currentBahnTwistSoll,
-      currentBahnJointStates,
-      currentBahnEvents,
-      currentBahnPoseTrans,
+      currentTrajInfo,
+      currentTrajPoseAct,
+      currentTrajVelAct,
+      currentTrajAccelAct,
+      currentTrajAccelCmd,
+      currentTrajPositionCmd,
+      currentTrajOrientationCmd,
+      currentTrajVelCmd,
+      currentTrajJointStates,
+      currentTrajSetpoints,
+      currentTrajPoseTrans,
     ],
   );
 

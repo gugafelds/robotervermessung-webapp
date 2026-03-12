@@ -1,10 +1,10 @@
 // types/pagination.types.ts
 
 import type {
-  AuswertungBahnIDs,
-  AuswertungInfo,
-} from '@/types/auswertung.types';
-import type { BahnInfo, BahnInfoRaw } from '@/types/bewegungsdaten.types';
+  EvaluationTrajIDs,
+  EvaluationInfo,
+} from '@/types/evaluation.types';
+import type { TrajInfo, TrajInfoRaw } from '@/types/motion.types';
 
 export interface PaginationParams {
   page?: number;
@@ -20,13 +20,13 @@ export interface PaginationResultRaw {
   has_previous: boolean;
 }
 
-export interface BahnInfoResponseRaw {
-  bahn_info: BahnInfoRaw[];
+export interface TrajInfoResponseRaw {
+  traj_info: TrajInfoRaw[];
   pagination: PaginationResultRaw;
 }
 
-export interface BahnInfoResponse {
-  bahnInfo: BahnInfo[];
+export interface TrajInfoResponse {
+  trajInfo: TrajInfo[];
   pagination: PaginationResult;
 }
 
@@ -39,8 +39,8 @@ export interface PaginationResult {
   hasPrevious: boolean;
 }
 
-export interface AuswertungInfoResponse {
-  auswertungInfo: AuswertungInfo;
+export interface EvaluationInfoResponse {
+  evaluationInfo: EvaluationInfo;
   pagination: {
     total: number;
     page: number;
@@ -51,8 +51,8 @@ export interface AuswertungInfoResponse {
   };
 }
 
-export interface AuswertungIDsResponse {
-  auswertungBahnIDs: AuswertungBahnIDs;
+export interface EvaluationIDsResponse {
+  evaluationTrajIDs: EvaluationTrajIDs;
   pagination: {
     total: number;
     page: number;

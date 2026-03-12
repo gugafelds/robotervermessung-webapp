@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 
 import { SimilarityService } from '@/src/actions/vergleich.service';
-import type { BahnInfo } from '@/types/bewegungsdaten.types';
+import type { BahnInfo } from '@/types/motion.types';
 import type {
   SegmentGroup,
   SimilarityResult,
