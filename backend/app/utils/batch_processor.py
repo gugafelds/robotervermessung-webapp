@@ -20,8 +20,8 @@ class BatchProcessor:
             files_and_paths,
             robot_model,
             bahnplanung,
-            source_data_ist,
-            source_data_soll,
+            source_data_act,
+            source_data_cmd,
             upload_database,
             segmentation_method,
             num_segments,
@@ -49,8 +49,8 @@ class BatchProcessor:
                 processed_data_list = csv_processor.process_csv(
                     robot_model,
                     bahnplanung,
-                    source_data_ist,
-                    source_data_soll,
+                    source_data_act,
+                    source_data_cmd,
                     file_info['filename'],
                     segmentation_method,
                     num_segments,
@@ -99,145 +99,145 @@ class BatchProcessor:
                 close_conn = True
 
             try:
-                # Collect data by type and extract all bahn_ids
-                bahn_info_data = []
+                # Collect data by type and extract all traj_ids
+                traj_info_data = []
                 pose_data = []
-                position_soll_data = []
-                orientation_soll_data = []
-                twist_ist_data = []
-                twist_soll_data = []
-                accel_ist_data = []
-                accel_soll_data = []
-                rapid_events_data = []
+                position_cmd_data = []
+                orientation_cmd_data = []
+                vel_act_data = []
+                vel_cmd_data = []
+                accel_act_data = []
+                accel_cmd_data = []
+                rapid_setpoints_data = []
                 joint_data = []
                 transf_data = []
 
-                all_bahn_ids = []
+                all_traj_ids = []
 
-                # Group all data by type and collect bahn_ids
+                # Group all data by type and collect traj_ids
                 for data_set in all_processed_data:
-                    bahn_id = data_set['bahn_info_data'][0]
-                    all_bahn_ids.append(bahn_id)
+                    traj_id = data_set['traj_info_data'][0]
+                    all_traj_ids.append(traj_id)
 
-                    bahn_info_data.append(data_set['bahn_info_data'])
+                    traj_info_data.append(data_set['traj_info_data'])
                     pose_data.extend(data_set.get('POSE_MAPPING', []))
-                    position_soll_data.extend(data_set.get('POSITION_SOLL_MAPPING', []))
-                    orientation_soll_data.extend(data_set.get('ORIENTATION_SOLL_MAPPING', []))
-                    twist_ist_data.extend(data_set.get('TWIST_IST_MAPPING', []))
-                    twist_soll_data.extend(data_set.get('TWIST_SOLL_MAPPING', []))
-                    accel_ist_data.extend(data_set.get('ACCEL_IST_MAPPING', []))
-                    accel_soll_data.extend(data_set.get('ACCEL_SOLL_MAPPING', []))
-                    rapid_events_data.extend(data_set.get('RAPID_EVENTS_MAPPING', []))
+                    position_cmd_data.extend(data_set.get('POSITION_CMD_MAPPING', []))
+                    orientation_cmd_data.extend(data_set.get('ORIENTATION_CMD_MAPPING', []))
+                    vel_act_data.extend(data_set.get('vel_ACT_MAPPING', []))
+                    vel_cmd_data.extend(data_set.get('vel_CMD_MAPPING', []))
+                    accel_act_data.extend(data_set.get('ACCEL_ACT_MAPPING', []))
+                    accel_cmd_data.extend(data_set.get('ACCEL_CMD_MAPPING', []))
+                    rapid_setpoints_data.extend(data_set.get('RAPID_setpoints_MAPPING', []))
                     joint_data.extend(data_set.get('JOINT_MAPPING', []))
                     transf_data.extend(data_set.get('TRANSFORM_MAPPING', []))
 
-                # First check which bahn_ids already exist in each table
+                # First check which traj_ids already exist in each table
                 # This avoids checking each record individually
                 tables = [
-                    'bahn_info',
-                    'bahn_pose_ist',
-                    'bahn_position_soll',
-                    'bahn_orientation_soll',
-                    'bahn_twist_ist',
-                    'bahn_twist_soll',
-                    'bahn_accel_ist',
-                    'bahn_accel_soll',
-                    'bahn_events',
-                    'bahn_joint_states',
-                    'bahn_pose_trans',
+                    'traj_info',
+                    'traj_pose_act_raw',
+                    'traj_position_cmd',
+                    'traj_orientation_cmd',
+                    'traj_vel_act',
+                    'traj_vel_cmd',
+                    'traj_accel_act',
+                    'traj_accel_cmd',
+                    'traj_setpoints',
+                    'traj_joint_states',
+                    'traj_pose_act',
                 ]
 
-                existing_bahn_ids = {}
+                existing_traj_ids = {}
                 for table in tables:
-                    # Query for all bahn_ids in this table in one go
+                    # Query for all traj_ids in this table in one go
                     query = f"""
-                    SELECT DISTINCT bahn_id FROM bewegungsdaten.{table} 
-                    WHERE bahn_id = ANY($1::text[])
+                    SELECT DISTINCT traj_id FROM motion.{table} 
+                    WHERE traj_id = ANY($1::text[])
                     """
-                    rows = await conn.fetch(query, all_bahn_ids)
-                    existing_bahn_ids[table] = {row['bahn_id'] for row in rows}
+                    rows = await conn.fetch(query, all_traj_ids)
+                    existing_traj_ids[table] = {row['traj_id'] for row in rows}
 
-                    existing_count = len(existing_bahn_ids[table])
+                    existing_count = len(existing_traj_ids[table])
                     if existing_count > 0:
-                        logger.info(f"Found {existing_count} existing bahn_ids in {table}")
+                        logger.info(f"Found {existing_count} existing traj_ids in {table}")
 
                 # Filter out records that already exist in each table
-                filtered_bahn_info = [
-                    record for record in bahn_info_data
-                    if record[0] not in existing_bahn_ids['bahn_info']
+                filtered_traj_info = [
+                    record for record in traj_info_data
+                    if record[0] not in existing_traj_ids['traj_info']
                 ]
 
                 filtered_pose = [
                     record for record in pose_data
-                    if record[0] not in existing_bahn_ids['bahn_pose_ist']
+                    if record[0] not in existing_traj_ids['traj_pose_act']
                 ]
 
                 filtered_transf = [
                     record for record in transf_data
-                    if record[0] not in existing_bahn_ids['bahn_pose_trans']
+                    if record[0] not in existing_traj_ids['traj_pose_trans']
                 ]
 
-                filtered_position_soll = [
-                    record for record in position_soll_data
-                    if record[0] not in existing_bahn_ids['bahn_position_soll']
+                filtered_position_cmd = [
+                    record for record in position_cmd_data
+                    if record[0] not in existing_traj_ids['traj_position_cmd']
                 ]
 
-                filtered_orientation_soll = [
-                    record for record in orientation_soll_data
-                    if record[0] not in existing_bahn_ids['bahn_orientation_soll']
+                filtered_orientation_cmd = [
+                    record for record in orientation_cmd_data
+                    if record[0] not in existing_traj_ids['traj_orientation_cmd']
                 ]
 
-                filtered_twist_ist = [
-                    record for record in twist_ist_data
-                    if record[0] not in existing_bahn_ids['bahn_twist_ist']
+                filtered_vel_act = [
+                    record for record in vel_act_data
+                    if record[0] not in existing_traj_ids['traj_vel_act']
                 ]
 
-                filtered_twist_soll = [
-                    record for record in twist_soll_data
-                    if record[0] not in existing_bahn_ids['bahn_twist_soll']
+                filtered_vel_cmd = [
+                    record for record in vel_cmd_data
+                    if record[0] not in existing_traj_ids['traj_vel_cmd']
                 ]
 
-                filtered_accel_ist = [
-                    record for record in accel_ist_data
-                    if record[0] not in existing_bahn_ids['bahn_accel_ist']
+                filtered_accel_act = [
+                    record for record in accel_act_data
+                    if record[0] not in existing_traj_ids['traj_accel_act']
                 ]
 
-                filtered_accel_soll = [
-                    record for record in accel_soll_data
-                    if record[0] not in existing_bahn_ids['bahn_accel_soll']
+                filtered_accel_cmd = [
+                    record for record in accel_cmd_data
+                    if record[0] not in existing_traj_ids['traj_accel_cmd']
                 ]
 
-                filtered_events = [
-                    record for record in rapid_events_data
-                    if record[0] not in existing_bahn_ids['bahn_events']
+                filtered_setpoints = [
+                    record for record in rapid_setpoints_data
+                    if record[0] not in existing_traj_ids['traj_setpoints']
                 ]
 
                 filtered_joint = [
                     record for record in joint_data
-                    if record[0] not in existing_bahn_ids['bahn_joint_states']
+                    if record[0] not in existing_traj_ids['traj_joint_states']
                 ]
 
 
                 # Now insert all filtered data in a single transaction
                 try:
                     async with conn.transaction():
-                        # First insert bahn_info (metadata)
-                        if filtered_bahn_info:
+                        # First insert traj_info (metadata)
+                        if filtered_traj_info:
                             columns = [
-                                'bahn_id', 'robot_model', 'bahnplanung', 'recording_date', 'start_time',
-                                'end_time', 'source_data_ist', 'source_data_soll', 'record_filename',
-                                'np_ereignisse', 'frequency_pose_ist', 'frequency_position_soll',
-                                'frequency_orientation_soll', 'frequency_twist_ist', 'frequency_twist_soll',
-                                'frequency_accel_ist', 'frequency_joint_states',
-                                'np_pose_ist', 'np_twist_ist', 'np_accel_ist', 'np_pos_soll', 'np_orient_soll',
-                                'np_twist_soll', 'np_jointstates', 'weight',
+                                'traj_id', 'robot_model', 'bahnplanung', 'recording_date', 'start_time',
+                                'end_time', 'source_data_act', 'source_data_cmd', 'record_filename',
+                                'np_ereignisse', 'frequency_pose_act', 'frequency_position_cmd',
+                                'frequency_orientation_cmd', 'frequency_vel_act', 'frequency_vel_cmd',
+                                'frequency_accel_act', 'frequency_joint_states',
+                                'np_pose_act', 'np_vel_act', 'np_accel_act', 'np_pos_cmd', 'np_orient_cmd',
+                                'np_vel_cmd', 'np_jointstates', 'weight',
                                 'pick_and_place', 'transformation_matrix',
-                                'np_accel_soll', 'frequency_accel_soll', 'setted_velocity', 'stop_point', 'wait_time'
+                                'np_accel_cmd', 'frequency_accel_cmd', 'setted_velocity', 'stop_point', 'wait_time'
                             ]
 
                             # Ensure all records have proper length
                             padded_records = []
-                            for record in filtered_bahn_info:
+                            for record in filtered_traj_info:
                                 if len(record) < 46:
                                     padded_record = list(record)
                                     padded_record.extend([None] * (46 - len(padded_record)))
@@ -245,38 +245,38 @@ class BatchProcessor:
                                 else:
                                     padded_records.append(record)
 
-                            await db_ops.copy_data_to_table(conn, 'bahn_info', padded_records, columns)
-                            logger.info(f"Inserted {len(padded_records)} new bahn_info records in batch")
+                            await db_ops.copy_data_to_table(conn, 'traj_info', padded_records, columns)
+                            logger.info(f"Inserted {len(padded_records)} new traj_info records in batch")
                         else:
-                            logger.info("No new bahn_info records to insert")
+                            logger.info("No new traj_info records to insert")
 
                         # Define data mappings for other tables
                         data_mappings = [
-                            (filtered_pose, 'bahn_pose_ist',
-                             ['bahn_id', 'segment_id', 'timestamp', 'x_ist', 'y_ist', 'z_ist', 'qx_ist', 'qy_ist',
-                              'qz_ist', 'qw_ist', 'source_data_ist']),
-                            (filtered_transf, 'bahn_pose_trans',
-                             ['bahn_id', 'segment_id', 'timestamp', 'x_trans', 'y_trans', 'z_trans', 'qx_trans', 'qy_trans',
+                            (filtered_pose, 'traj_pose_act',
+                             ['traj_id', 'seg_id', 'timestamp', 'x_act', 'y_act', 'z_act', 'qx_act', 'qy_act',
+                              'qz_act', 'qw_act', 'source_data_act']),
+                            (filtered_transf, 'traj_pose_trans',
+                             ['traj_id', 'seg_id', 'timestamp', 'x_trans', 'y_trans', 'z_trans', 'qx_trans', 'qy_trans',
                               'qz_trans', 'qw_trans']),
-                            (filtered_position_soll, 'bahn_position_soll',
-                             ['bahn_id', 'segment_id', 'timestamp', 'x_soll', 'y_soll', 'z_soll', 'source_data_soll']),
-                            (filtered_orientation_soll, 'bahn_orientation_soll',
-                             ['bahn_id', 'segment_id', 'timestamp', 'qx_soll', 'qy_soll', 'qz_soll', 'qw_soll',
-                              'source_data_soll']),
-                            (filtered_twist_ist, 'bahn_twist_ist',
-                             ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_ist']),
-                            (filtered_twist_soll, 'bahn_twist_soll',
-                             ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_soll', 'source_data_soll']),
-                            (filtered_accel_ist, 'bahn_accel_ist',
-                             ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_ist']),
-                            (filtered_accel_soll, 'bahn_accel_soll',
-                             ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_soll']),
-                            (filtered_events, 'bahn_events',
-                             ['bahn_id', 'segment_id', 'timestamp', 'x_reached', 'y_reached', 'z_reached', 'qx_reached',
-                              'qy_reached', 'qz_reached', 'qw_reached', 'source_data_soll', 'movement_type']),
-                            (filtered_joint, 'bahn_joint_states',
-                             ['bahn_id', 'segment_id', 'timestamp', 'joint_1', 'joint_2', 'joint_3', 'joint_4',
-                              'joint_5', 'joint_6', 'source_data_soll']),
+                            (filtered_position_cmd, 'traj_position_cmd',
+                             ['traj_id', 'seg_id', 'timestamp', 'x_cmd', 'y_cmd', 'z_cmd', 'source_data_cmd']),
+                            (filtered_orientation_cmd, 'traj_orientation_cmd',
+                             ['traj_id', 'seg_id', 'timestamp', 'qx_cmd', 'qy_cmd', 'qz_cmd', 'qw_cmd',
+                              'source_data_cmd']),
+                            (filtered_vel_act, 'traj_vel_act',
+                             ['traj_id', 'seg_id', 'timestamp', 'tcp_speed_act']),
+                            (filtered_vel_cmd, 'traj_vel_cmd',
+                             ['traj_id', 'seg_id', 'timestamp', 'tcp_speed_cmd', 'source_data_cmd']),
+                            (filtered_accel_act, 'traj_accel_act',
+                             ['traj_id', 'seg_id', 'timestamp', 'tcp_accel_act']),
+                            (filtered_accel_cmd, 'traj_accel_cmd',
+                             ['traj_id', 'seg_id', 'timestamp', 'tcp_accel_cmd']),
+                            (filtered_setpoints, 'traj_setpoints',
+                             ['traj_id', 'seg_id', 'timestamp', 'x_reached', 'y_reached', 'z_reached', 'qx_reached',
+                              'qy_reached', 'qz_reached', 'qw_reached', 'source_data_cmd', 'movement_type']),
+                            (filtered_joint, 'traj_joint_states',
+                             ['traj_id', 'seg_id', 'timestamp', 'joint_1', 'joint_2', 'joint_3', 'joint_4',
+                              'joint_5', 'joint_6', 'source_data_cmd']),
                         ]
 
                         # Insert each type of data
@@ -312,32 +312,32 @@ class BatchProcessor:
         return file_results
 
     # Die übrigen Methoden bleiben unverändert
-    async def batch_insert_bahn_info(self, db_ops, conn, data_list):
-        """Insert multiple bahn_info records at once"""
+    async def batch_insert_traj_info(self, db_ops, conn, data_list):
+        """Insert multiple traj_info records at once"""
         # Methode bleibt unverändert
         try:
             # Filter out records that already exist
             new_records = []
             for record in data_list:
-                bahn_id = record[0]
-                exists = await db_ops.check_bahn_id_exists(conn, 'bahn_info', bahn_id)
+                traj_id = record[0]
+                exists = await db_ops.check_traj_id_exists(conn, 'traj_info', traj_id)
                 if not exists:
                     new_records.append(record)
 
             if not new_records:
-                logger.info("No new bahn_info records to insert")
+                logger.info("No new traj_info records to insert")
                 return
 
             columns = [
-                'bahn_id', 'robot_model', 'bahnplanung', 'recording_date', 'start_time',
-                'end_time', 'source_data_ist', 'source_data_soll', 'record_filename',
-                'np_ereignisse', 'frequency_pose_ist', 'frequency_position_soll',
-                'frequency_orientation_soll', 'frequency_twist_ist', 'frequency_twist_soll',
-                'frequency_accel_ist', 'frequency_joint_states',
-                'np_pose_ist', 'np_twist_ist', 'np_accel_ist', 'np_pos_soll', 'np_orient_soll',
-                'np_twist_soll', 'np_jointstates', 'weight',
+                'traj_id', 'robot_model', 'bahnplanung', 'recording_date', 'start_time',
+                'end_time', 'source_data_act', 'source_data_cmd', 'record_filename',
+                'np_ereignisse', 'frequency_pose_act', 'frequency_position_cmd',
+                'frequency_orientation_cmd', 'frequency_vel_act', 'frequency_vel_cmd',
+                'frequency_accel_act', 'frequency_joint_states',
+                'np_pose_act', 'np_vel_act', 'np_accel_act', 'np_pos_cmd', 'np_orient_cmd',
+                'np_vel_cmd', 'np_jointstates', 'weight',
                 'pick_and_place', 'transformation_matrix',
-                'np_accel_soll', 'frequency_accel_soll', 'setted_velocity', 'stop_point', 'wait_time'
+                'np_accel_cmd', 'frequency_accel_cmd', 'setted_velocity', 'stop_point', 'wait_time'
             ]
 
             # Ensure all records have proper length
@@ -350,39 +350,39 @@ class BatchProcessor:
                 else:
                     padded_records.append(record)
 
-            await db_ops.copy_data_to_table(conn, 'bahn_info', padded_records, columns)
-            logger.info(f"Inserted {len(padded_records)} bahn_info records in batch")
+            await db_ops.copy_data_to_table(conn, 'traj_info', padded_records, columns)
+            logger.info(f"Inserted {len(padded_records)} traj_info records in batch")
         except Exception as e:
-            logger.error(f"Error in batch_insert_bahn_info: {str(e)}")
+            logger.error(f"Error in batch_insert_traj_info: {str(e)}")
             raise
 
     # Helper methods for each data type insertion
     async def batch_insert_data(self, db_ops, conn, table_name, data, columns=None):
-        """Generic batch insert for any table with uniqueness check on bahn_id"""
+        """Generic batch insert for any table with uniqueness check on traj_id"""
         # Methode bleibt unverändert
         if not data:
             logger.info(f"No {table_name} data to insert")
             return
 
         try:
-            # Group data by bahn_id
-            bahn_id_groups = {}
+            # Group data by traj_id
+            traj_id_groups = {}
             for row in data:
-                bahn_id = row[0]  # Assuming bahn_id is always the first column
-                if bahn_id not in bahn_id_groups:
-                    bahn_id_groups[bahn_id] = []
-                bahn_id_groups[bahn_id].append(row)
+                traj_id = row[0]  # Assuming traj_id is always the first column
+                if traj_id not in traj_id_groups:
+                    traj_id_groups[traj_id] = []
+                traj_id_groups[traj_id].append(row)
 
-            # Check which bahn_ids already exist
-            for bahn_id, rows in list(bahn_id_groups.items()):
-                exists = await db_ops.check_bahn_id_exists(conn, table_name, bahn_id)
+            # Check which traj_ids already exist
+            for traj_id, rows in list(traj_id_groups.items()):
+                exists = await db_ops.check_traj_id_exists(conn, table_name, traj_id)
                 if exists:
-                    logger.info(f"{table_name} data for bahn_id {bahn_id} already exists. Skipping.")
-                    del bahn_id_groups[bahn_id]
+                    logger.info(f"{table_name} data for traj_id {traj_id} already exists. Skipping.")
+                    del traj_id_groups[traj_id]
 
             # Flatten the remaining groups
             filtered_data = []
-            for rows in bahn_id_groups.values():
+            for rows in traj_id_groups.values():
                 filtered_data.extend(rows)
 
             if not filtered_data:
@@ -397,45 +397,45 @@ class BatchProcessor:
 
     # Specific batch insert methods for each data type - bleiben alle unverändert
     async def batch_insert_pose_data(self, db_ops, conn, data):
-        columns = ['bahn_id', 'segment_id', 'timestamp', 'x_ist', 'y_ist', 'z_ist',
-                   'qx_ist', 'qy_ist', 'qz_ist', 'qw_ist', 'source_data_ist']
-        await self.batch_insert_data(db_ops, conn, 'bahn_pose_ist', data, columns)
+        columns = ['traj_id', 'seg_id', 'timestamp', 'x_act', 'y_act', 'z_act',
+                   'qx_act', 'qy_act', 'qz_act', 'qw_act', 'source_data_act']
+        await self.batch_insert_data(db_ops, conn, 'traj_pose_act', data, columns)
 
-    async def batch_insert_position_soll_data(self, db_ops, conn, data):
-        columns = ['bahn_id', 'segment_id', 'timestamp', 'x_soll', 'y_soll', 'z_soll', 'source_data_soll']
-        await self.batch_insert_data(db_ops, conn, 'bahn_position_soll', data, columns)
+    async def batch_insert_position_cmd_data(self, db_ops, conn, data):
+        columns = ['traj_id', 'seg_id', 'timestamp', 'x_cmd', 'y_cmd', 'z_cmd']
+        await self.batch_insert_data(db_ops, conn, 'traj_position_cmd', data, columns)
 
-    async def batch_insert_orientation_soll_data(self, db_ops, conn, data):
-        columns = ['bahn_id', 'segment_id', 'timestamp', 'qx_soll', 'qy_soll', 'qz_soll', 'qw_soll', 'source_data_soll']
-        await self.batch_insert_data(db_ops, conn, 'bahn_orientation_soll', data, columns)
+    async def batch_insert_orientation_cmd_data(self, db_ops, conn, data):
+        columns = ['traj_id', 'seg_id', 'timestamp', 'qx_cmd', 'qy_cmd', 'qz_cmd', 'qw_cmd']
+        await self.batch_insert_data(db_ops, conn, 'traj_orientation_cmd', data, columns)
 
-    async def batch_insert_twist_ist_data(self, db_ops, conn, data):
-        columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_ist']
-        await self.batch_insert_data(db_ops, conn, 'bahn_twist_ist', data, columns)
+    async def batch_insert_vel_act_data(self, db_ops, conn, data):
+        columns = ['traj_id', 'seg_id', 'timestamp', 'tcp_speed_act']
+        await self.batch_insert_data(db_ops, conn, 'traj_vel_act', data, columns)
 
-    async def batch_insert_twist_soll_data(self, db_ops, conn, data):
-        columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_speed_soll', 'source_data_soll']
-        await self.batch_insert_data(db_ops, conn, 'bahn_twist_soll', data, columns)
+    async def batch_insert_vel_cmd_data(self, db_ops, conn, data):
+        columns = ['traj_id', 'seg_id', 'timestamp', 'tcp_speed_cmd']
+        await self.batch_insert_data(db_ops, conn, 'traj_vel_cmd', data, columns)
 
-    async def batch_insert_accel_ist_data(self, db_ops, conn, data):
-        columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_ist']
-        await self.batch_insert_data(db_ops, conn, 'bahn_accel_ist', data, columns)
+    async def batch_insert_accel_act_data(self, db_ops, conn, data):
+        columns = ['traj_id', 'seg_id', 'timestamp', 'tcp_accel_act']
+        await self.batch_insert_data(db_ops, conn, 'traj_accel_act', data, columns)
 
-    async def batch_insert_accel_soll_data(self, db_ops, conn, data):
-        columns = ['bahn_id', 'segment_id', 'timestamp', 'tcp_accel_soll']
-        await self.batch_insert_data(db_ops, conn, 'bahn_accel_soll', data, columns)
+    async def batch_insert_accel_cmd_data(self, db_ops, conn, data):
+        columns = ['traj_id', 'seg_id', 'timestamp', 'tcp_accel_cmd']
+        await self.batch_insert_data(db_ops, conn, 'traj_accel_cmd', data, columns)
 
-    async def batch_insert_rapid_events_data(self, db_ops, conn, data):
-        columns = ['bahn_id', 'segment_id', 'timestamp', 'x_reached', 'y_reached', 'z_reached',
-                   'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached', 'source_data_soll', 'movement_type']
-        await self.batch_insert_data(db_ops, conn, 'bahn_events', data, columns)
+    async def batch_insert_rapid_setpoints_data(self, db_ops, conn, data):
+        columns = ['traj_id', 'seg_id', 'timestamp', 'x_reached', 'y_reached', 'z_reached',
+                   'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached', 'source_data_cmd', 'movement_type']
+        await self.batch_insert_data(db_ops, conn, 'traj_setpoints', data, columns)
 
     async def batch_insert_joint_data(self, db_ops, conn, data):
-        columns = ['bahn_id', 'segment_id', 'timestamp', 'joint_1', 'joint_2', 'joint_3',
-                   'joint_4', 'joint_5', 'joint_6', 'source_data_soll']
-        await self.batch_insert_data(db_ops, conn, 'bahn_joint_states', data, columns)
+        columns = ['traj_id', 'seg_id', 'timestamp', 'joint_1', 'joint_2', 'joint_3',
+                   'joint_4', 'joint_5', 'joint_6', 'source_data_cmd']
+        await self.batch_insert_data(db_ops, conn, 'traj_joint_states', data, columns)
 
     async def batch_insert_transf_data(self, db_ops, conn, data):
-        columns = ['bahn_id', 'segment_id', 'timestamp', 'x_trans', 'y_trans', 'z_trans',
+        columns = ['traj_id', 'seg_id', 'timestamp', 'x_trans', 'y_trans', 'z_trans',
                    'qx_trans', 'qy_trans', 'qz_trans', 'qw_trans', 'calibration_id']
-        await self.batch_insert_data(db_ops, conn, 'bahn_pose_trans', data, columns)
+        await self.batch_insert_data(db_ops, conn, 'traj_pose_trans', data, columns)

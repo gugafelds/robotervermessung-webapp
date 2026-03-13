@@ -84,14 +84,14 @@ export default function SimilaritySearchWrapper({
             setSegmentGroups(groups);
           },
           onError: (errorMsg) => {
-            setError(`Fehler bei der Suche: ${errorMsg}`);
+            setError(`Error on the search: ${errorMsg}`);
             setIsLoading(false);
           },
         },
       );
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      setError(`Fehler bei der Suche: ${errorMessage}`);
+      setError(`Error on the search: ${errorMessage}`);
       setIsLoading(false);
     }
   };
@@ -111,7 +111,7 @@ export default function SimilaritySearchWrapper({
           <div className="my-2 flex gap-x-2 overflow-hidden">
             {trajResults.length > 0 && (
               <SimilarityPlot
-                mode="trajen"
+                mode="trajs"
                 results={trajResults}
                 isLoading={isLoading}
                 originalId={originalId}

@@ -88,23 +88,15 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
       position: 1.0,
       joint: 0.0,
       orientation: 0.0,
-      velocity: 0.0,
+      velocity: 1.0,
       metadata: 0.0,
-      modes: ['position'],
+      modes: ['position', 'velocity'],
     },
     motion: {
-      position: 0.3,
-      joint: 0.8,
-      orientation: 0.3,
-      velocity: 0.0,
-      metadata: 0.0,
-      modes: ['position', 'joint', 'orientation'],
-    },
-    intensity: {
       position: 0.0,
-      joint: 0.3,
+      joint: 1.0,
       orientation: 0.0,
-      velocity: 0.6,
+      velocity: 1.0,
       metadata: 0.0,
       modes: ['joint', 'velocity'],
     },
@@ -282,10 +274,10 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
                 Features:
               </span>
               {[
-                { key: 'length', label: 'Länge' },
-                { key: 'duration', label: 'Dauer' },
-                { key: 'movement_type', label: 'Bewegungstyp' },
-                { key: 'position_3d', label: 'Lage' },
+                { key: 'length', label: 'Length' },
+                { key: 'duration', label: 'Duration' },
+                { key: 'movement_type', label: 'Mov. Type' },
+                { key: 'position_3d', label: 'Position' },
               ].map(({ key, label }) => (
                 <button
                   key={key}
@@ -303,7 +295,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
 
             {/* Limit */}
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-700">Limit:</span>
+              <span className="text-sm font-medium text-gray-700">K:</span>
               <input
                 type="number"
                 min="1"
@@ -340,7 +332,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
                   onClick={onTogglePlots}
                   className="rounded-full bg-gray-200 px-3 py-1 text-xs text-gray-700 transition-colors hover:bg-gray-300"
                 >
-                  {showPlots ? '3D-Plots ausblenden' : '3D-Plots anzeigen'}
+                  {showPlots ? 'Hide 3D-Plots' : 'Show 3D-Plots'}
                 </button>
               )}
             </div>
@@ -403,7 +395,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
           className="w-full rounded-lg py-2 font-medium text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           style={{ backgroundColor: '#003560' }}
         >
-          Ähnliche finden
+          Find similar trajectories
         </button>
       </div>
     </div>

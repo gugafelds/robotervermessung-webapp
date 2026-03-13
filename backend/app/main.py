@@ -9,10 +9,6 @@ import aioredis
 import os
 from dotenv import load_dotenv
 import logging
-#from .api.endpoints.transformation_route_handler import MatlabEngine
-
-# Global config
-#USE_MATLAB = False  # Hier direkt definiert
 
 # Load environment variables
 load_dotenv()
@@ -22,8 +18,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="Bahn Data API",
-    description="API for managing and retrieving Bahn trajectory data",
+    title="RMPD-API",
+    description="API for managing and retrieving industrial robot motion and performance data",
     version="1.0.0",
 )
 
@@ -48,14 +44,6 @@ app.include_router(upload_route_handler.router, prefix="/api/upload", tags=["upl
 app.include_router(evaluation_route_handler.router, prefix="/api/evaluation", tags=["evaluation"])
 app.include_router(similarity_route_handler.router, prefix="/api/similarity", tags=["similarity"])
 app.include_router(metadata_route_handler.router, prefix="/api/metadata", tags=["metadata"])
-
-
-# Transformation Router nur einbinden wenn MATLAB aktiv ist
-#if USE_MATLAB:
-#    app.include_router(transformation_route_handler.router, prefix="/api/transform", tags=["transform"])
-#    logger.info("MATLAB transformation routes enabled")
-#else:
-#    logger.info("MATLAB transformation routes disabled")
 
 # Initialize the database
 init_db(app)

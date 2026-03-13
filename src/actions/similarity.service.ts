@@ -1,16 +1,11 @@
 import type {
-  AvailableDate,
   EmbeddingSimilarityParams,
   EmbeddingSimilarityResult,
   HierarchicalSimilarityResponse,
-  MetadataCalculationRequest,
-  MetadataCalculationResponse,
-  MetadataStats,
   SearchTiming,
   SegmentGroup,
   SimilarityResult,
   TargetFeatures,
-  TaskStatus,
 } from '@/types/similarity.types';
 
 export class SimilarityService {
@@ -76,7 +71,7 @@ export class SimilarityService {
       }
 
       const response = await fetch(
-        `${this.BASE_URL}/api/similar/search/${targetId}?${queryParams.toString()}`,
+        `${this.BASE_URL}/api/similarity/search/${targetId}?${queryParams.toString()}`,
         {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },

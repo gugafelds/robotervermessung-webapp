@@ -303,34 +303,34 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
                 ID
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
-                Typ
+                Type
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
                 {stage2Active ? 'DTW-Dist' : 'RRF Score'}
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
-                Dauer (s)
+                Duration [s]
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
-                Gewicht (kg)
+                Weight [kg]
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
-                Länge (mm)
+                Length [mm]
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
-                Bewegungstyp
+                Mov. Type
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
-                Geschwindigkeit [Max, Mean, Std]
+                Velocity [Max, Mean, Std]
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
-                Beschleunigung [Min, Max, Mean, Std]
+                Accel. [Min, Max, Mean, Std]
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
                 Position [X, Y, Z]
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
-                Genauigkeit
+                Accuracy
               </th>
             </tr>
           </thead>
