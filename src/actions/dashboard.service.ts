@@ -7,7 +7,7 @@ const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000/api';
 // Vereinfachte Funktion zum Abrufen der Dashboard-Daten
 export const getDashboardData = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}/bahn/dashboard_data`, {
+    const response = await fetch(`${API_BASE_URL}/dashboard/data`, {
       cache: 'no-cache', // Kein Caching für konsistente Ergebnisse
       headers: {
         Accept: 'application/json',
@@ -31,7 +31,7 @@ export const getDashboardData = async () => {
 // Funktion zum Abrufen der Arbeitsraum-Daten
 export const getWorkareaData = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}/bahn/dashboard_workarea`, {
+    const response = await fetch(`${API_BASE_URL}/dashboard/workarea`, {
       cache: 'no-cache',
       headers: {
         Accept: 'application/json',
@@ -56,7 +56,7 @@ export const getWorkareaData = async () => {
 export const getSIDTWTimeline = async () => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/bahn/dashboard_sidtw_timeline`,
+      `${API_BASE_URL}/dashboard/timeline`,
       {
         cache: 'no-cache',
         headers: {
@@ -81,7 +81,7 @@ export const getSIDTWTimeline = async () => {
 export const getSIDTWvsParameters = async () => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/bahn/dashboard_sidtw_vs_parameters`,
+      `${API_BASE_URL}/dashboard/influence`,
       {
         cache: 'no-cache',
         headers: {

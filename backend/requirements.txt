@@ -11,3 +11,6 @@ fastapi-cache2[redis]
 aioredis==2.0.1
 pandas
 setuptools
+dtaidistance
+pgvector
+psycopg

@@ -21,7 +21,7 @@ router = APIRouter()
 # Pydantic Models
 class MetadataCalculationRequest(BaseModel):
     mode: str  # "single", "timerange", "all_missing"
-    bahn_id: Optional[str] = None
+    traj_id: Optional[str] = None
     start_time: Optional[str] = None  # Format: "26.06.2025 12:12:10"
     end_time: Optional[str] = None
     duplicate_handling: str = "replace"  # "replace" oder "skip"
@@ -32,7 +32,7 @@ class TaskStatusResponse(BaseModel):
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
     failed_at: Optional[str] = None
-    total_bahns: int = 0
+    total_trajs: int = 0
     processed_bahns: int = 0
     successful_bahns: int = 0
     failed_bahns: int = 0
@@ -81,7 +81,7 @@ async def calculate_metadata(
         existing_task = find_running_task(
             "metadata_calculation",
             mode=request.mode,
-            bahn_id=request.bahn_id if request.mode == "single" else None
+            traj_id=request.traj_id if request.mode == "single" else None
         )
         if existing_task:
             logger.info(f"Metadata-Task für Mode {request.mode} läuft bereits: {existing_task}")
@@ -95,11 +95,11 @@ async def calculate_metadata(
         service = MetadataCalculatorService(db_pool)
 
         # Bahn-IDs ermitteln basierend auf Modus
-        bahn_ids = []
+        traj_ids = []
 
         if request.mode == "single":
-            bahn_ids = [request.bahn_id]
-            logger.info(f"Processing single bahn: {request.bahn_id}")
+            traj_ids = [request.traj_id]
+            logger.info(f"Processing single bahn: {request.traj_id}")
 
         elif request.mode == "timerange":
             # Validiere und konvertiere Zeitangaben
@@ -122,14 +122,14 @@ async def calculate_metadata(
                     detail="end_time must be after start_time"
                 )
 
-            bahn_ids = await service.get_bahn_ids_for_timerange(start_unix, end_unix)
-            logger.info(f"Found {len(bahn_ids)} bahns in timerange {request.start_time} - {request.end_time}")
+            traj_ids = await service.get_traj_ids_for_timerange(start_unix, end_unix)
+            logger.info(f"Found {len(traj_ids)} bahns in timerange {request.start_time} - {request.end_time}")
 
         elif request.mode == "all_missing":
-            bahn_ids = await service.get_all_missing_bahn_ids()
-            logger.info(f"Found {len(bahn_ids)} bahns without metadata")
+            traj_ids = await service.get_all_missing_traj_ids()
+            logger.info(f"Found {len(traj_ids)} bahns without metadata")
 
-        if not bahn_ids:
+        if not traj_ids:
             return MetadataCalculationResponse(
                 task_id="",
                 status="completed",
@@ -140,7 +140,7 @@ async def calculate_metadata(
         task_id = create_task_id("metadata")
 
         # Geschätzte Dauer berechnen (ca. 0.5-2 Sekunden pro Bahn)
-        estimated_seconds = len(bahn_ids) * 0.3  # Durchschnitt 1 Sekunde pro Bahn
+        estimated_seconds = len(traj_ids) * 0.3  # Durchschnitt 1 Sekunde pro Bahn
         estimated_minutes = estimated_seconds / 60
 
         # Background Task starten
@@ -149,16 +149,16 @@ async def calculate_metadata(
             task_id=task_id,
             service=service,
             mode=request.mode,
-            bahn_ids=bahn_ids,
+            traj_ids=traj_ids,
             duplicate_handling=request.duplicate_handling,
         )
 
-        logger.info(f"Started background task {task_id} for {len(bahn_ids)} bahns")
+        logger.info(f"Started background task {task_id} for {len(traj_ids)} bahns")
 
         return MetadataCalculationResponse(
             task_id=task_id,
             status="started",
-            message=f"Started processing {len(bahn_ids)} bahns in background",
+            message=f"Started processing {len(traj_ids)} bahns in background",
             estimated_duration_minutes=round(estimated_minutes, 1)
         )
 
@@ -184,9 +184,9 @@ async def get_task_status_endpoint(task_id: str):
     processed_items = 0
 
     # Prüfe Task-Typ anhand vorhandener Felder
-    if task_data.get("total_bahns", 0) > 0:
+    if task_data.get("total_trajs", 0) > 0:
         # Bahn-Task
-        total_items = task_data.get("total_bahns", 0)
+        total_items = task_data.get("total_trajs", 0)
         processed_items = task_data.get("processed_bahns", 0)
     elif task_data.get("total_segments", 0) > 0:
         # Segment-Task
@@ -202,7 +202,7 @@ async def get_task_status_endpoint(task_id: str):
         started_at=task_data.get("started_at"),
         completed_at=task_data.get("completed_at"),
         failed_at=task_data.get("failed_at"),
-        total_bahns=total_items,
+        total_trajs=total_items,
         processed_bahns=processed_items,
         successful_bahns=task_data.get("successful_bahns") or task_data.get("successful_segments", 0),
         failed_bahns=task_data.get("failed_bahns") or task_data.get("failed_segments", 0),
@@ -224,14 +224,14 @@ async def list_all_tasks():
     formatted_tasks = {}
     for task_id, task_data in tasks.items():
         progress_percent = 0.0
-        if task_data.get("total_bahns", 0) > 0:
-            progress_percent = (task_data.get("processed_bahns", 0) / task_data["total_bahns"]) * 100
+        if task_data.get("total_trajs", 0) > 0:
+            progress_percent = (task_data.get("processed_bahns", 0) / task_data["total_trajs"]) * 100
 
         formatted_tasks[task_id] = {
             "status": task_data.get("status"),
             "started_at": task_data.get("started_at"),
             "progress": f"{progress_percent:.1f}%",
-            "bahns": f"{task_data.get('processed_bahns', 0)}/{task_data.get('total_bahns', 0)}",
+            "bahns": f"{task_data.get('processed_bahns', 0)}/{task_data.get('total_trajs', 0)}",
             "success_rate": f"{task_data.get('successful_bahns', 0)}/{task_data.get('processed_bahns', 0)}" if task_data.get(
                 'processed_bahns', 0) > 0 else "0/0"
         }
@@ -282,29 +282,29 @@ async def get_metadata_stats(db_pool=Depends(get_db_pool)):
     """
     try:
         async with db_pool.acquire() as conn:
-            # Gesamtzahl Bahnen in bahn_info
-            total_bahns_query = """
-                SELECT COUNT(DISTINCT traj_id) as total_bahns
+            # Gesamtzahl Bahnen in traj_info
+            total_trajs_query = """
+                SELECT COUNT(DISTINCT traj_id) as total_trajs
                 FROM rmpd.motion.traj_info
                 WHERE source_data_act = 'leica_at960'
             """
-            total_bahns = await conn.fetchval(total_bahns_query)
+            total_trajs = await conn.fetchval(total_trajs_query)
 
             # Bahnen die in bahn_metadata existieren
-            bahns_with_metadata_query = """
-                SELECT COUNT(DISTINCT traj_id) as bahns_with_metadata
+            trajs_with_metadata_query = """
+                SELECT COUNT(DISTINCT traj_id) as trajs_with_metadata
                 FROM rmpd.motion.traj_metadata
             """
-            bahns_with_metadata = await conn.fetchval(bahns_with_metadata_query)
+            trajs_with_metadata = await conn.fetchval(trajs_with_metadata_query)
 
-            # Fehlende Bahnen (in bahn_info aber NICHT in bahn_metadata)
+            # Fehlende Bahnen (in traj_info aber NICHT in bahn_metadata)
             missing_bahns_query = """
-                SELECT COUNT(DISTINCT bi.bahn_id) as missing_bahns
+                SELECT COUNT(DISTINCT bi.traj_id) as missing_bahns
                 FROM rmpd.motion.traj_info bi
                 LEFT JOIN rmpd.motion.traj_metadata bm 
-                    ON bi.bahn_id = bm.bahn_id
+                    ON bi.traj_id = bm.traj_id
                 WHERE bi.source_data_act = 'leica_at960'
-                AND bm.bahn_id IS NULL
+                AND bm.traj_id IS NULL
             """
             missing_bahns = await conn.fetchval(missing_bahns_query)
 
@@ -317,11 +317,11 @@ async def get_metadata_stats(db_pool=Depends(get_db_pool)):
 
         
 
-            coverage_percent = (bahns_with_metadata / total_bahns * 100) if total_bahns > 0 else 0
+            coverage_percent = (trajs_with_metadata / total_trajs * 100) if total_trajs > 0 else 0
 
             return {
-                "total_bahns": total_bahns,
-                "bahns_with_metadata": bahns_with_metadata,
+                "total_trajs": total_trajs,
+                "trajs_with_metadata": trajs_with_metadata,
                 "missing_metadata": missing_bahns,
                 "coverage_percent": round(coverage_percent, 1),
                 "total_metadata_rows": total_metadata_rows,
@@ -334,7 +334,7 @@ async def get_metadata_stats(db_pool=Depends(get_db_pool)):
 @router.get("/available-dates")
 async def get_available_dates(db_pool=Depends(get_db_pool)):
     """
-    Ermittelt verfügbare recording_dates aus bahn_info (nur Datum)
+    Ermittelt verfügbare recording_dates aus traj_info (nur Datum)
     """
     try:
         async with db_pool.acquire() as conn:

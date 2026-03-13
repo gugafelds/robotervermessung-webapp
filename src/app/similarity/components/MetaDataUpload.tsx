@@ -4,7 +4,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 
-import { MetadataService } from '@/src/actions/vergleich.service';
+import { MetadataService } from '@/src/actions/metadata.service';
 import type {
   AvailableDate,
   MetadataCalculationRequest,
@@ -21,7 +21,7 @@ export const MetadataUpload: React.FC = () => {
   const [duplicateHandling, setDuplicateHandling] = useState<
     'replace' | 'skip'
   >('skip');
-  const [bahnId, setBahnId] = useState('');
+  const [trajID, setTrajID] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -52,7 +52,7 @@ export const MetadataUpload: React.FC = () => {
   }, [loadStats, loadAvailableDates]);
 
   const handleStartUpload = useCallback(async () => {
-    if (selectedMode === 'single' && !bahnId) {
+    if (selectedMode === 'single' && !trajID) {
       return;
     }
 
@@ -68,7 +68,7 @@ export const MetadataUpload: React.FC = () => {
       };
 
       if (selectedMode === 'single') {
-        request.bahn_id = bahnId;
+        request.traj_id = trajID;
       } else if (selectedMode === 'timerange') {
         request.start_time = `${startDate} 00:00:00`;
         request.end_time = `${endDate} 23:59:59`;
@@ -85,7 +85,7 @@ export const MetadataUpload: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMode, bahnId, startDate, endDate, duplicateHandling, loadStats]);
+  }, [selectedMode, trajID, startDate, endDate, duplicateHandling, loadStats]);
 
   return (
     <div className="mx-auto w-fit min-w-96 max-w-xl space-y-4 p-4">
@@ -104,7 +104,7 @@ export const MetadataUpload: React.FC = () => {
                   Gesamte Bahnen
                 </td>
                 <td className="py-2 text-right">
-                  {stats.total_bahns.toLocaleString()}
+                  {stats.total_trajs.toLocaleString()}
                 </td>
               </tr>
               <tr className="border-b">
@@ -112,7 +112,7 @@ export const MetadataUpload: React.FC = () => {
                   Mit Metadaten
                 </td>
                 <td className="py-2 text-right">
-                  {stats.bahns_with_metadata.toLocaleString()}
+                  {stats.trajs_with_metadata.toLocaleString()}
                 </td>
               </tr>
               <tr className="border-b">
@@ -178,8 +178,8 @@ export const MetadataUpload: React.FC = () => {
               <input
                 type="text"
                 placeholder="(z.B. 1719408730)"
-                value={bahnId}
-                onChange={(e) => setBahnId(e.target.value)}
+                value={trajID}
+                onChange={(e) => setTrajID(e.target.value)}
                 className="ml-7 w-min rounded border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             )}

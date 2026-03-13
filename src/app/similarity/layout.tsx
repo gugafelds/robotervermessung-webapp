@@ -1,26 +1,26 @@
 import React from 'react';
 
-import { getBahnInfo } from '@/src/actions/motion.service';
-import { MetadataUpload } from '@/src/app/vergleich/components/MetaDataUpload';
+import { getTrajInfo } from '@/src/actions/motion.service';
+import { MetadataUpload } from '@/src/app/similarity/components/MetaDataUpload';
 import { TrajectoryProvider } from '@/src/providers/trajectory.provider';
 
-interface VergleichLayoutProps {
+interface SimilarityLayoutProps {
   children: React.ReactNode;
 }
 
-export default async function VergleichLayout({
+export default async function SimilarityLayout({
   children,
-}: VergleichLayoutProps) {
-  // Lade Bahndaten für den TrajectoryProvider
-  const { bahnInfo: initialBahnInfo, pagination: initialPagination } =
-    await getBahnInfo({
+}: SimilarityLayoutProps) {
+  // Lade Trajdaten für den TrajectoryProvider
+  const { bahnInfo: initialTrajInfo, pagination: initialPagination } =
+    await getTrajInfo({
       page: 1,
-      pageSize: 15, // Mehr Bahnen für besseren Vergleich
+      pageSize: 15, // Mehr Bahnen für besseren Similarity
     });
 
   return (
     <TrajectoryProvider
-      initialBahnInfo={initialBahnInfo}
+      initialTrajInfo={initialTrajInfo}
       initialPagination={initialPagination}
     >
       <main className="flex flex-col lg:flex-row">

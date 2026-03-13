@@ -1,12 +1,11 @@
 /* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable react/button-has-type */
-// components/SimilaritySearch.tsx
 
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
 
-import type { BahnInfo } from '@/types/motion.types';
+import type { TrajInfo } from '@/types/motion.types';
 
 type SimilaritySearchProps = {
   onSearch: (
@@ -21,43 +20,45 @@ type SimilaritySearchProps = {
       metadata: number;
     },
     prefilterFeatures: string[],
+    stage2Active: boolean,
+    dtwMode: 'position' | 'joint',
   ) => void;
-  bahnInfo?: BahnInfo[] | undefined;
-  showPlots: boolean; // ⭐ NEU
-  onTogglePlots: () => void; // ⭐ NEU
-  hasResults: boolean; // ⭐ NEU
+  trajInfo?: TrajInfo[];
+  showPlots: boolean;
+  onTogglePlots: () => void;
+  hasResults: boolean;
 };
 
 const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
   onSearch,
-  bahnInfo,
+  trajInfo,
   showPlots,
   onTogglePlots,
   hasResults,
 }) => {
   const [id, setId] = useState('');
-  const [limit, setLimit] = useState(5); // ✅ Ein Limit für Bahnen + Segmente
+  const [limit, setLimit] = useState(5);
   const [showDropdown, setShowDropdown] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [activeModes, setActiveModes] = useState<Set<string>>(
-    new Set(['position']),
+    new Set(['position', 'joint', 'orientation', 'velocity', 'metadata']),
   );
-
   const [weights, setWeights] = useState({
-    position: 0.2,
-    joint: 0.2,
-    orientation: 0.2,
-    velocity: 0.2,
-    metadata: 0.2,
+    position: 1.0,
+    joint: 1.0,
+    orientation: 1.0,
+    velocity: 1.0,
+    metadata: 1.0,
   });
-
   const [prefilterFeatures, setPrefilterFeatures] = useState<Set<string>>(
-    new Set(['movement_type']),
+    new Set(['']),
   );
+  const [stage2Active, setStage2Active] = useState(false);
+  const [dtwMode, setDtwMode] = useState<'position' | 'joint'>('position');
 
-  const recentBahnIds = bahnInfo ? bahnInfo.map((bahn) => bahn.trajID) : [];
+  const recentBahnIds = trajInfo ? trajInfo.map((traj) => traj.trajID) : [];
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -70,18 +71,17 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
         setShowDropdown(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const presets = {
     balanced: {
-      position: 0.2,
-      joint: 0.2,
-      orientation: 0.2,
-      velocity: 0.2,
-      metadata: 0.2,
+      position: 1.0,
+      joint: 1.0,
+      orientation: 1.0,
+      velocity: 1.0,
+      metadata: 1.0,
       modes: ['position', 'joint', 'orientation', 'velocity', 'metadata'],
     },
     shape: {
@@ -112,73 +112,40 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
 
   const handleSearch = () => {
     if (id.trim() && activeModes.size > 0) {
-      // Normalisiere Gewichte basierend auf aktiven Modi
       const activeWeights = { ...weights };
-      const inactiveModes = [
-        'position',
-        'joint',
-        'orientation',
-        'velocity',
-        'metadata',
-      ].filter((m) => !activeModes.has(m));
-
-      // Setze inaktive Modi auf 0
-      inactiveModes.forEach((mode) => {
-        activeWeights[mode as keyof typeof weights] = 0;
-      });
+      ['position', 'joint', 'orientation', 'velocity', 'metadata']
+        .filter((m) => !activeModes.has(m))
+        .forEach((mode) => {
+          activeWeights[mode as keyof typeof weights] = 0;
+        });
 
       onSearch(
         id.trim(),
         limit,
         Array.from(activeModes),
         activeWeights,
-        Array.from(prefilterFeatures), // ✅ NEU
+        Array.from(prefilterFeatures),
+        stage2Active,
+        dtwMode,
       );
       setShowDropdown(false);
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch();
-    } else if (e.key === 'Escape') {
-      setShowDropdown(false);
-    }
-  };
-
-  const handleInputFocus = () => {
-    if (recentBahnIds.length > 0) {
-      setShowDropdown(true);
-    }
-  };
-
-  const handleBahnIdSelect = (selectedId: string) => {
-    setId(selectedId);
-    setShowDropdown(false);
-  };
-
-  const handleLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value, 10);
-    if (value >= 1 && value <= 100) {
-      setLimit(value);
-    }
+    if (e.key === 'Enter') handleSearch();
+    else if (e.key === 'Escape') setShowDropdown(false);
   };
 
   const handleWeightChange = (mode: string, value: number) => {
-    setWeights((prev) => ({
-      ...prev,
-      [mode]: value,
-    }));
+    setWeights((prev) => ({ ...prev, [mode]: value }));
   };
 
   const toggleMode = (mode: string) => {
     setActiveModes((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(mode)) {
-        // Mindestens ein Modus muss aktiv bleiben
-        if (newSet.size > 1) {
-          newSet.delete(mode);
-        }
+        if (newSet.size > 1) newSet.delete(mode);
       } else {
         newSet.add(mode);
       }
@@ -189,11 +156,8 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
   const togglePrefilterFeature = (feature: string) => {
     setPrefilterFeatures((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(feature)) {
-        newSet.delete(feature);
-      } else {
-        newSet.add(feature);
-      }
+      if (newSet.has(feature)) newSet.delete(feature);
+      else newSet.add(feature);
       return newSet;
     });
   };
@@ -213,7 +177,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
   return (
     <div className="w-full rounded-xl border border-gray-400 bg-gray-100 p-4">
       <div className="space-y-2">
-        {/* Haupteingabe mit Dropdown */}
+        {/* ID-Eingabe */}
         <div className="relative">
           <input
             ref={inputRef}
@@ -222,24 +186,25 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
             value={id}
             onChange={(e) => setId(e.target.value)}
             onKeyDown={handleKeyPress}
-            onFocus={handleInputFocus}
+            onFocus={() => recentBahnIds.length > 0 && setShowDropdown(true)}
             className="w-full rounded-xl bg-gray-50 p-3 text-lg shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-
-          {/* Dropdown mit letzten Bahn-IDs */}
           {showDropdown && recentBahnIds.length > 0 && (
             <div
               ref={dropdownRef}
               className="absolute inset-x-0 top-full z-10 mt-1 rounded-lg border border-gray-200 bg-white shadow-lg"
             >
               <div className="p-2">
-                {recentBahnIds.map((bahnId, index) => (
+                {recentBahnIds.map((trajId, index) => (
                   <button
-                    key={bahnId}
-                    onClick={() => handleBahnIdSelect(bahnId)}
+                    key={trajId}
+                    onClick={() => {
+                      setId(trajId);
+                      setShowDropdown(false);
+                    }}
                     className="flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100"
                   >
-                    <span className="font-mono">{bahnId}</span>
+                    <span className="font-mono">{trajId}</span>
                     <span className="text-xs text-gray-400">#{index + 1}</span>
                   </button>
                 ))}
@@ -248,6 +213,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
           )}
         </div>
 
+        {/* Modi + Gewichtungen */}
         <div className="flex items-center gap-8 rounded-lg bg-white p-3 text-sm sm:flex-col lg:flex-row">
           <div>Modi:</div>
           <div className="w-fit gap-2 space-x-2">
@@ -272,7 +238,6 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
             {Object.entries(weights).map(([mode, value]) => {
               const isActive = activeModes.has(mode);
               const sliderId = `slider-${mode}`;
-
               return (
                 <div
                   key={mode}
@@ -308,7 +273,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
           </span>
         </div>
 
-        {/* Preset-Buttons */}
+        {/* Preset-Buttons + Prefilter + Limit + Plots */}
         <div className="space-y-2 rounded-lg bg-white p-3">
           <div className="flex flex-col items-center gap-6 sm:flex-row">
             {/* Prefilter Features */}
@@ -336,69 +301,44 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
               ))}
             </div>
 
-            {/* Vertikaler Separator */}
-            <div className="h-6 w-px bg-gray-300" />
+            {/* Limit */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700">Limit:</span>
+              <input
+                type="number"
+                min="1"
+                max="100"
+                value={limit}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (val >= 1 && val <= 100) setLimit(val);
+                }}
+                className="w-16 rounded border border-gray-300 px-2 py-1 text-center text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
             {/* Presets */}
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-700">
-                Presets:
-              </span>
-              <button
-                onClick={() => applyPreset('balanced')}
-                className="rounded-full bg-gray-200 px-3 py-1 text-xs transition-colors hover:bg-gray-300"
-              >
-                Balanced
-              </button>
-              <button
-                onClick={() => applyPreset('motion')}
-                className="rounded-full bg-blue-200 px-3 py-1 text-xs transition-colors hover:bg-blue-300"
-              >
-                Motion
-              </button>
-              <button
-                onClick={() => applyPreset('shape')}
-                className="rounded-full bg-purple-200 px-3 py-1 text-xs transition-colors hover:bg-purple-300"
-              >
-                Shape
-              </button>
-              <button
-                onClick={() => applyPreset('intensity')}
-                className="rounded-full bg-red-200 px-3 py-1 text-xs transition-colors hover:bg-red-300"
-              >
-                Intensity
-              </button>
+              <span className="text-sm font-medium text-gray-700">Preset:</span>
+              {(Object.keys(presets) as Array<keyof typeof presets>).map(
+                (preset) => (
+                  <button
+                    key={preset}
+                    onClick={() => applyPreset(preset)}
+                    className="rounded-full bg-gray-200 px-3 py-1 text-xs text-gray-700 transition-colors hover:bg-gray-300"
+                  >
+                    {preset.charAt(0).toUpperCase() + preset.slice(1)}
+                  </button>
+                ),
+              )}
             </div>
 
-            {/* Vertikaler Separator */}
-            <div className="h-6 w-px bg-gray-300" />
-
-            {/* Limit Einstellungen */}
-            <div className=" rounded-lg bg-white p-3">
-              <div className="flex items-center justify-between space-x-2">
-                <label
-                  htmlFor="limit"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Anzahl Ergebnisse (Limit):
-                </label>
-                <input
-                  id="limit"
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={limit}
-                  onChange={handleLimitChange}
-                  className="w-16 rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
+            {/* Plot Toggle */}
+            <div className="ml-auto flex items-center gap-2">
               {hasResults && (
                 <button
                   onClick={onTogglePlots}
-                  className="w-full rounded-lg border-2 border-blue-600 bg-red-50 p-2 font-medium text-blue-600 transition-colors hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="rounded-full bg-gray-200 px-3 py-1 text-xs text-gray-700 transition-colors hover:bg-gray-300"
                 >
                   {showPlots ? '3D-Plots ausblenden' : '3D-Plots anzeigen'}
                 </button>
@@ -407,16 +347,60 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
           </div>
         </div>
 
+        {/* Stage 2: DTW Reranking */}
+        <div className="rounded-lg bg-white p-3">
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium text-gray-700">
+              Stage 2 DTW:
+            </span>
+
+            {/* Toggle */}
+            {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
+            <button
+              onClick={() => setStage2Active((prev) => !prev)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                stage2Active ? 'bg-blue-600' : 'bg-gray-300'
+              }`}
+              role="switch"
+              aria-checked={stage2Active}
+            >
+              <span
+                className={`inline-block size-4 rounded-full bg-white shadow transition-transform ${
+                  stage2Active ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+
+            {/* DTW Mode Dropdown — nur sichtbar wenn aktiv */}
+            {stage2Active && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Modus:</span>
+                <select
+                  value={dtwMode}
+                  onChange={(e) =>
+                    setDtwMode(e.target.value as 'position' | 'joint')
+                  }
+                  className="rounded border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="position">Shape (Position)</option>
+                  <option value="joint">Motion (Joints)</option>
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Info */}
         <div className="text-xs text-gray-600">
-          🎯 Embedding-basierte Ähnlichkeitssuche (RRF Fusion)
+          Stage 1 (RRF Fusion)
+          {stage2Active && ' → Stage 2 (DTW Reranking)'}
         </div>
 
         {/* Such-Button */}
         <button
           onClick={handleSearch}
           disabled={activeModes.size === 0}
-          className="w-full rounded-lg bg-blue-600 py-2 font-medium text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full rounded-lg py-2 font-medium text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           style={{ backgroundColor: '#003560' }}
         >
           Ähnliche finden

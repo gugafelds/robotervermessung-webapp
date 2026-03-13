@@ -54,11 +54,11 @@ export const Navbar = () => {
           </Typography>
         </Link>
 
-        <Link href="/comparison">
+        <Link href="/similarity">
           <Typography
             as="h2"
             className={`my-0 items-center rounded-md p-2 transition-colors duration-200 ease-in betterhover:hover:bg-gray-300 ${
-              pathname.includes('comparison') ? 'bg-gray-300' : ''
+              pathname.includes('similarity') ? 'bg-gray-300' : ''
             }`}
           >
             Similarity Search

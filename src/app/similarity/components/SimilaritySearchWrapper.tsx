@@ -2,9 +2,10 @@
 
 import React, { useState } from 'react';
 
-import { SimilarityService } from '@/src/actions/vergleich.service';
-import type { BahnInfo } from '@/types/motion.types';
+import { SimilarityService } from '@/src/actions/similarity.service';
+import type { TrajInfo } from '@/types/motion.types';
 import type {
+  SearchTiming,
   SegmentGroup,
   SimilarityResult,
   TargetFeatures,
@@ -12,17 +13,17 @@ import type {
 
 import SimilarityResults from './SimilarityResults';
 import SimilaritySearch from './SimilaritySearch';
-import { VergleichPlot } from './VergleichPlot';
+import { SimilarityPlot } from './SimilarityPlot';
 
 interface SimilaritySearchWrapperProps {
-  bahnInfo?: BahnInfo[];
+  trajInfo?: TrajInfo[];
 }
 
 export default function SimilaritySearchWrapper({
-  bahnInfo,
+  trajInfo,
 }: SimilaritySearchWrapperProps) {
-  const [bahnResults, setBahnResults] = useState<SimilarityResult[]>([]);
-  const [targetBahnFeatures, setTargetBahnFeatures] = useState<
+  const [trajResults, setTrajResults] = useState<SimilarityResult[]>([]);
+  const [targetTrajFeatures, setTargetTrajFeatures] = useState<
     TargetFeatures | undefined
   >();
   const [segmentGroups, setSegmentGroups] = useState<SegmentGroup[]>([]);
@@ -30,7 +31,11 @@ export default function SimilaritySearchWrapper({
   const [error, setError] = useState('');
   const [originalId, setOriginalId] = useState('');
   const [showPlots, setShowPlots] = useState(false);
-  const hasResults = bahnResults.length > 0 || segmentGroups.length > 0;
+  const [timing, setTiming] = useState<SearchTiming | undefined>();
+  const [stage2Active, setStage2Active] = useState(false);
+  const [dtwMode, setDtwMode] = useState<'position' | 'joint'>('position');
+
+  const hasResults = trajResults.length > 0 || segmentGroups.length > 0;
 
   const handleSearch = async (
     id: string,
@@ -44,22 +49,35 @@ export default function SimilaritySearchWrapper({
       metadata: number;
     },
     prefilter_features: string[],
+    stage2_active: boolean,
+    dtw_mode: 'position' | 'joint',
   ) => {
     setIsLoading(true);
     setError('');
     setOriginalId(id);
-    setBahnResults([]);
-    setTargetBahnFeatures(undefined);
+    setTrajResults([]);
+    setTargetTrajFeatures(undefined);
     setSegmentGroups([]);
+    setTiming(undefined);
+    setStage2Active(false);
 
     try {
       await SimilarityService.searchSimilarityEmbedding(
         id,
-        { modes, weights, limit, prefilter_features },
+        { modes, weights, limit, prefilter_features, stage2_active, dtw_mode },
         {
-          onBahnenFound: (results, targetFeatures) => {
-            setBahnResults(results);
-            setTargetBahnFeatures(targetFeatures);
+          onTrajsFound: (
+            results,
+            targetFeatures,
+            responseTiming,
+            responseStage2,
+            responseDtwMode,
+          ) => {
+            setTrajResults(results);
+            setTargetTrajFeatures(targetFeatures);
+            setTiming(responseTiming);
+            setStage2Active(responseStage2 ?? false);
+            setDtwMode(responseDtwMode ?? 'position');
             setIsLoading(false);
           },
           onSegmentsFound: (groups) => {
@@ -83,43 +101,46 @@ export default function SimilaritySearchWrapper({
       <div className="w-full p-2">
         <SimilaritySearch
           onSearch={handleSearch}
-          bahnInfo={bahnInfo}
-          showPlots={showPlots} // ⭐ NEU
-          onTogglePlots={() => setShowPlots(!showPlots)} // ⭐ NEU
-          hasResults={hasResults} // ⭐ NEU
+          trajInfo={trajInfo}
+          showPlots={showPlots}
+          onTogglePlots={() => setShowPlots(!showPlots)}
+          hasResults={hasResults}
         />
 
-        {/* Plot-Bereich - nur rendern wenn showPlots = true */}
         {showPlots && (
           <div className="my-2 flex gap-x-2 overflow-hidden">
-            {bahnResults.length > 0 && (
-              <VergleichPlot
-                mode="bahnen"
-                results={bahnResults}
+            {trajResults.length > 0 && (
+              <SimilarityPlot
+                mode="trajen"
+                results={trajResults}
                 isLoading={isLoading}
                 originalId={originalId}
+                stage2Active={stage2Active} // neu
               />
             )}
-
             {segmentGroups.length > 2 && (
-              <VergleichPlot
+              <SimilarityPlot
                 mode="segmente"
-                results={bahnResults}
+                results={trajResults}
                 segmentGroups={segmentGroups}
                 isLoading={isLoading}
                 originalId={originalId}
+                stage2Active={stage2Active} // neu
               />
             )}
           </div>
         )}
 
         <SimilarityResults
-          results={bahnResults}
+          results={trajResults}
           isLoading={isLoading}
           error={error}
           originalId={originalId}
-          targetBahnFeatures={targetBahnFeatures}
+          targetTrajFeatures={targetTrajFeatures}
           segmentGroups={segmentGroups}
+          timing={timing}
+          stage2Active={stage2Active}
+          dtwMode={dtwMode}
         />
       </div>
     </div>

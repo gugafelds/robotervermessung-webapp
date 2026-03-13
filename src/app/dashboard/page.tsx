@@ -28,7 +28,7 @@ export default function DashboardPage() {
         const dashboardResult = await getDashboardData();
         setData({
           segmentsCount: dashboardResult.segmentsCount,
-          bahnenCount: dashboardResult.bahnenCount,
+          trajsCount: dashboardResult.trajsCount,
           medianSIDTW: dashboardResult.medianSIDTW,
           meanSIDTW: dashboardResult.meanSIDTW,
           bestPerformers: dashboardResult.bestPerformers,
@@ -59,7 +59,7 @@ export default function DashboardPage() {
     <div className="flex justify-center">
       <DashboardClient
         segmentsCount={data.segmentsCount}
-        bahnenCount={data.bahnenCount}
+        trajsCount={data.trajsCount}
         medianSIDTW={data.medianSIDTW}
         meanSIDTW={data.meanSIDTW}
         bestPerformers={data.bestPerformers}

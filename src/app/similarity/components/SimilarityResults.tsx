@@ -2,6 +2,7 @@ import Link from 'next/link';
 import React from 'react';
 
 import type {
+  SearchTiming,
   SegmentGroup,
   SimilarityResult,
   TargetFeatures,
@@ -12,10 +13,13 @@ interface SimilarityResultsProps {
   isLoading: boolean;
   error?: string;
   originalId?: string;
-  targetBahnFeatures?: TargetFeatures;
+  targetTrajFeatures?: TargetFeatures;
   segmentGroups?: SegmentGroup[];
   isSegmentTaskRunning?: boolean;
   segmentProgress?: string;
+  timing?: SearchTiming;
+  stage2Active?: boolean;
+  dtwMode?: 'position' | 'joint';
 }
 
 const SimilarityResults: React.FC<SimilarityResultsProps> = ({
@@ -23,16 +27,19 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
   isLoading,
   error,
   originalId,
-  targetBahnFeatures,
+  targetTrajFeatures,
   segmentGroups = [],
   isSegmentTaskRunning = false,
   segmentProgress = '',
+  timing,
+  stage2Active = false,
+  dtwMode = 'position',
 }) => {
   const bahnResults = results.filter(
-    (r) => !r.segment_id || !r.segment_id.includes('_'),
+    (r) => !r.seg_id || !r.seg_id.includes('_'),
   );
   const segmentResults = results.filter(
-    (r) => r.segment_id && r.segment_id.includes('_'),
+    (r) => r.seg_id && r.seg_id.includes('_'),
   );
 
   if (isLoading) {
@@ -40,7 +47,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
       <div className="w-full rounded-lg border border-gray-400 bg-white p-6">
         <div className="flex items-center justify-center py-8">
           <div className="size-8 animate-spin rounded-full border-b-2 border-blue-950" />
-          <span className="ml-3 text-gray-600">Lade Bahn-Ähnlichkeiten...</span>
+          <span className="ml-3 text-gray-600">Lade Ähnlichkeiten...</span>
         </div>
       </div>
     );
@@ -66,7 +73,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
       <div className="w-full rounded-lg border border-gray-400 bg-white p-6">
         <div className="py-8 text-center text-gray-500">
           <p>
-            Gib eine Bahn- oder Segment-ID ein, um die Ähnlichkeiten zu
+            Gib eine Traj- oder Segment-ID ein, um die Ähnlichkeiten zu
             durchsuchen.
           </p>
         </div>
@@ -76,15 +83,14 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
 
   const isTargetEntry = (result: SimilarityResult): boolean => {
     if (!originalId) return false;
-    const currentId = result.segment_id || result.bahn_id || '';
+    const currentId = result.seg_id || result.traj_id || '';
     return currentId.includes(originalId);
   };
 
   const renderRows = (data: SimilarityResult[]) => {
-    // ✅ Helper Funktionen für Profile
     const formatVelocityProfile = (result: SimilarityResult) => {
-      if (!result.mean_twist_ist) return '-';
-      return `[${result.max_twist_ist?.toFixed(0) || '-'}, ${result.mean_twist_ist?.toFixed(0) || '-'}, ${result.std_twist_ist?.toFixed(0) || '-'}]`;
+      if (!result.mean_vel_act) return '-';
+      return `[${result.max_vel_act?.toFixed(0) || '-'}, ${result.mean_vel_act?.toFixed(0) || '-'}, ${result.std_vel_act?.toFixed(0) || '-'}]`;
     };
 
     const formatPosition3D = (result: SimilarityResult) => {
@@ -93,14 +99,14 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
     };
 
     const formatAccelerationProfile = (result: SimilarityResult) => {
-      if (!result.mean_acceleration_ist) return '-';
-      return `[${result.min_acceleration_ist?.toFixed(0) || '-'}, ${result.max_acceleration_ist?.toFixed(0) || '-'}, ${result.mean_acceleration_ist?.toFixed(0) || '-'}, ${result.std_acceleration_ist?.toFixed(0) || '-'}]`;
+      if (!result.mean_accel_act) return '-';
+      return `[${result.min_accel_act?.toFixed(0) || '-'}, ${result.max_accel_act?.toFixed(0) || '-'}, ${result.mean_accel_act?.toFixed(0) || '-'}, ${result.std_accel_act?.toFixed(0) || '-'}]`;
     };
 
     return data.map((result, index) => {
       const isTarget = isTargetEntry(result);
-      const id = result.segment_id || result.bahn_id || 'N/A';
-      const type = id.includes('_') ? 'Segment' : 'Bahn';
+      const id = result.seg_id || result.traj_id || 'N/A';
+      const type = id.includes('_') ? 'Segment' : 'Traj';
       const uniqueKey = `${id}-${index}`;
 
       let rowClass = 'transition-colors hover:bg-gray-100';
@@ -112,7 +118,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
         <tr key={uniqueKey} className={rowClass}>
           <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
             <Link
-              href={`/motion/${id.split('_')[0]}`}
+              href={`/bewegungsdaten/${id.split('_')[0]}`}
               target="_blank"
               rel="noopener noreferrer"
               className={`flex hover:text-blue-600 ${isTarget ? 'font-bold text-blue-900' : 'text-gray-900'}`}
@@ -123,7 +129,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
           <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
             <span
               className={`rounded-full px-2 py-1 text-xs ${
-                type === 'Bahn'
+                type === 'Traj'
                   ? 'bg-green-100 text-green-800'
                   : 'bg-blue-100 text-blue-600'
               }`}
@@ -131,15 +137,25 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
               {type}
             </span>
           </td>
+
+          {/* Score-Spalte: RRF Score oder DTW-Dist je nach Modus */}
           <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+            {/* eslint-disable-next-line no-nested-ternary */}
             {isTarget ? (
-              <span className="font-bold text-blue-600">Original</span>
+              <span className="font-bold text-blue-600">Query</span>
+            ) : stage2Active ? (
+              <span className="font-mono">
+                {result.dtw_distance !== undefined
+                  ? result.dtw_distance.toFixed(4)
+                  : 'N/A'}
+              </span>
             ) : (
               <span className="font-mono">
                 {result.similarity_score?.toFixed(4) ?? 'N/A'}
               </span>
             )}
           </td>
+
           <td className="whitespace-nowrap px-6 py-4 font-mono text-sm text-gray-900">
             {result.duration ? result.duration.toFixed(2) : '-'}
           </td>
@@ -176,30 +192,29 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
   };
 
   const featuresToResult = (f: TargetFeatures): SimilarityResult => ({
-    bahn_id: f.segment_id.includes('_') ? f.bahn_id : f.segment_id,
-    segment_id: f.segment_id,
+    traj_id: f.seg_id.includes('_') ? f.traj_id : f.seg_id,
+    seg_id: f.seg_id,
     similarity_score: 0,
     duration: f.duration,
     weight: f.weight,
     length: f.length,
     movement_type: f.movement_type,
-    mean_twist_ist: f.mean_twist_ist,
-    max_twist_ist: f.max_twist_ist,
-    std_twist_ist: f.std_twist_ist,
-    min_acceleration_ist: f.min_acceleration_ist,
-    max_acceleration_ist: f.max_acceleration_ist,
-    mean_acceleration_ist: f.mean_acceleration_ist,
-    std_acceleration_ist: f.std_acceleration_ist,
+    mean_vel_act: f.mean_vel_act,
+    max_vel_act: f.max_vel_act,
+    std_vel_act: f.std_vel_act,
+    min_accel_act: f.min_accel_act,
+    max_accel_act: f.max_accel_act,
+    mean_accel_act: f.mean_accel_act,
+    std_accel_act: f.std_accel_act,
     sidtw_average_distance: f.sidtw_average_distance,
     position_x: f.position_x,
     position_y: f.position_y,
     position_z: f.position_z,
   });
 
-  // 👉 Alle Zeilen in einem Array sammeln
   const allRows: JSX.Element[] = [];
-  if (targetBahnFeatures)
-    allRows.push(...renderRows([featuresToResult(targetBahnFeatures)]));
+  if (targetTrajFeatures)
+    allRows.push(...renderRows([featuresToResult(targetTrajFeatures)]));
   if (bahnResults.length > 0) allRows.push(...renderRows(bahnResults));
   if (segmentGroups.length > 0) {
     segmentGroups.forEach((group) => {
@@ -216,17 +231,57 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
   return (
     <div className="flex flex-col overflow-y-auto rounded-lg border border-gray-400 bg-white shadow-md">
       <div className="bg-gray-50 px-6 py-4">
-        <h3 className="text-lg font-medium text-gray-900">
-          Ähnlichkeitsergebnisse
-        </h3>
-        <p className="mt-1 text-sm text-gray-600">
-          {bahnResults.length > 0 && `${bahnResults.length} Bahnen`}
-          {bahnResults.length > 0 &&
-            (segmentResults.length > 0 || segmentGroups.length > 0) &&
-            ' • '}
-          {(segmentResults.length > 0 || segmentGroups.length > 0) &&
-            `${segmentGroups.length || segmentResults.length} Segmente`}
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-medium text-gray-900">
+              Ähnlichkeitsergebnisse
+            </h3>
+            <p className="mt-1 text-sm text-gray-600">
+              {bahnResults.length > 0 && `${bahnResults.length} Bahnen`}
+              {bahnResults.length > 0 &&
+                (segmentResults.length > 0 || segmentGroups.length > 0) &&
+                ' • '}
+              {(segmentResults.length > 0 || segmentGroups.length > 0) &&
+                `${segmentGroups.length || segmentResults.length} Segmente`}
+              {stage2Active && (
+                <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
+                  DTW {dtwMode}
+                </span>
+              )}
+            </p>
+          </div>
+
+          {/* Timing Badge */}
+          {timing && (
+            <div className="flex gap-3 text-xs text-gray-500">
+              <span>
+                Stage 1:{' '}
+                <span className="font-mono font-medium text-gray-700">
+                  {timing.stage1_ms.toFixed(0)} ms
+                </span>
+              </span>
+              {timing.data_loading_ms !== undefined && (
+                <span>
+                  Loading:{' '}
+                  <span className="font-mono font-medium text-gray-700">
+                    {timing.data_loading_ms.toFixed(0)} ms
+                  </span>
+                </span>
+              )}
+              {timing.stage2_ms !== undefined && (
+                <span>
+                  Stage 2:{' '}
+                  <span className="font-mono font-medium text-gray-700">
+                    {timing.stage2_ms.toFixed(0)} ms
+                  </span>
+                </span>
+              )}
+              <span className="font-medium text-gray-700">
+                Total: {timing.total_ms.toFixed(0)} ms
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {isSegmentTaskRunning && (
@@ -251,7 +306,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
                 Typ
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
-                Ähnlichkeit
+                {stage2Active ? 'DTW-Dist' : 'RRF Score'}
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
                 Dauer (s)

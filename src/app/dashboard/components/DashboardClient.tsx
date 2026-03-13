@@ -14,7 +14,7 @@ import type { PerformerData } from '@/types/dashboard.types';
 
 interface DashboardClientProps {
   segmentsCount: number;
-  bahnenCount: number;
+  trajsCount: number;
   medianSIDTW?: number;
   meanSIDTW?: number;
   bestPerformers?: PerformerData[]; // NEU
@@ -23,7 +23,7 @@ interface DashboardClientProps {
 
 export default function DashboardClient({
   segmentsCount,
-  bahnenCount,
+  trajsCount,
   medianSIDTW,
   meanSIDTW,
   bestPerformers,
@@ -36,7 +36,7 @@ export default function DashboardClient({
         <div className="my-2 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           <DataCard
             componentName="Roboterbahnen insgesamt"
-            value={bahnenCount}
+            value={trajsCount}
           />
           <DataCard componentName="Segmente insgesamt" value={segmentsCount} />
           <AccuracyCard medianSIDTW={medianSIDTW} meanSIDTW={meanSIDTW} />

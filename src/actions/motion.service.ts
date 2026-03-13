@@ -302,7 +302,7 @@ export const getTrajJointStatesById = async (
   }
 };
 
-export const getTrajEventsById = async (id: string): Promise<TrajSetpoints[]> => {
+export const getTrajSetpointsById = async (id: string): Promise<TrajSetpoints[]> => {
   try {
     const result = await fetchFromAPI(`/traj/traj_setpoints/${id}`, true);
     return transformTrajSetpointsResult(result);
@@ -313,7 +313,7 @@ export const getTrajEventsById = async (id: string): Promise<TrajSetpoints[]> =>
   }
 };
 
-export const getSegmentEventsById = async (
+export const getSegmentSetpointsById = async (
   id: string,
 ): Promise<TrajSetpoints[]> => {
   try {

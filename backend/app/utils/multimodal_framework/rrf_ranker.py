@@ -36,7 +36,7 @@ class RRFRanker:
         Args:
             rankings: Dict[mode_name, List[results]]
                 z.B. {'joint': [...], 'position': [...], 'orientation': [...]}
-                Jedes result dict muss 'segment_id' und 'rank' haben
+                Jedes result dict muss 'seg_id' und 'rank' haben
 
             weights: Optional Dict[mode_name, weight]
                 z.B. {'joint': 0.5, 'position': 0.3, 'orientation': 0.2}
@@ -44,7 +44,7 @@ class RRFRanker:
 
         Returns:
             List[Dict] sortiert nach RRF score (höchster zuerst)
-            Jedes Dict enthält: segment_id, rrf_score, rank, mode_scores
+            Jedes Dict enthält: seg_id, rrf_score, rank, mode_scores
         """
         if not rankings:
             logger.warning("No rankings provided for fusion")
@@ -64,7 +64,7 @@ class RRFRanker:
         # RRF Score Berechnung
         rrf_scores = defaultdict(float)
         mode_details = defaultdict(lambda: {})  # Für Debugging/Transparency
-        all_segment_ids = set()
+        all_seg_ids = set()
 
         for mode, results in rankings.items():
             weight = normalized_weights.get(mode, 0.0)
@@ -74,28 +74,28 @@ class RRFRanker:
                 continue
 
             for result in results:
-                segment_id = result.get('segment_id')
+                seg_id = result.get('seg_id')
                 rank = result.get('rank')
 
-                if segment_id is None or rank is None:
-                    logger.warning(f"Missing segment_id or rank in {mode} result")
+                if seg_id is None or rank is None:
+                    logger.warning(f"Missing seg_id or rank in {mode} result")
                     continue
 
                 # RRF Formula
                 rrf_contribution = weight / (self.k + rank)
-                rrf_scores[segment_id] += rrf_contribution
+                rrf_scores[seg_id] += rrf_contribution
 
                 # Details speichern
-                if segment_id not in mode_details:
-                    mode_details[segment_id] = {}
+                if seg_id not in mode_details:
+                    mode_details[seg_id] = {}
 
-                mode_details[segment_id][mode] = {
+                mode_details[seg_id][mode] = {
                     'rank': rank,
                     'distance': result.get('distance'),
                     'rrf_contribution': rrf_contribution
                 }
 
-                all_segment_ids.add(segment_id)
+                all_seg_ids.add(seg_id)
 
         if not rrf_scores:
             logger.warning("No valid RRF scores computed")
@@ -110,12 +110,12 @@ class RRFRanker:
 
         # Format Output
         fused_results = []
-        for final_rank, (segment_id, rrf_score) in enumerate(sorted_segments, start=1):
+        for final_rank, (seg_id, rrf_score) in enumerate(sorted_segments, start=1):
             fused_results.append({
-                'segment_id': segment_id,
+                'seg_id': seg_id,
                 'rrf_score': round(rrf_score, 6),
                 'rank': final_rank,
-                'mode_scores': mode_details[segment_id]
+                'mode_scores': mode_details[seg_id]
             })
 
         logger.info(
@@ -137,12 +137,12 @@ class RRFRanker:
         Returns:
             Human-readable Erklärung
         """
-        segment_id = result['segment_id']
+        seg_id = result['seg_id']
         rrf_score = result['rrf_score']
         mode_scores = result.get('mode_scores', {})
 
         lines = [
-            f"Segment: {segment_id}",
+            f"Segment: {seg_id}",
             f"Final RRF Score: {rrf_score:.6f}",
             f"Final Rank: {result['rank']}",
             "",

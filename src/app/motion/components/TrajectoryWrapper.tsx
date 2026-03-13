@@ -7,7 +7,7 @@ import {
   checkTransformedDataExists,
   getTrajAccelActById,
   getTrajAccelCmdById,
-  getTrajEventsById,
+  getTrajSetpointsById,
   getTrajInfoById,
   getTrajJointStatesById,
   getTrajOrientationCmdById,
@@ -177,7 +177,7 @@ export function TrajectoryWrapper() {
             ).then(() => updateLoadingState('pose', true)),
         // Events werden auch sofort benötigt
         fetchDataWithCache(
-          () => getTrajEventsById(id),
+          () => getTrajSetpointsById(id),
           setCurrentTrajSetpoints,
           'events',
         ).then(() => updateLoadingState('events', true)),

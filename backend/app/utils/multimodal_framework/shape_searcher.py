@@ -36,8 +36,8 @@ class ShapeSearcher:
 
             query = f"""
                 SELECT {embedding_col}
-                FROM motion.bahn_embeddings
-                WHERE segment_id = $1
+                FROM motion.traj_embeddings
+                WHERE seg_id = $1
             """
 
             result = await self.connection.fetchrow(query, target_id)
@@ -60,7 +60,7 @@ class ShapeSearcher:
             mode: str,
             limit: int = 100,
             candidate_ids: Optional[List[str]] = None,
-            only_bahnen: bool = False,
+            only_traj: bool = False,
             only_segments: bool = False
     ) -> List[Dict]:
         """
@@ -71,11 +71,11 @@ class ShapeSearcher:
             mode: 'joint', 'position', 'orientation', 'velocity', 'metadata'
             limit: Max Ergebnisse
             candidate_ids: Optional Pre-Filter Liste
-            only_bahnen: Nur Bahnen (segment_id = bahn_id)
-            only_segments: Nur Segmente (segment_id != bahn_id)
+            only_traj: Nur Bahnen (seg_id = traj_id)
+            only_segments: Nur Segmente (seg_id != traj_id)
 
         Returns:
-            List[Dict] mit segment_id, bahn_id, distance, rank
+            List[Dict] mit seg_id, traj_id, distance, rank
         """
 
         try:
@@ -90,35 +90,33 @@ class ShapeSearcher:
 
             # 2. Baue WHERE Conditions
             where_conditions = [
-                f"e.segment_id != $2",
+                f"e.seg_id != $2",
                 f"e.{embedding_col} IS NOT NULL"
             ]
 
             # Filter für Bahnen/Segmente
-            if only_bahnen:
-                where_conditions.append("e.segment_id = e.bahn_id")
-                lambda_factor = 1
+            if only_traj:
+                where_conditions.append("e.seg_id = e.traj_id")
             elif only_segments:
-                where_conditions.append("e.segment_id != e.bahn_id")
-                lambda_factor = 1
+                where_conditions.append("e.seg_id != e.traj_id")
 
             where_clause = " AND ".join(where_conditions)
 
             # ⭐ 3. SET HNSW parameter ERST (außerhalb der Query)
-            await self.connection.execute("SET LOCAL hnsw.ef_search = 100;")
+            await self.connection.execute("SET hnsw.ef_search = 500;")
 
             # 4. Query
             if candidate_ids is not None and len(candidate_ids) > 0:
                 # Mit Kandidaten-Filter
-                where_conditions.append("e.segment_id = ANY($3)")
+                where_conditions.append("e.seg_id = ANY($3)")
                 where_clause = " AND ".join(where_conditions)
 
                 query = f"""
                     SELECT 
-                        e.segment_id,
-                        e.bahn_id,
+                        e.seg_id,
+                        e.traj_id,
                         e.{embedding_col} <=> $1::vector as distance
-                    FROM motion.bahn_embeddings e
+                    FROM motion.traj_embeddings e
                     WHERE {where_clause}
                     ORDER BY distance
                     LIMIT $4
@@ -129,16 +127,16 @@ class ShapeSearcher:
                     target_embedding,
                     target_id,
                     candidate_ids,
-                    limit*lambda_factor
+                    limit
                 )
             else:
                 # Full Search
                 query = f"""
                     SELECT 
-                        e.segment_id,
-                        e.bahn_id,
+                        e.seg_id,
+                        e.traj_id,
                         e.{embedding_col} <=> $1::vector as distance
-                    FROM motion.bahn_embeddings e
+                    FROM motion.traj_embeddings e
                     WHERE {where_clause}
                     ORDER BY distance
                     LIMIT $3
@@ -148,23 +146,23 @@ class ShapeSearcher:
                     query,
                     target_embedding,
                     target_id,
-                    limit*lambda_factor
+                    limit
                 )
 
             # 5. Format Results
             ranked_results = []
             for rank, row in enumerate(results, start=1):
                 ranked_results.append({
-                    'segment_id': row['segment_id'],
-                    'bahn_id': row['bahn_id'],
+                    'seg_id': row['seg_id'],
+                    'traj_id': row['traj_id'],
                     'distance': float(row['distance']),
                     'rank': rank,
                     'mode': mode
                 })
 
             filter_info = ""
-            if only_bahnen:
-                filter_info = "(only bahnen)"
+            if only_traj:
+                filter_info = "(only trajs)"
             elif only_segments:
                 filter_info = "(only segments)"
 
@@ -193,8 +191,8 @@ class ShapeSearcher:
                        orientation_embedding IS NOT NULL as has_orientation,
                        velocity_embedding IS NOT NULL    as has_velocity,
                        metadata_embedding IS NOT NULL    as has_metadata
-                FROM motion.bahn_embeddings
-                WHERE segment_id = $1
+                FROM motion.traj_embeddings
+                WHERE seg_id = $1
             """
 
             result = await self.connection.fetchrow(query, target_id)
