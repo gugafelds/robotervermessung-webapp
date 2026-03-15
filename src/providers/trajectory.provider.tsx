@@ -19,7 +19,6 @@ import type {
   TrajJointStates,
   TrajOrientationCmd,
   TrajPoseAct,
-  TrajPoseTrans,
   TrajPositionCmd,
   TrajVelAct,
   TrajVelCmd,
@@ -27,7 +26,7 @@ import type {
 import type { PaginationResult } from '@/types/pagination.types';
 
 export interface TrajectoryState {
-  bahnInfo: TrajInfo[];
+  trajInfo: TrajInfo[];
   pagination: PaginationResult | null;
   currentPage: number;
   loadPage: (page: number) => Promise<void>;
@@ -63,10 +62,7 @@ export interface TrajectoryState {
   >;
   currentTrajSetpoints: TrajSetpoints[];
   setCurrentTrajSetpoints: React.Dispatch<React.SetStateAction<TrajSetpoints[]>>;
-  currentTrajPoseTrans: TrajPoseTrans[];
-  setCurrentTrajPoseTrans: React.Dispatch<
-    React.SetStateAction<TrajPoseTrans[]>
-  >;
+
 }
 
 type TrajectoryProviderProps = {
@@ -82,7 +78,7 @@ export const TrajectoryProvider = ({
   initialTrajInfo,
   initialPagination,
 }: TrajectoryProviderProps) => {
-  const [bahnInfo, setTrajInfo] = useState<TrajInfo[]>(initialTrajInfo);
+  const [trajInfo, setTrajInfo] = useState<TrajInfo[]>(initialTrajInfo);
   const [pagination, setPagination] = useState<PaginationResult | null>(
     initialPagination,
   );
@@ -113,9 +109,6 @@ export const TrajectoryProvider = ({
     TrajJointStates[]
   >([]);
   const [currentTrajSetpoints, setCurrentTrajSetpoints] = useState<TrajSetpoints[]>([]);
-  const [currentTrajPoseTrans, setCurrentTrajPoseTrans] = useState<
-    TrajPoseTrans[]
-  >([]);
 
   useEffect(() => {
     setTrajInfo(initialTrajInfo);
@@ -130,7 +123,7 @@ export const TrajectoryProvider = ({
       }
 
       try {
-        const { bahnInfo: newTrajInfo, pagination: newPagination } =
+        const { trajInfo: newTrajInfo, pagination: newPagination } =
           await getTrajInfo({
             page,
             pageSize: pagination.pageSize,
@@ -162,7 +155,7 @@ export const TrajectoryProvider = ({
 
   const contextValue = useMemo(
     () => ({
-      bahnInfo,
+      trajInfo,
       pagination,
       currentPage,
       loadPage,
@@ -188,11 +181,9 @@ export const TrajectoryProvider = ({
       setCurrentTrajJointStates,
       currentTrajSetpoints,
       setCurrentTrajSetpoints,
-      currentTrajPoseTrans,
-      setCurrentTrajPoseTrans,
     }),
     [
-      bahnInfo,
+      trajInfo,
       pagination,
       currentPage,
       loadPage,
@@ -208,7 +199,6 @@ export const TrajectoryProvider = ({
       currentTrajVelCmd,
       currentTrajJointStates,
       currentTrajSetpoints,
-      currentTrajPoseTrans,
     ],
   );
 

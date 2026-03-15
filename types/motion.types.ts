@@ -79,21 +79,19 @@ export interface TrajPoseAct {
   qyAct: number;
   qzAct: number;
   qwAct: number;
-  sourceDataAct: string;
 }
 
 export interface TrajPoseActRaw {
   traj_id: string;
   seg_id: string;
   timestamp: string;
-  x_raw_act: number;
-  y_raw_act: number;
-  z_raw_act: number;
-  qx_raw_act: number;
-  qy_raw_act: number;
-  qz_raw_act: number;
-  qw_raw_act: number;
-  source_data_raw_act: string;
+  x_act: number;
+  y_act: number;
+  z_act: number;
+  qx_act: number;
+  qy_act: number;
+  qz_act: number;
+  qw_act: number;
 }
 
 export interface TrajVelAct {
@@ -138,24 +136,6 @@ export interface TrajAccelCmdRaw {
   tcp_accel_cmd: number;
 }
 
-export interface TrajIMU {
-  trajID: string;
-  segID: string;
-  timestamp: string;
-  tcpAccelPi: number;
-  tcpAngularVelPi: number;
-  sourceDataAct: string;
-}
-
-export interface TrajIMURaw {
-  traj_id: string;
-  seg_id: string;
-  timestamp: string;
-  tcp_accel_pi: number;
-  tcp_angular_vel_pi: number;
-  source_data_act: string;
-}
-
 export interface TrajPositionCmd {
   trajID: string;
   segID: string;
@@ -163,7 +143,6 @@ export interface TrajPositionCmd {
   xCmd: number;
   yCmd: number;
   zCmd: number;
-  sourceDataCmd: string;
 }
 
 export interface TrajPositionCmdRaw {
@@ -173,10 +152,8 @@ export interface TrajPositionCmdRaw {
   x_cmd: number;
   y_cmd: number;
   z_cmd: number;
-  source_data_cmd: string;
 }
 
-// Interfaces
 export interface TrajOrientationCmd {
   trajID: string;
   segID: string;
@@ -185,7 +162,6 @@ export interface TrajOrientationCmd {
   qyCmd: number;
   qzCmd: number;
   qwCmd: number;
-  sourceDataCmd: string;
 }
 
 export interface TrajOrientationCmdRaw {
@@ -196,7 +172,6 @@ export interface TrajOrientationCmdRaw {
   qy_cmd: number;
   qz_cmd: number;
   qw_cmd: number;
-  source_data_cmd: string;
 }
 
 export interface TrajVelCmd {
@@ -204,7 +179,6 @@ export interface TrajVelCmd {
   segID: string;
   timestamp: string;
   tcpSpeedCmd: number;
-  sourceDataCmd: string;
 }
 
 export interface TrajVelCmdRaw {
@@ -212,7 +186,6 @@ export interface TrajVelCmdRaw {
   seg_id: string;
   timestamp: string;
   tcp_vel_cmd: number;
-  source_data_cmd: string;
 }
 
 export interface TrajJointStates {
@@ -225,7 +198,6 @@ export interface TrajJointStates {
   joint4: number;
   joint5: number;
   joint6: number;
-  sourceDataCmd: string;
 }
 
 export interface TrajJointStatesRaw {
@@ -238,7 +210,6 @@ export interface TrajJointStatesRaw {
   joint_4: number;
   joint_5: number;
   joint_6: number;
-  source_data_cmd: string;
 }
 
 export interface TrajSetpoints {
@@ -252,7 +223,6 @@ export interface TrajSetpoints {
   qyReached: number;
   qzReached: number;
   qwReached: number;
-  sourceDataCmd: string;
 }
 
 export interface TrajSetpointsRaw {
@@ -266,33 +236,4 @@ export interface TrajSetpointsRaw {
   qy_reached: number;
   qz_reached: number;
   qw_reached: number;
-  source_data_cmd: string;
-}
-
-export interface TrajPoseTrans {
-  bahnID: string;
-  segmentID: string;
-  timestamp: string;
-  xTrans: number;
-  yTrans: number;
-  zTrans: number;
-  qxTrans: number;
-  qyTrans: number;
-  qzTrans: number;
-  qwTrans: number;
-  calibrationID: string;
-}
-
-export interface TrajPoseTransRaw {
-  traj_id: string;
-  seg_id: string;
-  timestamp: string;
-  x_act: number;
-  y_act: number;
-  z_act: number;
-  qx_act: number;
-  qy_act: number;
-  qz_act: number;
-  qw_act: number;
-  calibration_id: string;
 }

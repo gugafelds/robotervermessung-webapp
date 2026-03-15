@@ -7,7 +7,6 @@ import React from 'react';
 import type {
   TrajSetpoints,
   TrajPoseAct,
-  TrajPoseTrans,
   TrajPositionCmd,
 } from '@/types/motion.types';
 
@@ -17,24 +16,18 @@ interface Position2DPlotProps {
   idealTrajectory: TrajPositionCmd[];
   currentTrajSetpoints: TrajSetpoints[];
   currentTrajPoseAct: TrajPoseAct[];
-  currentTrajPoseTrans: TrajPoseTrans[];
-  isTransformed: boolean;
 }
 
 export const Position2DPlot: React.FC<Position2DPlotProps> = ({
   idealTrajectory,
   currentTrajSetpoints,
   currentTrajPoseAct,
-  currentTrajPoseTrans,
-  isTransformed,
 }) => {
   const createCombinedPositionPlot = (): {
     plotData: Partial<PlotData>[];
     maxTimePos: number;
   } => {
-    const currentPoseData = isTransformed
-      ? currentTrajPoseTrans
-      : currentTrajPoseAct;
+    const currentPoseData = currentTrajPoseAct;
 
     // Neue optimierte Berechnung von globalStartTime
     const getGlobalStartTime = () => {
@@ -66,15 +59,6 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
 
     const positionIstData = currentPoseData.map((b) => {
       const x = (Number(b.timestamp) - globalStartTime) / 1e9;
-      if (isTransformed) {
-        const transPose = b as TrajPoseTrans;
-        return {
-          x,
-          xPos: transPose.xTrans,
-          yPos: transPose.yTrans,
-          zPos: transPose.zTrans,
-        };
-      }
       const istPose = b as TrajPoseAct;
       return {
         x,
@@ -132,7 +116,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'X-Sollposition',
+        name: 'X (C)',
         x: positionSollData.map((d) => d.x),
         y: positionSollData.map((d) => d.xPos),
         line: { color: 'red', width: 2 },
@@ -140,7 +124,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'X-Istposition',
+        name: 'X (M)',
         x: positionIstData.map((d) => d.x),
         y: positionIstData.map((d) => d.xPos),
         line: { color: 'darkred', width: 2 },
@@ -148,7 +132,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'markers',
-        name: 'X-Zielpunkte',
+        name: 'X (S)',
         x: currentTrajSetpoints.map(
           (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
         ),
@@ -159,7 +143,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'Y-Sollposition',
+        name: 'Y (C)',
         x: positionSollData.map((d) => d.x),
         y: positionSollData.map((d) => d.yPos),
         line: { color: 'green', width: 2 },
@@ -167,7 +151,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'Y-Istposition',
+        name: 'Y (M)',
         x: positionIstData.map((d) => d.x),
         y: positionIstData.map((d) => d.yPos),
         line: { color: 'darkgreen', width: 2 },
@@ -175,7 +159,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'markers',
-        name: 'Y-Zielpunkte',
+        name: 'Y (S)',
         x: currentTrajSetpoints.map(
           (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
         ),
@@ -186,7 +170,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'Z-Sollposition',
+        name: 'Z (C)',
         x: positionSollData.map((d) => d.x),
         y: positionSollData.map((d) => d.zPos),
         line: { color: 'blue', width: 2 },
@@ -194,7 +178,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'Z-Istposition',
+        name: 'Z (M)',
         x: positionIstData.map((d) => d.x),
         y: positionIstData.map((d) => d.zPos),
         line: { color: 'darkblue', width: 2 },
@@ -202,7 +186,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       {
         type: 'scatter',
         mode: 'markers',
-        name: 'Z-Zielpunkte',
+        name: 'Z (S)',
         x: currentTrajSetpoints.map(
           (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
         ),

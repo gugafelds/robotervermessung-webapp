@@ -40,7 +40,7 @@ class EmbeddingCalculator:
             return None
 
         # Position extrahieren
-        traj = np.array([[r['x_soll'], r['y_soll'], r['z_soll']]
+        traj = np.array([[r['x_cmd'], r['y_cmd'], r['z_cmd']]
                          for r in data], dtype=np.float32)
 
         # Normalisierung zu Startpunkt
@@ -63,7 +63,7 @@ class EmbeddingCalculator:
 
         # Quaternions extrahieren [qx, qy, qz, qw] für scipy
         quats = np.array([
-            [r['qx_soll'], r['qy_soll'], r['qz_soll'], r['qw_soll']]
+            [r['qx_cmd'], r['qy_cmd'], r['qz_cmd'], r['qw_cmd']]
             for r in data
         ], dtype=np.float32)
 
@@ -88,7 +88,7 @@ class EmbeddingCalculator:
 
         # Position extrahieren
         positions = np.array([
-            [r['x_soll'], r['y_soll'], r['z_soll']]
+            [r['x_cmd'], r['y_cmd'], r['z_cmd']]
             for r in data
         ], dtype=np.float32)
 
@@ -178,18 +178,18 @@ class EmbeddingCalculator:
         pos_z_norm = np.clip((pos_z - workspace_min_z) / (workspace_max_z - workspace_min_z), 0, 1)
 
         # Twist Stats
-        min_twist_norm = np.clip((metadata.get('min_twist_ist', 0.0) + vel_max) / (2 * vel_max), 0, 1)
-        max_twist_norm = np.clip((metadata.get('max_twist_ist', 0.0) + vel_max) / (2 * vel_max), 0, 1)
-        mean_twist_norm = np.clip((metadata.get('mean_twist_ist', 0.0) + vel_max) / (2 * vel_max), 0, 1)
-        median_twist_norm = np.clip((metadata.get('median_twist_ist', 0.0) + vel_max) / (2 * vel_max), 0, 1)
-        std_twist_norm = np.clip(metadata.get('std_twist_ist', 0.0) / vel_max, 0, 1)
+        min_twist_norm = np.clip((metadata.get('min_vel_act', 0.0) + vel_max) / (2 * vel_max), 0, 1)
+        max_twist_norm = np.clip((metadata.get('max_vel_act', 0.0) + vel_max) / (2 * vel_max), 0, 1)
+        mean_twist_norm = np.clip((metadata.get('mean_vel_act', 0.0) + vel_max) / (2 * vel_max), 0, 1)
+        median_twist_norm = np.clip((metadata.get('median_vel_act', 0.0) + vel_max) / (2 * vel_max), 0, 1)
+        std_twist_norm = np.clip(metadata.get('std_vel_act', 0.0) / vel_max, 0, 1)
 
         # Acceleration Stats
-        min_accel_norm = np.clip((metadata.get('min_acceleration_ist', 0.0) + accel_max) / (2 * accel_max), 0, 1)
-        max_accel_norm = np.clip((metadata.get('max_acceleration_ist', 0.0) + accel_max) / (2 * accel_max), 0, 1)
-        mean_accel_norm = np.clip((metadata.get('mean_acceleration_ist', 0.0) + accel_max) / (2 * accel_max), 0, 1)
-        median_accel_norm = np.clip((metadata.get('median_acceleration_ist', 0.0) + accel_max) / (2 * accel_max), 0, 1)
-        std_accel_norm = np.clip(metadata.get('std_acceleration_ist', 0.0) / accel_max, 0, 1)
+        min_accel_norm = np.clip((metadata.get('min_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
+        max_accel_norm = np.clip((metadata.get('max_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
+        mean_accel_norm = np.clip((metadata.get('mean_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
+        median_accel_norm = np.clip((metadata.get('median_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
+        std_accel_norm = np.clip(metadata.get('std_accel_act', 0.0) / accel_max, 0, 1)
 
         # 18D Embedding
         features = np.array([
@@ -216,7 +216,8 @@ class EmbeddingCalculator:
         return self._l2_normalize(features)
 
     # Helper methods
-    def _resample(self, trajectory: np.ndarray, n_samples: int) -> np.ndarray:
+    @staticmethod
+    def _resample(trajectory: np.ndarray, n_samples: int) -> np.ndarray:
         """Resample mit Interpolation statt Index-Selection"""
         from scipy.interpolate import interp1d
 
@@ -233,7 +234,8 @@ class EmbeddingCalculator:
         interpolator = interp1d(x_old, trajectory, axis=0, kind='linear')
         return interpolator(x_new)
 
-    def _l2_normalize(self, vec: np.ndarray) -> np.ndarray:
+    @staticmethod
+    def _l2_normalize(vec: np.ndarray) -> np.ndarray:
         """
         L2 normalization
 

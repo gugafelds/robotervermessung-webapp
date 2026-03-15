@@ -1,10 +1,9 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 
 import {
-  checkTransformedDataExists,
   getTrajAccelActById,
   getTrajAccelCmdById,
   getTrajSetpointsById,
@@ -12,7 +11,6 @@ import {
   getTrajJointStatesById,
   getTrajOrientationCmdById,
   getTrajPoseActById,
-  getTrajPoseTransById,
   getTrajPositionCmdById,
   getTrajVelActById,
   getTrajVelCmdById,
@@ -55,15 +53,15 @@ class TimedCache {
 const cache = new TimedCache();
 
 interface DataLoadingState {
-  pose: boolean;
-  twist: boolean;
-  accel: boolean;
+  poseAct: boolean;
+  velAct: boolean;
+  accelAct: boolean;
   accelCmd: boolean;
   positionCmd: boolean;
   orientationCmd: boolean;
-  twistCmd: boolean;
+  velCmd: boolean;
   jointStates: boolean;
-  events: boolean;
+  setpoints: boolean;
 }
 
 export function TrajectoryWrapper() {
@@ -71,36 +69,30 @@ export function TrajectoryWrapper() {
   const id = params?.id as string;
   const [isInfoLoaded, setIsInfoLoaded] = useState(false);
   const [loadingStates, setLoadingStates] = useState<DataLoadingState>({
-    pose: false,
-    twist: false,
-    accel: false,
+    poseAct: false,
+    velAct: false,
+    accelAct: false,
     accelCmd: false,
     positionCmd: false,
     orientationCmd: false,
-    twistCmd: false,
+    velCmd: false,
     jointStates: false,
-    events: false,
+    setpoints: false,
   });
   const [error, setError] = useState<string | null>(null);
-  const [isTransformed, setIsTransformed] = useState(false);
 
-  const plotAvailability = {
-    position:
-      loadingStates.positionCmd && loadingStates.pose && loadingStates.events,
-    orientation:
-      loadingStates.pose &&
-      loadingStates.orientationCmd &&
-      loadingStates.events,
-    twist: loadingStates.twist && loadingStates.twistCmd,
-    acceleration: loadingStates.accel && loadingStates.accelCmd,
-    joints: loadingStates.jointStates,
-  };
+  const plotAvailability = useMemo(() => ({
+  position: loadingStates.positionCmd && loadingStates.poseAct && loadingStates.setpoints,
+  orientation: loadingStates.poseAct && loadingStates.orientationCmd && loadingStates.setpoints,
+  velocity: loadingStates.velAct && loadingStates.velCmd,
+  acceleration: loadingStates.accelAct && loadingStates.accelCmd,
+  joints: loadingStates.jointStates,
+}), [loadingStates]);
 
   const {
     currentTrajInfo,
     setCurrentTrajInfo,
     setCurrentTrajPoseAct,
-    setCurrentTrajPoseTrans,
     setCurrentTrajVelAct,
     setCurrentTrajAccelAct,
     setCurrentTrajAccelCmd,
@@ -111,26 +103,28 @@ export function TrajectoryWrapper() {
     setCurrentTrajSetpoints,
   } = useTrajectory();
 
-  const updateLoadingState = (key: keyof DataLoadingState, value: boolean) => {
+  const updateLoadingState = useCallback(
+  (key: keyof DataLoadingState, value: boolean) => {
     setLoadingStates((prev) => ({ ...prev, [key]: value }));
-  };
+  }, []
+  );
 
   const fetchInfoData = useCallback(async () => {
     if (!id) return;
 
     try {
       const cacheKey = `info_${id}`;
-      let bahnInfo = cache.get(cacheKey);
+      let trajInfo = cache.get(cacheKey);
 
-      if (!bahnInfo) {
-        bahnInfo = await getTrajInfoById(id);
-        cache.set(cacheKey, bahnInfo);
+      if (!trajInfo) {
+        trajInfo = await getTrajInfoById(id);
+        cache.set(cacheKey, trajInfo);
       }
 
-      setCurrentTrajInfo(bahnInfo);
+      setCurrentTrajInfo(trajInfo);
       setIsInfoLoaded(true);
     } catch (err) {
-      setError('Trajinfo wurde nicht gefunden');
+      setError('Traj. info could not be loaded.');
     }
   }, [id, setCurrentTrajInfo]);
 
@@ -158,38 +152,30 @@ export function TrajectoryWrapper() {
     };
 
     try {
-      const useTrans = await checkTransformedDataExists(id);
-      setIsTransformed(useTrans);
 
       // Prioritätsgruppen für die Daten
       const highPriorityFetches = [
         // Pose Daten (höchste Priorität)
-        useTrans
-          ? fetchDataWithCache(
-              () => getTrajPoseTransById(id),
-              setCurrentTrajPoseTrans,
-              'pose_trans',
-            ).then(() => updateLoadingState('pose', true))
-          : fetchDataWithCache(
+        fetchDataWithCache(
               () => getTrajPoseActById(id),
               setCurrentTrajPoseAct,
-              'pose_ist',
-            ).then(() => updateLoadingState('pose', true)),
+              'pose_act',
+            ).then(() => updateLoadingState('poseAct', true)),
         // Events werden auch sofort benötigt
         fetchDataWithCache(
           () => getTrajSetpointsById(id),
           setCurrentTrajSetpoints,
-          'events',
-        ).then(() => updateLoadingState('events', true)),
+          'setpoints',
+        ).then(() => updateLoadingState('setpoints', true)),
         fetchDataWithCache(
           () => getTrajPositionCmdById(id),
           setCurrentTrajPositionCmd,
-          'position_soll',
+          'position_cmd',
         ).then(() => updateLoadingState('positionCmd', true)),
         fetchDataWithCache(
           () => getTrajOrientationCmdById(id),
           setCurrentTrajOrientationCmd,
-          'orientation_soll',
+          'orientation_cmd',
         ).then(() => updateLoadingState('orientationCmd', true)),
       ];
 
@@ -202,25 +188,25 @@ export function TrajectoryWrapper() {
         fetchDataWithCache(
           () => getTrajVelActById(id),
           setCurrentTrajVelAct,
-          'twist_ist',
-        ).then(() => updateLoadingState('twist', true)),
+          'vel_act',
+        ).then(() => updateLoadingState('velAct', true)),
         fetchDataWithCache(
           () => getTrajVelCmdById(id),
           setCurrentTrajVelCmd,
-          'twist_soll',
-        ).then(() => updateLoadingState('twistCmd', true)),
+          'vel_cmd',
+        ).then(() => updateLoadingState('velCmd', true)),
       ];
 
       const lowPriorityFetches = [
         fetchDataWithCache(
           () => getTrajAccelActById(id),
           setCurrentTrajAccelAct,
-          'accel_ist',
-        ).then(() => updateLoadingState('accel', true)),
+          'accel_act',
+        ).then(() => updateLoadingState('accelAct', true)),
         fetchDataWithCache(
           () => getTrajAccelCmdById(id),
           setCurrentTrajAccelCmd,
-          'accel_soll',
+          'accel_cmd',
         ).then(() => updateLoadingState('accelCmd', true)),
       ];
 
@@ -233,7 +219,6 @@ export function TrajectoryWrapper() {
     }
   }, [
     id,
-    setCurrentTrajPoseTrans,
     setCurrentTrajAccelCmd,
     setCurrentTrajPoseAct,
     setCurrentTrajSetpoints,
@@ -272,7 +257,6 @@ export function TrajectoryWrapper() {
     <>
       <TrajectoryInfo />
       <TrajectoryPlot
-        isTransformed={isTransformed}
         plotAvailability={plotAvailability}
       />
     </>

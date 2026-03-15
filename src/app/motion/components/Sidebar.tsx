@@ -155,7 +155,7 @@ export const Sidebar = () => {
         params.query = part;
       } else {
         // Alle Pattern gleichzeitig prüfen
-        const eventMatch = part.match(/^(n|number)=(\d+)$/i);
+        const eventMatch = part.match(/^(n|np)=(\d+)$/i);
         const weightMatch = part.match(/^(w|weight)=(\d*\.?\d+)$/i);
         const velMatch = part.match(/^(v|velocity)=(\d*\.?\d+)$/i);
         const dateMatch = part.match(/^d=(.+)$/i);
@@ -213,11 +213,13 @@ export const Sidebar = () => {
           <SearchFilter onFilterChange={handleFilterChange} />
           <SearchHelpTooltip />
         </div>
-        <div className="mt-2 pl-1 text-sm text-gray-600">
-          {`${trajInfo.length} ${
-            trajInfo.length === 1 ? 'Traj.' : ''
-          }${pagination ? ` of ${pagination.total} trajectories` : ''}`}
-        </div>
+        {!isLoading && (
+          <div className="mt-2 pl-1 text-sm text-gray-600">
+            {`${trajInfo.length} ${
+              trajInfo.length === 1 ? 'Traj.' : ''
+            }${pagination ? ` of ${pagination.total} trajectories` : ''}`}
+          </div>
+        )}
       </div>
 
       <div ref={scrollContainerRef} className="mt-4 overflow-scroll">
@@ -229,7 +231,7 @@ export const Sidebar = () => {
 
         {trajInfo.length === 0 && !isLoading && (
           <div className="py-4 text-center text-gray-500">
-            Keine Trajs gefunden
+            No trajectories found
           </div>
         )}
 

@@ -75,7 +75,6 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
 
     const plotData: Partial<PlotData>[] = [];
 
-    // Add IST data (Vicon)
     if (hasIstData) {
       const viconPlot: Partial<PlotData> = {
         type: 'scatter',
@@ -87,7 +86,7 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
           color: 'green',
           width: 3,
         },
-        name: 'Ist-Beschleunigung',
+        name: 'Measured',
       };
       plotData.push(viconPlot);
     }
@@ -104,7 +103,7 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
           color: 'lightgreen',
           width: 3,
         },
-        name: 'Soll-Beschleunigung',
+        name: 'Commanded',
       };
       plotData.push(sollPlot);
     }
@@ -118,7 +117,7 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
   const { plotData: tcpAccelPlotData, maxTimeAccel } = createTcpAccelPlot();
 
   const tcpAccelLayout: Partial<Layout> = {
-    title: 'Beschleunigung',
+    title: 'Acceleration',
     font: {
       family: 'Helvetica',
     },

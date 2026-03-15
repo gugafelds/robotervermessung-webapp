@@ -21,9 +21,9 @@ router = APIRouter()
 async def process_csv_batch(
         files: list[UploadFile] = File(...),
         robot_model: str = Form(...),
-        bahnplanung: str = Form(...),
-        source_data_ist: str = Form(...),
-        source_data_soll: str = Form(...),
+        path_planning: str = Form(...),
+        source_data_act: str = Form(...),
+        source_data_cmd: str = Form(...),
         upload_database: bool = Form(...),
         segmentation_method: str = Form(default="fixed_segments"),  # Geändert zu fixed_segments als Standard
         num_segments: int = Form(default=3),  # Standardwert auf 3 erhöht
@@ -79,9 +79,9 @@ async def process_csv_batch(
         file_results = await processor.process_csv_batch(
             files_and_paths,
             robot_model,
-            bahnplanung,
-            source_data_ist,
-            source_data_soll,
+            path_planning,
+            source_data_act,
+            source_data_cmd,
             upload_database,
             segmentation_method,
             num_segments,

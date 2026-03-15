@@ -5,8 +5,6 @@ import type {
   TrajAccelCmdRaw,
   TrajSetpoints,
   TrajSetpointsRaw,
-  TrajIMU,
-  TrajIMURaw,
   TrajInfo,
   TrajInfoRaw,
   TrajJointStates,
@@ -15,8 +13,6 @@ import type {
   TrajOrientationCmdRaw,
   TrajPoseAct,
   TrajPoseActRaw,
-  TrajPoseTrans,
-  TrajPoseTransRaw,
   TrajPositionCmd,
   TrajPositionCmdRaw,
   TrajVelAct,
@@ -110,21 +106,20 @@ export const transformTrajInfobyIDResult = (
 });
 
 export const transformTrajPoseActResult = (
-  bahnenPoseActRaw: TrajPoseActRaw[],
+  bahnenPoseAct: TrajPoseActRaw[],
 ): TrajPoseAct[] => {
-  return bahnenPoseActRaw.map(
+  return bahnenPoseAct.map(
     (bahn): TrajPoseAct => ({
       bahnID: bahn.traj_id,
       segmentID: bahn.seg_id,
       timestamp: bahn.timestamp,
-      xAct: bahn.x_raw_act,
-      yAct: bahn.y_raw_act,
-      zAct: bahn.z_raw_act,
-      qxAct: bahn.qx_raw_act,
-      qyAct: bahn.qy_raw_act,
-      qzAct: bahn.qz_raw_act,
-      qwAct: bahn.qw_raw_act,
-      sourceDataAct: bahn.source_data_raw_act,
+      xAct: bahn.x_act,
+      yAct: bahn.y_act,
+      zAct: bahn.z_act,
+      qxAct: bahn.qx_act,
+      qyAct: bahn.qy_act,
+      qzAct: bahn.qz_act,
+      qwAct: bahn.qw_act,
     }),
   );
 };
@@ -149,26 +144,6 @@ export const transformTrajInfoResponse = (
     trajInfo: transformTrajInfoResult(response.traj_info),
     pagination: transformPaginationResult(response.pagination),
   };
-};
-
-export const transformTrajPoseTransResult = (
-  bahnenPoseTransRaw: TrajPoseTransRaw[],
-): TrajPoseTrans[] => {
-  return bahnenPoseTransRaw.map(
-    (bahn): TrajPoseTrans => ({
-      bahnID: bahn.traj_id,
-      segmentID: bahn.seg_id,
-      timestamp: bahn.timestamp,
-      xTrans: bahn.x_act,
-      yTrans: bahn.y_act,
-      zTrans: bahn.z_act,
-      qxTrans: bahn.qx_act,
-      qyTrans: bahn.qy_act,
-      qzTrans: bahn.qz_act,
-      qwTrans: bahn.qw_act,
-      calibrationID: bahn.calibration_id,
-    }),
-  );
 };
 
 export const transformTrajVelActResult = (
@@ -221,7 +196,6 @@ export const transformTrajPositionCmdResult = (
       xCmd: bahn.x_cmd,
       yCmd: bahn.y_cmd,
       zCmd: bahn.z_cmd,
-      sourceDataCmd: bahn.source_data_cmd,
     }),
   );
 };
@@ -238,7 +212,6 @@ export const transformTrajOrientationCmdResult = (
       qyCmd: bahn.qy_cmd,
       qzCmd: bahn.qz_cmd,
       qwCmd: bahn.qw_cmd,
-      sourceDataCmd: bahn.source_data_cmd,
     }),
   );
 };
@@ -252,7 +225,6 @@ export const transformTrajVelCmdResult = (
       segID: bahn.seg_id,
       timestamp: bahn.timestamp,
       tcpSpeedCmd: bahn.tcp_vel_cmd,
-      sourceDataCmd: bahn.source_data_cmd,
     }),
   );
 };
@@ -271,7 +243,6 @@ export const transformTrajJointStatesResult = (
       joint4: bahn.joint_4,
       joint5: bahn.joint_5,
       joint6: bahn.joint_6,
-      sourceDataCmd: bahn.source_data_cmd,
     }),
   );
 };
@@ -291,7 +262,6 @@ export const transformTrajSetpointsResult = (
       qyReached: event.qy_reached,
       qzReached: event.qz_reached,
       qwReached: event.qw_reached,
-      sourceDataCmd: event.source_data_cmd,
     }),
   );
 };

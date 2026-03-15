@@ -62,7 +62,7 @@ export const TCPVelPlot: React.FC<TCPSpeedPlotProps> = ({
         color: 'blue',
         width: 3,
       },
-      name: 'Ist-Geschwindigkeit',
+      name: 'Measured',
     };
 
     const sollPlot: Partial<PlotData> = {
@@ -74,7 +74,7 @@ export const TCPVelPlot: React.FC<TCPSpeedPlotProps> = ({
         color: 'lightblue',
         width: 3,
       },
-      name: 'Soll-Geschwindigkeit',
+      name: 'Commanded',
     };
 
     return {
@@ -86,7 +86,7 @@ export const TCPVelPlot: React.FC<TCPSpeedPlotProps> = ({
   const { plotData: tcpSpeedPlotData, maxTimeSpeed } = createTcpSpeedPlot();
 
   const tcpSpeedLayout: Partial<Layout> = {
-    title: 'Geschwindigkeit',
+    title: 'Velocity',
     font: {
       family: 'Helvetica',
     },

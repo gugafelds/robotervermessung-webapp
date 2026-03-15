@@ -9,33 +9,26 @@ import type {
   TrajSetpoints,
   TrajOrientationCmd,
   TrajPoseAct,
-  TrajPoseTrans,
 } from '@/types/motion.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 interface OrientationPlotProps {
   currentTrajPoseAct: TrajPoseAct[];
-  currentTrajPoseTrans: TrajPoseTrans[];
   currentTrajOrientationCmd: TrajOrientationCmd[];
   currentTrajSetpoints: TrajSetpoints[];
-  isTransformed: boolean;
 }
 
 export const OrientationPlot: React.FC<OrientationPlotProps> = ({
   currentTrajPoseAct,
   currentTrajOrientationCmd,
-  currentTrajPoseTrans,
   currentTrajSetpoints,
-  isTransformed,
 }) => {
   const createCombinedEulerAnglePlotData = (): {
     plotData: Partial<PlotData>[];
     maxTimeOrientation: number;
   } => {
-    const currentPoseData = isTransformed
-      ? currentTrajPoseTrans
-      : currentTrajPoseAct;
+    const currentPoseData = currentTrajPoseAct;
 
     // Helper function to fix arrays of euler angles
     const fixGimbalLockBatch = (eulerAngles: number[][]): number[][] => {
@@ -101,17 +94,8 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       return elapsedNanoseconds / 1e9; // Convert to seconds
     });
 
-    const eulerAnglesIst = fixGimbalLockBatch(
-      isTransformed
-        ? currentTrajPoseTrans.map((traj) =>
-            quaternionToEuler(
-              traj.qxTrans,
-              traj.qyTrans,
-              traj.qzTrans,
-              traj.qwTrans,
-            ),
-          )
-        : currentTrajPoseAct.map((traj) =>
+    const eulerAnglesAct = fixGimbalLockBatch(
+      currentTrajPoseAct.map((traj) =>
             quaternionToEuler(traj.qxAct, traj.qyAct, traj.qzAct, traj.qwAct),
           ),
     );
@@ -165,7 +149,7 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'Roll-Sollwinkel',
+        name: 'Roll (C)',
         x: timestampsSoll,
         y: eulerAnglesSoll.map((angles) => angles[0]),
         line: { color: 'blue', width: 2 },
@@ -173,15 +157,15 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: isTransformed ? 'Roll-Transwinkel' : 'Roll-Istwinkel',
+        name: 'Roll (M)',
         x: timestampsIst,
-        y: eulerAnglesIst.map((angles) => angles[0]),
+        y: eulerAnglesAct.map((angles) => angles[0]),
         line: { color: 'darkblue', width: 2 },
       },
       {
         type: 'scatter',
         mode: 'markers',
-        name: 'Roll-Zielpunkte',
+        name: 'Roll (S)',
         x: eventEulerAngles.map((e) => e.time),
         y: eventEulerAngles.map((e) => e.angles[0]),
         marker: { color: 'blue', size: 12, symbol: 'circle' },
@@ -191,7 +175,7 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'Pitch-Sollwinkel',
+        name: 'Pitch (C)',
         x: timestampsSoll,
         y: eulerAnglesSoll.map((angles) => angles[1]),
         line: { color: 'green', width: 2 },
@@ -199,15 +183,15 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: isTransformed ? 'Pitch-Transwinkel' : 'Pitch-Istwinkel',
+        name: 'Pitch (M)',
         x: timestampsIst,
-        y: eulerAnglesIst.map((angles) => angles[1]),
+        y: eulerAnglesAct.map((angles) => angles[1]),
         line: { color: 'darkgreen', width: 2 },
       },
       {
         type: 'scatter',
         mode: 'markers',
-        name: 'Pitch-Zielpunkte',
+        name: 'Pitch (S)',
         x: eventEulerAngles.map((e) => e.time),
         y: eventEulerAngles.map((e) => e.angles[1]),
         marker: { color: 'green', size: 12, symbol: 'circle' },
@@ -217,7 +201,7 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: 'Gier-Sollwinkel',
+        name: 'Yaw (C)',
         x: timestampsSoll,
         y: eulerAnglesSoll.map((angles) => angles[2]),
         line: { color: 'red', width: 2 },
@@ -225,15 +209,15 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       {
         type: 'scatter',
         mode: 'lines',
-        name: isTransformed ? 'Gier-Transwinkel' : 'Gier-Istwinkel',
+        name: 'Yaw (M)',
         x: timestampsIst,
-        y: eulerAnglesIst.map((angles) => angles[2]),
+        y: eulerAnglesAct.map((angles) => angles[2]),
         line: { color: 'darkred', width: 2 },
       },
       {
         type: 'scatter',
         mode: 'markers',
-        name: 'Gier-Zielpunkte',
+        name: 'Yaw (S)',
         x: eventEulerAngles.map((e) => e.time),
         y: eventEulerAngles.map((e) => e.angles[2]),
         marker: { color: 'red', size: 12, symbol: 'circle' },

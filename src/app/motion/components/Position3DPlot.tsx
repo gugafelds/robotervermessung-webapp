@@ -6,7 +6,6 @@ import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
 import type {
   TrajSetpoints,
   TrajPoseAct,
-  TrajPoseTrans,
   TrajPositionCmd,
 } from '@/types/motion.types';
 
@@ -14,10 +13,8 @@ const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 interface Position3DPlotProps {
   currentTrajPoseAct: TrajPoseAct[];
-  currentTrajPoseTrans: TrajPoseTrans[];
   idealTrajectory: TrajPositionCmd[];
   currentTrajSetpoints: TrajSetpoints[];
-  isTransformed: boolean;
 }
 
 export const Position3DPlot: React.FC<Position3DPlotProps> = ({
@@ -34,15 +31,15 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
   const realTrajectoryData: Partial<PlotData> = {
     ...dataPlotConfig('lines', 'ist', 4, 'darkblue'),
     x: realTrajectory.map((row) =>
-      isTransformed ? (row as TrajPoseTrans).xTrans : (row as TrajPoseAct).xAct,
+      (row as TrajPoseAct).xAct,
     ),
     y: realTrajectory.map((row) =>
-      isTransformed ? (row as TrajPoseTrans).yTrans : (row as TrajPoseAct).yAct,
+      (row as TrajPoseAct).yAct,
     ),
     z: realTrajectory.map((row) =>
-      isTransformed ? (row as TrajPoseTrans).zTrans : (row as TrajPoseAct).zAct,
+      (row as TrajPoseAct).zAct,
     ),
-    name: isTransformed ? 'Transformierte Bahn' : 'Istbahn',
+    name: 'Trajectory (M)',
   };
 
   const idealTrajectoryData: Partial<PlotData> = {
@@ -50,7 +47,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     x: idealTrajectory.map((row) => row.xCmd),
     y: idealTrajectory.map((row) => row.yCmd),
     z: idealTrajectory.map((row) => row.zCmd),
-    name: 'Sollbahn',
+    name: 'Trajectory (C)',
   };
 
   // Startpunkt für Ist-Daten
@@ -58,12 +55,6 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     if (realTrajectory.length === 0) return 0;
 
     const firstPoint = realTrajectory[0];
-    if (isTransformed) {
-      const transPoint = firstPoint as TrajPoseTrans;
-      if (coordinate === 'x') return transPoint.xTrans;
-      if (coordinate === 'y') return transPoint.yTrans;
-      return transPoint.zTrans;
-    }
     const istPoint = firstPoint as TrajPoseAct;
     if (coordinate === 'x') return istPoint.xAct;
     if (coordinate === 'y') return istPoint.yAct;
@@ -73,7 +64,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
   const startPointData: Partial<PlotData> = {
     type: 'scatter3d',
     mode: 'markers',
-    name: 'Startpunkt',
+    name: 'Start',
     x: [getStartPointCoordinate('x')],
     y: [getStartPointCoordinate('y')],
     z: [getStartPointCoordinate('z')],
@@ -97,7 +88,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
   const targetPointsData: Partial<PlotData> = {
     type: 'scatter3d',
     mode: 'markers',
-    name: 'Zielpunkte',
+    name: 'Setpoints',
     x: currentTrajSetpoints.map((row) => row.xReached),
     y: currentTrajSetpoints.map((row) => row.yReached),
     z: currentTrajSetpoints.map((row) => row.zReached),
@@ -118,7 +109,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
   const targetLinesData: Partial<PlotData> = {
     type: 'scatter3d',
     mode: 'lines',
-    name: 'Zielpunkt-Verbindungen',
+    name: 'Setpoints-Connection',
     x: currentTrajSetpoints.map((row) => row.xReached),
     y: currentTrajSetpoints.map((row) => row.yReached),
     z: currentTrajSetpoints.map((row) => row.zReached),

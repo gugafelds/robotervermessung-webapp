@@ -112,18 +112,16 @@ async def search_traj_info(
             param_index += 2
 
         if setted_velocity is not None:
-            base_query += f" AND (b.setted_velocity = ${param_index} OR b.velocity_picking = ${param_index})"
+            base_query += f" AND (b.setted_velocity = ${param_index})"
             params.append(setted_velocity)
             param_index += 1
 
         if recording_date is not None:
-            # Jahr (4 Ziffern): 2024
             if recording_date.isdigit() and len(recording_date) == 4:
                 base_query += f" AND b.recording_date LIKE ${param_index}"
                 params.append(f"{recording_date}-%")
                 param_index += 1
 
-            # DD.MM.YYYY Format: 09.07.2024
             elif '.' in recording_date and ':' not in recording_date:
                 try:
                     parts = recording_date.split('.')
@@ -137,7 +135,6 @@ async def search_traj_info(
                 except Exception as e:
                     logger.warning(f"Invalid date format: {recording_date}")
 
-            # DD.MM.YYYY HH:MM Format: 09.07.2024 17:52
             elif '.' in recording_date and ':' in recording_date:
                 try:
                     date_time_parts = recording_date.split(' ')
@@ -208,23 +205,6 @@ async def get_traj_info_by_id(traj_id: str, conn = Depends(get_db)):
         logger.error(f"Error fetching Bahn info: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
-@router.get("/check_transformed_data/{traj_id}")
-@cache(expire=24000)
-async def check_transformed_data(traj_id: str, conn = Depends(get_db)):
-    try:
-        exists = await conn.fetchval("""
-            SELECT EXISTS (
-                SELECT 1 
-                FROM motion.traj_pose_act_raw 
-                WHERE traj_id = $1
-                LIMIT 1
-            )
-        """, traj_id)
-        return {"exists": exists}
-    except Exception as e:
-        logger.error(f"Error checking transformed data: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.get("/traj_pose_act/{traj_id}")
 @cache(expire=2400)
 async def get_traj_pose_ist_by_id(traj_id: str, conn = Depends(get_db)):
@@ -233,16 +213,6 @@ async def get_traj_pose_ist_by_id(traj_id: str, conn = Depends(get_db)):
         traj_id
     )
     return [dict(row) for row in rows]
-
-@router.get("/traj_pose_act_raw/{traj_id}")
-@cache(expire=2400)
-async def get_traj_pose_trans_by_id(traj_id: str, conn = Depends(get_db)):
-    rows = await conn.fetch(
-        "SELECT * FROM motion.traj_pose_act_raw WHERE traj_id = $1 ORDER BY timestamp ASC",
-        traj_id
-    )
-    return [dict(row) for row in rows]
-
 
 @router.get("/traj_vel_act/{traj_id}")
 @cache(expire=2400)
@@ -332,15 +302,6 @@ async def get_segment_events_by_id(segment_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
         "SELECT * FROM motion.traj_setpoints WHERE seg_id = $1 ORDER BY timestamp ASC",
         segment_id
-    )
-    return [dict(row) for row in rows]
-
-@router.get("/traj_imu/{traj_id}")
-@cache(expire=2400)
-async def get_traj_imu_by_id(traj_id: str, conn = Depends(get_db)):
-    rows = await conn.fetch(
-        "SELECT * FROM motion.traj_imu WHERE traj_id = $1 ORDER BY timestamp ASC",
-        traj_id
     )
     return [dict(row) for row in rows]
 

@@ -15,9 +15,9 @@ type ProcessingResult = {
 const CSVUploadForm: React.FC = () => {
   const [files, setFiles] = useState<FileList | null>(null);
   const [robotModel, setRobotModel] = useState<string>('');
-  const [bahnplanung, setBahnplanung] = useState<string>('');
-  const [sourceDataIst, setSourceDataIst] = useState<string>('');
-  const [sourceDataSoll, setSourceDataSoll] = useState<string>('');
+  const [pathPlanning, setPathPlanning] = useState<string>('');
+  const [sourceDataAct, setSourceDataAct] = useState<string>('');
+  const [sourceDataCmd, setSourceDataCmd] = useState<string>('');
   const [uploadDatabase, setUploadDatabase] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -68,9 +68,9 @@ const CSVUploadForm: React.FC = () => {
 
         // Add other parameters
         formData.append('robot_model', robotModel);
-        formData.append('bahnplanung', bahnplanung);
-        formData.append('source_data_ist', sourceDataIst);
-        formData.append('source_data_soll', sourceDataSoll);
+        formData.append('path_planning', pathPlanning);
+        formData.append('source_data_act', sourceDataAct);
+        formData.append('source_data_cmd', sourceDataCmd);
         formData.append('upload_database', uploadDatabase.toString());
         formData.append('segmentation_method', segmentationMethod);
         formData.append('num_segments', numSegments.toString());
@@ -142,9 +142,9 @@ const CSVUploadForm: React.FC = () => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('robot_model', robotModel);
-        formData.append('bahnplanung', bahnplanung);
-        formData.append('source_data_ist', sourceDataIst);
-        formData.append('source_data_soll', sourceDataSoll);
+        formData.append('pathPlanning', pathPlanning);
+        formData.append('source_data_ist', sourceDataAct);
+        formData.append('source_data_soll', sourceDataCmd);
         formData.append('upload_database', uploadDatabase.toString());
         formData.append('segmentation_method', segmentationMethod);
         formData.append('num_segments', numSegments.toString());
@@ -285,17 +285,17 @@ const CSVUploadForm: React.FC = () => {
         <div className="mb-2">
           <label
             className="block px-1 text-base font-bold text-primary"
-            htmlFor="bahnplanung-input"
+            htmlFor="pathPlanning-input"
           >
             Path planning
           </label>
           <input
             className="w-full appearance-none rounded border border-gray-400 p-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
-            id="bahnplanung-input"
+            id="pathPlanning-input"
             type="text"
-            value={bahnplanung}
+            value={pathPlanning}
             onChange={(e: ChangeEvent<HTMLInputElement>) =>
-              setBahnplanung(e.target.value)
+              setPathPlanning(e.target.value)
             }
             placeholder="abb_steuerung"
             required
@@ -312,9 +312,9 @@ const CSVUploadForm: React.FC = () => {
             className="w-full appearance-none rounded border border-gray-400 p-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
             id="source-data-ist"
             type="text"
-            value={sourceDataIst}
+            value={sourceDataAct}
             onChange={(e: ChangeEvent<HTMLInputElement>) =>
-              setSourceDataIst(e.target.value)
+              setSourceDataAct(e.target.value)
             }
             placeholder="leica_at960"
             required
@@ -331,9 +331,9 @@ const CSVUploadForm: React.FC = () => {
             className="w-full appearance-none rounded border border-gray-400 p-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"
             id="source-data-soll"
             type="text"
-            value={sourceDataSoll}
+            value={sourceDataCmd}
             onChange={(e: ChangeEvent<HTMLInputElement>) =>
-              setSourceDataSoll(e.target.value)
+              setSourceDataCmd(e.target.value)
             }
             placeholder="abb_websocket"
             required

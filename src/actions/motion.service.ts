@@ -11,7 +11,6 @@ import {
   transformTrajJointStatesResult,
   transformTrajOrientationCmdResult,
   transformTrajPoseActResult,
-  transformTrajPoseTransResult,
   transformTrajPositionCmdResult,
   transformTrajVelActResult,
   transformTrajVelCmdResult,
@@ -24,7 +23,6 @@ import type {
   TrajJointStates,
   TrajOrientationCmd,
   TrajPoseAct,
-  TrajPoseTrans,
   TrajPositionCmd,
   TrajVelAct,
   TrajVelCmd,
@@ -170,24 +168,11 @@ export const getTrajPoseActById = async (
   id: string,
 ): Promise<TrajPoseAct[]> => {
   try {
-    const result = await fetchFromAPI(`/traj/traj_pose_act_raw/${id}`, true);
+    const result = await fetchFromAPI(`/traj/traj_pose_act/${id}`, true);
     return transformTrajPoseActResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error fetching Traj pose ist by ID:', error);
-    throw error;
-  }
-};
-
-export const getTrajPoseTransById = async (
-  id: string,
-): Promise<TrajPoseTrans[]> => {
-  try {
-    const result = await fetchFromAPI(`/traj/traj_pose_act/${id}`, true);
-    return transformTrajPoseTransResult(result);
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Error fetching transformed pose data:', error);
     throw error;
   }
 };

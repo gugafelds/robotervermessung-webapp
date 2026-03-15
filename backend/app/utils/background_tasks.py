@@ -23,22 +23,20 @@ async def process_metadata_background(
         task_id: str,
         service,
         mode: str,
-        bahn_ids: List[str],
+        traj_ids: List[str],
         duplicate_handling: str
 ):
-    """
-    ✅ ERWEITERT: Prüft Metadata UND Embeddings separat
-    """
+
     BATCH_SIZE = 100
     
     task_store[task_id] = {
         "status": TaskStatus.RUNNING,
         "started_at": datetime.now().isoformat(),
-        "total_bahns": len(bahn_ids),
-        "processed_bahns": 0,
-        "successful_bahns": 0,
-        "failed_bahns": 0,
-        "current_bahn": None,
+        "total_trajs": len(traj_ids),
+        "processed_trajs": 0,
+        "successful_trajs": 0,
+        "failed_trajs": 0,
+        "current_traj": None,
         "errors": [],
         "details": {
             "mode": mode, 
@@ -50,75 +48,75 @@ async def process_metadata_background(
 
     async with service.db_pool.acquire() as conn:
         try:
-            logger.info(f"Starting task {task_id} for {len(bahn_ids)} bahns")
+            logger.info(f"Starting task {task_id} for {len(traj_ids)} trajectories")
 
             # ✅ SCHRITT 1: Prüfe welche Bahnen Metadata/Embeddings brauchen
-            bahns_needing_metadata = []
-            bahns_needing_embeddings = []
+            trajs_needing_metadata = []
+            trajs_needing_embeddings = []
 
             if duplicate_handling == "replace":
                 # Replace: Alles neu berechnen
-                existing_metadata = await service.check_existing_bahns(bahn_ids)
+                existing_metadata = await service.check_existing_trajs(traj_ids)
                 existing_embeddings = existing_metadata  # Gleiche Liste
                 
                 if existing_metadata:
                     await service.delete_existing_metadata(existing_metadata)
                     await service.delete_existing_embeddings(existing_embeddings)
                 
-                bahns_needing_metadata = bahn_ids
-                bahns_needing_embeddings = bahn_ids
+                trajs_needing_metadata = traj_ids
+                trajs_needing_embeddings = traj_ids
                 
             elif duplicate_handling == "skip":
                 # ✅ Skip: Prüfe separat für Metadata und Embeddings
-                existing_metadata = await service.check_existing_bahns(bahn_ids)
-                bahns_needing_metadata = [b for b in bahn_ids if b not in existing_metadata]
+                existing_metadata = await service.check_existing_trajs(traj_ids)
+                trajs_needing_metadata = [b for b in traj_ids if b not in existing_metadata]
                 
                 # Prüfe welche Bahnen Embeddings fehlen
-                existing_embeddings = await service.check_existing_embeddings(bahn_ids)
-                bahns_needing_embeddings = [b for b in bahn_ids if b not in existing_embeddings]
+                existing_embeddings = await service.check_existing_embeddings(traj_ids)
+                trajs_needing_embeddings = [b for b in traj_ids if b not in existing_embeddings]
                 
             else:  # append (default)
-                bahns_needing_metadata = bahn_ids
-                bahns_needing_embeddings = bahn_ids
+                trajs_needing_metadata = traj_ids
+                trajs_needing_embeddings = traj_ids
 
             # Kombiniere: Alle Bahnen die IRGENDWAS brauchen
-            all_bahns_to_process = list(set(bahns_needing_metadata + bahns_needing_embeddings))
+            all_trajs_to_process = list(set(trajs_needing_metadata + trajs_needing_embeddings))
             
-            task_store[task_id]["total_bahns"] = len(all_bahns_to_process)
-            task_store[task_id]["details"]["bahns_needing_metadata"] = len(bahns_needing_metadata)
-            task_store[task_id]["details"]["bahns_needing_embeddings"] = len(bahns_needing_embeddings)
+            task_store[task_id]["total_trajs"] = len(all_trajs_to_process)
+            task_store[task_id]["details"]["trajs_needing_metadata"] = len(trajs_needing_metadata)
+            task_store[task_id]["details"]["trajs_needing_embeddings"] = len(trajs_needing_embeddings)
 
             logger.info(
-                f"Task {task_id}: {len(bahns_needing_metadata)} need metadata, "
-                f"{len(bahns_needing_embeddings)} need embeddings"
+                f"Task {task_id}: {len(trajs_needing_metadata)} need metadata, "
+                f"{len(trajs_needing_embeddings)} need embeddings"
             )
 
             successful_results = []
             failed_results = []
 
             # ✅ SCHRITT 2: Batch-Processing
-            for batch_idx in range(0, len(all_bahns_to_process), BATCH_SIZE):
-                batch = all_bahns_to_process[batch_idx:batch_idx + BATCH_SIZE]
+            for batch_idx in range(0, len(all_trajs_to_process), BATCH_SIZE):
+                batch = all_trajs_to_process[batch_idx:batch_idx + BATCH_SIZE]
                 batch_metadata = []
                 batch_embeddings = []
                 
-                for bahn_id in batch:
-                    task_store[task_id]["current_bahn"] = bahn_id
+                for traj_id in batch:
+                    task_store[task_id]["current_traj"] = traj_id
                     
-                    needs_metadata = bahn_id in bahns_needing_metadata
-                    needs_embeddings = bahn_id in bahns_needing_embeddings
+                    needs_metadata = traj_id in trajs_needing_metadata
+                    needs_embeddings = traj_id in trajs_needing_embeddings
                     
                     try:
                         # Verarbeite mit Flag was benötigt wird
-                        result = await service.process_single_bahn(
-                            conn, bahn_id, 
+                        result = await service.process_single_traj(
+                            conn, traj_id,
                             compute_metadata=needs_metadata,
                             compute_embeddings=needs_embeddings
                         )
                         
                         if result.get('error'):
                             failed_results.append(result)
-                            task_store[task_id]["failed_bahns"] += 1
+                            task_store[task_id]["failed_trajs"] += 1
                         else:
                             # Nur hinzufügen was auch berechnet wurde
                             if needs_metadata and result.get('metadata'):
@@ -127,14 +125,14 @@ async def process_metadata_background(
                                 batch_embeddings.extend(result['embeddings'])
                             
                             successful_results.append(result)
-                            task_store[task_id]["successful_bahns"] += 1
+                            task_store[task_id]["successful_trajs"] += 1
                             
                     except Exception as e:
-                        logger.error(f"Error {bahn_id}: {e}")
-                        failed_results.append({"bahn_id": bahn_id, "error": str(e)})
-                        task_store[task_id]["failed_bahns"] += 1
+                        logger.error(f"Error {traj_id}: {e}")
+                        failed_results.append({"traj_id": traj_id, "error": str(e)})
+                        task_store[task_id]["failed_trajs"] += 1
                     
-                    task_store[task_id]["processed_bahns"] += 1
+                    task_store[task_id]["processed_trajs"] += 1
                 
                 # ✅ Schreibe Batch (nur was vorhanden ist)
                 if batch_metadata:
@@ -155,7 +153,7 @@ async def process_metadata_background(
                 "status": TaskStatus.COMPLETED,
                 "completed_at": datetime.now().isoformat(),
                 "summary": {
-                    "total_processed": len(all_bahns_to_process),
+                    "total_processed": len(all_trajs_to_process),
                     "successful": len(successful_results),
                     "failed": len(failed_results),
                     "metadata_rows": task_store[task_id]["details"]["metadata_written"],
@@ -188,7 +186,6 @@ def cleanup_old_tasks(max_age_hours: int = 24):
 
     for task_id, task_data in task_store.items():
         if "completed_at" in task_data or "failed_at" in task_data:
-            # Parse completion time
             completion_time_str = task_data.get("completed_at") or task_data.get("failed_at")
             completion_time = datetime.fromisoformat(completion_time_str)
 
@@ -205,17 +202,16 @@ def cleanup_old_tasks(max_age_hours: int = 24):
 
 
 def get_all_tasks() -> Dict[str, Dict]:
-    """Holt alle Tasks (für Admin/Debugging)"""
     return dict(task_store)
 
 
-def find_running_task(task_type: str, target_bahn_id: str = None, **kwargs) -> Optional[str]:
+def find_running_task(task_type: str, target_traj_id: str = None, **kwargs) -> Optional[str]:
     """
     Sucht nach bereits laufenden Tasks für gleiche Parameter
 
     Args:
         task_type: Art des Tasks ("segment_similarity", "metadata_calculation", etc.)
-        target_bahn_id: Bahn-ID für Segment-Tasks
+        target_traj_id: Bahn-ID für Segment-Tasks
         **kwargs: Weitere Parameter je nach Task-Type
 
     Returns:
@@ -227,20 +223,20 @@ def find_running_task(task_type: str, target_bahn_id: str = None, **kwargs) -> O
             # Segment Similarity Tasks
             if (task_type == "segment_similarity" and
                     task_data.get("task_type") == "segment_similarity" and
-                    task_data.get("target_bahn_id") == target_bahn_id):
+                    task_data.get("target_traj_id") == target_traj_id):
                 return task_id
 
             # Metadata Calculation Tasks
             elif (task_type == "metadata_calculation" and
                   task_data.get("details", {}).get("mode") is not None):  # Hat metadata structure
                 mode = kwargs.get("mode")
-                bahn_id = kwargs.get("bahn_id")
+                traj_id = kwargs.get("traj_id")
 
                 task_mode = task_data.get("details", {}).get("mode")
-                task_bahn_id = task_data.get("details", {}).get("bahn_id")
+                task_traj_id = task_data.get("details", {}).get("traj_id")
 
                 # Prüfe je nach Mode
-                if mode == "single" and task_mode == "single" and task_bahn_id == bahn_id:
+                if mode == "single" and task_mode == "single" and task_traj_id == traj_id:
                     return task_id
                 elif mode == "all_missing" and task_mode == "all_missing":
                     return task_id

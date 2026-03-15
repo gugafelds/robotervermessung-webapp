@@ -13,34 +13,23 @@ import { Position2DPlot } from './Position2DPlot';
 import { TCPAccelPlot } from './TCPAccelPlot';
 import { TCPVelPlot } from './TCPVelPlot';
 
-/**
- * Verfügbarkeit der Plots basierend auf geladenen Daten:
- * - position: Benötigt position_soll, pose_ist/trans, events
- * - orientation: Benötigt orientation_soll, pose_ist/trans, events
- * - twist: Benötigt twist_ist, twist_soll
- * - acceleration: Benötigt accel_ist, twist_soll
- * - joints: Benötigt joint_states
- */
 interface PlotAvailability {
-  position: boolean; // position_soll + pose_ist/trans + events
-  orientation: boolean; // orientation_soll + pose_ist/trans + events
-  twist: boolean; // twist_ist + twist_soll
-  acceleration: boolean; // accel_ist + accel_soll
-  joints: boolean; // joint_states
+  position: boolean;
+  orientation: boolean;
+  velocity: boolean;
+  acceleration: boolean;
+  joints: boolean;
 }
 
 interface TrajectoryPlotProps {
-  isTransformed: boolean;
   plotAvailability: PlotAvailability;
 }
 
 export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
-  isTransformed,
   plotAvailability,
 }) => {
   const {
     currentTrajPoseAct,
-    currentTrajPoseTrans,
     currentTrajVelAct,
     currentTrajAccelAct,
     currentTrajAccelCmd,
@@ -60,7 +49,7 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
           <div className="animate-spin">
             <Loader className="mx-auto w-10" color="#003560" />
           </div>
-          <Typography as="h5">Es lädt...</Typography>
+          <Typography as="h5">Loading...</Typography>
         </div>
       </div>
     );
@@ -74,15 +63,11 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
             currentTrajSetpoints={currentTrajSetpoints}
             idealTrajectory={currentTrajPositionCmd}
             currentTrajPoseAct={currentTrajPoseAct}
-            currentTrajPoseTrans={currentTrajPoseTrans}
-            isTransformed={isTransformed}
           />
           <Position3DPlot
             currentTrajPoseAct={currentTrajPoseAct}
-            currentTrajPoseTrans={currentTrajPoseTrans}
             currentTrajSetpoints={currentTrajSetpoints}
             idealTrajectory={currentTrajPositionCmd}
-            isTransformed={isTransformed}
           />
         </>
       )}
@@ -91,9 +76,7 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
         <OrientationPlot
           currentTrajOrientationCmd={currentTrajOrientationCmd}
           currentTrajPoseAct={currentTrajPoseAct}
-          currentTrajPoseTrans={currentTrajPoseTrans}
           currentTrajSetpoints={currentTrajSetpoints}
-          isTransformed={isTransformed}
         />
       )}
 
@@ -101,7 +84,7 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
         <JointStatesPlot currentTrajJointStates={currentTrajJointStates} />
       )}
 
-      {plotAvailability.twist && (
+      {plotAvailability.velocity && (
         <TCPVelPlot
           currentTrajVelAct={currentTrajVelAct}
           currentTrajVelCmd={currentTrajVelCmd}

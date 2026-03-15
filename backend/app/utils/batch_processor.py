@@ -19,7 +19,7 @@ class BatchProcessor:
             self,
             files_and_paths,
             robot_model,
-            bahnplanung,
+            path_planning,
             source_data_act,
             source_data_cmd,
             upload_database,
@@ -48,7 +48,7 @@ class BatchProcessor:
                 csv_processor = CSVProcessor(file_info['path'])
                 processed_data_list = csv_processor.process_csv(
                     robot_model,
-                    bahnplanung,
+                    path_planning,
                     source_data_act,
                     source_data_cmd,
                     file_info['filename'],
@@ -123,11 +123,11 @@ class BatchProcessor:
                     pose_data.extend(data_set.get('POSE_MAPPING', []))
                     position_cmd_data.extend(data_set.get('POSITION_CMD_MAPPING', []))
                     orientation_cmd_data.extend(data_set.get('ORIENTATION_CMD_MAPPING', []))
-                    vel_act_data.extend(data_set.get('vel_ACT_MAPPING', []))
-                    vel_cmd_data.extend(data_set.get('vel_CMD_MAPPING', []))
+                    vel_act_data.extend(data_set.get('VEL_ACT_MAPPING', []))
+                    vel_cmd_data.extend(data_set.get('VEL_CMD_MAPPING', []))
                     accel_act_data.extend(data_set.get('ACCEL_ACT_MAPPING', []))
                     accel_cmd_data.extend(data_set.get('ACCEL_CMD_MAPPING', []))
-                    rapid_setpoints_data.extend(data_set.get('RAPID_setpoints_MAPPING', []))
+                    rapid_setpoints_data.extend(data_set.get('RAPID_SETPOINTS_MAPPING', []))
                     joint_data.extend(data_set.get('JOINT_MAPPING', []))
                     transf_data.extend(data_set.get('TRANSFORM_MAPPING', []))
 
@@ -169,12 +169,12 @@ class BatchProcessor:
 
                 filtered_pose = [
                     record for record in pose_data
-                    if record[0] not in existing_traj_ids['traj_pose_act']
+                    if record[0] not in existing_traj_ids['traj_pose_act_raw']
                 ]
 
                 filtered_transf = [
                     record for record in transf_data
-                    if record[0] not in existing_traj_ids['traj_pose_trans']
+                    if record[0] not in existing_traj_ids['traj_pose_act']
                 ]
 
                 filtered_position_cmd = [
@@ -224,15 +224,15 @@ class BatchProcessor:
                         # First insert traj_info (metadata)
                         if filtered_traj_info:
                             columns = [
-                                'traj_id', 'robot_model', 'bahnplanung', 'recording_date', 'start_time',
+                                'traj_id', 'robot_model', 'path_planning', 'recording_date', 'start_time',
                                 'end_time', 'source_data_act', 'source_data_cmd', 'record_filename',
-                                'np_ereignisse', 'frequency_pose_act', 'frequency_position_cmd',
-                                'frequency_orientation_cmd', 'frequency_vel_act', 'frequency_vel_cmd',
-                                'frequency_accel_act', 'frequency_joint_states',
-                                'np_pose_act', 'np_vel_act', 'np_accel_act', 'np_pos_cmd', 'np_orient_cmd',
-                                'np_vel_cmd', 'np_jointstates', 'weight',
-                                'pick_and_place', 'transformation_matrix',
-                                'np_accel_cmd', 'frequency_accel_cmd', 'setted_velocity', 'stop_point', 'wait_time'
+                                'number_setpoints', 'freq_pose_act', 'freq_position_cmd',
+                                'freq_orientation_cmd', 'freq_vel_act', 'freq_vel_cmd',
+                                'freq_accel_act', 'freq_joint_states',
+                                'number_pose_act', 'number_vel_act', 'number_accel_act', 'number_position_cmd', 'number_orientation_cmd',
+                                'number_vel_cmd', 'number_joint_states', 'weight',
+                                'transformation_matrix',
+                                'number_accel_cmd', 'freq_accel_cmd', 'setted_velocity', 'stop_point', 'wait_time'
                             ]
 
                             # Ensure all records have proper length
@@ -252,31 +252,30 @@ class BatchProcessor:
 
                         # Define data mappings for other tables
                         data_mappings = [
-                            (filtered_pose, 'traj_pose_act',
+                            (filtered_pose, 'traj_pose_act_raw',
+                             ['traj_id', 'seg_id', 'timestamp', 'x_act_raw', 'y_act_raw', 'z_act_raw', 'qx_act_raw', 'qy_act_raw',
+                              'qz_act_raw', 'qw_act_raw']),
+                            (filtered_transf, 'traj_pose_act',
                              ['traj_id', 'seg_id', 'timestamp', 'x_act', 'y_act', 'z_act', 'qx_act', 'qy_act',
-                              'qz_act', 'qw_act', 'source_data_act']),
-                            (filtered_transf, 'traj_pose_trans',
-                             ['traj_id', 'seg_id', 'timestamp', 'x_trans', 'y_trans', 'z_trans', 'qx_trans', 'qy_trans',
-                              'qz_trans', 'qw_trans']),
+                              'qz_act', 'qw_act']),
                             (filtered_position_cmd, 'traj_position_cmd',
-                             ['traj_id', 'seg_id', 'timestamp', 'x_cmd', 'y_cmd', 'z_cmd', 'source_data_cmd']),
+                             ['traj_id', 'seg_id', 'timestamp', 'x_cmd', 'y_cmd', 'z_cmd']),
                             (filtered_orientation_cmd, 'traj_orientation_cmd',
-                             ['traj_id', 'seg_id', 'timestamp', 'qx_cmd', 'qy_cmd', 'qz_cmd', 'qw_cmd',
-                              'source_data_cmd']),
+                             ['traj_id', 'seg_id', 'timestamp', 'qx_cmd', 'qy_cmd', 'qz_cmd', 'qw_cmd']),
                             (filtered_vel_act, 'traj_vel_act',
-                             ['traj_id', 'seg_id', 'timestamp', 'tcp_speed_act']),
+                             ['traj_id', 'seg_id', 'timestamp', 'tcp_vel_act']),
                             (filtered_vel_cmd, 'traj_vel_cmd',
-                             ['traj_id', 'seg_id', 'timestamp', 'tcp_speed_cmd', 'source_data_cmd']),
+                             ['traj_id', 'seg_id', 'timestamp', 'tcp_vel_cmd']),
                             (filtered_accel_act, 'traj_accel_act',
                              ['traj_id', 'seg_id', 'timestamp', 'tcp_accel_act']),
                             (filtered_accel_cmd, 'traj_accel_cmd',
                              ['traj_id', 'seg_id', 'timestamp', 'tcp_accel_cmd']),
                             (filtered_setpoints, 'traj_setpoints',
                              ['traj_id', 'seg_id', 'timestamp', 'x_reached', 'y_reached', 'z_reached', 'qx_reached',
-                              'qy_reached', 'qz_reached', 'qw_reached', 'source_data_cmd', 'movement_type']),
+                              'qy_reached', 'qz_reached', 'qw_reached']),
                             (filtered_joint, 'traj_joint_states',
                              ['traj_id', 'seg_id', 'timestamp', 'joint_1', 'joint_2', 'joint_3', 'joint_4',
-                              'joint_5', 'joint_6', 'source_data_cmd']),
+                              'joint_5', 'joint_6']),
                         ]
 
                         # Insert each type of data
@@ -329,15 +328,15 @@ class BatchProcessor:
                 return
 
             columns = [
-                'traj_id', 'robot_model', 'bahnplanung', 'recording_date', 'start_time',
+                'traj_id', 'robot_model', 'path_planning', 'recording_date', 'start_time',
                 'end_time', 'source_data_act', 'source_data_cmd', 'record_filename',
-                'np_ereignisse', 'frequency_pose_act', 'frequency_position_cmd',
-                'frequency_orientation_cmd', 'frequency_vel_act', 'frequency_vel_cmd',
-                'frequency_accel_act', 'frequency_joint_states',
-                'np_pose_act', 'np_vel_act', 'np_accel_act', 'np_pos_cmd', 'np_orient_cmd',
-                'np_vel_cmd', 'np_jointstates', 'weight',
-                'pick_and_place', 'transformation_matrix',
-                'np_accel_cmd', 'frequency_accel_cmd', 'setted_velocity', 'stop_point', 'wait_time'
+                'number_setpoints', 'freq_pose_act', 'freq_position_cmd',
+                'freq_orientation_cmd', 'freq_vel_act', 'freq_vel_cmd',
+                'freq_accel_act', 'freq_joint_states',
+                'number_pose_act', 'number_vel_act', 'number_accel_act', 'number_position_cmd', 'number_orientation_cmd',
+                'number_vel_cmd', 'number_joint_states', 'weight',
+                'transformation_matrix',
+                'number_accel_cmd', 'freq_accel_cmd', 'setted_velocity', 'stop_point', 'wait_time'
             ]
 
             # Ensure all records have proper length
@@ -397,9 +396,9 @@ class BatchProcessor:
 
     # Specific batch insert methods for each data type - bleiben alle unverändert
     async def batch_insert_pose_data(self, db_ops, conn, data):
-        columns = ['traj_id', 'seg_id', 'timestamp', 'x_act', 'y_act', 'z_act',
-                   'qx_act', 'qy_act', 'qz_act', 'qw_act', 'source_data_act']
-        await self.batch_insert_data(db_ops, conn, 'traj_pose_act', data, columns)
+        columns = ['traj_id', 'seg_id', 'timestamp', 'x_act_raw', 'y_act_raw', 'z_act_raw',
+                   'qx_act_raw', 'qy_act_raw', 'qz_act_raw', 'qw_act_raw']
+        await self.batch_insert_data(db_ops, conn, 'traj_pose_act_raw', data, columns)
 
     async def batch_insert_position_cmd_data(self, db_ops, conn, data):
         columns = ['traj_id', 'seg_id', 'timestamp', 'x_cmd', 'y_cmd', 'z_cmd']
@@ -427,15 +426,15 @@ class BatchProcessor:
 
     async def batch_insert_rapid_setpoints_data(self, db_ops, conn, data):
         columns = ['traj_id', 'seg_id', 'timestamp', 'x_reached', 'y_reached', 'z_reached',
-                   'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached', 'source_data_cmd', 'movement_type']
+                   'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached']
         await self.batch_insert_data(db_ops, conn, 'traj_setpoints', data, columns)
 
     async def batch_insert_joint_data(self, db_ops, conn, data):
         columns = ['traj_id', 'seg_id', 'timestamp', 'joint_1', 'joint_2', 'joint_3',
-                   'joint_4', 'joint_5', 'joint_6', 'source_data_cmd']
+                   'joint_4', 'joint_5', 'joint_6']
         await self.batch_insert_data(db_ops, conn, 'traj_joint_states', data, columns)
 
     async def batch_insert_transf_data(self, db_ops, conn, data):
-        columns = ['traj_id', 'seg_id', 'timestamp', 'x_trans', 'y_trans', 'z_trans',
-                   'qx_trans', 'qy_trans', 'qz_trans', 'qw_trans', 'calibration_id']
-        await self.batch_insert_data(db_ops, conn, 'traj_pose_trans', data, columns)
+        columns = ['traj_id', 'seg_id', 'timestamp', 'x_act', 'y_act', 'z_act',
+                   'qx_act', 'qy_act', 'qz_act', 'qw_act']
+        await self.batch_insert_data(db_ops, conn, 'traj_pose_act', data, columns)
