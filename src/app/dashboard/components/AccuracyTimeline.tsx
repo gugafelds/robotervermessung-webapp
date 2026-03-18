@@ -34,13 +34,12 @@ function AccuracyTimelineContent({ data }: AccuracyTimelineContentProps) {
   return (
     <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
       <Typography as="h2" className="mb-2">
-        Genauigkeitsentwicklung
+        Accuracy Timeline
       </Typography>
       <div className="mb-4 text-sm text-gray-600">
         <p>
-          Dieser Plot zeigt die Entwicklung der Messgenauigkeit über die Zeit.
-          Ein Anstieg könnte auf Verschleiß oder Kalibrierungsprobleme
-          hinweisen.
+          This plot shows the developement of the measurement accuracy over time. 
+          An increase could indicate wear and tear or calibration problems.
         </p>
       </div>
 
@@ -52,11 +51,11 @@ function AccuracyTimelineContent({ data }: AccuracyTimelineContentProps) {
             y: avgValues,
             type: 'scatter',
             mode: 'lines+markers',
-            name: 'Durchschnitt',
+            name: 'Average',
             line: { color: '#003560', width: 3 },
             marker: { size: 6 },
             hovertemplate:
-              '<b>Durchschnitt SIDTW</b><br>' +
+              '<b>Average SIDTW</b><br>' +
               'Datum: %{x}<br>' +
               'SIDTW: %{y:.3f} mm<br>' +
               '<extra></extra>',
@@ -95,7 +94,7 @@ function AccuracyTimelineContent({ data }: AccuracyTimelineContentProps) {
           height: 500,
           margin: { t: 20, r: 20, l: 80, b: 80 },
           xaxis: {
-            title: 'Aufnahmedatum',
+            title: 'Recording date',
             type: 'date',
             tickformat: '%d.%m.%Y',
           },
@@ -129,19 +128,19 @@ function AccuracyTimelineContent({ data }: AccuracyTimelineContentProps) {
 
       <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-lg bg-blue-50 p-4">
-          <p className="text-sm text-gray-600">Gesamtmessungen</p>
+          <p className="text-sm text-gray-600">Overall Measurements</p>
           <p className="text-2xl font-bold text-blue-950">
             {data.reduce((sum, d) => sum + d.count, 0).toLocaleString()}
           </p>
         </div>
         <div className="rounded-lg bg-green-50 p-4">
-          <p className="text-sm text-gray-600">Bester Durchschnitt</p>
+          <p className="text-sm text-gray-600">Best Average</p>
           <p className="text-2xl font-bold text-green-700">
             {Math.min(...avgValues).toFixed(2)} mm
           </p>
         </div>
         <div className="rounded-lg bg-red-50 p-4">
-          <p className="text-sm text-gray-600">Schlechtester Durchschnitt</p>
+          <p className="text-sm text-gray-600">Worst Average</p>
           <p className="text-2xl font-bold text-red-700">
             {Math.max(...avgValues).toFixed(2)} mm
           </p>
@@ -180,12 +179,12 @@ export function AccuracyTimeline() {
     return (
       <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
-          Genauigkeitsentwicklung
+          Accuracy Developement
         </Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center">
             <Loader className="mx-auto mb-4 size-12 animate-spin text-blue-950" />
-            <p className="text-sm text-gray-600">Lade Zeitreihen-Daten...</p>
+            <p className="text-sm text-gray-600">Loading timeline data...</p>
           </div>
         </div>
       </div>
@@ -197,7 +196,7 @@ export function AccuracyTimeline() {
     return (
       <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
-          Genauigkeitsentwicklung
+          Accuracy Developement
         </Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center text-red-600">
@@ -206,7 +205,7 @@ export function AccuracyTimeline() {
               onClick={() => window.location.reload()}
               className="mt-4 rounded-md bg-blue-950 px-4 py-2 text-white hover:bg-blue-900"
             >
-              Seite neu laden
+              reload page
             </button>
           </div>
         </div>
@@ -219,10 +218,10 @@ export function AccuracyTimeline() {
     return (
       <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
-          Genauigkeitsentwicklung
+          Accuracy Developement
         </Typography>
         <div className="flex h-96 items-center justify-center">
-          <p className="text-gray-600">Keine Zeitreihen-Daten verfügbar</p>
+          <p className="text-gray-600">NO timeline data available</p>
         </div>
       </div>
     );

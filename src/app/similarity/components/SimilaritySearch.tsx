@@ -207,7 +207,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
 
         {/* Modi + Gewichtungen */}
         <div className="flex items-center gap-8 rounded-lg bg-white p-3 text-sm sm:flex-col lg:flex-row">
-          <div>Modi:</div>
+          <div>Modes:</div>
           <div className="w-fit gap-2 space-x-2">
             {['position', 'joint', 'orientation', 'velocity', 'metadata'].map(
               (mode) => (
@@ -225,7 +225,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
               ),
             )}
           </div>
-          <div className="text-sm font-medium text-gray-700">Gewichtungen:</div>
+          <div className="text-sm font-medium text-gray-700">Weights:</div>
           <span className="flex w-fit flex-col gap-3 sm:flex-row">
             {Object.entries(weights).map(([mode, value]) => {
               const isActive = activeModes.has(mode);
@@ -366,7 +366,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
             {/* DTW Mode Dropdown — nur sichtbar wenn aktiv */}
             {stage2Active && (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Modus:</span>
+                <span className="text-xs text-gray-500">Mode:</span>
                 <select
                   value={dtwMode}
                   onChange={(e) =>

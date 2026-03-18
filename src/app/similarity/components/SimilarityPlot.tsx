@@ -316,7 +316,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
         setLoadedIds((prev) => new Set([...prev, ...newIds]));
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : 'Unbekannter Fehler beim Laden',
+          err instanceof Error ? err.message : 'Unknown error during loading',
         );
       } finally {
         setIsLoadingPlot(false);
@@ -379,7 +379,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
         plotData.push({
           type: 'scatter3d',
           mode: 'markers',
-          name: `${trajectory.name} (Zielpunkte)`,
+          name: `${trajectory.name} (Endpoints)`,
           x: trajectory.events.map((e) => e.xReached),
           y: trajectory.events.map((e) => e.yReached),
           z: trajectory.events.map((e) => e.zReached),
@@ -406,11 +406,11 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
 
   const getPlotTitle = () => {
     if (mode === 'trajs') {
-      return `3D-Position (${trajectoryData.length} Bahnen)`;
+      return `3D-Position (${trajectoryData.length} Trajectories)`;
     }
     const selectedSegmentLabel =
       segmentOptions.find((opt) => opt.value === selectedSegment)?.label || '';
-    return `3D-Position ${selectedSegmentLabel} (${trajectoryData.length} Segmente)`;
+    return `3D-Position ${selectedSegmentLabel} (${trajectoryData.length} Segments)`;
   };
 
   const layout: Partial<Layout> = {
@@ -443,7 +443,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
             <Loader className="size-8" color="#003560" />
           </div>
           <Typography as="p">
-            Lade {mode === 'trajs' ? 'Bahnen' : 'Segmente'}...
+            Loading {mode === 'trajs' ? 'trajectories' : 'segments'}...
           </Typography>
         </div>
       </div>
@@ -455,7 +455,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
       <div className="flex w-full flex-row justify-center rounded-lg border border-gray-400 bg-gray-50 p-2">
         <div className="py-8 text-center">
           <Typography as="h5" className="mb-2 text-red-600">
-            Fehler beim Laden
+            Error while loading
           </Typography>
           <Typography as="p" className="text-gray-600">
             {error}
@@ -473,13 +473,13 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
         <div className="py-8 text-center">
           <Typography as="h5" className="mb-2">
             {mode === 'segmente' && segmentOptions.length === 0
-              ? 'Keine Segmente für Visualisierung gefunden'
-              : 'Keine Vergleichsdaten verfügbar'}
+              ? 'No segments found for visalisation'
+              : 'No comparison data available'}
           </Typography>
           <Typography as="p" className="text-gray-600">
             {mode === 'trajs'
-              ? 'Führe eine Ähnlichkeitssuche durch, um Bahnen im 3D-Raum zu vergleichen.'
-              : 'Warte auf Segment-Ähnlichkeitsergebnisse.'}
+              ? 'Conduct a similarity search to compare trajectories in 3D-space.'
+              : 'Waiting for results of segment similarity search.'}
           </Typography>
         </div>
       </div>
@@ -528,7 +528,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
                 className="inline-flex items-center rounded-md border border-gray-300 bg-white p-2 text-sm hover:bg-gray-50"
               >
                 {segmentOptions.find((opt) => opt.value === selectedSegment)
-                  ?.label || 'Segment auswählen'}
+                  ?.label || 'Choose Segment'}
                 <ChevronDownIcon className="size-4" />
               </button>
 
@@ -562,7 +562,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
               className="rounded"
             />
             <div className="text-sm text-gray-700">
-              Startpunkt normalisieren
+              Normalize starting point
             </div>
           </label>
         </div>
@@ -570,7 +570,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
         {trajectoryData.length > 0 && (
           <div className="mt-4 space-y-2 overflow-y-auto">
             <div className="mb-2 text-sm font-medium text-gray-700">
-              Sichtbare {mode === 'trajs' ? 'Bahnen' : 'Segmente'}:
+              visible {mode === 'trajs' ? 'trajectories' : 'sements'}:
             </div>
             {sortedLegend.map((trajectory) => (
               <label

@@ -57,39 +57,39 @@ function ParameterCorrelationContent({
   const parameters: ParameterConfig[] = [
     {
       id: 'velocity',
-      label: 'Geschwindigkeit',
+      label: 'Velocity',
       unit: 'mm/s',
-      xLabel: 'Geschwindigkeitsbereich',
+      xLabel: 'Velocity Range',
       numBins: 6,
       useRanges: true,
     },
     {
       id: 'acceleration',
-      label: 'Beschleunigung',
+      label: 'Acceleration',
       unit: 'mm/s²',
-      xLabel: 'Beschleunigungsbereich',
+      xLabel: 'Acceleration Range',
       numBins: 6,
       useRanges: true,
     },
     {
       id: 'weight',
-      label: 'Last',
+      label: 'Payload',
       unit: 'kg',
-      xLabel: 'Last',
+      xLabel: 'Payload',
       useRanges: false,
     },
     {
       id: 'stop_point',
-      label: 'Stopp-Punkte',
+      label: 'Stop Points',
       unit: '%',
-      xLabel: 'Stopp-Punkte',
+      xLabel: 'Stop Points',
       useRanges: false,
     },
     {
       id: 'wait_time',
-      label: 'Wartezeit',
+      label: 'Wait Time',
       unit: 's',
-      xLabel: 'Wartezeit',
+      xLabel: 'Wait Time',
       useRanges: false,
     },
   ];
@@ -167,13 +167,13 @@ function ParameterCorrelationContent({
   return (
     <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
       <Typography as="h2" className="mb-2">
-        Einflussfaktoren auf Genauigkeit
+        Factors influencing accuracy
       </Typography>
       <div className="mb-4 text-sm text-gray-600">
         <p>
-          Box Plots zeigen die SIDTW-Verteilung für verschiedene
-          Parameter-Bereiche. Eine Stichprobe von {data.length.toLocaleString()}{' '}
-          repräsentativen Bahnen.
+          Box Plots showing the SIDTW-distribution for differents parameter ranges. 
+          A sample of {data.length.toLocaleString()}{' '}
+          representative trajectories.
         </p>
       </div>
 
@@ -234,14 +234,14 @@ function ParameterCorrelationContent({
       {/* Statistiken */}
       <div className="mt-2 grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-lg bg-blue-50 p-4">
-          <p className="text-sm text-gray-600">Datenpunkte (Stichprobe)</p>
+          <p className="text-sm text-gray-600">Data Points (Sample)</p>
           <p className="text-2xl font-bold text-blue-950">
             {data.length.toLocaleString()}
           </p>
         </div>
         <div className="rounded-lg bg-green-50 p-4">
           <p className="text-sm text-gray-600">
-            Bester Bereich (niedrigste SIDTW)
+            Best Range (lowest SIDTW)
           </p>
           <p className="text-2xl font-bold text-green-700">
             {binnedData[bestBinIndex]?.binLabel} {activeConfig.unit}
@@ -251,7 +251,7 @@ function ParameterCorrelationContent({
           </p>
         </div>
         <div className="rounded-lg bg-red-50 p-4">
-          <p className="text-sm text-gray-600">Schlechtester Bereich</p>
+          <p className="text-sm text-gray-600">Worst Range</p>
           <p className="text-2xl font-bold text-red-700">
             {binnedData[worstBinIndex]?.binLabel} {activeConfig.unit}
           </p>
@@ -294,12 +294,12 @@ export function ParameterCorrelation() {
     return (
       <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
-          Einflussfaktoren auf Genauigkeit
+          Factors influencing accuracy
         </Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center">
             <Loader className="mx-auto mb-4 size-12 animate-spin text-blue-950" />
-            <p className="text-sm text-gray-600">Lade Parameter-Daten...</p>
+            <p className="text-sm text-gray-600">Loading parameter data...</p>
           </div>
         </div>
       </div>
@@ -311,7 +311,7 @@ export function ParameterCorrelation() {
     return (
       <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
-          Einflussfaktoren auf Genauigkeit
+          Factors influencing accuracy
         </Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center text-red-600">
@@ -320,7 +320,7 @@ export function ParameterCorrelation() {
               onClick={() => window.location.reload()}
               className="mt-4 rounded-md bg-blue-950 px-4 py-2 text-white hover:bg-blue-900"
             >
-              Seite neu laden
+              Reload page
             </button>
           </div>
         </div>
@@ -333,10 +333,10 @@ export function ParameterCorrelation() {
     return (
       <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
-          Einflussfaktoren auf Genauigkeit
+          Factors influencing accuracy
         </Typography>
         <div className="flex h-96 items-center justify-center">
-          <p className="text-gray-600">Keine Parameter-Daten verfügbar</p>
+          <p className="text-gray-600">No parameter data available</p>
         </div>
       </div>
     );

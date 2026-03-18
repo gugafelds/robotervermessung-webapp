@@ -91,7 +91,7 @@ export const MetadataUpload: React.FC = () => {
     <div className="mx-auto w-fit min-w-96 max-w-xl space-y-4 p-4">
       <div className="text-justify">
         <h1 className="text-xl font-bold text-blue-950">Metadata</h1>
-        <p className="text-gray-600">Aktueller Stand der Metadaten</p>
+        <p className="text-gray-600">current state of Metadata</p>
       </div>
 
       {/* Status Tabelle */}
@@ -101,7 +101,7 @@ export const MetadataUpload: React.FC = () => {
             <tbody className="space-y-1">
               <tr className="border-b">
                 <td className="py-2 font-medium text-gray-700">
-                  Gesamte Bahnen
+                  Overall Trajectories
                 </td>
                 <td className="py-2 text-right">
                   {stats.total_trajs.toLocaleString()}
@@ -109,7 +109,7 @@ export const MetadataUpload: React.FC = () => {
               </tr>
               <tr className="border-b">
                 <td className="py-2 font-medium text-gray-700">
-                  Mit Metadaten
+                  With Metadata
                 </td>
                 <td className="py-2 text-right">
                   {stats.trajs_with_metadata.toLocaleString()}
@@ -117,14 +117,14 @@ export const MetadataUpload: React.FC = () => {
               </tr>
               <tr className="border-b">
                 <td className="py-2 font-medium text-gray-700">
-                  Fehlende Metadaten
+                  Missing Metadata
                 </td>
                 <td className="py-2 text-right">
                   {stats.missing_metadata.toLocaleString()}
                 </td>
               </tr>
               <tr>
-                <td className="py-2 font-medium text-gray-700">Abdeckung</td>
+                <td className="py-2 font-medium text-gray-700">Coverage</td>
                 <td className="py-2 text-right">
                   <span className="font-semibold">
                     {stats.coverage_percent}%
@@ -138,7 +138,7 @@ export const MetadataUpload: React.FC = () => {
 
       {/* Upload Optionen */}
       <div className="rounded-lg border border-gray-400 bg-white p-4">
-        <h2 className="mb-4 text-lg font-semibold">Upload-Modus</h2>
+        <h2 className="mb-4 text-lg font-semibold">Upload-Mode</h2>
 
         <div className="space-y-3">
           {/* Alle fehlenden Bahnen */}
@@ -153,7 +153,7 @@ export const MetadataUpload: React.FC = () => {
               className="size-4"
             />
             <label htmlFor="mode-all-missing" className="font-medium">
-              Alle fehlenden Bahnen
+              All missing Trajectories
               {stats && ` (${stats.missing_metadata})`}
             </label>
           </div>
@@ -171,13 +171,13 @@ export const MetadataUpload: React.FC = () => {
                 className="size-4"
               />
               <label htmlFor="mode-single" className="font-medium">
-                Bahn-ID
+                Traj-ID
               </label>
             </div>
             {selectedMode === 'single' && (
               <input
                 type="text"
-                placeholder="(z.B. 1719408730)"
+                placeholder="(e.g. 1719408730)"
                 value={trajID}
                 onChange={(e) => setTrajID(e.target.value)}
                 className="ml-7 w-min rounded border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -200,7 +200,7 @@ export const MetadataUpload: React.FC = () => {
                 onChange={(e) => setSelectedMode(e.target.value as any)}
                 className="size-4"
               />
-              <span className="font-medium">Zeitraum</span>
+              <span className="font-medium">Timespan</span>
             </label>
             {selectedMode === 'timerange' && (
               <div className="ml-7 grid grid-rows-2 gap-1">
@@ -209,7 +209,7 @@ export const MetadataUpload: React.FC = () => {
                     htmlFor="start-date"
                     className="block text-sm font-medium"
                   >
-                    Von
+                    From
                   </label>
                   <select
                     id="start-date"
@@ -234,7 +234,7 @@ export const MetadataUpload: React.FC = () => {
                     htmlFor="end-date"
                     className="block text-sm font-medium"
                   >
-                    Bis
+                    Until
                   </label>
                   <select
                     id="end-date"
@@ -253,7 +253,7 @@ export const MetadataUpload: React.FC = () => {
               </div>
             )}
           </div>
-          <div>Duplikaten-Handling</div>
+          <div>Duplicate-Handling</div>
           <div>
             <input
               type="radio"
@@ -274,7 +274,7 @@ export const MetadataUpload: React.FC = () => {
               onChange={(e) => setDuplicateHandling(e.target.value as any)}
               className="ml-2 size-4"
             />
-            <span className="ml-2 font-medium">Überschreiben</span>
+            <span className="ml-2 font-medium">Overwrite</span>
           </div>
         </div>
       </div>

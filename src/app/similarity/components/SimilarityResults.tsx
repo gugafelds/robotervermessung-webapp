@@ -47,7 +47,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
       <div className="w-full rounded-lg border border-gray-400 bg-white p-6">
         <div className="flex items-center justify-center py-8">
           <div className="size-8 animate-spin rounded-full border-b-2 border-blue-950" />
-          <span className="ml-3 text-gray-600">Lade Ähnlichkeiten...</span>
+          <span className="ml-3 text-gray-600">Loading similarities...</span>
         </div>
       </div>
     );
@@ -57,7 +57,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
     return (
       <div className="w-full rounded-lg border border-gray-400 bg-white p-6">
         <div className="py-4 text-center text-red-600">
-          <p className="font-medium">Fehler bei der Suche!</p>
+          <p className="font-medium">Error in search!</p>
           <p className="mt-1 text-sm">{error}</p>
         </div>
       </div>
@@ -73,8 +73,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
       <div className="w-full rounded-lg border border-gray-400 bg-white p-6">
         <div className="py-8 text-center text-gray-500">
           <p>
-            Gib eine Traj- oder Segment-ID ein, um die Ähnlichkeiten zu
-            durchsuchen.
+            Enter a Traj- or Segment-ID to search for similarities.
           </p>
         </div>
       </div>
@@ -234,7 +233,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-medium text-gray-900">
-              Ähnlichkeitsergebnisse
+              Similarity results
             </h3>
             <p className="mt-1 text-sm text-gray-600">
               {bahnResults.length > 0 && `${bahnResults.length} Bahnen`}
@@ -289,7 +288,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
           <div className="flex items-center">
             <div className="size-4 animate-spin rounded-full border-b-2 border-yellow-600" />
             <span className="ml-3 text-sm text-yellow-800">
-              Berechne Segment-Ähnlichkeiten... {segmentProgress}
+              Calculation segment similarities... {segmentProgress}
             </span>
           </div>
         </div>

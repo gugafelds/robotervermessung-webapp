@@ -204,7 +204,7 @@ function WorkareaPlotContent({
   return (
     <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-4">
       <Typography as="h2" className="mb-2">
-        Arbeitsraum
+        Work Area
       </Typography>
       {/* Toggle Buttons für Trajektorien */}
       <div className="mb-4 flex gap-4">
@@ -233,7 +233,7 @@ function WorkareaPlotContent({
       {/* Range-Slider für SIDTW Threshold */}
       <div className="mb-4">
         <label className="mb-2 block text-sm font-medium text-gray-700">
-          SIDTW Bereich: {sidtwMin.toFixed(3)} mm - {sidtwMax.toFixed(3)} mm
+          SIDTW Range: {sidtwMin.toFixed(3)} mm - {sidtwMax.toFixed(3)} mm
         </label>
 
         <div className="mb-3">
@@ -281,8 +281,8 @@ function WorkareaPlotContent({
           <span>{maxSidtw.toFixed(3)} mm</span>
         </div>
         <p className="mt-2 text-sm text-gray-600">
-          Zeige {filteredData.length.toLocaleString()} von{' '}
-          {data.length.toLocaleString()} Punkten
+          Show {filteredData.length.toLocaleString()} of{' '}
+          {data.length.toLocaleString()} points
         </p>
       </div>
 
@@ -388,7 +388,7 @@ export function WorkareaPlot({
         <div className="flex h-96 items-center justify-center">
           <div className="text-center">
             <Loader className="mx-auto mb-4 size-12 animate-spin text-blue-950" />
-            <p className="text-sm text-gray-600">Lade Arbeitsraum-Daten...</p>
+            <p className="text-sm text-gray-600">Loading workarea data...</p>
           </div>
         </div>
       </div>
@@ -405,7 +405,7 @@ export function WorkareaPlot({
               onClick={() => window.location.reload()}
               className="mt-4 rounded-md bg-blue-950 px-4 py-2 text-white hover:bg-blue-900"
             >
-              Seite neu laden
+              reload page
             </button>
           </div>
         </div>
@@ -417,10 +417,10 @@ export function WorkareaPlot({
     return (
       <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-4">
         <Typography as="h3" className="mb-4">
-          Arbeitsraum-Erkundung
+          Workarea-Exploration
         </Typography>
         <div className="flex h-96 items-center justify-center">
-          <p className="text-gray-600">Keine Arbeitsraum-Daten verfügbar</p>
+          <p className="text-gray-600">No workarea data available</p>
         </div>
       </div>
     );

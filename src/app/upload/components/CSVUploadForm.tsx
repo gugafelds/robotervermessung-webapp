@@ -43,7 +43,7 @@ const CSVUploadForm: React.FC = () => {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!files || files.length === 0) {
-      setError('Bitte wählen Sie mindestens eine CSV-Datei aus.');
+      setError('Please choose at least one CSV-record.');
       return;
     }
 
@@ -110,8 +110,8 @@ const CSVUploadForm: React.FC = () => {
 
         let summaryMessage = '';
         if (successfulFiles.length > 0) {
-          summaryMessage += `${successfulFiles.length} Datei(en) verarbeitet in ${result.processing_time_seconds.toFixed(2)} Sekunden.\n`;
-          summaryMessage += `Insgesamt ${totalSegments} Bahnen gefunden.\n`;
+          summaryMessage += `${successfulFiles.length} Record(s) processed in ${result.processing_time_seconds.toFixed(2)} seconds.\n`;
+          summaryMessage += `Overall ${totalSegments} trajectories found.\n`;
         }
 
         if (failedFiles.length > 0) {
@@ -199,8 +199,8 @@ const CSVUploadForm: React.FC = () => {
 
       let summaryMessage = '';
       if (successfulFiles.length > 0) {
-        summaryMessage += `${successfulFiles.length} Datei(en) verarbeitet.\n`;
-        summaryMessage += `Insgesamt ${totalSegments} Bahnen gefunden.\n`;
+        summaryMessage += `${successfulFiles.length} Record(s) processed.\n`;
+        summaryMessage += `Overall ${totalSegments} trajectories found.\n`;
       }
 
       if (failedFiles.length > 0) {
@@ -375,7 +375,7 @@ const CSVUploadForm: React.FC = () => {
                   }
                 />
                 <span className="ml-2">
-                  Fixed segments pro trajectory
+                  Fixed segments per trajectory
                 </span>
               </label>
               <label className="inline-flex items-center font-light">
@@ -522,7 +522,7 @@ const CSVUploadForm: React.FC = () => {
             type="submit"
             disabled={isLoading}
           >
-            {isLoading ? 'Wird verarbeitet...' : 'Start'}
+            {isLoading ? 'Processing...' : 'Start'}
           </button>
         </div>
       </form>

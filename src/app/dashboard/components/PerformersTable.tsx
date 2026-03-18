@@ -30,21 +30,21 @@ export function PerformersTable({
         <table className="w-full text-center text-sm">
           <thead className="bg-gray-50 text-xs uppercase text-gray-700">
             <tr>
-              <th className="px-4 py-3">Bahn-ID</th>
+              <th className="px-4 py-3">Traj-ID</th>
               <th className="px-4 py-3">SIDTW (mm)</th>
-              <th className="px-4 py-3">Last (kg)</th>
-              <th className="px-4 py-3">Geschw. (mm/s)</th>
-              <th className="px-4 py-3">Beschl. (mm/s²)</th>
-              <th className="px-4 py-3">Zielpunkte</th>
-              <th className="px-4 py-3">Stopp (%)</th>
-              <th className="px-4 py-3">Wartezeit (s)</th>
+              <th className="px-4 py-3">Payload (kg)</th>
+              <th className="px-4 py-3">Vel. (mm/s)</th>
+              <th className="px-4 py-3">Accel. (mm/s²)</th>
+              <th className="px-4 py-3">Endpoint</th>
+              <th className="px-4 py-3">Stop (%)</th>
+              <th className="px-4 py-3">Wait Time (s)</th>
             </tr>
           </thead>
           <tbody>
             {data.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-4 py-6 text-center text-gray-500">
-                  Keine Daten verfügbar
+                  No data available
                 </td>
               </tr>
             ) : (
@@ -82,8 +82,8 @@ export function PerformersTable({
 
   return (
     <div className="flex flex-col justify-center space-y-8 rounded-2xl border border-gray-500 bg-white p-6">
-      {renderTable(bestPerformers, 'Die 5 besten', 'text-green-600')}
-      {renderTable(worstPerformers, 'Die 5 schlechtesten', 'text-red-600')}
+      {renderTable(bestPerformers, 'The 5 best', 'text-green-600')}
+      {renderTable(worstPerformers, 'The 5 worst', 'text-red-600')}
     </div>
   );
 }

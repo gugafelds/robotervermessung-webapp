@@ -32,13 +32,13 @@ export default function DashboardClient({
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2">
       <div>
-        <Typography as="h2">Bewegungsdaten</Typography>
+        <Typography as="h2">Motion Data</Typography>
         <div className="my-2 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           <DataCard
-            componentName="Roboterbahnen insgesamt"
+            componentName="Trajectories overall"
             value={trajsCount}
           />
-          <DataCard componentName="Segmente insgesamt" value={segmentsCount} />
+          <DataCard componentName="Segments overall" value={segmentsCount} />
           <AccuracyCard medianSIDTW={medianSIDTW} meanSIDTW={meanSIDTW} />
         </div>
         <DistributionCharts />

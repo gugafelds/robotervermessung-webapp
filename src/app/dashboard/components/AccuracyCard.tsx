@@ -8,7 +8,7 @@ interface AccuracyCardProps {
 export function AccuracyCard({ medianSIDTW, meanSIDTW }: AccuracyCardProps) {
   return (
     <div className="rounded-lg border border-gray-500 bg-white p-4">
-      <Typography as="h5">Durchschnittliche Genauigkeit</Typography>
+      <Typography as="h5">Average Accuracy</Typography>
 
       <div className="mt-3 grid grid-cols-2">
         {/* Median */}
@@ -23,7 +23,7 @@ export function AccuracyCard({ medianSIDTW, meanSIDTW }: AccuracyCardProps) {
 
         {/* Mean */}
         <div>
-          <p className="text-sm text-gray-600">Mittelwert</p>
+          <p className="text-sm text-gray-600">Mean</p>
           <Typography as="h4" className="text-primary">
             {meanSIDTW !== undefined && meanSIDTW !== null
               ? `${meanSIDTW.toFixed(2)} mm`

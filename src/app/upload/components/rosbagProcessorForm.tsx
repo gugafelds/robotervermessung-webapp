@@ -24,7 +24,7 @@ const ROSBAGProcessorForm: React.FC = () => {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!files?.length) {
-      setError('Bitte wählen Sie mindestens eine rosbag-Datei aus.');
+      setError('Please choose at least one rosbag-record.');
       return;
     }
 
@@ -87,7 +87,7 @@ const ROSBAGProcessorForm: React.FC = () => {
 
     if (successfulFiles.length) {
       setSuccess(
-        `${successfulFiles.length} rosbag-Datei(en) erfolgreich verarbeitet.\n${successfulFiles
+        `${successfulFiles.length} rosbag-record(s) processed successfully.\n${successfulFiles
           .map((r) => `\n${r.filename}: Erfolgreich`)
           .join('')}`,
       );
@@ -137,7 +137,7 @@ const ROSBAGProcessorForm: React.FC = () => {
                   result.success ? 'text-green-600' : 'text-red-600'
                 }`}
               >
-                {result.filename}: {result.success ? 'Erfolgreich' : 'Fehler!'}
+                {result.filename}: {result.success ? 'Success' : 'Error!'}
               </div>
             ))}
           </div>
@@ -172,7 +172,7 @@ const ROSBAGProcessorForm: React.FC = () => {
             type="submit"
             disabled={isLoading}
           >
-            {isLoading ? 'Wird verarbeitet...' : 'Start'}
+            {isLoading ? 'Processing...' : 'Start'}
           </button>
         </div>
       </form>
