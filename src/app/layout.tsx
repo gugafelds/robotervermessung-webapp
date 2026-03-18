@@ -9,7 +9,7 @@ import { Navbar } from '@/src/app/components/Navbar';
 const inter = Inter({ subsets: ['latin'], display: 'swap' });
 
 export const metadata: Metadata = {
-  title: 'Robot Motion and Performance Database',
+  title: 'RMPD',
   description:
     'Web platform for the analysis and visualization of industrial robot motion and performance data.',
 };

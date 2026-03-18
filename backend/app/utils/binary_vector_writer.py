@@ -32,8 +32,8 @@ class BinaryVectorWriter:
         
         Args:
             embedding_rows: List[Dict] mit:
-                - segment_id: str
-                - bahn_id: str
+                - seg_id: str
+                - traj_id: str
                 - joint_embedding: np.ndarray oder None
                 - position_embedding: np.ndarray oder None
                 - orientation_embedding: np.ndarray oder None
@@ -61,8 +61,8 @@ class BinaryVectorWriter:
             cur = conn.cursor()
             
             with cur.copy(
-                "COPY motion.bahn_embeddings "
-                "(segment_id, bahn_id, joint_embedding, position_embedding, "
+                "COPY motion.traj_embeddings "
+                "(seg_id, traj_id, joint_embedding, position_embedding, "
                 "orientation_embedding, velocity_embedding, metadata_embedding) "
                 "FROM STDIN WITH (FORMAT BINARY)"
             ) as copy:
@@ -79,8 +79,8 @@ class BinaryVectorWriter:
                     meta_emb = self._to_numpy(row.get('metadata_embedding'))
                     
                     copy.write_row([
-                        row['segment_id'],
-                        row['bahn_id'],
+                        row['seg_id'],
+                        row['traj_id'],
                         joint_emb,
                         pos_emb,
                         ori_emb,

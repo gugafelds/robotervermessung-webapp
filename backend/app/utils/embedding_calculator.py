@@ -15,9 +15,18 @@ class EmbeddingCalculator:
 
     def __init__(
             self,
-            n_samples: int = 10
+            n_samples: int = 10,
+            robot_info: Optional[Dict] = None  # neu
     ):
         self.n_samples = n_samples
+
+        info = robot_info or {}
+        self.vel_max = info.get('vel_max', 3200.0)
+        self.accel_max = info.get('accel_max', 10200.0)
+        self.reach_xy = info.get('reach_xy', 1955.0)
+        self.reach_z_max = info.get('reach_z_max', 2140.0)
+        self.reach_z_min = info.get('reach_z_min', -290.0)
+        self.max_payload = info.get('max_payload', 60.0)
 
     def compute_joint_embedding(self, data: List[Dict]) -> Optional[np.ndarray]:
         if len(data) < 10:
@@ -136,76 +145,68 @@ class EmbeddingCalculator:
         return self._l2_normalize(flat)
 
     def compute_metadata_embedding(self, metadata: Dict) -> Optional[np.ndarray]:
-        # Robot limits (from robot_info: abb_irb4400)
-        vel_max = 3200.0
-        accel_max = 10200.0
-        workspace_max_x = 1900.0
-        workspace_max_y = 1100.0
-        workspace_max_z = 2000.0
-        workspace_min_x = 400.0
-        workspace_min_y = -1100.0
-        workspace_min_z = 400.0
-        max_payload = 60.0
-        max_length = 9000.0
-        max_duration = 25.0
+        vel_max = self.vel_max
+        accel_max = self.accel_max
+        reach_xy = self.reach_xy
+        reach_z_max = self.reach_z_max
+        reach_z_min = self.reach_z_min
+        max_payload = self.max_payload
 
-        # Movement Type
-        movement_str = metadata.get('movement_type', '').lower()
-        linear_count = movement_str.count('l') + ('linear' in movement_str)
-        circular_count = movement_str.count('c') + ('circular' in movement_str)
-        total_chars = linear_count + circular_count
+        movement_str = metadata.get('movement_type', '').lower().strip()
 
-        if total_chars > 0:
-            linear_ratio = linear_count / total_chars
-            circular_ratio = circular_count / total_chars
-        else:
-            linear_ratio = 0.0
+        if movement_str in ('linear', 'l'):
+            linear_ratio   = 1.0
             circular_ratio = 0.0
-
-        # Length & Duration
-        length_norm = np.clip(metadata.get('length', 0.0) / max_length, 0, 1)
-        duration_norm = np.clip(metadata.get('duration', 0.0) / max_duration, 0, 1)
+        elif movement_str in ('circular', 'c'):
+            linear_ratio   = 0.0
+            circular_ratio = 1.0
+        else:
+            linear_count   = movement_str.count('l')
+            circular_count = movement_str.count('c')
+            total = linear_count + circular_count
+            if total > 0:
+                linear_ratio   = linear_count / total
+                circular_ratio = circular_count / total
+            else:
+                linear_ratio   = 0.0
+                circular_ratio = 0.0
 
         # Payload
         weight_norm = np.clip(metadata.get('weight', 0.0) / max_payload, 0, 1)
 
-        # Position (normalized to workspace range)
+        # Position — normalisiert durch physikalische Reichweite
         pos_x = metadata.get('position_x', 0.0)
         pos_y = metadata.get('position_y', 0.0)
         pos_z = metadata.get('position_z', 0.0)
-        pos_x_norm = np.clip((pos_x - workspace_min_x) / (workspace_max_x - workspace_min_x), 0, 1)
-        pos_y_norm = np.clip((pos_y - workspace_min_y) / (workspace_max_y - workspace_min_y), 0, 1)
-        pos_z_norm = np.clip((pos_z - workspace_min_z) / (workspace_max_z - workspace_min_z), 0, 1)
+        pos_x_norm = np.clip(pos_x / reach_xy, -1, 1)
+        pos_y_norm = np.clip(pos_y / reach_xy, -1, 1)
+        pos_z_norm = np.clip((pos_z - reach_z_min) / (reach_z_max - reach_z_min), 0, 1)
 
-        # Twist Stats
-        min_twist_norm = np.clip((metadata.get('min_vel_act', 0.0) + vel_max) / (2 * vel_max), 0, 1)
-        max_twist_norm = np.clip((metadata.get('max_vel_act', 0.0) + vel_max) / (2 * vel_max), 0, 1)
-        mean_twist_norm = np.clip((metadata.get('mean_vel_act', 0.0) + vel_max) / (2 * vel_max), 0, 1)
-        median_twist_norm = np.clip((metadata.get('median_vel_act', 0.0) + vel_max) / (2 * vel_max), 0, 1)
-        std_twist_norm = np.clip(metadata.get('std_vel_act', 0.0) / vel_max, 0, 1)
+        # Velocity Stats
+        max_vel_norm    = np.clip((metadata.get('max_vel_act', 0.0) + vel_max) / (2 * vel_max), 0, 1)
+        mean_vel_norm   = np.clip((metadata.get('mean_vel_act', 0.0) + vel_max) / (2 * vel_max), 0, 1)
+        median_vel_norm = np.clip((metadata.get('median_vel_act', 0.0) + vel_max) / (2 * vel_max), 0, 1)
+        std_vel_norm    = np.clip(metadata.get('std_vel_act', 0.0) / vel_max, 0, 1)
 
         # Acceleration Stats
-        min_accel_norm = np.clip((metadata.get('min_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
-        max_accel_norm = np.clip((metadata.get('max_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
-        mean_accel_norm = np.clip((metadata.get('mean_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
+        min_accel_norm    = np.clip((metadata.get('min_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
+        max_accel_norm    = np.clip((metadata.get('max_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
+        mean_accel_norm   = np.clip((metadata.get('mean_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
         median_accel_norm = np.clip((metadata.get('median_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
-        std_accel_norm = np.clip(metadata.get('std_accel_act', 0.0) / accel_max, 0, 1)
+        std_accel_norm    = np.clip(metadata.get('std_accel_act', 0.0) / accel_max, 0, 1)
 
-        # 18D Embedding
+        # 15D Embedding
         features = np.array([
             linear_ratio,
             circular_ratio,
-            length_norm,
-            duration_norm,
             weight_norm,
             pos_x_norm,
             pos_y_norm,
             pos_z_norm,
-            min_twist_norm,
-            max_twist_norm,
-            mean_twist_norm,
-            median_twist_norm,
-            std_twist_norm,
+            max_vel_norm,
+            mean_vel_norm,
+            median_vel_norm,
+            std_vel_norm,
             min_accel_norm,
             max_accel_norm,
             mean_accel_norm,

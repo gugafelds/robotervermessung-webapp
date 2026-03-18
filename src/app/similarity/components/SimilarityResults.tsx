@@ -115,7 +115,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
         <tr key={uniqueKey} className={rowClass}>
           <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
             <Link
-              href={`/bewegungsdaten/${id.split('_')[0]}`}
+              href={`/motion/${id.split('_')[0]}`}
               target="_blank"
               rel="noopener noreferrer"
               className={`flex hover:text-blue-600 ${isTarget ? 'font-bold text-blue-900' : 'text-gray-900'}`}

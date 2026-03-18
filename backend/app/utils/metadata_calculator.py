@@ -23,13 +23,9 @@ class MetadataCalculatorService:
         self.db_pool = db_pool
         self.skip_embeddings = skip_embeddings
         self.downsample_factor = 1
-
-        self.embedding_calculator = EmbeddingCalculator(
-        n_samples=10
-     )
+        self._calculator_cache: Dict[str, EmbeddingCalculator] = {}  # neu
 
         DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/dbname")
-
         self.binary_writer = BinaryVectorWriter(DATABASE_URL)
 
     async def validate_datetime_input(self, date_string: str) -> Optional[int]:
@@ -69,7 +65,7 @@ class MetadataCalculatorService:
 
             query = """
                     SELECT traj_id
-                    FROM robotervermessung.motion.traj_info
+                    FROM rmpd.motion.traj_info
                     WHERE LEFT (recording_date \
                         , 10) BETWEEN $1 \
                       AND $2
@@ -90,8 +86,8 @@ class MetadataCalculatorService:
             # Bahnen ohne Metadaten
             metadata_query = """
                 SELECT DISTINCT bi.traj_id
-                FROM robotervermessung.motion.traj_info bi
-                LEFT JOIN robotervermessung.motion.traj_metadata bm
+                FROM rmpd.motion.traj_info bi
+                LEFT JOIN rmpd.motion.traj_metadata bm
                     ON bi.traj_id = bm.traj_id AND bi.traj_id = bm.seg_id
                 WHERE bm.seg_id IS NULL 
                 ORDER BY bi.traj_id
@@ -102,8 +98,8 @@ class MetadataCalculatorService:
             # Bahnen ohne Embeddings (aber MIT Metadaten!)
             embedding_query = """
                 SELECT DISTINCT bm.traj_id
-                FROM robotervermessung.motion.traj_metadata bm
-                LEFT JOIN robotervermessung.motion.traj_embeddings be
+                FROM rmpd.motion.traj_metadata bm
+                LEFT JOIN rmpd.motion.traj_embeddings be
                     ON bm.traj_id = be.traj_id AND bm.seg_id = be.seg_id
                 WHERE be.seg_id IS NULL
                 AND bm.traj_id = bm.seg_id
@@ -114,7 +110,7 @@ class MetadataCalculatorService:
             
             return missing_metadata, missing_embeddings
 
-    async def check_existing_bahns(self, traj_ids: List[str]) -> List[str]:
+    async def check_existing_trajs(self, traj_ids: List[str]) -> List[str]:
         """Prüft welche traj_ids bereits Metadaten haben"""
         if not traj_ids:
             return []
@@ -122,7 +118,7 @@ class MetadataCalculatorService:
         async with self.db_pool.acquire() as conn:
             query = """
                     SELECT DISTINCT traj_id
-                    FROM robotervermessung.motion.traj_metadata
+                    FROM rmpd.motion.traj_metadata
                     WHERE traj_id = ANY ($1::text[]) \
                     """
             rows = await conn.fetch(query, traj_ids)
@@ -136,7 +132,7 @@ class MetadataCalculatorService:
         async with self.db_pool.acquire() as conn:
             query = """
                     DELETE \
-                    FROM robotervermessung.motion.traj_metadata
+                    FROM rmpd.motion.traj_metadata
                     WHERE traj_id = ANY ($1::text[]) \
                     """
             result = await conn.execute(query, traj_ids)
@@ -150,7 +146,7 @@ class MetadataCalculatorService:
         async with self.db_pool.acquire() as conn:
             query = """
                     DELETE \
-                    FROM robotervermessung.motion.traj_embeddings
+                    FROM rmpd.motion.traj_embeddings
                     WHERE traj_id = ANY ($1::text[]) \
                     """
             result = await conn.execute(query, traj_ids)
@@ -195,10 +191,10 @@ class MetadataCalculatorService:
         Inkl. Joint States und Orientation für Embeddings!
         """
         traj_info_query = """
-                          SELECT weight, start_time, end_time
-                          FROM robotervermessung.motion.traj_info
-                          WHERE traj_id = $1 \
-                          """
+                        SELECT weight, start_time, end_time, robot_model
+                        FROM rmpd.motion.traj_info
+                        WHERE traj_id = $1
+                    """
         traj_info = await conn.fetchrow(traj_info_query, traj_id)
 
         if not traj_info:
@@ -206,13 +202,13 @@ class MetadataCalculatorService:
 
         segments_query = """
             SELECT seg_id,
-                array_agg(x_soll ORDER BY timestamp) as x_data,
-                array_agg(y_soll ORDER BY timestamp) as y_data,
-                array_agg(z_soll ORDER BY timestamp) as z_data,
+                array_agg(x_cmd ORDER BY timestamp) as x_data,
+                array_agg(y_cmd ORDER BY timestamp) as y_data,
+                array_agg(z_cmd ORDER BY timestamp) as z_data,
                 array_agg(timestamp ORDER BY timestamp) as timestamps,  -- ✅ NEU
                 MIN(timestamp) as min_timestamp,
                 MAX(timestamp) as max_timestamp
-            FROM robotervermessung.motion.traj_position_soll
+            FROM rmpd.motion.traj_position_cmd
             WHERE traj_id = $1
             GROUP BY seg_id
             ORDER BY seg_id
@@ -224,7 +220,7 @@ class MetadataCalculatorService:
                 SELECT seg_id,
                        joint_1, joint_2, joint_3, joint_4, joint_5, joint_6,
                        ROW_NUMBER() OVER (PARTITION BY seg_id ORDER BY timestamp) as rn
-                FROM robotervermessung.motion.traj_joint_states
+                FROM rmpd.motion.traj_joint_states
                 WHERE traj_id = $1
             )
             SELECT seg_id,
@@ -241,16 +237,16 @@ class MetadataCalculatorService:
 
         orientation_query = f"""
             WITH numbered AS (
-                SELECT seg_id, qw_soll, qx_soll, qy_soll, qz_soll,
+                SELECT seg_id, qw_cmd, qx_cmd, qy_cmd, qz_cmd,
                        ROW_NUMBER() OVER (PARTITION BY seg_id ORDER BY timestamp) as rn
-                FROM robotervermessung.motion.traj_orientation_soll
+                FROM rmpd.motion.traj_orientation_cmd
                 WHERE traj_id = $1
             )
             SELECT seg_id,
-                   array_agg(qw_soll ORDER BY rn) as qw,
-                   array_agg(qx_soll ORDER BY rn) as qx,
-                   array_agg(qy_soll ORDER BY rn) as qy,
-                   array_agg(qz_soll ORDER BY rn) as qz
+                   array_agg(qw_cmd ORDER BY rn) as qw,
+                   array_agg(qx_cmd ORDER BY rn) as qx,
+                   array_agg(qy_cmd ORDER BY rn) as qy,
+                   array_agg(qz_cmd ORDER BY rn) as qz
             FROM numbered
             GROUP BY seg_id
         """
@@ -262,7 +258,7 @@ class MetadataCalculatorService:
                 SELECT seg_id,
                        tcp_vel_act,
                        ROW_NUMBER() OVER (PARTITION BY seg_id ORDER BY timestamp) as rn
-                FROM robotervermessung.motion.traj_vel_act
+                FROM rmpd.motion.traj_vel_act
                 WHERE traj_id = $1
             )
             SELECT seg_id,
@@ -276,13 +272,13 @@ class MetadataCalculatorService:
         accel_query = f"""
             WITH numbered AS (
                 SELECT seg_id,
-                       tcp_accel_soll,
+                       tcp_accel_cmd,
                        ROW_NUMBER() OVER (PARTITION BY seg_id ORDER BY timestamp) as rn
-                FROM robotervermessung.motion.traj_accel_soll
+                FROM rmpd.motion.traj_accel_cmd
                 WHERE traj_id = $1
             )
             SELECT seg_id,
-                   array_agg(tcp_accel_soll ORDER BY rn) as accel_values
+                   array_agg(tcp_accel_cmd ORDER BY rn) as accel_values
             FROM numbered
             GROUP BY seg_id
         """
@@ -487,9 +483,9 @@ class MetadataCalculatorService:
             if segment['x_data'] and len(segment['x_data']) > 0:
                 pos_data = [
                     {
-                        'x_soll': segment['x_data'][i],
-                        'y_soll': segment['y_data'][i],
-                        'z_soll': segment['z_data'][i]
+                        'x_cmd': segment['x_data'][i],
+                        'y_cmd': segment['y_data'][i],
+                        'z_cmd': segment['z_data'][i]
                     }
                     for i in range(len(segment['x_data']))
                 ]
@@ -501,10 +497,10 @@ class MetadataCalculatorService:
             if ori_data_raw and ori_data_raw['qw']:
                 ori_data = [
                     {
-                        'qw_soll': ori_data_raw['qw'][i],
-                        'qx_soll': ori_data_raw['qx'][i],
-                        'qy_soll': ori_data_raw['qy'][i],
-                        'qz_soll': ori_data_raw['qz'][i]
+                        'qw_cmd': ori_data_raw['qw'][i],
+                        'qx_cmd': ori_data_raw['qx'][i],
+                        'qy_cmd': ori_data_raw['qy'][i],
+                        'qz_cmd': ori_data_raw['qz'][i]
                     }
                     for i in range(len(ori_data_raw['qw']))
                 ]
@@ -522,9 +518,9 @@ class MetadataCalculatorService:
                 
                 vel_data = [
                     {
-                        'x_soll': segment['x_data'][i],
-                        'y_soll': segment['y_data'][i],
-                        'z_soll': segment['z_data'][i],
+                        'x_cmd': segment['x_data'][i],
+                        'y_cmd': segment['y_data'][i],
+                        'z_cmd': segment['z_data'][i],
                         'timestamp': timestamps[i]
                     }
                     for i in range(len(segment['x_data']))
@@ -583,9 +579,9 @@ class MetadataCalculatorService:
             if segment['x_data']:
                 for i in range(len(segment['x_data'])):
                     all_pos_data.append({
-                        'x_soll': segment['x_data'][i],
-                        'y_soll': segment['y_data'][i],
-                        'z_soll': segment['z_data'][i]
+                        'x_cmd': segment['x_data'][i],
+                        'y_cmd': segment['y_data'][i],
+                        'z_cmd': segment['z_data'][i]
                     })
 
             # Orientation
@@ -593,10 +589,10 @@ class MetadataCalculatorService:
             if ori_raw and ori_raw['qw']:
                 for i in range(len(ori_raw['qw'])):
                     all_ori_data.append({
-                        'qw_soll': ori_raw['qw'][i],
-                        'qx_soll': ori_raw['qx'][i],
-                        'qy_soll': ori_raw['qy'][i],
-                        'qz_soll': ori_raw['qz'][i]
+                        'qw_cmd': ori_raw['qw'][i],
+                        'qx_cmd': ori_raw['qx'][i],
+                        'qy_cmd': ori_raw['qy'][i],
+                        'qz_cmd': ori_raw['qz'][i]
                     })
 
         for segment in traj_data['segments']:
@@ -605,9 +601,9 @@ class MetadataCalculatorService:
                 
                 for i in range(len(segment['x_data'])):
                     all_vel_data.append({
-                        'x_soll': segment['x_data'][i],
-                        'y_soll': segment['y_data'][i],
-                        'z_soll': segment['z_data'][i],
+                        'x_cmd': segment['x_data'][i],
+                        'y_cmd': segment['y_data'][i],
+                        'z_cmd': segment['z_data'][i],
                         'timestamp': timestamps[i]
                     })
         
@@ -644,7 +640,7 @@ class MetadataCalculatorService:
         """Convert numpy array to PostgreSQL vector string"""
         return '[' + ','.join(str(x) for x in arr.tolist()) + ']'
 
-    async def process_single_bahn(
+    async def process_single_traj(
         self,
         conn: asyncpg.Connection,
         traj_id: str,
@@ -666,6 +662,9 @@ class MetadataCalculatorService:
             if not traj_data:
                 result['error'] = 'Data not found'
                 return result
+
+            robot_model = traj_data['traj_info']['robot_model']
+            self.embedding_calculator = await self._get_embedding_calculator(conn, robot_model)
 
             # 1. Metadaten (optional)
             if compute_metadata:
@@ -713,7 +712,7 @@ class MetadataCalculatorService:
                 median_vel_act, std_vel_act,
                 min_accel_act, max_accel_act, mean_accel_act,
                 median_accel_act, std_accel_act
-            FROM robotervermessung.motion.traj_metadata
+            FROM rmpd.motion.traj_metadata
             WHERE traj_id = $1
             ORDER BY seg_id
         """
@@ -874,9 +873,32 @@ class MetadataCalculatorService:
         async with self.db_pool.acquire() as conn:
             query = """
                 SELECT DISTINCT traj_id
-                FROM robotervermessung.motion.traj_embeddings
+                FROM rmpd.motion.traj_embeddings
                 WHERE traj_id = ANY($1::text[])
                 AND seg_id = traj_id
             """
             rows = await conn.fetch(query, traj_ids)
             return [row['traj_id'] for row in rows]
+    
+    async def _fetch_robot_info(self, conn: asyncpg.Connection, robot_model: str) -> Optional[Dict]:
+        query = """
+            SELECT 
+                vel_max, accel_max, max_payload, reach_xy, reach_z_max, reach_z_min
+            FROM rmpd.motion.robot_info
+            WHERE robot_model = $1
+        """
+        row = await conn.fetchrow(query, robot_model)
+        if row:
+            return dict(row)
+        logger.warning(f"Robot model '{robot_model}' nicht in DB gefunden, nutze Fallback-Werte")
+        return None
+
+    async def _get_embedding_calculator(self, conn: asyncpg.Connection, robot_model: str) -> EmbeddingCalculator:
+        if robot_model not in self._calculator_cache:
+            robot_info = await self._fetch_robot_info(conn, robot_model)
+            self._calculator_cache[robot_model] = EmbeddingCalculator(
+                n_samples=10,
+                robot_info=robot_info
+            )
+            logger.info(f"EmbeddingCalculator für '{robot_model}' initialisiert")
+        return self._calculator_cache[robot_model]
