@@ -4,9 +4,9 @@ import asyncio
 import asyncpg
 from typing import Dict, List, Optional, Union
 import logging
-from backend.app.utils.multimodal_framework.shape_searcher import ShapeSearcher
-from backend.app.utils.multimodal_framework.rrf_ranker import RRFRanker
-from backend.app.utils.multimodal_framework.filter_searcher import FilterSearcher
+from .shape_searcher import ShapeSearcher
+from .rrf_ranker import RRFRanker
+from .filter_searcher import FilterSearcher
 
 logger = logging.getLogger(__name__)
 
