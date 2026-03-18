@@ -107,16 +107,16 @@ export const JointStatesPlot: React.FC<JointStatesPlotProps> = ({
     createJointStatesPlot();
 
   const jointStatesLayout: Partial<Layout> = {
-    title: 'Joint States',
+    title: { text: 'Joint States' },
     font: {
       family: 'Helvetica',
     },
     xaxis: {
-      title: 's',
+      title: { text: 's' },
       tickformat: '.2f',
       range: [0, maxTimeJoints],
     },
-    yaxis: { title: '°' },
+    yaxis: { title: { text: '°' } },
     legend: { orientation: 'h', y: -0.2 },
     hovermode: 'x unified',
     uirevision: 'true',

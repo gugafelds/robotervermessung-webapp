@@ -77,9 +77,7 @@ const SearchHelpTooltip = () => {
                   </li>
                   <li>
                     • <code className="rounded bg-gray-100 px-1">w=2.5</code> or{' '}
-                    <code className="rounded bg-gray-100 px-1">
-                      weight=2.5
-                    </code>{' '}
+                    <code className="rounded bg-gray-100 px-1">weight=2.5</code>{' '}
                     - weight in kg (±0.5 kg tolerance)
                   </li>
                   <li>

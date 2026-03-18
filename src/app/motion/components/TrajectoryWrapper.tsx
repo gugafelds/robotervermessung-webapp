@@ -1,17 +1,17 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   getTrajAccelActById,
   getTrajAccelCmdById,
-  getTrajSetpointsById,
   getTrajInfoById,
   getTrajJointStatesById,
   getTrajOrientationCmdById,
   getTrajPoseActById,
   getTrajPositionCmdById,
+  getTrajSetpointsById,
   getTrajVelActById,
   getTrajVelCmdById,
 } from '@/src/actions/motion.service';
@@ -81,13 +81,22 @@ export function TrajectoryWrapper() {
   });
   const [error, setError] = useState<string | null>(null);
 
-  const plotAvailability = useMemo(() => ({
-  position: loadingStates.positionCmd && loadingStates.poseAct && loadingStates.setpoints,
-  orientation: loadingStates.poseAct && loadingStates.orientationCmd && loadingStates.setpoints,
-  velocity: loadingStates.velAct && loadingStates.velCmd,
-  acceleration: loadingStates.accelAct && loadingStates.accelCmd,
-  joints: loadingStates.jointStates,
-}), [loadingStates]);
+  const plotAvailability = useMemo(
+    () => ({
+      position:
+        loadingStates.positionCmd &&
+        loadingStates.poseAct &&
+        loadingStates.setpoints,
+      orientation:
+        loadingStates.poseAct &&
+        loadingStates.orientationCmd &&
+        loadingStates.setpoints,
+      velocity: loadingStates.velAct && loadingStates.velCmd,
+      acceleration: loadingStates.accelAct && loadingStates.accelCmd,
+      joints: loadingStates.jointStates,
+    }),
+    [loadingStates],
+  );
 
   const {
     currentTrajInfo,
@@ -104,9 +113,10 @@ export function TrajectoryWrapper() {
   } = useTrajectory();
 
   const updateLoadingState = useCallback(
-  (key: keyof DataLoadingState, value: boolean) => {
-    setLoadingStates((prev) => ({ ...prev, [key]: value }));
-  }, []
+    (key: keyof DataLoadingState, value: boolean) => {
+      setLoadingStates((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
   );
 
   const fetchInfoData = useCallback(async () => {
@@ -152,15 +162,14 @@ export function TrajectoryWrapper() {
     };
 
     try {
-
       // Prioritätsgruppen für die Daten
       const highPriorityFetches = [
         // Pose Daten (höchste Priorität)
         fetchDataWithCache(
-              () => getTrajPoseActById(id),
-              setCurrentTrajPoseAct,
-              'pose_act',
-            ).then(() => updateLoadingState('poseAct', true)),
+          () => getTrajPoseActById(id),
+          setCurrentTrajPoseAct,
+          'pose_act',
+        ).then(() => updateLoadingState('poseAct', true)),
         // Events werden auch sofort benötigt
         fetchDataWithCache(
           () => getTrajSetpointsById(id),
@@ -219,15 +228,16 @@ export function TrajectoryWrapper() {
     }
   }, [
     id,
-    setCurrentTrajAccelCmd,
     setCurrentTrajPoseAct,
     setCurrentTrajSetpoints,
     setCurrentTrajPositionCmd,
     setCurrentTrajOrientationCmd,
-    setCurrentTrajVelAct,
-    setCurrentTrajAccelAct,
-    setCurrentTrajVelCmd,
     setCurrentTrajJointStates,
+    setCurrentTrajVelAct,
+    setCurrentTrajVelCmd,
+    setCurrentTrajAccelAct,
+    setCurrentTrajAccelCmd,
+    updateLoadingState,
   ]);
 
   useEffect(() => {
@@ -256,9 +266,7 @@ export function TrajectoryWrapper() {
   ) : (
     <>
       <TrajectoryInfo />
-      <TrajectoryPlot
-        plotAvailability={plotAvailability}
-      />
+      <TrajectoryPlot plotAvailability={plotAvailability} />
     </>
   );
 }

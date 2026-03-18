@@ -11,25 +11,27 @@ export const ProjectInfo = () => {
       <div className="mb-2 flex flex-col gap-3">
         <Typography as="h1">Info</Typography>
         <Typography as="h2">
-          Autonomous Measurement and Efficient Storage of Industrial Robot Motion Data
+          Autonomous Measurement and Efficient Storage of Industrial Robot
+          Motion Data
         </Typography>
       </div>
 
       <div className="mt-2">
         <Typography as="p" className="mt-4">
-          This research project develops the foundation for a comprehensive robot
-          measurement database that systematically captures and provides motion
-          data from industrial robots. By continuously expanding this database,
-          a wide range of applications and scenarios can be efficiently supported.
+          This research project develops the foundation for a comprehensive
+          robot measurement database that systematically captures and provides
+          motion data from industrial robots. By continuously expanding this
+          database, a wide range of applications and scenarios can be
+          efficiently supported.
         </Typography>
 
         <Typography as="p" className="mt-4">
-          The database replaces time-consuming and costly individual measurements
-          with a centralized data pool. It enables quantitative comparison of
-          different robotic systems for specific application scenarios and
-          provides a reliable basis for decision-making — for example, identifying
-          the most precise robot for a process or the system with the shortest
-          cycle time.
+          The database replaces time-consuming and costly individual
+          measurements with a centralized data pool. It enables quantitative
+          comparison of different robotic systems for specific application
+          scenarios and provides a reliable basis for decision-making — for
+          example, identifying the most precise robot for a process or the
+          system with the shortest cycle time.
         </Typography>
 
         <Typography as="p" className="mt-4">
@@ -77,7 +79,8 @@ export const ProjectInfo = () => {
             className="border-b-2 border-dotted border-b-black font-extrabold"
           >
             515675259
-          </Link>.
+          </Link>
+          .
         </Typography>
       </div>
     </section>

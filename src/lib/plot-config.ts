@@ -58,8 +58,8 @@ export const plotLayoutConfig: Partial<Layout> = {
   width: 500,
   height: 500,
   scene: {
-    xaxis: { title: 'x [mm]' },
-    yaxis: { title: 'y [mm]' },
-    zaxis: { title: 'z [mm]' },
+    xaxis: { title: { text: 'x [mm]' } },
+    yaxis: { title: { text: 'y [mm]' } },
+    zaxis: { title: { text: 'z [mm]' } },
   },
 };

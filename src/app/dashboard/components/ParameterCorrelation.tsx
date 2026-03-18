@@ -171,9 +171,9 @@ function ParameterCorrelationContent({
       </Typography>
       <div className="mb-4 text-sm text-gray-600">
         <p>
-          Box Plots showing the SIDTW-distribution for differents parameter ranges. 
-          A sample of {data.length.toLocaleString()}{' '}
-          representative trajectories.
+          Box Plots showing the SIDTW-distribution for differents parameter
+          ranges. A sample of {data.length.toLocaleString()} representative
+          trajectories.
         </p>
       </div>
 
@@ -215,11 +215,11 @@ function ParameterCorrelationContent({
           height: 500,
           margin: { t: 20, r: 20, l: 80, b: 120 },
           xaxis: {
-            title: `${activeConfig.xLabel} [${activeConfig.unit}]`,
+            title: { text: `${activeConfig.xLabel} [${activeConfig.unit}]` },
             type: 'category',
           },
           yaxis: {
-            title: 'SIDTW [mm]',
+            title: { text: 'SIDTW [mm]' },
           },
           showlegend: false,
         }}
@@ -240,9 +240,7 @@ function ParameterCorrelationContent({
           </p>
         </div>
         <div className="rounded-lg bg-green-50 p-4">
-          <p className="text-sm text-gray-600">
-            Best Range (lowest SIDTW)
-          </p>
+          <p className="text-sm text-gray-600">Best Range (lowest SIDTW)</p>
           <p className="text-2xl font-bold text-green-700">
             {binnedData[bestBinIndex]?.binLabel} {activeConfig.unit}
           </p>

@@ -21,7 +21,8 @@ import SearchHelpTooltip from './SearchHelpTooltip';
 export const Sidebar = () => {
   const [trajInfo, setTrajInfo] = useState<TrajInfo[]>([]);
   const [pagination, setPagination] = useState<PaginationResult | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchParams, setSearchParams] = useState<SearchTrajParams>({
     page: 1,
@@ -38,18 +39,20 @@ export const Sidebar = () => {
 
   // Load trajen with current search parameters
   const loadTrajs = useCallback(async (params: SearchTrajParams) => {
-    if (params.page && params.page > 1) {
+    const isNextPage = params.page !== undefined && params.page > 1;
+
+    if (isNextPage) {
       isLoadingNextPageRef.current = true;
+      setIsLoadingMore(true);
+    } else {
+      setIsInitialLoading(true);
     }
 
-    setIsLoading(true);
     try {
       const { trajInfo: newTrajInfo, pagination: newPagination } =
         await searchTrajInfo(params);
 
-      // Wenn page > 1, dann zur bestehenden Liste hinzufügen, sonst ersetzen
-      if (params.page && params.page > 1) {
-        // Prüfe auf Duplikate
+      if (isNextPage) {
         setTrajInfo((prev) => {
           const existingIds = new Set(
             prev.map((traj) => traj.trajID?.toString()),
@@ -68,7 +71,8 @@ export const Sidebar = () => {
     } catch (error) {
       console.error('Failed to load trajectory data:', error);
     } finally {
-      setIsLoading(false);
+      setIsInitialLoading(false);
+      setIsLoadingMore(false);
       isLoadingNextPageRef.current = false;
     }
   }, []);
@@ -82,13 +86,16 @@ export const Sidebar = () => {
 
   // Load next page for infinite scroll
   const loadNextPage = useCallback(() => {
-    // Use ref to prevent multiple simultaneous calls
-    if (pagination?.hasNext && !isLoading && !isLoadingNextPageRef.current) {
+    if (
+      pagination?.hasNext &&
+      !isInitialLoading &&
+      !isLoadingNextPageRef.current
+    ) {
       const nextPageParams = { ...searchParams, page: currentPage + 1 };
       setSearchParams(nextPageParams);
       loadTrajs(nextPageParams);
     }
-  }, [pagination, isLoading, currentPage, searchParams, loadTrajs]);
+  }, [pagination, isInitialLoading, currentPage, searchParams, loadTrajs]);
 
   useEffect(() => {
     const pathParts = pathname.split('/');
@@ -107,11 +114,11 @@ export const Sidebar = () => {
 
   // Intersection Observer für Infinite Scrolling
   useEffect(() => {
-    if (!pagination?.hasNext || isLoading) {
-      return undefined; // Explicit return for consistent-return rule
+    if (!pagination?.hasNext || isInitialLoading) {
+      return undefined;
     }
 
-    const handleIntersection = (entries: any) => {
+    const handleIntersection = (entries: IntersectionObserverEntry[]) => {
       const [entry] = entries;
       if (
         entry.isIntersecting &&
@@ -126,7 +133,7 @@ export const Sidebar = () => {
 
     const observer = new IntersectionObserver(handleIntersection, {
       threshold: 0.1,
-      rootMargin: '0px 0px 200px 0px', // Trigger a bit before reaching the bottom
+      rootMargin: '0px 0px 200px 0px',
     });
 
     const currentLoadMoreRef = loadMoreRef.current;
@@ -137,7 +144,7 @@ export const Sidebar = () => {
     return () => {
       observer.disconnect();
     };
-  }, [pagination?.hasNext, isLoading, loadNextPage]);
+  }, [pagination?.hasNext, isInitialLoading, loadNextPage]);
 
   // Parse filter string to search parameters
   const parseFilterToSearchParams = (filter: string): SearchTrajParams => {
@@ -150,11 +157,9 @@ export const Sidebar = () => {
     const filterParts = filter.trim().split(/\s+/);
 
     for (const part of filterParts) {
-      // Numerische ID
       if (/^\d+$/.test(part)) {
         params.query = part;
       } else {
-        // Alle Pattern gleichzeitig prüfen
         const eventMatch = part.match(/^(n|np)=(\d+)$/i);
         const weightMatch = part.match(/^(w|weight)=(\d*\.?\d+)$/i);
         const velMatch = part.match(/^(v|velocity)=(\d*\.?\d+)$/i);
@@ -187,12 +192,9 @@ export const Sidebar = () => {
 
   const handleFilterChange = useCallback(
     (filter: string) => {
-      // Filter in Suchparameter umwandeln
       const newSearchParams = parseFilterToSearchParams(filter);
       setSearchParams(newSearchParams);
-
-      // Erste Seite mit neuen Suchparametern laden
-      setTrajInfo([]); // Liste zurücksetzen
+      setTrajInfo([]);
       loadTrajs(newSearchParams);
     },
     [loadTrajs],
@@ -213,23 +215,25 @@ export const Sidebar = () => {
           <SearchFilter onFilterChange={handleFilterChange} />
           <SearchHelpTooltip />
         </div>
-        {!isLoading && (
+
+        {/* Count bleibt beim Infinite Scroll sichtbar, verschwindet nur bei initialem Load */}
+        {!isInitialLoading && (
           <div className="mt-2 pl-1 text-sm text-gray-600">
-            {`${trajInfo.length} ${
-              trajInfo.length === 1 ? 'Traj.' : ''
-            }${pagination ? ` of ${pagination.total} trajectories` : ''}`}
+            {`${trajInfo.length}${
+              pagination ? ` of ${pagination.total} trajectories` : ' Traj.'
+            }`}
           </div>
         )}
       </div>
 
       <div ref={scrollContainerRef} className="mt-4 overflow-scroll">
-        {trajInfo.length === 0 && isLoading && (
+        {trajInfo.length === 0 && isInitialLoading && (
           <div className="flex justify-center py-4">
             <div className="size-6 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           </div>
         )}
 
-        {trajInfo.length === 0 && !isLoading && (
+        {trajInfo.length === 0 && !isInitialLoading && (
           <div className="py-4 text-center text-gray-500">
             No trajectories found
           </div>
@@ -286,10 +290,10 @@ export const Sidebar = () => {
               </div>
             ))}
 
-            {/* Invisible loader element at the bottom for infinite scroll */}
+            {/* Spinner nur unten beim Nachladen, Count bleibt oben sichtbar */}
             {pagination?.hasNext && (
               <div ref={loadMoreRef} className="py-4">
-                {isLoading && (
+                {isLoadingMore && (
                   <div className="flex justify-center">
                     <div className="size-6 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                   </div>

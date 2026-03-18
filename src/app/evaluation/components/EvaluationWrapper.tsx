@@ -23,8 +23,6 @@ export function EvaluationWrapper() {
   const params = useParams();
   const id = params?.id as string;
 
-  console.log("params:", params);
-
   const { currentTrajInfo, setCurrentTrajInfo } = useTrajectory();
 
   // Handler für Segmentauswahl - WICHTIG: useCallback verwenden!

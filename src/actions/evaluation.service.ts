@@ -200,7 +200,7 @@ export const getSIDTWPositionById = async (
   }
 };
 
-/*export const getDTWPositionById = async (
+/* export const getDTWPositionById = async (
   id: string,
 ): Promise<DTWPosition[]> => {
   try {
@@ -212,7 +212,7 @@ export const getSIDTWPositionById = async (
     console.error('Error fetching DTW deviation data:', error);
     throw error;
   }
-};*/
+}; */
 
 export const checkPositionDataAvailability = async (
   id: string,

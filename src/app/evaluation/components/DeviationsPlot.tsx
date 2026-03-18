@@ -6,8 +6,8 @@ import { Loader2 } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 
 import {
-  getEvaluationInfoById,
   getEDPositionById,
+  getEvaluationInfoById,
   getGDOrientationById,
   getQDTWOrientationById,
   getSIDTWPositionById,
@@ -15,6 +15,7 @@ import {
 import { getTrajInfoById } from '@/src/actions/motion.service';
 import { PosDeviationPlot2D } from '@/src/app/evaluation/components/PosDeviationPlot2D';
 import { PosDeviationPlot3D } from '@/src/app/evaluation/components/PosDeviationPlot3D';
+
 import { OriDeviationPlot2D } from './OriDeviationPlot2D';
 
 interface MetricState {
@@ -200,7 +201,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   // Verfügbarkeit der Daten prüfen
   const hasEDData = currentEvaluationInfo.EDInfo.length > 0;
   const hasSIDTWData = currentEvaluationInfo.SIDTWInfo.length > 0;
-  //const hasDTWData = currentEvaluationInfo.info_dtw.length > 0;
+  // const hasDTWData = currentEvaluationInfo.info_dtw.length > 0;
   const hasGDData = currentEvaluationInfo.GDInfo?.length > 0;
   const hasQDTWData = currentEvaluationInfo.QDTWInfo?.length > 0;
 
@@ -294,7 +295,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
           </button>
         )}
 
-        {/*hasDTWData && (
+        {/* hasDTWData && (
           <button
             onClick={() => loadPosMetricData('dtw')}
             disabled={posMetrics.dtw.isLoading}
@@ -304,7 +305,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
           >
             {getButtonContent(posMetrics.dtw, 'DTW')}
           </button>
-        )*/}
+        ) */}
 
         {hasGDData ||
           (hasQDTWData && (

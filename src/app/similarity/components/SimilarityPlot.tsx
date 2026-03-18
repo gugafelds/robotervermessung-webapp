@@ -10,16 +10,14 @@ import type { Layout, PlotData } from 'plotly.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
-  getTrajSetpointsById,
-  getTrajPositionCmdById,
-  getSegmentSetpointsById,
   getSegmentPositionCmdById,
+  getSegmentSetpointsById,
+  getTrajPositionCmdById,
+  getTrajSetpointsById,
 } from '@/src/actions/motion.service';
 import { Typography } from '@/src/components/Typography';
 import { plotLayoutConfig } from '@/src/lib/plot-config';
-import type {
-  TrajPositionCmd, TrajSetpoints,
-} from '@/types/motion.types';
+import type { TrajPositionCmd, TrajSetpoints } from '@/types/motion.types';
 import type { SegmentGroup, SimilarityResult } from '@/types/similarity.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -245,6 +243,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
   };
 
   // Format score label for legend
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const formatScoreLabel = (result: SimilarityResult | undefined): string => {
     if (!result) return 'N/A';
     if (stage2Active && result.dtw_distance !== undefined) {
@@ -333,6 +332,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
     bahnResults,
     segmentResults,
     stage2Active,
+    formatScoreLabel,
   ]);
 
   useEffect(() => {
@@ -415,7 +415,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
 
   const layout: Partial<Layout> = {
     ...plotLayoutConfig,
-    title: getPlotTitle(),
+    title: { text: getPlotTitle() },
     height: 600,
     width: 600,
     scene: {
@@ -426,9 +426,9 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
       },
       aspectmode: 'cube',
       dragmode: 'orbit',
-      xaxis: { title: 'X [mm]', showgrid: true, zeroline: true },
-      yaxis: { title: 'Y [mm]', showgrid: true, zeroline: true },
-      zaxis: { title: 'Z [mm]', showgrid: true, zeroline: true },
+      xaxis: { title: { text: 'X [mm]' }, showgrid: true, zeroline: true },
+      yaxis: { title: { text: 'Y [mm]' }, showgrid: true, zeroline: true },
+      zaxis: { title: { text: 'Z [mm]' }, showgrid: true, zeroline: true },
     },
     margin: { t: 50, b: 20, l: 20, r: 20 },
     showlegend: false,

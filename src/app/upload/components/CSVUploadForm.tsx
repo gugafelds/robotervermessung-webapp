@@ -374,9 +374,7 @@ const CSVUploadForm: React.FC = () => {
                     )
                   }
                 />
-                <span className="ml-2">
-                  Fixed segments per trajectory
-                </span>
+                <span className="ml-2">Fixed segments per trajectory</span>
               </label>
               <label className="inline-flex items-center font-light">
                 <input
@@ -457,10 +455,7 @@ const CSVUploadForm: React.FC = () => {
 
         {segmentationMethod === 'fixed_segments' && (
           <div className="mb-4">
-            <label
-              className="mb-2 block text-primary"
-              htmlFor="num-segments"
-            >
+            <label className="mb-2 block text-primary" htmlFor="num-segments">
               Number of segments per trajectory?
               <input
                 className="mt-2 w-full appearance-none rounded border p-2 leading-tight text-primary focus:outline-none focus:ring-2 focus:ring-blue-500"

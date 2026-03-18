@@ -72,9 +72,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
     return (
       <div className="w-full rounded-lg border border-gray-400 bg-white p-6">
         <div className="py-8 text-center text-gray-500">
-          <p>
-            Enter a Traj- or Segment-ID to search for similarities.
-          </p>
+          <p>Enter a Trajectory-ID to search for similarities.</p>
         </div>
       </div>
     );

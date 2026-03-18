@@ -9,7 +9,7 @@ export default async function EvaluationLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { bahnInfo: initialTrajInfo, pagination: initialPagination } =
+  const { trajInfo: initialTrajInfo, pagination: initialPagination } =
     await getTrajInfo({
       page: 1,
       pageSize: 40,

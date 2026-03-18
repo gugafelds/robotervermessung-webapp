@@ -138,13 +138,15 @@ export const OriDeviationPlot2D: React.FC<OriDeviationPlot2DProps> = ({
 
   // Layout für 2D Plot
   const get2DLayout = (): Partial<Layout> => ({
-    title:
-      selectedSegment === 'total'
-        ? 'Orientierung (Gesamtmessung)'
-        : `Orientierung (Segment ${selectedSegment.split('_')[1]})`,
+    title: {
+      text:
+        selectedSegment === 'total'
+          ? 'Orientierung (Gesamtmessung)'
+          : `Orientierung (Segment ${selectedSegment.split('_')[1]})`,
+    },
     font: { family: 'Helvetica' },
-    xaxis: { title: 'Zeit [s]' },
-    yaxis: { title: 'Abweichung [°]', rangemode: 'tozero' },
+    xaxis: { title: { text: 'Zeit [s]' } },
+    yaxis: { title: { text: 'Abweichung [°]' }, rangemode: 'tozero' },
     hovermode: 'x unified',
     height: 600,
     margin: { t: 40, b: 40, l: 60, r: 20 },

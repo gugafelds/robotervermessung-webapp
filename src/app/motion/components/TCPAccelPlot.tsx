@@ -117,17 +117,17 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = ({
   const { plotData: tcpAccelPlotData, maxTimeAccel } = createTcpAccelPlot();
 
   const tcpAccelLayout: Partial<Layout> = {
-    title: 'Acceleration',
+    title: { text: 'Acceleration' },
     font: {
       family: 'Helvetica',
     },
     xaxis: {
-      title: 'Zeit (s)',
+      title: { text: 'Zeit (s)' },
       tickformat: '.2f',
       range: [0, maxTimeAccel],
     },
     yaxis: {
-      title: 'mm/s²',
+      title: { text: 'mm/s²' },
       rangemode: 'tozero',
     },
     legend: { orientation: 'h', y: -0.2 },

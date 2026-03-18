@@ -11,9 +11,9 @@ import type {
   TargetFeatures,
 } from '@/types/similarity.types';
 
+import { SimilarityPlot } from './SimilarityPlot';
 import SimilarityResults from './SimilarityResults';
 import SimilaritySearch from './SimilaritySearch';
-import { SimilarityPlot } from './SimilarityPlot';
 
 interface SimilaritySearchWrapperProps {
   trajInfo?: TrajInfo[];

@@ -34,10 +34,7 @@ export default function DashboardClient({
       <div>
         <Typography as="h2">Motion Data</Typography>
         <div className="my-2 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <DataCard
-            componentName="Trajectories overall"
-            value={trajsCount}
-          />
+          <DataCard componentName="Trajectories overall" value={trajsCount} />
           <DataCard componentName="Segments overall" value={segmentsCount} />
           <AccuracyCard medianSIDTW={medianSIDTW} meanSIDTW={meanSIDTW} />
         </div>

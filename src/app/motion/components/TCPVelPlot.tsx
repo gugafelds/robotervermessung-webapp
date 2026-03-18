@@ -86,16 +86,16 @@ export const TCPVelPlot: React.FC<TCPSpeedPlotProps> = ({
   const { plotData: tcpSpeedPlotData, maxTimeSpeed } = createTcpSpeedPlot();
 
   const tcpSpeedLayout: Partial<Layout> = {
-    title: 'Velocity',
+    title: { text: 'Velocity' },
     font: {
       family: 'Helvetica',
     },
     xaxis: {
-      title: 's',
+      title: { text: 's' },
       tickformat: '.2f',
       range: [0, maxTimeSpeed],
     },
-    yaxis: { title: 'mm/s' },
+    yaxis: { title: { text: 'mm/s' } },
     legend: { orientation: 'h', y: -0.2 },
     hovermode: 'x unified',
     uirevision: 'true',

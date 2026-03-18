@@ -3,8 +3,6 @@ import type {
   TrajAccelActRaw,
   TrajAccelCmd,
   TrajAccelCmdRaw,
-  TrajSetpoints,
-  TrajSetpointsRaw,
   TrajInfo,
   TrajInfoRaw,
   TrajJointStates,
@@ -15,17 +13,19 @@ import type {
   TrajPoseActRaw,
   TrajPositionCmd,
   TrajPositionCmdRaw,
+  TrajSetpoints,
+  TrajSetpointsRaw,
   TrajVelAct,
   TrajVelActRaw,
   TrajVelCmd,
   TrajVelCmdRaw,
-} from "@/types/motion.types";
+} from '@/types/motion.types';
 import type {
-  TrajInfoResponse,
-  TrajInfoResponseRaw,
   PaginationResult,
   PaginationResultRaw,
-} from "@/types/pagination.types";
+  TrajInfoResponse,
+  TrajInfoResponseRaw,
+} from '@/types/pagination.types';
 
 export const transformTrajInfoResult = (
   bahnenRaw: TrajInfoRaw[],
@@ -61,7 +61,7 @@ export const transformTrajInfoResult = (
       numberPointsAccelCmd: bahn.number_accel_cmd,
       frequencyAccelCmd: bahn.freq_accel_cmd,
       settedVelocity: bahn.setted_velocity,
-        transfMatrix: bahn.transformation_matrix,
+      transfMatrix: bahn.transformation_matrix,
       stopPoint: bahn.stop_point,
       waitTime: bahn.wait_time,
     }),
@@ -102,7 +102,7 @@ export const transformTrajInfobyIDResult = (
   settedVelocity: bahnRaw.setted_velocity,
   stopPoint: bahnRaw.stop_point,
   waitTime: bahnRaw.wait_time,
-    transfMatrix: bahnRaw.transformation_matrix,
+  transfMatrix: bahnRaw.transformation_matrix,
 });
 
 export const transformTrajPoseActResult = (

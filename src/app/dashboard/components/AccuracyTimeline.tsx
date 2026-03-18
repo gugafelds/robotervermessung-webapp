@@ -38,8 +38,9 @@ function AccuracyTimelineContent({ data }: AccuracyTimelineContentProps) {
       </Typography>
       <div className="mb-4 text-sm text-gray-600">
         <p>
-          This plot shows the developement of the measurement accuracy over time. 
-          An increase could indicate wear and tear or calibration problems.
+          This plot shows the developement of the measurement accuracy over
+          time. An increase could indicate wear and tear or calibration
+          problems.
         </p>
       </div>
 
@@ -94,12 +95,12 @@ function AccuracyTimelineContent({ data }: AccuracyTimelineContentProps) {
           height: 500,
           margin: { t: 20, r: 20, l: 80, b: 80 },
           xaxis: {
-            title: 'Recording date',
+            title: { text: 'Recording date' },
             type: 'date',
             tickformat: '%d.%m.%Y',
           },
           yaxis: {
-            title: 'SIDTW [mm]',
+            title: { text: 'SIDTW [mm]' },
             rangemode: 'tozero',
           },
           hovermode: 'x unified',

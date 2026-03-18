@@ -11,11 +11,10 @@ interface SimilarityLayoutProps {
 export default async function SimilarityLayout({
   children,
 }: SimilarityLayoutProps) {
-  // Lade Trajdaten für den TrajectoryProvider
-  const { bahnInfo: initialTrajInfo, pagination: initialPagination } =
+  const { trajInfo: initialTrajInfo, pagination: initialPagination } =
     await getTrajInfo({
       page: 1,
-      pageSize: 15, // Mehr Bahnen für besseren Similarity
+      pageSize: 30,
     });
 
   return (

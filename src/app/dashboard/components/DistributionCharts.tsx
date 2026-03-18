@@ -130,10 +130,12 @@ function DistributionChartsContent({
           height: 450,
           margin: { t: 20, r: 20, l: 80, b: 80 },
           xaxis: {
-            title: `${activeDistribution.meta.label} [${activeDistribution.meta.unit}]`,
+            title: {
+              text: `${activeDistribution.meta.label} [${activeDistribution.meta.unit}]`,
+            },
             type: 'category',
           },
-          yaxis: { title: 'Amount' },
+          yaxis: { title: { text: 'Amount' } },
         }}
         style={{ width: '100%' }}
         config={{
@@ -188,7 +190,9 @@ export function DistributionCharts() {
         <div className="flex h-96 items-center justify-center">
           <div className="text-center">
             <Loader className="mx-auto mb-4 size-12 animate-spin text-blue-950" />
-            <p className="text-sm text-gray-600">Loading distribution data...</p>
+            <p className="text-sm text-gray-600">
+              Loading distribution data...
+            </p>
           </div>
         </div>
       </div>

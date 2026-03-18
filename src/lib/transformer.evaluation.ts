@@ -1,21 +1,21 @@
 import type {
-    EDInfo,
-    EDInfoRaw,
-    EDPosition,
-    EDPositionRaw,
-    GDInfo,
-    GDInfoRaw,
-    GDOrientation,
-    GDOrientationRaw,
-    QDTWInfo,
-    QDTWInfoRaw,
-    QDTWOrientation,
-    QDTWOrientationRaw,
-    SIDTWInfo,
-    SIDTWInfoRaw,
-    SIDTWPosition,
-    SIDTWPositionRaw,
-} from "@/types/evaluation.types";
+  EDInfo,
+  EDInfoRaw,
+  EDPosition,
+  EDPositionRaw,
+  GDInfo,
+  GDInfoRaw,
+  GDOrientation,
+  GDOrientationRaw,
+  QDTWInfo,
+  QDTWInfoRaw,
+  QDTWOrientation,
+  QDTWOrientationRaw,
+  SIDTWInfo,
+  SIDTWInfoRaw,
+  SIDTWPosition,
+  SIDTWPositionRaw,
+} from '@/types/evaluation.types';
 
 export const transformEDInfoResult = (trajsRaw: EDInfoRaw[]): EDInfo[] => {
   return trajsRaw.map(
@@ -73,7 +73,7 @@ export const transformQDTWInfoResult = (
   );
 };
 
-/*export const transformDTWInfoResult = (trajsRaw: DTWInfoRaw[]): DTWInfo[] => {
+/* export const transformDTWInfoResult = (trajsRaw: DTWInfoRaw[]): DTWInfo[] => {
   return trajsRaw.map(
     (bahn): DTWInfo => ({
       trajID: bahn.traj_id,
@@ -85,7 +85,7 @@ export const transformQDTWInfoResult = (
       evaluation: bahn.evaluation,
     }),
   );
-};*/
+}; */
 
 export const transformEDDeviationResult = (
   data: EDPositionRaw[],
@@ -121,7 +121,7 @@ export const transformSIDTWDeviationResult = (
   }));
 };
 
-/*export const transformDTWDeviationResult = (
+/* export const transformDTWDeviationResult = (
   data: DTWPositionRaw[],
 ): DTWPosition[] => {
   return data.map((item) => ({
@@ -136,7 +136,7 @@ export const transformSIDTWDeviationResult = (
     DTWIstZ: item.dtw_act_z,
     pointsOrder: item.points_order,
   }));
-};*/
+}; */
 
 export const transformQDTWDeviationResult = (
   data: QDTWOrientationRaw[],
@@ -161,9 +161,6 @@ export const transformGDDeviationResult = (
   data: GDOrientationRaw[] | undefined,
 ): GDOrientation[] => {
   if (!Array.isArray(data)) {
-    console.warn(
-      "GDDeviation data is undefined or not an array, returning empty array",
-    );
     return [];
   }
 

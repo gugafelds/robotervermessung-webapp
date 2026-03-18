@@ -14,12 +14,12 @@ import { getTrajInfo } from '@/src/actions/motion.service';
 import type {
   TrajAccelAct,
   TrajAccelCmd,
-  TrajSetpoints,
   TrajInfo,
   TrajJointStates,
   TrajOrientationCmd,
   TrajPoseAct,
   TrajPositionCmd,
+  TrajSetpoints,
   TrajVelAct,
   TrajVelCmd,
 } from '@/types/motion.types';
@@ -41,9 +41,7 @@ export interface TrajectoryState {
   currentTrajAccelAct: TrajAccelAct[];
   setCurrentTrajAccelAct: React.Dispatch<React.SetStateAction<TrajAccelAct[]>>;
   currentTrajAccelCmd: TrajAccelCmd[];
-  setCurrentTrajAccelCmd: React.Dispatch<
-    React.SetStateAction<TrajAccelCmd[]>
-  >;
+  setCurrentTrajAccelCmd: React.Dispatch<React.SetStateAction<TrajAccelCmd[]>>;
   currentTrajPositionCmd: TrajPositionCmd[];
   setCurrentTrajPositionCmd: React.Dispatch<
     React.SetStateAction<TrajPositionCmd[]>
@@ -53,16 +51,15 @@ export interface TrajectoryState {
     React.SetStateAction<TrajOrientationCmd[]>
   >;
   currentTrajVelCmd: TrajVelCmd[];
-  setCurrentTrajVelCmd: React.Dispatch<
-    React.SetStateAction<TrajVelCmd[]>
-  >;
+  setCurrentTrajVelCmd: React.Dispatch<React.SetStateAction<TrajVelCmd[]>>;
   currentTrajJointStates: TrajJointStates[];
   setCurrentTrajJointStates: React.Dispatch<
     React.SetStateAction<TrajJointStates[]>
   >;
   currentTrajSetpoints: TrajSetpoints[];
-  setCurrentTrajSetpoints: React.Dispatch<React.SetStateAction<TrajSetpoints[]>>;
-
+  setCurrentTrajSetpoints: React.Dispatch<
+    React.SetStateAction<TrajSetpoints[]>
+  >;
 }
 
 type TrajectoryProviderProps = {
@@ -87,9 +84,7 @@ export const TrajectoryProvider = ({
   const [currentTrajPoseAct, setCurrentTrajPoseAct] = useState<TrajPoseAct[]>(
     [],
   );
-  const [currentTrajVelAct, setCurrentTrajVelAct] = useState<
-    TrajVelAct[]
-  >([]);
+  const [currentTrajVelAct, setCurrentTrajVelAct] = useState<TrajVelAct[]>([]);
   const [currentTrajAccelAct, setCurrentTrajAccelAct] = useState<
     TrajAccelAct[]
   >([]);
@@ -102,13 +97,13 @@ export const TrajectoryProvider = ({
   const [currentTrajOrientationCmd, setCurrentTrajOrientationCmd] = useState<
     TrajOrientationCmd[]
   >([]);
-  const [currentTrajVelCmd, setCurrentTrajVelCmd] = useState<
-    TrajVelCmd[]
-  >([]);
+  const [currentTrajVelCmd, setCurrentTrajVelCmd] = useState<TrajVelCmd[]>([]);
   const [currentTrajJointStates, setCurrentTrajJointStates] = useState<
     TrajJointStates[]
   >([]);
-  const [currentTrajSetpoints, setCurrentTrajSetpoints] = useState<TrajSetpoints[]>([]);
+  const [currentTrajSetpoints, setCurrentTrajSetpoints] = useState<
+    TrajSetpoints[]
+  >([]);
 
   useEffect(() => {
     setTrajInfo(initialTrajInfo);

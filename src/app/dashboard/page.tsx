@@ -10,7 +10,7 @@ import DashboardClient from './components/DashboardClient';
 
 interface BasicDashboardData {
   segmentsCount: number;
-  bahnenCount: number;
+  trajsCount: number;
   medianSIDTW?: number;
   meanSIDTW?: number;
   bestPerformers?: PerformerData[];

@@ -66,7 +66,7 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
       </span>
     );
   }
-  
+
   return (
     <div className="flex h-full min-w-80 flex-col border-r border-gray-500 bg-gray-50 p-4 lg:h-fullscreen lg:overflow-scroll">
       {currentTrajInfo && Object.keys(currentTrajInfo).length !== 0 && (
@@ -111,10 +111,7 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
           </div>
 
           <InfoSection title="Allgemein">
-            <InfoRow
-              label="Robot"
-              value={currentTrajInfo.robotModel || '-'}
-            />
+            <InfoRow label="Robot" value={currentTrajInfo.robotModel || '-'} />
             <InfoRow
               label="Start"
               value={
@@ -176,9 +173,7 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
               />
               <InfoRow
                 label="Velocity"
-                value={
-                  formatNumber(currentTrajInfo.numberPointsVelAct) || '-'
-                }
+                value={formatNumber(currentTrajInfo.numberPointsVelAct) || '-'}
               />
               <InfoRow
                 label="Acceleration"
@@ -204,9 +199,7 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
               />
               <InfoRow
                 label="Velocity"
-                value={
-                  formatNumber(currentTrajInfo.numberPointsVelCmd) || '-'
-                }
+                value={formatNumber(currentTrajInfo.numberPointsVelCmd) || '-'}
               />
               <InfoRow
                 label="Acceleration"

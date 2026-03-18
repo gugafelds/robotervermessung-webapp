@@ -4,9 +4,9 @@ import React from 'react';
 
 import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
 import type {
-  TrajSetpoints,
   TrajPoseAct,
   TrajPositionCmd,
+  TrajSetpoints,
 } from '@/types/motion.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -18,27 +18,17 @@ interface Position3DPlotProps {
 }
 
 export const Position3DPlot: React.FC<Position3DPlotProps> = ({
-  currentTrajPoseTrans,
   currentTrajPoseAct,
   idealTrajectory,
   currentTrajSetpoints,
-  isTransformed,
 }) => {
-  const realTrajectory = isTransformed
-    ? currentTrajPoseTrans
-    : currentTrajPoseAct;
+  const realTrajectory = currentTrajPoseAct;
 
   const realTrajectoryData: Partial<PlotData> = {
     ...dataPlotConfig('lines', 'ist', 4, 'darkblue'),
-    x: realTrajectory.map((row) =>
-      (row as TrajPoseAct).xAct,
-    ),
-    y: realTrajectory.map((row) =>
-      (row as TrajPoseAct).yAct,
-    ),
-    z: realTrajectory.map((row) =>
-      (row as TrajPoseAct).zAct,
-    ),
+    x: realTrajectory.map((row) => (row as TrajPoseAct).xAct),
+    y: realTrajectory.map((row) => (row as TrajPoseAct).yAct),
+    z: realTrajectory.map((row) => (row as TrajPoseAct).zAct),
     name: 'Trajectory (M)',
   };
 
@@ -122,7 +112,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
 
   const layout: Partial<Layout> = {
     ...plotLayoutConfig,
-    title: '3D position',
+    title: { text: '3D position' },
     autosize: true,
     height: 500,
     scene: {
@@ -133,9 +123,9 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
       },
       aspectmode: 'cube',
       dragmode: 'orbit',
-      xaxis: { title: 'X [mm]', showgrid: true, zeroline: true },
-      yaxis: { title: 'Y [mm]', showgrid: true, zeroline: true },
-      zaxis: { title: 'Z [mm]', showgrid: true, zeroline: true },
+      xaxis: { title: { text: 'X [mm]' }, showgrid: true, zeroline: true },
+      yaxis: { title: { text: 'Y [mm]' }, showgrid: true, zeroline: true },
+      zaxis: { title: { text: 'Z [mm]' }, showgrid: true, zeroline: true },
     },
     margin: { t: 50, b: 20, l: 20, r: 20 },
     uirevision: 'true',

@@ -5,9 +5,9 @@ import type { Layout, PlotData } from 'plotly.js';
 import React from 'react';
 
 import type {
-  TrajSetpoints,
   TrajPoseAct,
   TrajPositionCmd,
+  TrajSetpoints,
 } from '@/types/motion.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -202,12 +202,16 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
     createCombinedPositionPlot();
 
   const combinedPositionLayout: Partial<Layout> = {
-    title: 'Position',
+    title: { text: 'Position' },
     font: {
       family: 'Helvetica',
     },
-    xaxis: { title: 's', range: [0, positionMaxTime], tickformat: '.2f' },
-    yaxis: { title: 'mm' },
+    xaxis: {
+      title: { text: 's' },
+      range: [0, positionMaxTime],
+      tickformat: '.2f',
+    },
+    yaxis: { title: { text: 'mm' } },
     legend: { orientation: 'h', y: -0.15 }, // Legende näher zum Plot
     hovermode: 'x unified',
     margin: { l: 60, r: 20, b: 80, t: 50 }, // Kleinere Margins = mehr Platz für Plot

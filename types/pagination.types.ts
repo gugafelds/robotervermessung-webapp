@@ -1,8 +1,8 @@
 // types/pagination.types.ts
 
 import type {
-  EvaluationTrajIDs,
   EvaluationInfo,
+  EvaluationTrajIDs,
 } from '@/types/evaluation.types';
 import type { TrajInfo, TrajInfoRaw } from '@/types/motion.types';
 

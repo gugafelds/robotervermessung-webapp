@@ -161,14 +161,14 @@ function WorkareaPlotContent({
         z: performer.trajectory.map((p) => p.z),
         mode: 'lines' as const,
         type: 'scatter3d' as const,
-        name: `Best #${idx + 1} (ID: ${performer.bahn_id})`,
+        name: `Best #${idx + 1} (ID: ${performer.traj_id})`,
         line: {
           color: greenColors[idx % greenColors.length],
           width: 4,
         },
         hovertemplate:
           `<b>Best Performer #${idx + 1}</b><br>` +
-          `Bahn-ID: ${performer.bahn_id}<br>` +
+          `Bahn-ID: ${performer.traj_id}<br>` +
           `SIDTW: ${performer.sidtw_average_distance.toFixed(3)} mm<br>` +
           'X: %{x:.2f} mm<br>' +
           'Y: %{y:.2f} mm<br>' +
@@ -185,14 +185,14 @@ function WorkareaPlotContent({
         z: performer.trajectory.map((p) => p.z),
         mode: 'lines' as const,
         type: 'scatter3d' as const,
-        name: `Worst #${idx + 1} (ID: ${performer.bahn_id})`,
+        name: `Worst #${idx + 1} (ID: ${performer.traj_id})`,
         line: {
           color: redColors[idx % redColors.length],
           width: 4,
         },
         hovertemplate:
           `<b>Worst Performer #${idx + 1}</b><br>` +
-          `Bahn-ID: ${performer.bahn_id}<br>` +
+          `Bahn-ID: ${performer.traj_id}<br>` +
           `SIDTW: ${performer.sidtw_average_distance.toFixed(3)} mm<br>` +
           'X: %{x:.2f} mm<br>' +
           'Y: %{y:.2f} mm<br>' +
@@ -303,7 +303,7 @@ function WorkareaPlotContent({
               colorscale: 'Inferno',
               showscale: true,
               colorbar: {
-                title: 'SIDTW [mm]',
+                title: { text: 'SIDTW [mm]' },
               },
             },
             hovertemplate:
@@ -325,9 +325,9 @@ function WorkareaPlotContent({
           autosize: true,
           height: 550,
           scene: {
-            xaxis: { title: 'X [mm]', range: [0, 2300] },
-            yaxis: { title: 'Y [mm]', range: [-1300, 1300] },
-            zaxis: { title: 'Z [mm]', range: [0, 2000] },
+            xaxis: { title: { text: 'X [mm]' }, range: [0, 2300] },
+            yaxis: { title: { text: 'Y [mm]' }, range: [-1300, 1300] },
+            zaxis: { title: { text: 'Z [mm]' }, range: [0, 2000] },
           },
           margin: { t: 10, r: 10, l: 10, b: 10 },
           uirevision: 'true',

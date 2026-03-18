@@ -251,7 +251,7 @@ export const MetricsPanel: React.FC<MetrikenPanelProps> = ({
                 </td>
               </tr>
             )}
-            {/*dtwMetrics && (
+            {/* dtwMetrics && (
               <tr className="border-t">
                 <td className="py-3 text-primary">DTW</td>
                 <td className="py-3 text-center text-primary">
@@ -267,7 +267,7 @@ export const MetricsPanel: React.FC<MetrikenPanelProps> = ({
                   {formatNumber(dtwMetrics.std)}
                 </td>
               </tr>
-            )*/}
+            ) */}
           </tbody>
         </table>
       </div>

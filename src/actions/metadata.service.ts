@@ -1,15 +1,8 @@
 import type {
   AvailableDate,
-  EmbeddingSimilarityParams,
-  EmbeddingSimilarityResult,
-  HierarchicalSimilarityResponse,
   MetadataCalculationRequest,
   MetadataCalculationResponse,
   MetadataStats,
-  SearchTiming,
-  SegmentGroup,
-  SimilarityResult,
-  TargetFeatures,
   TaskStatus,
 } from '@/types/similarity.types';
 

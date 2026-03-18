@@ -184,10 +184,10 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
       currentEuclideanDeviation?.length
         ? currentEuclideanDeviation
         : metrics.SIDTW.isLoaded &&
-          metrics.SIDTW.visible &&
-          currentSIDTWDeviation?.length
-        ? currentSIDTWDeviation
-        : null;
+            metrics.SIDTW.visible &&
+            currentSIDTWDeviation?.length
+          ? currentSIDTWDeviation
+          : null;
 
     if (firstVisibleData) {
       const filteredData = filterDataBySegment(firstVisibleData);
@@ -255,10 +255,12 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
 
   // Layout für 3D Plot
   const get3DLayout = (): Partial<Layout> => ({
-    title:
-      selectedSegment === 'total'
-        ? '3D-Abweichungsplot (Gesamtmessung)'
-        : `3D-Abweichungsplot (Segment ${selectedSegment.split('_')[1]})`,
+    title: {
+      text:
+        selectedSegment === 'total'
+          ? '3D-Abweichungsplot (Gesamtmessung)'
+          : `3D-Abweichungsplot (Segment ${selectedSegment.split('_')[1]})`,
+    },
     autosize: true,
     height: 600,
     scene: {
@@ -269,9 +271,9 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
       },
       aspectmode: 'cube',
       dragmode: 'orbit',
-      xaxis: { title: 'X [mm]', showgrid: true, zeroline: true },
-      yaxis: { title: 'Y [mm]', showgrid: true, zeroline: true },
-      zaxis: { title: 'Z [mm]', showgrid: true, zeroline: true },
+      xaxis: { title: { text: 'X [mm]' }, showgrid: true, zeroline: true },
+      yaxis: { title: { text: 'Y [mm]' }, showgrid: true, zeroline: true },
+      zaxis: { title: { text: 'Z [mm]' }, showgrid: true, zeroline: true },
     },
     margin: { t: 50, b: 20, l: 20, r: 20 },
     showlegend: true,

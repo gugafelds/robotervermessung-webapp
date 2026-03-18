@@ -6,9 +6,9 @@ import React from 'react';
 
 import { quaternionToEuler } from '@/src/lib/functions';
 import type {
-  TrajSetpoints,
   TrajOrientationCmd,
   TrajPoseAct,
+  TrajSetpoints,
 } from '@/types/motion.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -96,8 +96,8 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
 
     const eulerAnglesAct = fixGimbalLockBatch(
       currentTrajPoseAct.map((traj) =>
-            quaternionToEuler(traj.qxAct, traj.qyAct, traj.qzAct, traj.qwAct),
-          ),
+        quaternionToEuler(traj.qxAct, traj.qyAct, traj.qzAct, traj.qwAct),
+      ),
     );
 
     // Process Soll data
@@ -230,16 +230,16 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
     createCombinedEulerAnglePlotData();
 
   const combinedEulerLayout: Partial<Layout> = {
-    title: 'Euler-Winkel',
+    title: { text: 'Euler-Winkel' },
     font: {
       family: 'Helvetica',
     },
     xaxis: {
-      title: 's',
+      title: { text: 's' },
       tickformat: '.2f',
       range: [0, maxTimeOrientation],
     },
-    yaxis: { title: '°' },
+    yaxis: { title: { text: '°' } },
     legend: { orientation: 'h', y: -0.2 },
     hovermode: 'x unified',
     uirevision: 'true',

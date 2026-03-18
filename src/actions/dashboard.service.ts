@@ -55,15 +55,12 @@ export const getWorkareaData = async () => {
 
 export const getSIDTWTimeline = async () => {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/dashboard/timeline`,
-      {
-        cache: 'no-cache',
-        headers: {
-          Accept: 'application/json',
-        },
+    const response = await fetch(`${API_BASE_URL}/dashboard/timeline`, {
+      cache: 'no-cache',
+      headers: {
+        Accept: 'application/json',
       },
-    );
+    });
 
     if (!response.ok) {
       throw new Error(
@@ -80,15 +77,12 @@ export const getSIDTWTimeline = async () => {
 
 export const getSIDTWvsParameters = async () => {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/dashboard/influence`,
-      {
-        cache: 'no-cache',
-        headers: {
-          Accept: 'application/json',
-        },
+    const response = await fetch(`${API_BASE_URL}/dashboard/influence`, {
+      cache: 'no-cache',
+      headers: {
+        Accept: 'application/json',
       },
-    );
+    });
 
     if (!response.ok) {
       throw new Error(

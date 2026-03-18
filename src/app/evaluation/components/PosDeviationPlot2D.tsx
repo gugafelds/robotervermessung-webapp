@@ -58,10 +58,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
   };
 
   // Zeitarray generieren basierend auf pointsOrder
-  const getTimeArray = (
-    data: any[],
-    metricType: 'ED' | 'SIDTW',
-  ) => {
+  const getTimeArray = (data: any[], metricType: 'ED' | 'SIDTW') => {
     if (!data.length) return [];
 
     if (!currentBahnInfo?.startTime || !currentBahnInfo?.endTime) {
@@ -118,7 +115,6 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
       });
     }
 
-
     if (metrics.SIDTW.isLoaded && metrics.SIDTW.visible) {
       const filteredData = filterDataBySegment(currentSIDTWDeviation);
       const sortedSIDTW = [...filteredData].sort(
@@ -136,7 +132,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
         hovertemplate: 'Zeit: %{x:.2f}s<br>SIDTW: %{y:.2f}mm<extra></extra>',
       });
     }
-/*
+    /*
     if (metrics.dtw.isLoaded && metrics.dtw.visible) {
       const filteredData = filterDataBySegment(currentDTWDeviation);
       const sortedDTW = [...filteredData].sort(
@@ -154,20 +150,22 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
         hovertemplate: 'Zeit: %{x:.2f}s<br>DTW: %{y:.2f}mm<extra></extra>',
         uirevision: 'true',
       });
-    }*/
+    } */
 
     return plots;
   };
 
   // Layout für 2D Plot
   const get2DLayout = (): Partial<Layout> => ({
-    title:
-      selectedSegment === 'total'
-        ? 'Position (Gesamtmessung)'
-        : `Position (Segment ${selectedSegment.split('_')[1]})`,
+    title: {
+      text:
+        selectedSegment === 'total'
+          ? 'Position (Gesamtmessung)'
+          : `Position (Segment ${selectedSegment.split('_')[1]})`,
+    },
     font: { family: 'Helvetica' },
-    xaxis: { title: 'Zeit [s]' },
-    yaxis: { title: 'Abweichung [mm]', rangemode: 'tozero' },
+    xaxis: { title: { text: 'Zeit [s]' } },
+    yaxis: { title: { text: 'Abweichung [mm]' }, rangemode: 'tozero' },
     hovermode: 'x unified',
     height: 600,
     margin: { t: 40, b: 40, l: 60, r: 20 },

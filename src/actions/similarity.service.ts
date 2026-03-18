@@ -96,8 +96,7 @@ export class SimilarityService {
           mean_vel_act: data.target_traj_features.mean_vel_act,
           max_vel_act: data.target_traj_features.max_vel_act,
           std_vel_act: data.target_traj_features.std_vel_act,
-          mean_accel_act:
-            data.target_traj_features.mean_accel_act,
+          mean_accel_act: data.target_traj_features.mean_accel_act,
           max_accel_act: data.target_traj_features.max_accel_act,
           min_accel_act: data.target_traj_features.min_accel_act,
           std_accel_act: data.target_traj_features.std_accel_act,
@@ -140,14 +139,10 @@ export class SimilarityService {
                 mean_vel_act: seg.target_segment_features.mean_vel_act,
                 max_vel_act: seg.target_segment_features.max_vel_act,
                 std_vel_act: seg.target_segment_features.std_vel_act,
-                mean_accel_act:
-                  seg.target_segment_features.mean_accel_act,
-                max_accel_act:
-                  seg.target_segment_features.max_accel_act,
-                min_accel_act:
-                  seg.target_segment_features.min_accel_act,
-                std_accel_act:
-                  seg.target_segment_features.std_accel_act,
+                mean_accel_act: seg.target_segment_features.mean_accel_act,
+                max_accel_act: seg.target_segment_features.max_accel_act,
+                min_accel_act: seg.target_segment_features.min_accel_act,
+                std_accel_act: seg.target_segment_features.std_accel_act,
                 sidtw_average_distance:
                   seg.target_segment_features.sidtw_average_distance,
                 movement_type: seg.target_segment_features.movement_type,

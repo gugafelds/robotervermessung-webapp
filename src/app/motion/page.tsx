@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-import {getBahnInfo, getTrajInfo} from '@/src/actions/motion.service';
+import { getTrajInfo } from '@/src/actions/motion.service';
 
 export default async function MotionPage() {
   // Lade nur die erste Seite mit Standard-Seitengröße
