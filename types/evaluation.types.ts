@@ -189,10 +189,10 @@ export interface GDOrientation {
 export interface EDInfoRaw {
   traj_id: string;
   seg_id: string;
-  euclidean_min_distance: number;
-  euclidean_max_distance: number;
-  euclidean_average_distance: number;
-  euclidean_standard_deviation: number;
+  ed_min_distance: number;
+  ed_max_distance: number;
+  ed_average_distance: number;
+  ed_standard_deviation: number;
 }
 
 export interface EDInfo {

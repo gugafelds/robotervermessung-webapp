@@ -108,19 +108,9 @@ export default function SimilaritySearchWrapper({
         />
 
         {showPlots && (
-          <div className="my-2 flex gap-x-2 overflow-hidden">
-            {trajResults.length > 0 && (
-              <SimilarityPlot
-                mode="trajs"
-                results={trajResults}
-                isLoading={isLoading}
-                originalId={originalId}
-                stage2Active={stage2Active} // neu
-              />
-            )}
+          <div className="my-2 flex items-center gap-x-2 overflow-hidden">
             {segmentGroups.length > 2 && (
               <SimilarityPlot
-                mode="segmente"
                 results={trajResults}
                 segmentGroups={segmentGroups}
                 isLoading={isLoading}

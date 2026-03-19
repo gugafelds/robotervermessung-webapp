@@ -7,7 +7,7 @@ import time
 
 from ...database import get_db, get_db_pool
 from ...utils.multimodal_framework.multi_modal_searcher import MultiModalSearcher
-from ...utils.trajectory_loader import TrajectoryLoader
+from ...utils.metadata_embeddings.trajectory_loader import TrajectoryLoader
 from ...utils.multimodal_framework.dtw_reranker import rerank
 
 logger = logging.getLogger(__name__)

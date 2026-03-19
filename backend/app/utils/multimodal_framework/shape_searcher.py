@@ -67,7 +67,7 @@ class ShapeSearcher:
         Sucht ähnliche Bahnen/Segmente basierend auf Embedding
 
         Args:
-            target_id: Target ID
+            target_id: Target ID (kann Traj-ID oder Segment-ID sein)
             mode: 'joint', 'position', 'orientation', 'velocity', 'metadata'
             limit: Max Ergebnisse
             candidate_ids: Optional Pre-Filter Liste
@@ -88,9 +88,17 @@ class ShapeSearcher:
 
             embedding_col = f"{mode}_embedding"
 
-            # 2. Baue WHERE Conditions
+            # 2. Parent-Trajectory-ID ableiten:
+            #    "1773409661_1" → "1773409661"
+            #    "1773409661"   → "1773409661"
+            parent_traj_id = target_id.rsplit('_', 1)[0] if '_' in target_id else target_id
+
+            # 3. Baue WHERE Conditions
+            #    - e.seg_id != $2        → schließt das Segment selbst aus
+            #    - e.traj_id != $3       → schließt alle Segmente der gleichen Trajectory aus
             where_conditions = [
-                f"e.seg_id != $2",
+                "e.seg_id != $2",
+                "e.traj_id != $3",
                 f"e.{embedding_col} IS NOT NULL"
             ]
 
@@ -102,15 +110,36 @@ class ShapeSearcher:
 
             where_clause = " AND ".join(where_conditions)
 
-            # ⭐ 3. SET HNSW parameter ERST (außerhalb der Query)
-            await self.connection.execute("SET hnsw.ef_search = 500;")
+            # 4. SET HNSW parameter (außerhalb der Query)
+            await self.connection.execute("SET hnsw.ef_search = 200;")
 
-            # 4. Query
+            # 5. Query
             if candidate_ids is not None and len(candidate_ids) > 0:
                 # Mit Kandidaten-Filter
-                where_conditions.append("e.seg_id = ANY($3)")
+                where_conditions.append("e.seg_id = ANY($4)")
                 where_clause = " AND ".join(where_conditions)
 
+                query = f"""
+                    SELECT 
+                        e.seg_id,
+                        e.traj_id,
+                        e.{embedding_col} <=> $1::vector as distance
+                    FROM motion.traj_embeddings e
+                    WHERE {where_clause}
+                    ORDER BY distance
+                    LIMIT $5
+                """
+
+                results = await self.connection.fetch(
+                    query,
+                    target_embedding,  # $1
+                    target_id,         # $2 — seg_id != target_id
+                    parent_traj_id,    # $3 — traj_id != parent_traj_id
+                    candidate_ids,     # $4
+                    limit              # $5
+                )
+            else:
+                # Full Search
                 query = f"""
                     SELECT 
                         e.seg_id,
@@ -124,32 +153,13 @@ class ShapeSearcher:
 
                 results = await self.connection.fetch(
                     query,
-                    target_embedding,
-                    target_id,
-                    candidate_ids,
-                    limit
-                )
-            else:
-                # Full Search
-                query = f"""
-                    SELECT 
-                        e.seg_id,
-                        e.traj_id,
-                        e.{embedding_col} <=> $1::vector as distance
-                    FROM motion.traj_embeddings e
-                    WHERE {where_clause}
-                    ORDER BY distance
-                    LIMIT $3
-                """
-
-                results = await self.connection.fetch(
-                    query,
-                    target_embedding,
-                    target_id,
-                    limit
+                    target_embedding,  # $1
+                    target_id,         # $2 — seg_id != target_id
+                    parent_traj_id,    # $3 — traj_id != parent_traj_id
+                    limit              # $4
                 )
 
-            # 5. Format Results
+            # 6. Format Results
             ranked_results = []
             for rank, row in enumerate(results, start=1):
                 ranked_results.append({
@@ -199,10 +209,10 @@ class ShapeSearcher:
 
             if not result:
                 return {
-                    'joint': False, 
-                    'position': False, 
-                    'orientation': False, 
-                    'velocity': False, 
+                    'joint': False,
+                    'position': False,
+                    'orientation': False,
+                    'velocity': False,
                     'metadata': False
                 }
 
@@ -217,9 +227,9 @@ class ShapeSearcher:
         except Exception as e:
             logger.error(f"Error checking embeddings for {target_id}: {e}")
             return {
-                'joint': False, 
-                'position': False, 
-                'orientation': False, 
-                'velocity': False, 
+                'joint': False,
+                'position': False,
+                'orientation': False,
+                'velocity': False,
                 'metadata': False
             }

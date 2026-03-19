@@ -103,7 +103,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
     return data.map((result, index) => {
       const isTarget = isTargetEntry(result);
       const id = result.seg_id || result.traj_id || 'N/A';
-      const type = id.includes('_') ? 'Segment' : 'Traj';
+      const type = id.includes('_') ? 'Segment' : 'Trajectory';
       const uniqueKey = `${id}-${index}`;
 
       let rowClass = 'transition-colors hover:bg-gray-100';
@@ -126,7 +126,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
           <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
             <span
               className={`rounded-full px-2 py-1 text-xs ${
-                type === 'Traj'
+                type === 'Trajectory'
                   ? 'bg-green-100 text-green-800'
                   : 'bg-blue-100 text-blue-600'
               }`}

@@ -6,12 +6,8 @@ from datetime import datetime
 from typing import List, Dict, Optional
 import logging
 import re
-import sys
-from pathlib import Path
 
-# Import EmbeddingCalculator
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from ..utils.embedding_calculator import EmbeddingCalculator
+from .embedding_calculator import EmbeddingCalculator
 from .binary_vector_writer import BinaryVectorWriter
 import os
 

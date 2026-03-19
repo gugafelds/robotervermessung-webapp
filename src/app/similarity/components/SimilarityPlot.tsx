@@ -3,7 +3,6 @@
 
 'use client';
 
-import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { Loader } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { Layout, PlotData } from 'plotly.js';
@@ -22,32 +21,11 @@ import type { SegmentGroup, SimilarityResult } from '@/types/similarity.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
-const TRAJECTORY_COLORS = [
-  '#1f77b4',
-  '#ff7f0e',
-  '#2ca02c',
-  '#d62728',
-  '#9467bd',
-  '#8c564b',
-  '#e377c2',
-  '#7f7f7f',
-  '#bcbd22',
-  '#17becf',
-  '#aec7e8',
-  '#ffbb78',
-];
-
-interface SegmentOption {
-  value: string;
-  label: string;
-}
-
 interface VergleichPlotProps {
   results: SimilarityResult[];
   segmentGroups?: SegmentGroup[];
   isLoading: boolean;
   originalId: string;
-  mode: 'trajs' | 'segmente';
   stage2Active?: boolean;
   className?: string;
 }
@@ -64,211 +42,243 @@ interface TrajectoryData {
   rank?: number;
 }
 
+type TabKey = string;
+type TabDataMap = Record<TabKey, TrajectoryData[]>;
+type LoadedIdsMap = Record<TabKey, Set<string>>;
+
 export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
   results,
-  segmentGroups,
+  segmentGroups = [],
   isLoading: searchLoading,
   originalId,
-  mode,
   stage2Active = false,
   className = '',
 }) => {
-  const [trajectoryData, setTrajectoryData] = useState<TrajectoryData[]>([]);
+  const [activeTab, setActiveTab] = useState<TabKey>('trajs');
+  const [tabData, setTabData] = useState<TabDataMap>({});
+  const [loadedIds, setLoadedIds] = useState<LoadedIdsMap>({});
   const [isLoadingPlot, setIsLoadingPlot] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
   const [normalizeStartPoint, setNormalizeStartPoint] = useState(true);
   const [visibleTrajectories, setVisibleTrajectories] = useState<Set<string>>(
     new Set(),
   );
 
-  const [selectedSegment, setSelectedSegment] = useState<string>('');
-  const [showDropdown, setShowDropdown] = useState(false);
+  const tabs = useMemo(() => {
+    const t: { key: TabKey; label: string }[] = [
+      { key: 'trajs', label: 'Trajectory' },
+    ];
+    segmentGroups.forEach((group) => {
+      const segNum = group.target_segment.split('_').pop();
+      t.push({ key: `segment_${segNum}`, label: `Segment ${segNum}` });
+    });
+    return t;
+  }, [segmentGroups]);
 
   const sampleEveryFifthPoint = useCallback(<T,>(data: T[]): T[] => {
-    return data.filter((_, index) => index % 13 === 0);
+    return data.filter((_, index) => index % 23 === 0);
   }, []);
 
+  const getTrajectoryColor = (rank: number, totalCount: number): string => {
+    const t = totalCount <= 1 ? 0 : rank / (totalCount - 1);
+    const tSteep = t ** 3;
+    const r = Math.round(255 * (1 - tSteep));
+    return `rgb(${r}, 0, 0)`;
+  };
+
   const normalizeTrajectory = useCallback(
-    (trajectory: TrajectoryData): TrajectoryData => {
+    (
+      trajectory: TrajectoryData,
+      queryTrajectory?: TrajectoryData,
+    ): TrajectoryData => {
       if (trajectory.positions.length === 0) return trajectory;
 
-      const offsetX = trajectory.positions[0].xCmd;
-      const offsetY = trajectory.positions[0].yCmd;
-      const offsetZ = trajectory.positions[0].zCmd;
+      const centroid = (positions: TrajPositionCmd[]) => ({
+        x: positions.reduce((s, p) => s + p.xCmd, 0) / positions.length,
+        y: positions.reduce((s, p) => s + p.yCmd, 0) / positions.length,
+        z: positions.reduce((s, p) => s + p.zCmd, 0) / positions.length,
+      });
+
+      if (!queryTrajectory || trajectory.isOriginal) {
+        return trajectory;
+      }
+
+      const queryCentroid = centroid(queryTrajectory.positions);
+      const trajCentroid = centroid(trajectory.positions);
+
+      const translated = trajectory.positions.map((p) => ({
+        ...p,
+        xCmd: p.xCmd - trajCentroid.x,
+        yCmd: p.yCmd - trajCentroid.y,
+        zCmd: p.zCmd - trajCentroid.z,
+      }));
+      const translatedEvents = trajectory.events.map((e) => ({
+        ...e,
+        xReached: e.xReached - trajCentroid.x,
+        yReached: e.yReached - trajCentroid.y,
+        zReached: e.zReached - trajCentroid.z,
+      }));
+
+      const qStart = queryTrajectory.positions[0];
+      const qEnd =
+        queryTrajectory.positions[queryTrajectory.positions.length - 1];
+      const qVec = {
+        x: qEnd.xCmd - qStart.xCmd,
+        y: qEnd.yCmd - qStart.yCmd,
+        z: qEnd.zCmd - qStart.zCmd,
+      };
+
+      const tStart = trajectory.positions[0];
+      const tEnd = trajectory.positions[trajectory.positions.length - 1];
+      const tVec = {
+        x: tEnd.xCmd - tStart.xCmd,
+        y: tEnd.yCmd - tStart.yCmd,
+        z: tEnd.zCmd - tStart.zCmd,
+      };
+
+      const normalize = (v: { x: number; y: number; z: number }) => {
+        const len = Math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2);
+        if (len < 1e-10) return { x: 1, y: 0, z: 0 };
+        return { x: v.x / len, y: v.y / len, z: v.z / len };
+      };
+
+      const qNorm = normalize(qVec);
+      const tNorm = normalize(tVec);
+
+      const cross = {
+        x: tNorm.y * qNorm.z - tNorm.z * qNorm.y,
+        y: tNorm.z * qNorm.x - tNorm.x * qNorm.z,
+        z: tNorm.x * qNorm.y - tNorm.y * qNorm.x,
+      };
+      const crossLen = Math.sqrt(cross.x ** 2 + cross.y ** 2 + cross.z ** 2);
+      const dot = tNorm.x * qNorm.x + tNorm.y * qNorm.y + tNorm.z * qNorm.z;
+
+      const applyRotation = (p: { x: number; y: number; z: number }) => {
+        if (crossLen < 1e-10) {
+          if (dot > 0) return p;
+          return { x: -p.x, y: -p.y, z: p.z };
+        }
+        const axis = normalize(cross);
+        const angle = Math.atan2(crossLen, dot);
+        const c = Math.cos(angle);
+        const s = Math.sin(angle);
+        const t = 1 - c;
+        return {
+          x:
+            (t * axis.x * axis.x + c) * p.x +
+            (t * axis.x * axis.y - s * axis.z) * p.y +
+            (t * axis.x * axis.z + s * axis.y) * p.z,
+          y:
+            (t * axis.x * axis.y + s * axis.z) * p.x +
+            (t * axis.y * axis.y + c) * p.y +
+            (t * axis.y * axis.z - s * axis.x) * p.z,
+          z:
+            (t * axis.x * axis.z - s * axis.y) * p.x +
+            (t * axis.y * axis.z + s * axis.x) * p.y +
+            (t * axis.z * axis.z + c) * p.z,
+        };
+      };
+
+      const rotatedPositions = translated.map((p) => {
+        const r = applyRotation({ x: p.xCmd, y: p.yCmd, z: p.zCmd });
+        return {
+          ...p,
+          xCmd: r.x + queryCentroid.x,
+          yCmd: r.y + queryCentroid.y,
+          zCmd: r.z + queryCentroid.z,
+        };
+      });
+      const rotatedEvents = translatedEvents.map((e) => {
+        const r = applyRotation({
+          x: e.xReached,
+          y: e.yReached,
+          z: e.zReached,
+        });
+        return {
+          ...e,
+          xReached: r.x + queryCentroid.x,
+          yReached: r.y + queryCentroid.y,
+          zReached: r.z + queryCentroid.z,
+        };
+      });
 
       return {
         ...trajectory,
-        positions: trajectory.positions.map((p) => ({
-          ...p,
-          xCmd: p.xCmd - offsetX,
-          yCmd: p.yCmd - offsetY,
-          zCmd: p.zCmd - offsetZ,
-        })),
-        events: trajectory.events.map((e) => ({
-          ...e,
-          xReached: e.xReached - offsetX,
-          yReached: e.yReached - offsetY,
-          zReached: e.zReached - offsetZ,
-        })),
+        positions: rotatedPositions,
+        events: rotatedEvents,
       };
     },
     [],
   );
 
-  const { bahnResults, segmentResults } = useMemo(() => {
-    const trajs = results.filter(
-      (result) => result.traj_id && !result.seg_id?.includes('_'),
-    );
+  // ── Results split ─────────────────────────────────────────────────────────
+  const bahnResults = useMemo(
+    () => results.filter((r) => r.traj_id && !r.seg_id?.includes('_')),
+    [results],
+  );
 
-    const segmente: SimilarityResult[] = [];
-    if (segmentGroups) {
-      segmentGroups.forEach((group) => {
-        if (group.target_segment_features) {
-          segmente.push({
-            seg_id: group.target_segment,
-            traj_id: group.target_segment_features.traj_id,
-            similarity_score: 0,
-            duration: group.target_segment_features.duration,
-          });
-        }
-        group.results.forEach((result) => {
-          segmente.push(result);
+  // ── IDs per tab ───────────────────────────────────────────────────────────
+  const uniqueIdsForTab = useCallback(
+    (tabKey: TabKey): string[] => {
+      if (tabKey === 'trajs') {
+        const trajIDs = new Set<string>();
+        if (originalId) trajIDs.add(originalId);
+        const sorted = [...bahnResults].sort((a, b) =>
+          stage2Active
+            ? (a.dtw_distance ?? Infinity) - (b.dtw_distance ?? Infinity)
+            : (b.similarity_score ?? 0) - (a.similarity_score ?? 0),
+        );
+        sorted.forEach((r) => {
+          if (r.traj_id) trajIDs.add(r.traj_id);
         });
-      });
-    }
-
-    return { bahnResults: trajs, segmentResults: segmente };
-  }, [results, segmentGroups]);
-
-  const segmentOptions = useMemo((): SegmentOption[] => {
-    if (mode !== 'segmente' || !originalId) return [];
-
-    const originalBahnSegments = segmentResults.filter((result) =>
-      result.seg_id?.startsWith(originalId),
-    );
-
-    const segmentNumbers = new Set<number>();
-    originalBahnSegments.forEach((result) => {
-      if (result.seg_id) {
-        const parts = result.seg_id.split('_');
-        if (parts.length >= 2) {
-          const segmentNum = parseInt(parts[parts.length - 1], 10);
-          if (!Number.isNaN(segmentNum)) {
-            segmentNumbers.add(segmentNum);
-          }
-        }
+        return Array.from(trajIDs).slice(0, 50);
       }
-    });
 
-    return Array.from(segmentNumbers)
-      .sort((a, b) => a - b)
-      .map((segNum) => ({
-        value: `segment_${segNum}`,
-        label: `Segment ${segNum}`,
-      }));
-  }, [segmentResults, originalId, mode]);
-
-  const groupedSegments = useMemo((): Record<string, string[]> => {
-    const groups: Record<string, string[]> = {};
-    let currentOriginal: string | null = null;
-
-    segmentResults.forEach((result) => {
-      if (result.seg_id?.includes(originalId)) {
-        currentOriginal = result.seg_id;
-        groups[currentOriginal] = [result.seg_id];
-      } else if (currentOriginal && result.seg_id) {
-        groups[currentOriginal].push(result.seg_id);
-      }
-    });
-
-    return groups;
-  }, [segmentResults, originalId]);
-
-  useEffect(() => {
-    if (mode === 'segmente' && segmentOptions.length > 0 && !selectedSegment) {
-      setSelectedSegment(segmentOptions[0].value);
-    }
-  }, [segmentOptions, selectedSegment, mode]);
-
-  const uniqueIds = useMemo((): string[] => {
-    if (mode === 'trajs') {
-      const trajIDs = new Set<string>();
-      if (originalId) trajIDs.add(originalId);
-
-      // Sort by rank (stage2: dtw_distance asc, stage1: similarity_score desc)
-      const sorted = [...bahnResults].sort((a, b) => {
-        if (stage2Active) {
-          return (a.dtw_distance ?? Infinity) - (b.dtw_distance ?? Infinity);
-        }
-        return (b.similarity_score ?? 0) - (a.similarity_score ?? 0);
+      const segNum = tabKey.replace('segment_', '');
+      const group = segmentGroups.find(
+        (g) => g.target_segment === `${originalId}_${segNum}`,
+      );
+      if (!group) return [];
+      const ids: string[] = [group.target_segment];
+      group.results.forEach((r) => {
+        if (r.seg_id) ids.push(r.seg_id);
       });
+      return ids.slice(0, 50);
+    },
+    [bahnResults, segmentGroups, originalId, stage2Active],
+  );
 
-      sorted.forEach((result) => {
-        if (result.traj_id) trajIDs.add(result.traj_id);
-      });
-
-      return Array.from(trajIDs).slice(0, 50);
-    }
-
-    if (!selectedSegment || !originalId) return [];
-    const targetSegmentId = `${originalId}_${selectedSegment.replace('segment_', '')}`;
-    const segmentGroup = groupedSegments[targetSegmentId] || [];
-    return segmentGroup.slice(0, 50);
-  }, [
-    mode,
-    selectedSegment,
-    originalId,
-    groupedSegments,
-    bahnResults,
-    stage2Active,
-  ]);
-
-  useEffect(() => {
-    setVisibleTrajectories(new Set(trajectoryData.map((t) => t.id)));
-  }, [trajectoryData]);
-
-  const toggleVisibility = (id: string) => {
-    setVisibleTrajectories((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) newSet.delete(id);
-      else newSet.add(id);
-      return newSet;
-    });
-  };
-
-  const handleSegmentSelect = (segmentValue: string) => {
-    setSelectedSegment(segmentValue);
-    setShowDropdown(false);
-  };
-
-  // Format score label for legend
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const formatScoreLabel = (result: SimilarityResult | undefined): string => {
     if (!result) return 'N/A';
-    if (stage2Active && result.dtw_distance !== undefined) {
+    if (stage2Active && result.dtw_distance !== undefined)
       return `DTW: ${result.dtw_distance.toFixed(1)}`;
-    }
     return `RRF: ${result.similarity_score?.toFixed(4) ?? 'N/A'}`;
   };
 
-  // Parallel loading with Promise.all
   useEffect(() => {
     const loadTrajectories = async () => {
+      const uniqueIds = uniqueIdsForTab(activeTab);
       if (uniqueIds.length === 0) return;
 
-      const newIds = uniqueIds.filter((id) => !loadedIds.has(id));
+      const alreadyLoaded = loadedIds[activeTab] ?? new Set<string>();
+      const newIds = uniqueIds.filter((id) => !alreadyLoaded.has(id));
       if (newIds.length === 0) return;
 
       setIsLoadingPlot(true);
       setError(null);
 
       try {
-        const isBahn = mode === 'trajs';
+        const isBahn = activeTab === 'trajs';
+        const segNum = activeTab.replace('segment_', '');
+        const originalSegId = isBahn ? originalId : `${originalId}_${segNum}`;
+        const candidateIds = newIds.filter((id) => id !== originalSegId);
 
         const loadedTrajectories = await Promise.all(
-          newIds.map(async (id, index) => {
-            const isOriginal = id === originalId || id.startsWith(originalId);
+          newIds.map(async (id) => {
+            const isOriginal = isBahn
+              ? id === originalId
+              : id === originalSegId;
 
             const [positions, events] = await Promise.all([
               isBahn
@@ -279,22 +289,24 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
 
             const sampledPositions = sampleEveryFifthPoint(positions);
 
-            const result =
-              mode === 'trajs'
-                ? bahnResults.find((r) => r.traj_id === id)
-                : segmentResults.find((r) => r.seg_id === id);
+            const result = isBahn
+              ? bahnResults.find((r) => r.traj_id === id)
+              : segmentGroups
+                  .find((g) => g.target_segment === originalSegId)
+                  ?.results.find((r) => r.seg_id === id);
 
             const scoreLabel = isOriginal
               ? 'Original'
               : formatScoreLabel(result);
+            const candidateRank = candidateIds.indexOf(id);
 
             return {
               id,
               positions: sampledPositions,
               events,
               color: isOriginal
-                ? '#003560'
-                : TRAJECTORY_COLORS[index % TRAJECTORY_COLORS.length],
+                ? '#ff0000'
+                : getTrajectoryColor(candidateRank, candidateIds.length - 1),
               name: isOriginal ? `${id} (Original)` : `${id} (${scoreLabel})`,
               isOriginal,
               similarityScore: result?.similarity_score,
@@ -304,15 +316,19 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
           }),
         );
 
-        setTrajectoryData((prev) => {
-          const existingIds = new Set(prev.map((t) => t.id));
-          const newTrajectories = loadedTrajectories.filter(
+        setTabData((prev) => {
+          const existing = prev[activeTab] ?? [];
+          const existingIds = new Set(existing.map((t) => t.id));
+          const fresh = loadedTrajectories.filter(
             (t) => !existingIds.has(t.id),
           );
-          return [...prev, ...newTrajectories];
+          return { ...prev, [activeTab]: [...existing, ...fresh] };
         });
 
-        setLoadedIds((prev) => new Set([...prev, ...newIds]));
+        setLoadedIds((prev) => ({
+          ...prev,
+          [activeTab]: new Set([...alreadyLoaded, ...newIds]),
+        }));
       } catch (err) {
         setError(
           err instanceof Error ? err.message : 'Unknown error during loading',
@@ -324,37 +340,50 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
 
     loadTrajectories();
   }, [
-    uniqueIds,
+    activeTab,
+    uniqueIdsForTab,
     loadedIds,
-    mode,
     originalId,
     sampleEveryFifthPoint,
     bahnResults,
-    segmentResults,
+    segmentGroups,
     stage2Active,
     formatScoreLabel,
   ]);
 
+  // ── Current tab trajectories ──────────────────────────────────────────────
+  const trajectoryData = useMemo(
+    () => tabData[activeTab] ?? [],
+    [tabData, activeTab],
+  );
+
   useEffect(() => {
-    setTrajectoryData([]);
-    setLoadedIds(new Set());
-  }, [mode, selectedSegment]);
+    setVisibleTrajectories(new Set(trajectoryData.map((t) => t.id)));
+  }, [activeTab, tabData, trajectoryData]);
+
+  const toggleVisibility = (id: string) => {
+    setVisibleTrajectories((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      return newSet;
+    });
+  };
 
   const createPlotData = useCallback((): Partial<PlotData>[] => {
     const plotData: Partial<PlotData>[] = [];
 
-    // Sort trajectories for plot: original first, then by rank/score
     const sorted = [...trajectoryData].sort((a, b) => {
       if (a.isOriginal) return -1;
       if (b.isOriginal) return 1;
-      if (stage2Active) {
+      if (stage2Active)
         return (a.dtwDistance ?? Infinity) - (b.dtwDistance ?? Infinity);
-      }
       return (b.similarityScore ?? 0) - (a.similarityScore ?? 0);
     });
 
+    const queryTraj = sorted.find((t) => t.isOriginal);
     const dataToPlot = normalizeStartPoint
-      ? sorted.map((t) => normalizeTrajectory(t))
+      ? sorted.map((t) => normalizeTrajectory(t, queryTraj))
       : sorted;
 
     dataToPlot.forEach((trajectory) => {
@@ -404,24 +433,16 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
     stage2Active,
   ]);
 
-  const getPlotTitle = () => {
-    if (mode === 'trajs') {
-      return `3D-Position (${trajectoryData.length} Trajectories)`;
-    }
-    const selectedSegmentLabel =
-      segmentOptions.find((opt) => opt.value === selectedSegment)?.label || '';
-    return `3D-Position ${selectedSegmentLabel} (${trajectoryData.length} Segments)`;
-  };
+  const activeTabLabel = tabs.find((t) => t.key === activeTab)?.label ?? '';
 
   const layout: Partial<Layout> = {
     ...plotLayoutConfig,
-    title: { text: getPlotTitle() },
-    height: 600,
-    width: 600,
+    height: 700,
+    width: 700,
     scene: {
       camera: {
         up: { x: 0, y: 0, z: 1 },
-        center: { x: 0, y: 0, z: -0.1 },
+        center: { x: 0.1, y: 0.1, z: -0.1 },
         eye: { x: 1.5, y: 1.2, z: 1.2 },
       },
       aspectmode: 'cube',
@@ -432,55 +453,25 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
     },
     margin: { t: 50, b: 20, l: 20, r: 20 },
     showlegend: false,
-    uirevision: 'true',
+    uirevision: activeTab,
   };
 
-  if (searchLoading || isLoadingPlot) {
+  const sortedLegend = [...trajectoryData].sort((a, b) => {
+    if (a.isOriginal) return -1;
+    if (b.isOriginal) return 1;
+    if (stage2Active)
+      return (a.dtwDistance ?? Infinity) - (b.dtwDistance ?? Infinity);
+    return (b.similarityScore ?? 0) - (a.similarityScore ?? 0);
+  });
+
+  if (searchLoading) {
     return (
       <div className="flex w-full flex-row justify-center rounded-lg border border-gray-400 bg-gray-50 p-2">
         <div className="flex flex-col items-center space-y-4 py-8">
           <div className="animate-spin">
             <Loader className="size-8" color="#003560" />
           </div>
-          <Typography as="p">
-            Loading {mode === 'trajs' ? 'trajectories' : 'segments'}...
-          </Typography>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex w-full flex-row justify-center rounded-lg border border-gray-400 bg-gray-50 p-2">
-        <div className="py-8 text-center">
-          <Typography as="h5" className="mb-2 text-red-600">
-            Error while loading
-          </Typography>
-          <Typography as="p" className="text-gray-600">
-            {error}
-          </Typography>
-        </div>
-      </div>
-    );
-  }
-
-  if (trajectoryData.length === 0) {
-    return (
-      <div
-        className={`flex w-full flex-row justify-center rounded-lg border border-gray-400 bg-gray-50 p-2 ${className}`}
-      >
-        <div className="py-8 text-center">
-          <Typography as="h5" className="mb-2">
-            {mode === 'segmente' && segmentOptions.length === 0
-              ? 'No segments found for visalisation'
-              : 'No comparison data available'}
-          </Typography>
-          <Typography as="p" className="text-gray-600">
-            {mode === 'trajs'
-              ? 'Conduct a similarity search to compare trajectories in 3D-space.'
-              : 'Waiting for results of segment similarity search.'}
-          </Typography>
+          <Typography as="p">Loading results...</Typography>
         </div>
       </div>
     );
@@ -488,110 +479,122 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
 
   const plotData = createPlotData();
 
-  // Sort legend same as plot
-  const sortedLegend = [...trajectoryData].sort((a, b) => {
-    if (a.isOriginal) return -1;
-    if (b.isOriginal) return 1;
-    if (stage2Active) {
-      return (a.dtwDistance ?? Infinity) - (b.dtwDistance ?? Infinity);
-    }
-    return (b.similarityScore ?? 0) - (a.similarityScore ?? 0);
-  });
-
   return (
-    <div className="flex w-full flex-row justify-start rounded-lg border border-gray-400 bg-gray-50 p-2">
-      <Plot
-        data={plotData}
-        layout={layout}
-        useResizeHandler
-        className="border border-gray-200"
-        config={{
-          displaylogo: false,
-          modeBarButtonsToRemove: [
-            'toImage',
-            'orbitRotation',
-            'zoom3d',
-            'tableRotation',
-            'pan3d',
-            'resetCameraDefault3d',
-          ],
-          responsive: true,
-        }}
-      />
+    <div
+      className={`flex w-fit flex-col rounded-lg border border-gray-400 bg-white ${className}`}
+    >
+      <div className="flex border-b px-2 pt-2">
+        {tabs.map((tab) => {
+          const isActive = tab.key === activeTab;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`mr-2 flex items-center gap-2 rounded-t-md p-2 text-sm font-medium transition-colors ${
+                isActive
+                  ? '-mb-px border border-gray-200 border-b-white bg-white text-blue-950'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-      <div className="m-4 flex flex-col">
-        {mode === 'segmente' && segmentOptions.length > 0 && (
-          <div className="flex justify-between rounded">
-            <div className="relative">
-              <button
-                onClick={() => setShowDropdown(!showDropdown)}
-                className="inline-flex items-center rounded-md border border-gray-300 bg-white p-2 text-sm hover:bg-gray-50"
-              >
-                {segmentOptions.find((opt) => opt.value === selectedSegment)
-                  ?.label || 'Choose Segment'}
-                <ChevronDownIcon className="size-4" />
-              </button>
-
-              {showDropdown && (
-                <div className="absolute right-0 w-40 rounded-md border bg-white shadow-lg">
-                  {segmentOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => handleSegmentSelect(option.value)}
-                      className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 ${
-                        option.value === selectedSegment
-                          ? 'bg-blue-50 text-blue-600'
-                          : ''
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+      <div className="flex flex-row justify-start p-2">
+        {/* eslint-disable-next-line no-nested-ternary */}
+        {error ? (
+          <div className="flex flex-1 items-center justify-center py-8 text-center">
+            <div>
+              <Typography as="h5" className="mb-2 text-red-600">
+                Error while loading
+              </Typography>
+              <Typography as="p" className="text-gray-600">
+                {error}
+              </Typography>
+            </div>
+          </div>
+        ) : trajectoryData.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center py-8">
+            {isLoadingPlot ? (
+              <div className="flex flex-col items-center space-y-4">
+                <div className="animate-spin">
+                  <Loader className="size-8" color="#003560" />
                 </div>
-              )}
-            </div>
+                <Typography as="p">Loading {activeTabLabel}...</Typography>
+              </div>
+            ) : (
+              <div className="text-center">
+                <Typography as="h5" className="mb-2">
+                  No comparison data available
+                </Typography>
+                <Typography as="p" className="text-gray-600">
+                  Conduct a similarity search to compare trajectories in
+                  3D-space.
+                </Typography>
+              </div>
+            )}
           </div>
+        ) : (
+          <Plot
+            data={plotData}
+            layout={layout}
+            useResizeHandler
+            config={{
+              displaylogo: false,
+              modeBarButtonsToRemove: [
+                'toImage',
+                'orbitRotation',
+                'zoom3d',
+                'tableRotation',
+                'pan3d',
+                'resetCameraDefault3d',
+              ],
+              responsive: true,
+            }}
+          />
         )}
 
-        <div className="mt-4 flex flex-col justify-between rounded bg-gray-50">
-          <label className="flex cursor-pointer items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={normalizeStartPoint}
-              onChange={(e) => setNormalizeStartPoint(e.target.checked)}
-              className="rounded"
-            />
-            <div className="text-sm text-gray-700">
-              Normalize starting point
+        <div className="m-4 flex flex-col">
+          <div className="flex flex-col justify-between rounded">
+            <label className="flex cursor-pointer items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={normalizeStartPoint}
+                onChange={(e) => setNormalizeStartPoint(e.target.checked)}
+                className="rounded"
+              />
+              <div className="text-sm text-gray-700">Normalize</div>
+            </label>
+          </div>
+
+          {trajectoryData.length > 0 && (
+            <div className="mt-4 space-y-2 overflow-y-auto">
+              <div className="mb-2 text-sm font-medium text-gray-700">
+                Visible:
+              </div>
+              {sortedLegend.map((trajectory) => (
+                <label
+                  key={trajectory.id}
+                  className="flex cursor-pointer items-center space-x-2"
+                >
+                  <input
+                    type="checkbox"
+                    checked={visibleTrajectories.has(trajectory.id)}
+                    onChange={() => toggleVisibility(trajectory.id)}
+                    className="rounded"
+                  />
+                  <div
+                    className="h-2 w-4 rounded"
+                    style={{ backgroundColor: trajectory.color }}
+                  />
+                  <span className="text-sm">{trajectory.name}</span>
+                </label>
+              ))}
             </div>
-          </label>
+          )}
         </div>
-
-        {trajectoryData.length > 0 && (
-          <div className="mt-4 space-y-2 overflow-y-auto">
-            <div className="mb-2 text-sm font-medium text-gray-700">
-              visible {mode === 'trajs' ? 'trajectories' : 'sements'}:
-            </div>
-            {sortedLegend.map((trajectory) => (
-              <label
-                key={trajectory.id}
-                className="flex cursor-pointer items-center space-x-2"
-              >
-                <input
-                  type="checkbox"
-                  checked={visibleTrajectories.has(trajectory.id)}
-                  onChange={() => toggleVisibility(trajectory.id)}
-                  className="rounded"
-                />
-                <div
-                  className="h-2 w-4 rounded"
-                  style={{ backgroundColor: trajectory.color }}
-                />
-                <span className="text-sm">{trajectory.name}</span>
-              </label>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

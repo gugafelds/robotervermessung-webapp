@@ -22,10 +22,10 @@ export const transformEDInfoResult = (trajsRaw: EDInfoRaw[]): EDInfo[] => {
     (bahn): EDInfo => ({
       trajID: bahn.traj_id,
       segID: bahn.seg_id,
-      EDMinDistance: bahn.euclidean_min_distance,
-      EDMaxDistance: bahn.euclidean_max_distance,
-      EDAvgDistance: bahn.euclidean_average_distance,
-      EDStdDeviation: bahn.euclidean_standard_deviation,
+      EDMinDistance: bahn.ed_min_distance,
+      EDMaxDistance: bahn.ed_max_distance,
+      EDAvgDistance: bahn.ed_average_distance,
+      EDStdDeviation: bahn.ed_standard_deviation,
     }),
   );
 };

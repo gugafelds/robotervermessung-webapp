@@ -13,7 +13,7 @@ import shutil
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from ...utils.batch_processor import BatchProcessor
+from ...utils.upload_data.batch_processor import BatchProcessor
 
 router = APIRouter()
 

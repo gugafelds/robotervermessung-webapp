@@ -1,11 +1,10 @@
 from datetime import datetime
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from ...database import get_db
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from ...database import get_db_pool
-from ...utils.metadata_calculator import MetadataCalculatorService
-from ...utils.background_tasks import (
+from ...utils.metadata_embeddings.metadata_calculator import MetadataCalculatorService
+from ...utils.metadata_embeddings.background_tasks import (
     process_metadata_background,
     create_task_id,
     get_task_status,
