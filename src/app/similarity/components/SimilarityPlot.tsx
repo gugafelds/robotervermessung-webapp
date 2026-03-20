@@ -54,6 +54,8 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
   stage2Active = false,
   className = '',
 }) => {
+  const INITIAL_LIMIT = 5;
+  const [showAll, setShowAll] = useState<Record<TabKey, boolean>>({});
   const [activeTab, setActiveTab] = useState<TabKey>('trajs');
   const [tabData, setTabData] = useState<TabDataMap>({});
   const [loadedIds, setLoadedIds] = useState<LoadedIdsMap>({});
@@ -81,7 +83,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
 
   const getTrajectoryColor = (rank: number, totalCount: number): string => {
     const t = totalCount <= 1 ? 0 : rank / (totalCount - 1);
-    const tSteep = t ** 3;
+    const tSteep = t ** 2;
     const r = Math.round(255 * (1 - tSteep));
     return `rgb(${r}, 0, 0)`;
   };
@@ -211,13 +213,11 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
     [],
   );
 
-  // ── Results split ─────────────────────────────────────────────────────────
   const bahnResults = useMemo(
     () => results.filter((r) => r.traj_id && !r.seg_id?.includes('_')),
     [results],
   );
 
-  // ── IDs per tab ───────────────────────────────────────────────────────────
   const uniqueIdsForTab = useCallback(
     (tabKey: TabKey): string[] => {
       if (tabKey === 'trajs') {
@@ -261,8 +261,13 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
       const uniqueIds = uniqueIdsForTab(activeTab);
       if (uniqueIds.length === 0) return;
 
+      const isShowAll = showAll[activeTab] ?? false;
+      const limitedIds = isShowAll
+        ? uniqueIds
+        : uniqueIds.slice(0, INITIAL_LIMIT + 1);
+
       const alreadyLoaded = loadedIds[activeTab] ?? new Set<string>();
-      const newIds = uniqueIds.filter((id) => !alreadyLoaded.has(id));
+      const newIds = limitedIds.filter((id) => !alreadyLoaded.has(id));
       if (newIds.length === 0) return;
 
       setIsLoadingPlot(true);
@@ -272,7 +277,10 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
         const isBahn = activeTab === 'trajs';
         const segNum = activeTab.replace('segment_', '');
         const originalSegId = isBahn ? originalId : `${originalId}_${segNum}`;
-        const candidateIds = newIds.filter((id) => id !== originalSegId);
+        const allCandidateIds = uniqueIds.filter((id) => id !== originalSegId);
+        const visibleCandidateIds = limitedIds.filter(
+          (id) => id !== originalSegId,
+        );
 
         const loadedTrajectories = await Promise.all(
           newIds.map(async (id) => {
@@ -298,7 +306,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
             const scoreLabel = isOriginal
               ? 'Original'
               : formatScoreLabel(result);
-            const candidateRank = candidateIds.indexOf(id);
+            const candidateRank = allCandidateIds.indexOf(id);
 
             return {
               id,
@@ -306,7 +314,10 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
               events,
               color: isOriginal
                 ? '#ff0000'
-                : getTrajectoryColor(candidateRank, candidateIds.length - 1),
+                : getTrajectoryColor(
+                    candidateRank,
+                    visibleCandidateIds.length - 1,
+                  ),
               name: isOriginal ? `${id} (Original)` : `${id} (${scoreLabel})`,
               isOriginal,
               similarityScore: result?.similarity_score,
@@ -343,6 +354,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
     activeTab,
     uniqueIdsForTab,
     loadedIds,
+    showAll,
     originalId,
     sampleEveryFifthPoint,
     bahnResults,
@@ -594,6 +606,43 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
               ))}
             </div>
           )}
+          {!(showAll[activeTab] ?? false) &&
+            uniqueIdsForTab(activeTab).length > INITIAL_LIMIT + 1 && (
+              <button
+                onClick={() => {
+                  setShowAll((prev) => ({ ...prev, [activeTab]: true }));
+                  setTabData((prev) => {
+                    const allIds = uniqueIdsForTab(activeTab);
+                    const isBahn = activeTab === 'trajs';
+                    const segNum = activeTab.replace('segment_', '');
+                    const originalSegId = isBahn
+                      ? originalId
+                      : `${originalId}_${segNum}`;
+                    const candidateIds = allIds.filter(
+                      (id) => id !== originalSegId,
+                    ); // ← aus allIds, nicht newIds
+                    const existing = prev[activeTab] ?? [];
+                    const updated = existing.map((t) => {
+                      if (t.isOriginal) return t;
+                      const rank = candidateIds.indexOf(t.id);
+                      return {
+                        ...t,
+                        color: getTrajectoryColor(
+                          rank,
+                          candidateIds.length - 1,
+                        ),
+                      };
+                    });
+                    return { ...prev, [activeTab]: updated };
+                  });
+                }}
+                className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+              >
+                {isLoadingPlot
+                  ? 'Loading...'
+                  : `Show all (${uniqueIdsForTab(activeTab).length - 1})`}
+              </button>
+            )}
         </div>
       </div>
     </div>

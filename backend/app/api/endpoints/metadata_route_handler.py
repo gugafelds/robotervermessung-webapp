@@ -125,8 +125,11 @@ async def calculate_metadata(
             logger.info(f"Found {len(traj_ids)} bahns in timerange {request.start_time} - {request.end_time}")
 
         elif request.mode == "all_missing":
-            traj_ids = await service.get_all_missing_traj_ids()
-            logger.info(f"Found {len(traj_ids)} bahns without metadata")
+            traj_ids_metadata, traj_ids_embeddings = await service.get_all_missing_traj_ids()
+            logger.info(f"Found {len(traj_ids_metadata)} bahns without metadata")
+            logger.info(f"Found {len(traj_ids_embeddings)} bahns without embeddings")
+
+            traj_ids = list(set(traj_ids_metadata) | set(traj_ids_embeddings))
 
         if not traj_ids:
             return MetadataCalculationResponse(

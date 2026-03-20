@@ -91,7 +91,7 @@ class MetadataCalculatorService:
             metadata_rows = await conn.fetch(metadata_query)
             missing_metadata = [row['traj_id'] for row in metadata_rows]
             
-            # Bahnen ohne Embeddings (aber MIT Metadaten!)
+            # Bahnen ohne Embeddings
             embedding_query = """
                 SELECT DISTINCT bm.traj_id
                 FROM rmpd.motion.traj_metadata bm
