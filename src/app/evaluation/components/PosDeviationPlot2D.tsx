@@ -24,7 +24,7 @@ interface PosDeviationPlot2DProps {
     ED: MetricState;
     SIDTW: MetricState;
   };
-  currentEuclideanDeviation: any[];
+  currentEDDeviation: any[];
   currentSIDTWDeviation: any[];
   currentBahnInfo: any;
 }
@@ -33,7 +33,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
   hasDeviationData,
   selectedSegment,
   metrics,
-  currentEuclideanDeviation,
+  currentEDDeviation,
   currentSIDTWDeviation,
   currentBahnInfo,
 }) => {
@@ -69,7 +69,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
     const endTime = new Date(currentBahnInfo.endTime).getTime();
     const duration = endTime - startTime;
 
-    const allEDData = currentEuclideanDeviation || [];
+    const allEDData = currentEDDeviation || [];
     const totalPoints = Math.max(...allEDData.map((d) => d.pointsOrder));
 
     if (metricType === 'ED') {
@@ -98,7 +98,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
     const plots: Partial<PlotData>[] = [];
 
     if (metrics.ED.isLoaded && metrics.ED.visible) {
-      const filteredData = filterDataBySegment(currentEuclideanDeviation);
+      const filteredData = filterDataBySegment(currentEDDeviation);
       const sortedED = [...filteredData].sort(
         (a, b) => a.pointsOrder - b.pointsOrder,
       );
@@ -160,12 +160,12 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
     title: {
       text:
         selectedSegment === 'total'
-          ? 'Position (Gesamtmessung)'
+          ? 'Position (Trajectory)'
           : `Position (Segment ${selectedSegment.split('_')[1]})`,
     },
     font: { family: 'Helvetica' },
-    xaxis: { title: { text: 'Zeit [s]' } },
-    yaxis: { title: { text: 'Abweichung [mm]' }, rangemode: 'tozero' },
+    xaxis: { title: { text: 'Time [s]' } },
+    yaxis: { title: { text: 'Deviation [mm]' }, rangemode: 'tozero' },
     hovermode: 'x unified',
     height: 600,
     margin: { t: 40, b: 40, l: 60, r: 20 },
@@ -207,7 +207,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
           />
         ) : (
           <div className="flex items-center justify-center text-gray-500">
-            Keine Datenquelle ausgewählt
+            No metric selected
           </div>
         )}
       </div>

@@ -54,9 +54,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   });
 
   // Zentrale Daten States
-  const [currentEuclideanDeviation, setCurrentEuclideanDeviation] = useState<
-    any[]
-  >([]);
+  const [currentEDDeviation, setCurrentEDDeviation] = useState<any[]>([]);
   const [currentSIDTWDeviation, setCurrentSIDTWDeviation] = useState<any[]>([]);
   const [currentGDDeviation, setCurrentGDDeviation] = useState<any[]>([]);
   const [currentQDTWDeviation, setCurrentQDTWDeviation] = useState<any[]>([]);
@@ -123,7 +121,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
         switch (metricType) {
           case 'ED':
             data = await getEDPositionById(trajID);
-            setCurrentEuclideanDeviation(data);
+            setCurrentEDDeviation(data);
             break;
           case 'SIDTW':
             data = await getSIDTWPositionById(trajID);
@@ -228,6 +226,36 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
     loadOriMetricData,
   ]);
 
+  useEffect(() => {
+    if (
+      hasSIDTWData &&
+      !posMetrics.SIDTW.isLoaded &&
+      !posMetrics.SIDTW.isLoading
+    ) {
+      loadPosMetricData('SIDTW');
+    }
+  }, [
+    hasSIDTWData,
+    posMetrics.SIDTW.isLoaded,
+    posMetrics.SIDTW.isLoading,
+    loadPosMetricData,
+  ]);
+
+  useEffect(() => {
+    if (
+      hasQDTWData &&
+      !oriMetrics.QDTW.isLoaded &&
+      !oriMetrics.QDTW.isLoading
+    ) {
+      loadOriMetricData('QDTW');
+    }
+  }, [
+    hasQDTWData,
+    oriMetrics.QDTW.isLoaded,
+    oriMetrics.QDTW.isLoading,
+    loadOriMetricData,
+  ]);
+
   const getButtonContent = (metric: MetricState, label: string) => {
     if (metric.isLoading) {
       return (
@@ -239,7 +267,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
     }
 
     if (metric.isLoaded) {
-      return metric.visible ? `${label} ausblenden` : `${label} einblenden`;
+      return metric.visible ? `Hide ${label}` : `Show ${label}`;
     }
 
     return `${label} laden`;
@@ -310,7 +338,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
         {hasGDData ||
           (hasQDTWData && (
             <div className="ml-2 border-l border-gray-200 pl-6">
-              Orientierung:
+              Orientation:
             </div>
           ))}
         {hasGDData && (
@@ -346,7 +374,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
             selectedSegment={selectedSegment}
             // Übergabe aller benötigten Daten und States
             metrics={posMetrics}
-            currentEuclideanDeviation={currentEuclideanDeviation}
+            currentEDDeviation={currentEDDeviation}
             currentSIDTWDeviation={currentSIDTWDeviation}
             currentBahnInfo={currentBahnInfo}
           />
@@ -355,7 +383,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
             selectedSegment={selectedSegment}
             // Übergabe aller benötigten Daten und States
             metrics={posMetrics}
-            currentEuclideanDeviation={currentEuclideanDeviation}
+            currentEDDeviation={currentEDDeviation}
             currentSIDTWDeviation={currentSIDTWDeviation}
           />
         </div>

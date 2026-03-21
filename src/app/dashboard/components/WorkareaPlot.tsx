@@ -135,7 +135,7 @@ function WorkareaPlotContent({
     showlegend: false,
   };
 
-  // Generiere Grün-Töne für Best Performers
+  // Generiere Grün-Töne für Best performers
   const greenColors = [
     '#00ff00', // Bright green
     '#00cc00', // Medium green
@@ -153,7 +153,7 @@ function WorkareaPlotContent({
     '#770000', // Darker red
   ];
 
-  // Best Performers Trajektorien
+  // Best performers Trajektorien
   const bestTrajectories = showBest
     ? bestPerformers.map((performer, idx) => ({
         x: performer.trajectory.map((p) => p.x),
@@ -191,7 +191,7 @@ function WorkareaPlotContent({
           width: 4,
         },
         hovertemplate:
-          `<b>Worst Performer #${idx + 1}</b><br>` +
+          `<b>Worst performer #${idx + 1}</b><br>` +
           `Bahn-ID: ${performer.traj_id}<br>` +
           `SIDTW: ${performer.sidtw_average_distance.toFixed(3)} mm<br>` +
           'X: %{x:.2f} mm<br>' +
@@ -204,7 +204,7 @@ function WorkareaPlotContent({
   return (
     <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-4">
       <Typography as="h2" className="mb-2">
-        Work Area
+        Work area
       </Typography>
       {/* Toggle Buttons für Trajektorien */}
       <div className="mb-4 flex gap-4">
@@ -216,7 +216,7 @@ function WorkareaPlotContent({
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
-          {showBest ? '✓' : ''} Best Performers
+          {showBest ? '✓' : ''} Best performers
         </button>
         <button
           onClick={() => setShowWorst(!showWorst)}
@@ -226,7 +226,7 @@ function WorkareaPlotContent({
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
-          {showWorst ? '✓' : ''} Worst Performers
+          {showWorst ? '✓' : ''} Worst performers
         </button>
       </div>
 
@@ -295,7 +295,7 @@ function WorkareaPlotContent({
             z: filteredData.map((p) => p.z),
             mode: 'markers',
             type: 'scatter3d',
-            name: 'Messpunkte',
+            name: 'Measurement points',
             marker: {
               size: 3,
               opacity: 0.5,
@@ -372,7 +372,7 @@ export function WorkareaPlot({
         const result = await getWorkareaData();
         setData(result.points || []);
       } catch (err) {
-        setError('Fehler beim Laden der Arbeitsraum-Daten');
+        setError('Loading error');
         setData([]);
       } finally {
         setIsLoading(false);
@@ -405,7 +405,7 @@ export function WorkareaPlot({
               onClick={() => window.location.reload()}
               className="mt-4 rounded-md bg-blue-950 px-4 py-2 text-white hover:bg-blue-900"
             >
-              reload page
+              Reload page
             </button>
           </div>
         </div>
@@ -417,7 +417,7 @@ export function WorkareaPlot({
     return (
       <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-4">
         <Typography as="h3" className="mb-4">
-          Workarea-Exploration
+          Workarea exploration
         </Typography>
         <div className="flex h-96 items-center justify-center">
           <p className="text-gray-600">No workarea data available</p>

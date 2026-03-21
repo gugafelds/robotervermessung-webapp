@@ -88,10 +88,10 @@ async def get_dashboard_data(conn=Depends(get_db)):
             trajectory = await conn.fetch("""
                                             SELECT x_cmd, y_cmd, z_cmd
                                             FROM motion.traj_position_cmd
-                                            WHERE traj_id = $1 AND seg_id = $2
+                                            WHERE traj_id = $1
                                             ORDER BY timestamp  
-                                        """, perf["traj_id"], perf["seg_id"])
-
+                                        """, perf["traj_id"])
+            
             best_performers.append({
                 "traj_id": perf["traj_id"],
                 "seg_id": perf["seg_id"],
@@ -110,9 +110,9 @@ async def get_dashboard_data(conn=Depends(get_db)):
             trajectory = await conn.fetch("""
                                             SELECT x_cmd, y_cmd, z_cmd
                                             FROM motion.traj_position_cmd
-                                            WHERE traj_id = $1 AND seg_id = $2
+                                            WHERE traj_id = $1
                                             ORDER BY timestamp  
-                                        """, perf["traj_id"], perf["seg_id"])
+                                        """, perf["traj_id"])
 
             worst_performers.append({
                 "traj_id": perf["traj_id"],
@@ -156,7 +156,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
                 "max": 3500,
                 "numBuckets": 7,
                 "unit": "mm/s",
-                "label": "Geschwindigkeit"
+                "label": "Velocity"
             }
         }
 
@@ -174,7 +174,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
             "meta": {
                 "useRanges": False,
                 "unit": "kg",
-                "label": "Last"
+                "label": "Payload"
             }
         }
 
@@ -192,7 +192,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
             "meta": {
                 "useRanges": False,
                 "unit": "-",
-                "label": "Zielpunkte"
+                "label": "Setpoint"
             }
         }
 
@@ -238,7 +238,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
                 "max": sidtw_max,
                 "numBuckets": 9,
                 "unit": "mm",
-                "label": "Genauigkeit"
+                "label": "Accuracy"
             }
         }
 
@@ -256,7 +256,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
             "meta": {
                 "useRanges": False,
                 "unit": "%",
-                "label": "Stopp-Punkte"
+                "label": "Stop point"
             }
         }
 
@@ -274,7 +274,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
             "meta": {
                 "useRanges": False,
                 "unit": "s",
-                "label": "Wartezeit"
+                "label": "Wait time"
             }
         }
 

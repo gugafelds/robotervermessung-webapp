@@ -141,12 +141,12 @@ export const OriDeviationPlot2D: React.FC<OriDeviationPlot2DProps> = ({
     title: {
       text:
         selectedSegment === 'total'
-          ? 'Orientierung (Gesamtmessung)'
-          : `Orientierung (Segment ${selectedSegment.split('_')[1]})`,
+          ? 'Orientation (Trajectory)'
+          : `Orientation (Segment ${selectedSegment.split('_')[1]})`,
     },
     font: { family: 'Helvetica' },
-    xaxis: { title: { text: 'Zeit [s]' } },
-    yaxis: { title: { text: 'Abweichung [°]' }, rangemode: 'tozero' },
+    xaxis: { title: { text: 'Time [s]' } },
+    yaxis: { title: { text: 'Deviation [°]' }, rangemode: 'tozero' },
     hovermode: 'x unified',
     height: 600,
     margin: { t: 40, b: 40, l: 60, r: 20 },
@@ -188,7 +188,7 @@ export const OriDeviationPlot2D: React.FC<OriDeviationPlot2DProps> = ({
           />
         ) : (
           <div className="flex items-center justify-center text-gray-500">
-            Keine Datenquelle ausgewählt
+            No metric selected
           </div>
         )}
       </div>

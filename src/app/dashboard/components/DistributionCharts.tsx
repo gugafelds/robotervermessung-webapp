@@ -52,10 +52,10 @@ function DistributionChartsContent({
   const tabs: TabConfig[] = [
     { id: 'weight', label: 'Payload' },
     { id: 'velocity', label: 'Velocity' },
-    { id: 'waypoint', label: 'Endpoint' },
+    { id: 'waypoint', label: 'Setpoint' },
     { id: 'performance_sidtw', label: 'Accuracy' },
-    { id: 'stopPoint', label: 'Stop Point' },
-    { id: 'waitTime', label: 'Wait Time' },
+    { id: 'stopPoint', label: 'Stop point' },
+    { id: 'waitTime', label: 'Wait time' },
   ];
 
   // Mapping von TabType zu Distribution
@@ -97,7 +97,7 @@ function DistributionChartsContent({
 
   return (
     <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-4">
-      <Typography as="h2">Data Distribution</Typography>
+      <Typography as="h2">Data distribution</Typography>
       {/* Tab Navigation */}
       <div className="mb-6 flex flex-wrap gap-4 border-b">
         {tabs.map((tab) => (
@@ -172,7 +172,7 @@ export function DistributionCharts() {
         const result = await getDashboardData();
         setStats(result.stats);
       } catch (err) {
-        setError('Fehler beim Laden der Verteilungsdaten');
+        setError('Loading error');
         setStats(null);
       } finally {
         setIsLoading(false);
@@ -186,7 +186,7 @@ export function DistributionCharts() {
   if (isLoading) {
     return (
       <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-4">
-        <Typography as="h2">Data Ditribution</Typography>
+        <Typography as="h2">Data distribution</Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center">
             <Loader className="mx-auto mb-4 size-12 animate-spin text-blue-950" />
@@ -202,7 +202,7 @@ export function DistributionCharts() {
   if (error || !stats) {
     return (
       <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-2">
-        <Typography as="h2">Data Ditribution</Typography>
+        <Typography as="h2">Data distribution</Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center text-red-600">
             <p className="mb-2 text-lg font-semibold">
@@ -212,7 +212,7 @@ export function DistributionCharts() {
               onClick={() => window.location.reload()}
               className="mt-4 rounded-md bg-blue-950 px-4 py-2 text-white hover:bg-blue-900"
             >
-              reload page
+              Reload page
             </button>
           </div>
         </div>

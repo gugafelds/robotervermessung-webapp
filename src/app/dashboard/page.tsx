@@ -52,7 +52,7 @@ export default function DashboardPage() {
   }
 
   if (!data) {
-    return <div className="p-6">Fehler: Keine Daten verfügbar</div>;
+    return <div className="p-6">Error: No data found</div>;
   }
 
   return (

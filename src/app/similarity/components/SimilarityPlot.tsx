@@ -638,9 +638,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
                 }}
                 className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
               >
-                {isLoadingPlot
-                  ? 'Loading...'
-                  : `Show all (${uniqueIdsForTab(activeTab).length - 1})`}
+                {isLoadingPlot ? 'Loading...' : `Show all`}
               </button>
             )}
         </div>

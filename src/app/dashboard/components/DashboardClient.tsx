@@ -17,8 +17,8 @@ interface DashboardClientProps {
   trajsCount: number;
   medianSIDTW?: number;
   meanSIDTW?: number;
-  bestPerformers?: PerformerData[]; // NEU
-  worstPerformers?: PerformerData[]; // NEU
+  bestPerformers?: PerformerData[];
+  worstPerformers?: PerformerData[];
 }
 
 export default function DashboardClient({

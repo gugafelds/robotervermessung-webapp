@@ -39,8 +39,8 @@ export interface DashboardData {
   trajsCount: number;
   medianSIDTW?: number;
   meanSIDTW?: number;
-  bestPerformers?: PerformerData[]; // NEU
-  worstPerformers?: PerformerData[]; // NEU
+  bestPerformers?: PerformerData[];
+  worstPerformers?: PerformerData[];
   stats: {
     velocityDistribution: Distribution;
     weightDistribution: Distribution;

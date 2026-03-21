@@ -91,12 +91,12 @@ export interface SIDTWPosition {
   trajID: string;
   segID: string;
   SIDTWDistances: number;
-  SIDTWSollX: number;
-  SIDTWSollY: number;
-  SIDTWSollZ: number;
-  SIDTWIstX: number;
-  SIDTWIstY: number;
-  SIDTWIstZ: number;
+  SIDTWCmdX: number;
+  SIDTWCmdY: number;
+  SIDTWCmdZ: number;
+  SIDTWActX: number;
+  SIDTWActY: number;
+  SIDTWActZ: number;
   pointsOrder: number;
 }
 
@@ -117,12 +117,12 @@ export interface DTWPosition {
   trajID: string;
   segID: string;
   DTWDistances: number;
-  DTWSollX: number;
-  DTWSollY: number;
-  DTWSollZ: number;
-  DTWIstX: number;
-  DTWIstY: number;
-  DTWIstZ: number;
+  DTWCmdX: number;
+  DTWCmdY: number;
+  DTWCmdZ: number;
+  DTWActX: number;
+  DTWActY: number;
+  DTWActZ: number;
   pointsOrder: number;
 }
 
@@ -145,14 +145,14 @@ export interface QDTWOrientation {
   trajID: string;
   segID: string;
   QDTWDistances: number;
-  QDTWSollX: number;
-  QDTWSollY: number;
-  QDTWSollZ: number;
-  QDTWSollW: number;
-  QDTWIstX: number;
-  QDTWIstY: number;
-  QDTWIstZ: number;
-  QDTWIstW: number;
+  QDTWCmdX: number;
+  QDTWCmdY: number;
+  QDTWCmdZ: number;
+  QDTWCmdW: number;
+  QDTWActX: number;
+  QDTWActY: number;
+  QDTWActZ: number;
+  QDTWActW: number;
   pointsOrder: number;
 }
 
@@ -175,14 +175,14 @@ export interface GDOrientation {
   trajID: string;
   segID: string;
   GDDistances: number;
-  GDSollX: number;
-  GDSollY: number;
-  GDSollZ: number;
-  GDSollW: number;
-  GDIstX: number;
-  GDIstY: number;
-  GDIstZ: number;
-  GDIstW: number;
+  GDCmdX: number;
+  GDCmdY: number;
+  GDCmdZ: number;
+  GDCmdW: number;
+  GDActX: number;
+  GDActY: number;
+  GDActZ: number;
+  GDActW: number;
   pointsOrder: number;
 }
 
@@ -221,12 +221,12 @@ export interface EDPosition {
   trajID: string;
   segID: string;
   EDDistances: number;
-  EDSollX: number;
-  EDSollY: number;
-  EDSollZ: number;
-  EDIstX: number;
-  EDIstY: number;
-  EDIstZ: number;
+  EDCmdX: number;
+  EDCmdY: number;
+  EDCmdZ: number;
+  EDActX: number;
+  EDActY: number;
+  EDActZ: number;
   pointsOrder: number;
 }
 

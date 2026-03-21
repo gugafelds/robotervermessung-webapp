@@ -8,7 +8,7 @@ interface AccuracyCardProps {
 export function AccuracyCard({ medianSIDTW, meanSIDTW }: AccuracyCardProps) {
   return (
     <div className="rounded-lg border border-gray-500 bg-white p-4">
-      <Typography as="h5">Average Accuracy</Typography>
+      <Typography as="h5">Average accuracy</Typography>
 
       <div className="mt-3 grid grid-cols-2">
         {/* Median */}

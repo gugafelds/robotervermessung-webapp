@@ -31,13 +31,13 @@ export function PerformersTable({
           <thead className="bg-gray-50 text-xs uppercase text-gray-700">
             <tr>
               <th className="px-4 py-3">Traj-ID</th>
-              <th className="px-4 py-3">SIDTW (mm)</th>
-              <th className="px-4 py-3">Payload (kg)</th>
-              <th className="px-4 py-3">Vel. (mm/s)</th>
-              <th className="px-4 py-3">Accel. (mm/s²)</th>
-              <th className="px-4 py-3">Endpoint</th>
-              <th className="px-4 py-3">Stop (%)</th>
-              <th className="px-4 py-3">Wait Time (s)</th>
+              <th className="px-4 py-3">SIDTW [mm]</th>
+              <th className="px-4 py-3">Payload [kg]</th>
+              <th className="px-4 py-3">Vel. [mm/s]</th>
+              <th className="px-4 py-3">Accel. [mm/s²]</th>
+              <th className="px-4 py-3">Setpoints</th>
+              <th className="px-4 py-3">Stop [%]</th>
+              <th className="px-4 py-3">Wait Time [s]</th>
             </tr>
           </thead>
           <tbody>

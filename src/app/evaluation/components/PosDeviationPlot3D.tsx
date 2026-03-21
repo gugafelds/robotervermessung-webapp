@@ -10,13 +10,13 @@ const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 const methodColors = {
   ED: {
-    soll: '#003560',
-    ist: '#0066b8',
+    cmd: '#003560',
+    act: '#0066b8',
     connection: 'rgba(0, 53, 96, 0.7)',
   },
   SIDTW: {
-    soll: '#e63946',
-    ist: '#ff6b6b',
+    cmd: '#e63946',
+    act: '#ff6b6b',
     connection: 'rgba(230, 57, 70, 0.7)',
   },
 };
@@ -34,7 +34,7 @@ interface PosDeviationPlot3DProps {
     ED: MetricState;
     SIDTW: MetricState;
   };
-  currentEuclideanDeviation: any[];
+  currentEDDeviation: any[];
   currentSIDTWDeviation: any[];
 }
 
@@ -42,7 +42,7 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
   hasDeviationData,
   selectedSegment,
   metrics,
-  currentEuclideanDeviation,
+  currentEDDeviation,
   currentSIDTWDeviation,
 }) => {
   // Daten nach Segment filtern
@@ -81,26 +81,26 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
     const traces: Partial<PlotData>[] = [];
 
     const prefix = methodName;
-    const sollFields = {
-      x: `${prefix}SollX`,
-      y: `${prefix}SollY`,
-      z: `${prefix}SollZ`,
+    const cmdFields = {
+      x: `${prefix}CmdX`,
+      y: `${prefix}CmdY`,
+      z: `${prefix}CmdZ`,
     };
-    const istFields = {
-      x: `${prefix}IstX`,
-      y: `${prefix}IstY`,
-      z: `${prefix}IstZ`,
+    const actFields = {
+      x: `${prefix}ActX`,
+      y: `${prefix}ActY`,
+      z: `${prefix}ActZ`,
     };
 
     // Soll trajectory
     traces.push({
       type: 'scatter3d',
       mode: 'lines',
-      name: `${methodName} Soll`,
-      x: sortedData.map((d) => d[sollFields.x]),
-      y: sortedData.map((d) => d[sollFields.y]),
-      z: sortedData.map((d) => d[sollFields.z]),
-      line: { color: colors.soll, width: 3 },
+      name: `${methodName} (C)`,
+      x: sortedData.map((d) => d[cmdFields.x]),
+      y: sortedData.map((d) => d[cmdFields.y]),
+      z: sortedData.map((d) => d[cmdFields.z]),
+      line: { color: colors.cmd, width: 3 },
       hovertemplate:
         'X: %{x:.2f}mm<br>Y: %{y:.2f}mm<br>Z: %{z:.2f}mm<br><extra></extra>',
     });
@@ -109,11 +109,11 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
     traces.push({
       type: 'scatter3d',
       mode: 'lines',
-      name: `${methodName} Ist`,
-      x: sortedData.map((d) => d[istFields.x]),
-      y: sortedData.map((d) => d[istFields.y]),
-      z: sortedData.map((d) => d[istFields.z]),
-      line: { color: colors.ist, width: 4 },
+      name: `${methodName} (M)`,
+      x: sortedData.map((d) => d[actFields.x]),
+      y: sortedData.map((d) => d[actFields.y]),
+      z: sortedData.map((d) => d[actFields.z]),
+      line: { color: colors.act, width: 4 },
       hovertemplate:
         'X: %{x:.2f}mm<br>Y: %{y:.2f}mm<br>Z: %{z:.2f}mm<br><extra></extra>',
     });
@@ -122,21 +122,21 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
     traces.push({
       type: 'scatter3d',
       mode: 'lines',
-      name: `${methodName} Abweichungen`,
+      name: `${methodName} deviation`,
       showlegend: true,
       x: sortedData.flatMap((point) => [
-        point[sollFields.x],
-        point[istFields.x],
+        point[cmdFields.x],
+        point[actFields.x],
         null,
       ]),
       y: sortedData.flatMap((point) => [
-        point[sollFields.y],
-        point[istFields.y],
+        point[cmdFields.y],
+        point[actFields.y],
         null,
       ]),
       z: sortedData.flatMap((point) => [
-        point[sollFields.z],
-        point[istFields.z],
+        point[cmdFields.z],
+        point[actFields.z],
         null,
       ]),
       line: {
@@ -144,10 +144,10 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
         width: 2,
         dash: 'solid',
       },
-      hovertemplate: `${methodName} Abweichung: %{text:.2f}mm<br><extra></extra>`,
+      hovertemplate: `${methodName} Deviation: %{text:.2f}mm<br><extra></extra>`,
       text: sortedData.flatMap((point) => [
-        point[`${methodName}Distances`],
-        point[`${methodName}Distances`],
+        point[`${methodName} distances`],
+        point[`${methodName} distances`],
         null,
       ]),
     });
@@ -162,10 +162,10 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
     if (
       metrics.ED.isLoaded &&
       metrics.ED.visible &&
-      currentEuclideanDeviation?.length
+      currentEDDeviation?.length
     ) {
       plotData = plotData.concat(
-        addMethodTraces(currentEuclideanDeviation, 'ED', methodColors.ED),
+        addMethodTraces(currentEDDeviation, 'ED', methodColors.ED),
       );
     }
     if (
@@ -179,10 +179,8 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
     }
 
     const firstVisibleData =
-      metrics.ED.isLoaded &&
-      metrics.ED.visible &&
-      currentEuclideanDeviation?.length
-        ? currentEuclideanDeviation
+      metrics.ED.isLoaded && metrics.ED.visible && currentEDDeviation?.length
+        ? currentEDDeviation
         : metrics.SIDTW.isLoaded &&
             metrics.SIDTW.visible &&
             currentSIDTWDeviation?.length
@@ -203,14 +201,14 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
         const methodPrefix =
           metrics.ED.isLoaded && metrics.ED.visible ? 'ED' : 'SIDTW';
 
-        // Startpunkt (grün)
+        // Start (grün)
         plotData.push({
           type: 'scatter3d',
           mode: 'markers',
-          name: 'Startpunkt',
-          x: [firstPoint[`${methodPrefix}IstX`]],
-          y: [firstPoint[`${methodPrefix}IstY`]],
-          z: [firstPoint[`${methodPrefix}IstZ`]],
+          name: 'Start',
+          x: [firstPoint[`${methodPrefix}ActX`]],
+          y: [firstPoint[`${methodPrefix}ActY`]],
+          z: [firstPoint[`${methodPrefix}ActZ`]],
           marker: {
             size: 4,
             color: 'green',
@@ -222,17 +220,17 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
             },
           },
           hovertemplate:
-            'Startpunkt<br>X: %{x:.2f}mm<br>Y: %{y:.2f}mm<br>Z: %{z:.2f}mm<extra></extra>',
+            'Start<br>X: %{x:.2f}mm<br>Y: %{y:.2f}mm<br>Z: %{z:.2f}mm<extra></extra>',
         });
 
-        // Endpunkt (rot)
+        // End (rot)
         plotData.push({
           type: 'scatter3d',
           mode: 'markers',
-          name: 'Endpunkt',
-          x: [lastPoint[`${methodPrefix}IstX`]],
-          y: [lastPoint[`${methodPrefix}IstY`]],
-          z: [lastPoint[`${methodPrefix}IstZ`]],
+          name: 'End',
+          x: [lastPoint[`${methodPrefix}ActX`]],
+          y: [lastPoint[`${methodPrefix}ActY`]],
+          z: [lastPoint[`${methodPrefix}ActZ`]],
           uirevision: 'true',
           marker: {
             size: 4,
@@ -245,7 +243,7 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
             },
           },
           hovertemplate:
-            'Endpunkt<br>X: %{x:.2f}mm<br>Y: %{y:.2f}mm<br>Z: %{z:.2f}mm<extra></extra>',
+            'End<br>X: %{x:.2f}mm<br>Y: %{y:.2f}mm<br>Z: %{z:.2f}mm<extra></extra>',
         });
       }
     }
@@ -258,8 +256,8 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
     title: {
       text:
         selectedSegment === 'total'
-          ? '3D-Abweichungsplot (Gesamtmessung)'
-          : `3D-Abweichungsplot (Segment ${selectedSegment.split('_')[1]})`,
+          ? '3D-Deviation (Trajectory)'
+          : `3D-Deviation (Segment ${selectedSegment.split('_')[1]})`,
     },
     autosize: true,
     height: 600,
@@ -318,7 +316,7 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = ({
           />
         ) : (
           <div className="flex items-center justify-center text-gray-500">
-            Keine Datenquelle ausgewählt
+            No metric selected
           </div>
         )}
       </div>

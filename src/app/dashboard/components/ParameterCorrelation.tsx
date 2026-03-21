@@ -80,16 +80,16 @@ function ParameterCorrelationContent({
     },
     {
       id: 'stop_point',
-      label: 'Stop Points',
+      label: 'Stop point',
       unit: '%',
-      xLabel: 'Stop Points',
+      xLabel: 'Stop point',
       useRanges: false,
     },
     {
       id: 'wait_time',
-      label: 'Wait Time',
+      label: 'Wait time',
       unit: 's',
-      xLabel: 'Wait Time',
+      xLabel: 'Wait time',
       useRanges: false,
     },
   ];

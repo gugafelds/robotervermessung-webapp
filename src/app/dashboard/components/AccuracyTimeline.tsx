@@ -180,7 +180,7 @@ export function AccuracyTimeline() {
     return (
       <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
-          Accuracy Developement
+          Accuracy development
         </Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center">
@@ -197,7 +197,7 @@ export function AccuracyTimeline() {
     return (
       <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
-          Accuracy Developement
+          Accuracy development
         </Typography>
         <div className="flex h-96 items-center justify-center">
           <div className="text-center text-red-600">
@@ -206,7 +206,7 @@ export function AccuracyTimeline() {
               onClick={() => window.location.reload()}
               className="mt-4 rounded-md bg-blue-950 px-4 py-2 text-white hover:bg-blue-900"
             >
-              reload page
+              Reload page
             </button>
           </div>
         </div>
@@ -219,7 +219,7 @@ export function AccuracyTimeline() {
     return (
       <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
         <Typography as="h2" className="mb-2">
-          Accuracy Developement
+          Accuracy development
         </Typography>
         <div className="flex h-96 items-center justify-center">
           <p className="text-gray-600">NO timeline data available</p>

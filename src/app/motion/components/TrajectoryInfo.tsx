@@ -110,7 +110,7 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
             </div>
           </div>
 
-          <InfoSection title="Allgemein">
+          <InfoSection title="General">
             <InfoRow label="Robot" value={currentTrajInfo.robotModel || '-'} />
             <InfoRow
               label="Start"
