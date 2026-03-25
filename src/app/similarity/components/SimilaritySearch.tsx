@@ -22,6 +22,7 @@ type SimilaritySearchProps = {
     prefilterFeatures: string[],
     stage2Active: boolean,
     dtwMode: 'position' | 'joint',
+    metric: 'sidtw' | 'qdtw',
   ) => void;
   trajInfo?: TrajInfo[];
   showPlots: boolean;
@@ -41,6 +42,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [metric, setMetric] = useState<'sidtw' | 'qdtw'>('sidtw');
 
   const [activeModes, setActiveModes] = useState<Set<string>>(
     new Set(['position', 'joint', 'orientation', 'velocity', 'metadata']),
@@ -119,6 +121,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
         Array.from(prefilterFeatures),
         stage2Active,
         dtwMode,
+        metric,
       );
       setShowDropdown(false);
     }
@@ -340,7 +343,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
         </div>
 
         {/* Stage 2: DTW Reranking */}
-        <div className="rounded-lg bg-white p-3">
+        <div className="flex flex-row rounded-lg bg-white p-3">
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium text-gray-700">
               Stage 2 DTW:
@@ -379,6 +382,24 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
                 </select>
               </div>
             )}
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">
+              Prognosis:
+            </span>
+            {(['sidtw', 'qdtw'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMetric(m)}
+                className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                  metric === m
+                    ? 'bg-blue-950 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {m.toUpperCase()}
+              </button>
+            ))}
           </div>
         </div>
 

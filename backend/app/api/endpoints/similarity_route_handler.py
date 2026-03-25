@@ -36,12 +36,15 @@ async def search_similar(
             None,
             description="Comma-separated prefilter features: length,duration,movement_type,position_3d"
         ),
-        # --- Stage 2 parameters ---
         stage2_active: bool = Query(False, description="Enable DTW reranking (Stage 2)"),
         dtw_mode: Literal["position", "joint"] = Query(
             "position",
             description="DTW alignment domain: 'position' (3D Cartesian) or 'joint' (6D joint space)"
         ),
+        metric: Literal["sidtw", "qdtw"] = Query(                        
+            "sidtw",                                                       
+            description="Evaluation metric for prognosis: 'sidtw' or 'qdtw'"  
+        ),                                                                 
         pool=Depends(get_db_pool),
         conn=Depends(get_db)
 ):
@@ -56,7 +59,7 @@ async def search_similar(
     candidates for both trajectory-level and segment-level results.
 
     Example:
-        GET /search/similar/1765989370?limit=10&stage2_active=true&dtw_mode=position
+        GET /search/similar/1765989370?limit=10&stage2_active=true&dtw_mode=position&metric=sidtw
     """
     try:
         t_start = time.time()
@@ -93,6 +96,7 @@ async def search_similar(
             weights=weights,
             limit=limit,
             prefilter_features=prefilter_list,
+            metric=metric,                                                 
         )
 
         if result.get('error'):
@@ -127,24 +131,20 @@ async def search_similar(
         if traj_results:
             traj_candidate_ids = [r['seg_id'] for r in traj_results]
 
-            # Load query trajectory
             t_load = time.time()
             query_traj_data = await loader.load_trajectory_data(target_id, dtw_mode)
 
             if query_traj_data is not None:
-                # Load all candidates at once
                 candidates_traj = await loader.load_trajectories_batch(
                     traj_candidate_ids, dtw_mode
                 )
                 data_load_ms = (time.time() - t_load) * 1000
 
-                # Flatten to {id: array}
                 candidates_flat = {
                     traj_id: data['trajectory']
                     for traj_id, data in candidates_traj.items()
                 }
 
-                t_dtw = time.time()
                 dtw_traj = rerank(
                     query_seq=query_traj_data['trajectory'],
                     candidates=candidates_flat,
@@ -152,8 +152,6 @@ async def search_similar(
                     mode=dtw_mode,
                 )
 
-                # Merge DTW results back into traj_similarity
-                # keeping existing enriched features, just updating rank + distance
                 dtw_lookup = {r['id']: r for r in dtw_traj}
                 enriched_traj = []
                 for r in traj_results:
@@ -164,28 +162,19 @@ async def search_similar(
                         r['rank_stage2'] = dtw_lookup[sid]['rank']
                     enriched_traj.append(r)
 
-                # Re-sort by DTW distance
                 enriched_traj.sort(key=lambda x: x.get('dtw_distance', float('inf')))
                 result['traj_similarity']['results'] = enriched_traj
 
         # ── Segment-level reranking ───────────────────────────────────────
-        # Segment-IDs haben Format "<traj_id>_<n>" (z.B. "1769774562_1")
-        # TrajectoryLoader lädt nach traj_id → wir parsen die traj_id heraus
-        # und greifen dann auf data['segments'][seg_id] zu.
-
         def seg_id_to_traj_id(seg_id: str) -> str:
-            """'1769774562_1'  →  '1769774562'"""
             return seg_id.rsplit('_', 1)[0]
 
         segment_groups = result.get('segment_similarity', [])
 
-        # Alle benötigten traj_ids für Segment-Kandidaten vorab sammeln
-        # und in einem einzigen Batch-Query laden
         all_seg_traj_ids: set = set()
         for group in segment_groups:
             for r in group.get('similar_segments', {}).get('results', []):
                 all_seg_traj_ids.add(seg_id_to_traj_id(r['seg_id']))
-        # Query-traj_id selbst auch laden (enthält Query-Segmente)
         all_seg_traj_ids.add(target_id)
 
         seg_batch = await loader.load_trajectories_batch(
@@ -193,14 +182,13 @@ async def search_similar(
         )
 
         for group in segment_groups:
-            query_seg_id = group['target_segment']          # z.B. "1769774547_1"
+            query_seg_id = group['target_segment']
             query_traj_id_local = seg_id_to_traj_id(query_seg_id)
             seg_results = group.get('similar_segments', {}).get('results', [])
 
             if not seg_results:
                 continue
 
-            # Query-Segment-Array aus Batch-Ergebnis holen
             query_traj_data = seg_batch.get(query_traj_id_local)
             if query_traj_data is None:
                 logger.warning(f"Query traj not found in batch: {query_traj_id_local}")
@@ -211,10 +199,9 @@ async def search_similar(
                 logger.warning(f"Query segment not found: {query_seg_id}")
                 continue
 
-            # Kandidaten-Arrays aufbauen: {seg_id: array}
             candidates_seg_flat = {}
             for r in seg_results:
-                cand_seg_id = r['seg_id']                # z.B. "1769774562_1"
+                cand_seg_id = r['seg_id']
                 cand_traj_id = seg_id_to_traj_id(cand_seg_id)
                 cand_traj_data = seg_batch.get(cand_traj_id)
                 if cand_traj_data is None:
@@ -234,7 +221,6 @@ async def search_similar(
                 mode=dtw_mode,
             )
 
-            # Merge DTW-Ergebnisse zurück
             dtw_seg_lookup = {r['id']: r for r in dtw_seg}
             enriched_seg = []
             for r in seg_results:

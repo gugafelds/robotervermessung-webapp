@@ -11,6 +11,7 @@ import type {
   TargetFeatures,
 } from '@/types/similarity.types';
 
+import Prognosis from './Prognosis';
 import { SimilarityPlot } from './SimilarityPlot';
 import SimilarityResults from './SimilarityResults';
 import SimilaritySearch from './SimilaritySearch';
@@ -34,6 +35,7 @@ export default function SimilaritySearchWrapper({
   const [timing, setTiming] = useState<SearchTiming | undefined>();
   const [stage2Active, setStage2Active] = useState(false);
   const [dtwMode, setDtwMode] = useState<'position' | 'joint'>('position');
+  const [metric, setMetric] = useState<'sidtw' | 'qdtw'>('sidtw');
 
   const hasResults = trajResults.length > 0 || segmentGroups.length > 0;
 
@@ -51,6 +53,7 @@ export default function SimilaritySearchWrapper({
     prefilter_features: string[],
     stage2_active: boolean,
     dtw_mode: 'position' | 'joint',
+    search_metric: 'sidtw' | 'qdtw',
   ) => {
     setIsLoading(true);
     setError('');
@@ -60,11 +63,20 @@ export default function SimilaritySearchWrapper({
     setSegmentGroups([]);
     setTiming(undefined);
     setStage2Active(false);
+    setMetric(search_metric);
 
     try {
       await SimilarityService.searchSimilarityEmbedding(
         id,
-        { modes, weights, limit, prefilter_features, stage2_active, dtw_mode },
+        {
+          modes,
+          weights,
+          limit,
+          prefilter_features,
+          stage2_active,
+          dtw_mode,
+          metric: search_metric,
+        },
         {
           onTrajsFound: (
             results,
@@ -108,18 +120,29 @@ export default function SimilaritySearchWrapper({
         />
 
         {showPlots && (
-          <div className="my-2 flex items-center gap-x-2 overflow-hidden">
+          <div className="my-2 flex items-start gap-x-2 overflow-hidden">
             {segmentGroups.length > 2 && (
               <SimilarityPlot
                 results={trajResults}
                 segmentGroups={segmentGroups}
                 isLoading={isLoading}
                 originalId={originalId}
-                stage2Active={stage2Active} // neu
+                stage2Active={stage2Active}
               />
             )}
           </div>
         )}
+
+        <div className="my-2 items-start gap-x-2 overflow-hidden">
+          <Prognosis
+            trajResults={trajResults}
+            segmentGroups={segmentGroups}
+            targetTrajFeatures={targetTrajFeatures}
+            stage2Active={stage2Active}
+            dtwMode={dtwMode}
+            metric={metric}
+          />
+        </div>
 
         <SimilarityResults
           results={trajResults}
@@ -131,6 +154,7 @@ export default function SimilaritySearchWrapper({
           timing={timing}
           stage2Active={stage2Active}
           dtwMode={dtwMode}
+          metric={metric}
         />
       </div>
     </div>

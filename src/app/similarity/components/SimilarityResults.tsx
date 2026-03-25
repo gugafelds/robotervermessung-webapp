@@ -20,6 +20,7 @@ interface SimilarityResultsProps {
   timing?: SearchTiming;
   stage2Active?: boolean;
   dtwMode?: 'position' | 'joint';
+  metric?: 'sidtw' | 'qdtw'; // NEU
 }
 
 const SimilarityResults: React.FC<SimilarityResultsProps> = ({
@@ -34,6 +35,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
   timing,
   stage2Active = false,
   dtwMode = 'position',
+  metric = 'sidtw', // NEU
 }) => {
   const bahnResults = results.filter(
     (r) => !r.seg_id || !r.seg_id.includes('_'),
@@ -100,6 +102,11 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
       return `[${result.min_accel_act?.toFixed(0) || '-'}, ${result.max_accel_act?.toFixed(0) || '-'}, ${result.mean_accel_act?.toFixed(0) || '-'}, ${result.std_accel_act?.toFixed(0) || '-'}]`;
     };
 
+    const formatAccuracy = (result: SimilarityResult) => {
+      if (result.min_distance == null) return '-';
+      return `[${result.min_distance.toFixed(4)}, ${result.mean_distance?.toFixed(4) ?? '-'}, ${result.max_distance?.toFixed(4) ?? '-'}]`;
+    };
+
     return data.map((result, index) => {
       const isTarget = isTargetEntry(result);
       const id = result.seg_id || result.traj_id || 'N/A';
@@ -135,20 +142,14 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
             </span>
           </td>
 
-          {/* Score-Spalte: RRF Score oder DTW-Dist je nach Modus */}
           <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-            {/* eslint-disable-next-line no-nested-ternary */}
             {isTarget ? (
               <span className="font-bold text-blue-600">Query</span>
-            ) : stage2Active ? (
-              <span className="font-mono">
-                {result.dtw_distance !== undefined
-                  ? result.dtw_distance.toFixed(4)
-                  : 'N/A'}
-              </span>
             ) : (
               <span className="font-mono">
-                {result.similarity_score?.toFixed(4) ?? 'N/A'}
+                {stage2Active
+                  ? (result.dtw_distance?.toFixed(4) ?? 'N/A')
+                  : (result.similarity_score?.toFixed(4) ?? 'N/A')}
               </span>
             )}
           </td>
@@ -174,14 +175,8 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
           <td className="whitespace-nowrap px-6 py-4 font-mono text-xs text-gray-900">
             {formatPosition3D(result)}
           </td>
-          <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-            {result.sidtw_average_distance ? (
-              <span className="font-mono">
-                {result.sidtw_average_distance.toFixed(4)}
-              </span>
-            ) : (
-              '-'
-            )}
+          <td className="whitespace-nowrap px-6 py-4 font-mono text-xs text-gray-900">
+            {formatAccuracy(result)}
           </td>
         </tr>
       );
@@ -203,7 +198,9 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
     max_accel_act: f.max_accel_act,
     mean_accel_act: f.mean_accel_act,
     std_accel_act: f.std_accel_act,
-    sidtw_average_distance: f.sidtw_average_distance,
+    min_distance: f.min_distance,
+    mean_distance: f.mean_distance,
+    max_distance: f.max_distance,
     position_x: f.position_x,
     position_y: f.position_y,
     position_z: f.position_z,
@@ -240,6 +237,9 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
                 ' • '}
               {(segmentResults.length > 0 || segmentGroups.length > 0) &&
                 `${segmentGroups.length || segmentResults.length} Segmente`}
+              <span className="ml-2 rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium uppercase text-gray-700">
+                {metric}
+              </span>
               {stage2Active && (
                 <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
                   DTW {dtwMode}
@@ -248,7 +248,6 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
             </p>
           </div>
 
-          {/* Timing Badge */}
           {timing && (
             <div className="flex gap-3 text-xs text-gray-500">
               <span>
@@ -327,7 +326,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
                 Position [X, Y, Z]
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500">
-                Accuracy
+                {metric.toUpperCase()} [Min, Mean, Max]
               </th>
             </tr>
           </thead>

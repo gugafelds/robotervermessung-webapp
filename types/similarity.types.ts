@@ -13,6 +13,7 @@ export interface EmbeddingSimilarityParams {
   prefilter_features?: string[];
   stage2_active?: boolean;
   dtw_mode?: 'position' | 'joint';
+  metric?: 'sidtw' | 'qdtw'; // NEU
 }
 
 export interface EmbeddingModeScore {
@@ -86,7 +87,9 @@ export interface EmbeddingSimilarityResult {
     max_accel_act?: number;
     min_accel_act?: number;
     std_accel_act?: number;
-    sidtw_average_distance?: number;
+    min_distance?: number; // NEU
+    mean_distance?: number; // NEU
+    max_distance?: number; // NEU
     position_x?: number;
     position_y?: number;
     position_z?: number;
@@ -129,7 +132,9 @@ export interface SimilarityResult {
   max_accel_act?: number;
   min_accel_act?: number;
   std_accel_act?: number;
-  sidtw_average_distance?: number;
+  min_distance?: number; // NEU
+  mean_distance?: number; // NEU
+  max_distance?: number; // NEU
   position_x?: number;
   position_y?: number;
   position_z?: number;
@@ -149,7 +154,9 @@ export interface TargetFeatures {
   max_accel_act?: number;
   min_accel_act?: number;
   std_accel_act?: number;
-  sidtw_average_distance?: number;
+  min_distance?: number; // NEU
+  mean_distance?: number; // NEU
+  max_distance?: number; // NEU
   position_x?: number;
   position_y?: number;
   position_z?: number;
@@ -171,25 +178,7 @@ export interface SearchTiming {
 export interface HierarchicalSimilarityResponse {
   target_id: string;
   target_traj_id: string;
-  target_traj_features?: {
-    seg_id: string;
-    traj_id: string;
-    duration?: number;
-    weight?: number;
-    length?: number;
-    movement_type?: string;
-    mean_vel_act?: number;
-    max_vel_act?: number;
-    std_vel_act?: number;
-    mean_accel_act?: number;
-    max_accel_act?: number;
-    min_accel_act?: number;
-    std_accel_act?: number;
-    sidtw_average_distance?: number;
-    position_x?: number;
-    position_y?: number;
-    position_z?: number;
-  };
+  target_traj_features?: TargetFeatures; // vereinfacht — nutzt jetzt TargetFeatures
   modes: string[];
   weights: {
     joint: number;
@@ -199,28 +188,11 @@ export interface HierarchicalSimilarityResponse {
     acceleration: number;
     metadata: number;
   };
+  metric: 'sidtw' | 'qdtw'; // NEU
   traj_similarity: TrajSimilarityResponse;
   segment_similarity: {
     target_segment: string;
-    target_segment_features?: {
-      seg_id: string;
-      traj_id: string;
-      duration?: number;
-      weight?: number;
-      length?: number;
-      movement_type?: string;
-      mean_vel_act?: number;
-      max_vel_act?: number;
-      std_vel_act?: number;
-      mean_accel_act?: number;
-      max_accel_act?: number;
-      min_accel_act?: number;
-      std_accel_act?: number;
-      sidtw_average_distance?: number;
-      position_x?: number;
-      position_y?: number;
-      position_z?: number;
-    };
+    target_segment_features?: TargetFeatures; // vereinfacht
     similar_segments: {
       target: string;
       results: EmbeddingSimilarityResult[];
@@ -245,4 +217,33 @@ export interface HierarchicalSimilarityResponse {
   stage2_active: boolean;
   stage2_dtw_mode?: 'position' | 'joint';
   timing?: SearchTiming;
+}
+
+export interface PrognosisValues {
+  simple: number | null;
+  weighted: number | null;
+}
+
+export interface PrognosisFields {
+  min: PrognosisValues;
+  mean: PrognosisValues;
+  max: PrognosisValues;
+}
+
+export interface PrognosisResult {
+  direct: PrognosisFields;
+  decomposed: PrognosisFields;
+  groundTruth: {
+    min: number | null;
+    mean: number | null;
+    max: number | null;
+  };
+  confidence: {
+    direct: number | null;
+    decomposed: {
+      weightedMean: number | null;
+      minimum: number | null;
+      harmonicMean: number | null;
+    };
+  };
 }
