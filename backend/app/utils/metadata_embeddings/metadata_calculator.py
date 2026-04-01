@@ -289,7 +289,12 @@ class MetadataCalculatorService:
             'accels': {row['seg_id']: row['accel_values'] for row in accels}
         }
 
-    def _calculate_all_metadata_in_memory(self, traj_id: str, traj_data: Dict) -> List[Dict]:
+    def _calculate_all_metadata_in_memory(
+        self,
+        traj_id: str,
+        traj_data: Dict,
+        waypoints: list[dict] | None = None,
+    ) -> List[Dict]:
         """
         Berechnet SIMPLIFIED Metadaten (nur 14 Spalten!)
         """
@@ -323,10 +328,31 @@ class MetadataCalculatorService:
 
             centroid = self._calculate_3d_centroid(x_data, y_data, z_data)
 
-            step = max(1, len(x_data) // 20)
-            movement_type = self.detect_movement_type(
-                x_data[::step], y_data[::step], z_data[::step]
-            )
+            movement_type = None
+            if waypoints:
+                # Centroid des Segments berechnen
+                seg_centroid = np.array([
+                    float(np.mean(x_data)),
+                    float(np.mean(y_data)),
+                    float(np.mean(z_data))
+                ])
+                # Nächsten Waypoint finden
+                min_dist = float('inf')
+                for wp in waypoints:
+                    if 'pos' not in wp:
+                        continue
+                    wp_pos = np.array(wp['pos'])
+                    dist = float(np.linalg.norm(wp_pos - seg_centroid))
+                    if dist < min_dist:
+                        min_dist = dist
+                        movement_type = wp.get('move_type', 'linear')
+
+            # Fallback — detect from data
+            if movement_type is None:
+                step = max(1, len(x_data) // 20)
+                movement_type = self.detect_movement_type(
+                    x_data[::step], y_data[::step], z_data[::step]
+                )
             segment_movement_types.append(movement_type)
 
             # Duration
@@ -641,7 +667,8 @@ class MetadataCalculatorService:
         conn: asyncpg.Connection,
         traj_id: str,
         compute_metadata: bool = True,
-        compute_embeddings: bool = True
+        compute_embeddings: bool = True,
+        waypoints: list[dict] | None = None,
     ) -> Dict:
 
         result = {
@@ -664,7 +691,9 @@ class MetadataCalculatorService:
 
             # 1. Metadaten (optional)
             if compute_metadata:
-                metadata_rows = self._calculate_all_metadata_in_memory(traj_id, traj_data)
+                metadata_rows = self._calculate_all_metadata_in_memory(
+                    traj_id, traj_data, waypoints=waypoints
+                )
                 result['metadata'] = metadata_rows
                 result['segments_processed'] = len(metadata_rows) - 1
             else:
@@ -676,6 +705,12 @@ class MetadataCalculatorService:
                 if not self.skip_embeddings:
                     traj_data['metadata_rows'] = metadata_rows
                     embedding_rows = self._calculate_all_embeddings_in_memory(traj_id, traj_data)
+                    # ── Debug ──────────────────────────────────────────────
+                    logger.info(f'Segments: {len(traj_data["segments"])}')
+                    logger.info(f'Joints available: {list(traj_data["joints"].keys())[:3]}')
+                    logger.info(f'Orientations available: {list(traj_data["orientations"].keys())[:3]}')
+                    logger.info(f'Embeddings computed: {len(embedding_rows)}')
+                    # ───────────────────────────────────────────────────────
                     result['embeddings'] = embedding_rows
 
         except Exception as e:
@@ -772,7 +807,6 @@ class MetadataCalculatorService:
                     values = [float(x) for x in emb_str.split(',')]
                     row[key] = np.array(values, dtype=np.float32)
         
-        # ✅ Binary COPY via psycopg3 (synchron, aber schnell!)
         import asyncio
         await asyncio.get_event_loop().run_in_executor(
             None,  # Default executor
@@ -897,4 +931,5 @@ class MetadataCalculatorService:
                 robot_info=robot_info
             )
             logger.info(f"EmbeddingCalculator für '{robot_model}' initialisiert")
+
         return self._calculator_cache[robot_model]

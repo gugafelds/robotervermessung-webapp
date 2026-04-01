@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 from .csv_processor import CSVProcessor
 from .db_operations import DatabaseOperations
 from .db_config import DB_PARAMS
+from ..metadata_embeddings.metadata_calculator import MetadataCalculatorService
 
 
 class BatchProcessor:
@@ -271,8 +272,11 @@ class BatchProcessor:
                             (filtered_accel_cmd, 'traj_accel_cmd',
                              ['traj_id', 'seg_id', 'timestamp', 'tcp_accel_cmd']),
                             (filtered_setpoints, 'traj_setpoints',
-                             ['traj_id', 'seg_id', 'timestamp', 'x_reached', 'y_reached', 'z_reached', 'qx_reached',
-                              'qy_reached', 'qz_reached', 'qw_reached']),
+                             ['traj_id', 'seg_id', 'timestamp',
+                              'x_reached', 'y_reached', 'z_reached',
+                              'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached',
+                              'x_support', 'y_support', 'z_support',
+                              'qx_support', 'qy_support', 'qz_support', 'qw_support']),
                             (filtered_joint, 'traj_joint_states',
                              ['traj_id', 'seg_id', 'timestamp', 'joint_1', 'joint_2', 'joint_3', 'joint_4',
                               'joint_5', 'joint_6']),
@@ -307,6 +311,51 @@ class BatchProcessor:
         end_time = datetime.now()
         processing_time = (end_time - start_time).total_seconds()
         logger.info(f"Batch processing completed in {processing_time:.2f} seconds")
+
+        # ── Metadata berechnen und hochladen ──────────────────────
+        new_traj_ids = [r[0] for r in filtered_traj_info]
+        if new_traj_ids:
+            logger.info(f'Computing metadata for {len(new_traj_ids)} new trajectories...')
+
+            metadata_service = MetadataCalculatorService(
+                db_pool=None,
+                skip_embeddings=False
+            )
+
+            for traj_id in new_traj_ids:
+                try:
+                    async with conn.transaction():
+                        # Hole waypoints für diese traj_id aus processed_data
+                        traj_comments = next(
+                            (d.get('traj_comments', {})
+                                for d in all_processed_data
+                                if d['traj_info_data'][0] == traj_id),
+                            {}
+                        )
+                        waypoints = traj_comments.get('waypoints', [])
+
+                        result = await metadata_service.process_single_traj(
+                            conn=conn,
+                            traj_id=traj_id,
+                            compute_metadata=True,
+                            compute_embeddings=True,
+                            waypoints=waypoints,
+                        )
+
+                        if result.get('metadata') or result.get('embeddings'):
+                            await metadata_service.batch_write_everything(
+                                conn,
+                                result.get('metadata', []),
+                                result.get('embeddings', []),
+                            )
+                            logger.info(
+                                f'✓ Metadata + Embeddings written for {traj_id} '
+                                f'({len(result.get("metadata", []))} metadata, '
+                                f'{len(result.get("embeddings", []))} embeddings)'
+                            )
+
+                except Exception as e:
+                    logger.error(f'Metadata error for {traj_id}: {e}')
 
         return file_results
 

@@ -1,6 +1,8 @@
 import csv
 import re
 from datetime import datetime
+
+from fastapi import logger
 from .db_config import MAPPINGS
 
 class CSVProcessor:
@@ -20,6 +22,8 @@ class CSVProcessor:
         print(f'Verarbeite CSV-Datei: {record_filename}')
         try:
             matrix_info = None
+            traj_comments = self._parse_trajectory_comments()
+
             with open(self.file_path, 'r') as matrixfile:
                 for line in matrixfile:
                     if line.strip().startswith('# transformation_matrix:'):
@@ -561,18 +565,26 @@ class CSVProcessor:
                     traj_point_counts['number_orientation_cmd'],
                     traj_point_counts['number_vel_cmd'],
                     traj_point_counts['number_joint_states'],
-                    self.extract_tool_weight_from_filename(record_filename),
+                    traj_comments.get('weight'),
                     matrix_info,
                     traj_point_counts['number_accel_cmd'],
                     traj_frequencies['freq_accel_cmd'],
-                    self.extract_velocity_from_filename(record_filename),
-                    self.extract_stop_point_from_filename(record_filename),
-                    self.extract_wait_time_from_filename(record_filename),
+                    traj_comments.get('velocity'),
+                    traj_comments.get('stop_point'),
+                    traj_comments.get('wait_time'),
                 ]
 
                 traj_info_data = tuple(base_info)
 
                 traj_data['traj_info_data'] = traj_info_data
+                traj_data['traj_comments'] = traj_comments
+
+                waypoints = traj_comments.get('waypoints', [])
+                if waypoints and traj_data.get('RAPID_SETPOINTS_MAPPING'):
+                    traj_data['RAPID_SETPOINTS_MAPPING'] = self._match_waypoints_to_setpoints(
+                        traj_data['RAPID_SETPOINTS_MAPPING'],
+                        waypoints
+                    )
 
                 all_processed_data.append(traj_data)
 
@@ -901,7 +913,7 @@ class CSVProcessor:
         if not data_rows or len(data_rows) < 2:
             return 0.0
 
-        timestamps = [row[2] for row in data_rows if len(row) > 2]  # Zeitstempel an Position 2
+        timestamps = [row[2] for row in data_rows if len(row) > 2]
         if not timestamps or len(timestamps) < 2:
             return 0.0
 
@@ -911,6 +923,146 @@ class CSVProcessor:
 
         avg_diff = sum(diffs) / len(diffs) if diffs else 0
         return 1 / avg_diff if avg_diff > 0 else 0.0
+
+    def _parse_trajectory_comments(self) -> dict:
+        """
+        Parse comment lines at the end of CSV file.
+        Extracts velocity, load_data, and waypoint list.
+        """
+        result = {
+            'velocity': None,
+            'load_data': None,
+            'waypoints': []
+        }
+
+        tool_weights = {
+            'Goodarzi35':  15.5,
+            'Goodarzi75':  19.5,
+            'Goodarzi100': 22.0,
+            'Goodarzi':    12.0,
+            'Prototyp3D':  2.4,
+        }
+
+        def parse_vec(s: str) -> list[float]:
+            """Parse '[1085.0000 -189.0000 965.5000]' → [1085.0, -189.0, 965.5]"""
+            s = s.strip().strip('[]')
+            return [float(x) for x in s.split()]
+
+        with open(self.file_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line.startswith('#'):
+                    continue
+
+                content = line[1:].strip()
+
+                # velocity
+                if content.startswith('velocity:'):
+                    try:
+                        result['velocity'] = float(content.split(':', 1)[1].strip())
+                    except ValueError:
+                        pass
+
+                # load_data → weight
+                elif content.startswith('load_data:'):
+                    tool = content.split(':', 1)[1].strip()
+                    result['load_data'] = tool
+                    # longest match first
+                    for name in sorted(tool_weights, key=len, reverse=True):
+                        if name in tool:
+                            result['weight'] = tool_weights[name]
+                            break
+                
+                # stop_point
+                elif content.startswith('stop_point:'):
+                    try:
+                        result['stop_point'] = float(content.split(':', 1)[1].strip())
+                    except ValueError:
+                        pass
+
+                # wait_time
+                elif content.startswith('wait_time:'):
+                    try:
+                        result['wait_time'] = float(content.split(':', 1)[1].strip())
+                    except ValueError:
+                        pass
+
+                # seg_N: move_type; pos=[...]; quat=[...]; support_pos=[...]; support_quat=[...]
+                elif content.startswith('seg_'):
+                    try:
+                        # split by ';'
+                        parts = [p.strip() for p in content.split(';')]
+                        # parts[0] = 'seg_1: linear'
+                        move_type = parts[0].split(':', 1)[1].strip()
+
+                        wp = {'move_type': move_type}
+
+                        for part in parts[1:]:
+                            if part.startswith('pos='):
+                                wp['pos'] = parse_vec(part[4:])
+                            elif part.startswith('quat='):
+                                wp['quat'] = parse_vec(part[5:])
+                            elif part.startswith('support_pos='):
+                                wp['support_pos'] = parse_vec(part[12:])
+                            elif part.startswith('support_quat='):
+                                wp['support_quat'] = parse_vec(part[13:])
+
+                        result['waypoints'].append(wp)
+                    except Exception as e:
+                        logger.warning(f'Could not parse waypoint line: {line} — {e}')
+
+        return result
+
+    def _match_waypoints_to_setpoints(
+        self,
+        setpoints_data: list,
+        waypoints: list[dict]
+    ) -> list:
+        """
+        Match waypoints from CSV comments to setpoints via exact position match.
+        Fills move_type and support columns for circular waypoints.
+
+        setpoints_data: list of records [traj_id, seg_id, timestamp, x, y, z, qx, qy, qz, qw]
+        waypoints:      list of dicts with pos, quat, move_type, support_pos, support_quat
+
+        Returns updated setpoints_data with support columns appended.
+        """
+        if not waypoints:
+            return setpoints_data
+
+        # Build position lookup from waypoints
+        # key: (round(x,4), round(y,4), round(z,4)) → waypoint dict
+        wp_lookup = {}
+        for wp in waypoints:
+            if 'pos' not in wp:
+                continue
+            key = (round(wp['pos'][0], 4), round(wp['pos'][1], 4), round(wp['pos'][2], 4))
+            wp_lookup[key] = wp
+
+        updated = []
+        for record in setpoints_data:
+            # record: [traj_id, seg_id, timestamp, x_reached, y_reached, z_reached,
+            #          qx_reached, qy_reached, qz_reached, qw_reached]
+            x = round(float(record[3]), 4) if record[3] is not None else None
+            y = round(float(record[4]), 4) if record[4] is not None else None
+            z = round(float(record[5]), 4) if record[5] is not None else None
+
+            wp = wp_lookup.get((x, y, z))
+
+            if wp and wp.get('move_type') == 'circular' and wp.get('support_pos'):
+                sp = wp['support_pos']
+                sq = wp.get('support_quat') or [None, None, None, None]
+                record = list(record) + [
+                    sp[0], sp[1], sp[2],
+                    sq[0], sq[1], sq[2], sq[3]
+                ]
+            else:
+                # linear or no match — support columns are NULL
+                record = list(record) + [None, None, None, None, None, None, None]
+
+            updated.append(tuple(record))
+
+        return updated
 
     @staticmethod
     def convert_timestamp(ts):
