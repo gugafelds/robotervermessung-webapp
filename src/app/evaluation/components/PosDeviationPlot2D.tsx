@@ -49,6 +49,8 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = ({
       if (hasOldStructure) {
         return data.filter((d) => d.trajID === d.segID);
       }
+
+      console.log('hasOldStructure:', hasOldStructure, data.slice(0,3));
       // Alle Segmente der Bahn
       return data;
     }

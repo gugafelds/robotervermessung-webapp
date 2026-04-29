@@ -218,6 +218,9 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
     [results],
   );
 
+  console.log('results raw:', results);
+  console.log('bahnResults:', bahnResults);
+
   const uniqueIdsForTab = useCallback(
     (tabKey: TabKey): string[] => {
       if (tabKey === 'trajs') {

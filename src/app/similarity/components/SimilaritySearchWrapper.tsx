@@ -121,7 +121,7 @@ export default function SimilaritySearchWrapper({
 
         {showPlots && (
           <div className="my-2 flex items-start gap-x-2 overflow-hidden">
-            {segmentGroups.length > 2 && (
+            {segmentGroups.length > 1 && (
               <SimilarityPlot
                 results={trajResults}
                 segmentGroups={segmentGroups}
