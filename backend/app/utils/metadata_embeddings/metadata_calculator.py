@@ -201,7 +201,7 @@ class MetadataCalculatorService:
                 array_agg(x_cmd ORDER BY timestamp) as x_data,
                 array_agg(y_cmd ORDER BY timestamp) as y_data,
                 array_agg(z_cmd ORDER BY timestamp) as z_data,
-                array_agg(timestamp ORDER BY timestamp) as timestamps,  -- ✅ NEU
+                array_agg(timestamp ORDER BY timestamp) as timestamps,
                 MIN(timestamp) as min_timestamp,
                 MAX(timestamp) as max_timestamp
             FROM rmpd.motion.traj_position_cmd
@@ -210,6 +210,15 @@ class MetadataCalculatorService:
             ORDER BY seg_id
         """
         segments = await conn.fetch(segments_query, traj_id)
+
+        support_query = """
+            SELECT DISTINCT seg_id
+            FROM motion.traj_setpoints
+            WHERE traj_id = $1
+            AND x_support IS NOT NULL
+        """
+        support_rows = await conn.fetch(support_query, traj_id)
+        circular_seg_ids = {row['seg_id'] for row in support_rows}
 
         joint_query = f"""
             WITH numbered AS (
@@ -249,33 +258,22 @@ class MetadataCalculatorService:
         orientations = await conn.fetch(orientation_query, traj_id)
 
         # Twist Stats mit Downsampling
-        twist_query = f"""
-            WITH numbered AS (
-                SELECT seg_id,
-                       tcp_vel_act,
-                       ROW_NUMBER() OVER (PARTITION BY seg_id ORDER BY timestamp) as rn
-                FROM rmpd.motion.traj_vel_act
-                WHERE traj_id = $1
-            )
+        twist_query = """
             SELECT seg_id,
-                   array_agg(tcp_vel_act ORDER BY rn) as twist_values
-            FROM numbered
+                   array_agg(tcp_vel_act ORDER BY timestamp) as twist_values
+            FROM rmpd.motion.traj_vel_act
+            WHERE traj_id = $1
             GROUP BY seg_id
         """
+
         twists = await conn.fetch(twist_query, traj_id)
 
         # Acceleration Stats mit Downsampling
-        accel_query = f"""
-            WITH numbered AS (
-                SELECT seg_id,
-                       tcp_accel_cmd,
-                       ROW_NUMBER() OVER (PARTITION BY seg_id ORDER BY timestamp) as rn
-                FROM rmpd.motion.traj_accel_cmd
-                WHERE traj_id = $1
-            )
+        accel_query = """
             SELECT seg_id,
-                   array_agg(tcp_accel_cmd ORDER BY rn) as accel_values
-            FROM numbered
+                   array_agg(tcp_accel_cmd ORDER BY timestamp) as accel_values
+            FROM rmpd.motion.traj_accel_cmd
+            WHERE traj_id = $1
             GROUP BY seg_id
         """
         accels = await conn.fetch(accel_query, traj_id)
@@ -286,7 +284,8 @@ class MetadataCalculatorService:
             'joints': {row['seg_id']: row for row in joints},
             'orientations': {row['seg_id']: row for row in orientations},
             'twists': {row['seg_id']: row['twist_values'] for row in twists},
-            'accels': {row['seg_id']: row['accel_values'] for row in accels}
+            'accels': {row['seg_id']: row['accel_values'] for row in accels},
+            'circular_seg_ids': circular_seg_ids,
         }
 
     def _calculate_all_metadata_in_memory(
@@ -328,31 +327,9 @@ class MetadataCalculatorService:
 
             centroid = self._calculate_3d_centroid(x_data, y_data, z_data)
 
-            movement_type = None
-            if waypoints:
-                # Centroid des Segments berechnen
-                seg_centroid = np.array([
-                    float(np.mean(x_data)),
-                    float(np.mean(y_data)),
-                    float(np.mean(z_data))
-                ])
-                # Nächsten Waypoint finden
-                min_dist = float('inf')
-                for wp in waypoints:
-                    if 'pos' not in wp:
-                        continue
-                    wp_pos = np.array(wp['pos'])
-                    dist = float(np.linalg.norm(wp_pos - seg_centroid))
-                    if dist < min_dist:
-                        min_dist = dist
-                        movement_type = wp.get('move_type', 'linear')
+            circular_seg_ids = traj_data.get('circular_seg_ids', set())
+            movement_type = 'circular' if seg_id in circular_seg_ids else 'linear'
 
-            # Fallback — detect from data
-            if movement_type is None:
-                step = max(1, len(x_data) // 20)
-                movement_type = self.detect_movement_type(
-                    x_data[::step], y_data[::step], z_data[::step]
-                )
             segment_movement_types.append(movement_type)
 
             # Duration
@@ -691,6 +668,14 @@ class MetadataCalculatorService:
 
             # 1. Metadaten (optional)
             if compute_metadata:
+                if waypoints:
+                    traj_data['wp_lookup'] = {
+                        (round(wp['pos'][0], 4), round(wp['pos'][1], 4), round(wp['pos'][2], 4)): wp.get('move_type', 'linear')
+                        for wp in waypoints if 'pos' in wp
+                    }
+                else:
+                    traj_data['wp_lookup'] = {}
+
                 metadata_rows = self._calculate_all_metadata_in_memory(
                     traj_id, traj_data, waypoints=waypoints
                 )

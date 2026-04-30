@@ -7,10 +7,6 @@ from .db_config import MAPPINGS
 
 class CSVProcessor:
     def __init__(self, file_path):
-        self.act_segments = None
-        self.cmd_segments = None
-        self.cmd_segments_with_ap = None
-        self.act_segments_with_ap = None
         self.file_path = file_path
         self.mappings = MAPPINGS
 
@@ -34,24 +30,13 @@ class CSVProcessor:
                 reader = csv.DictReader(csvfile)
                 rows = list(reader)
 
-            #print(str(reference_position))
-            #print(segmentation_method)
-
-            # Pick&Place Metadaten extrahieren
-            is_pickplace = "pickplace" in record_filename
             self.record_filename = record_filename
 
-            # NEU: Teile die Daten in IST und SOLL Zeilen auf basierend auf den Spalten
-            # IST-Spalten: timestamp, pv_x, pv_y, pv_z, ov_x, ov_y, ov_z, ov_w, pt_x, pt_y, pt_z, ot_x, ot_y, ot_z, ot_w,
-            # tcp_speedv, tcp_angularv, tcp_accelv, tcp_accelv_angular, tcp_accel_pi, tcp_angular_vel_pi, segment_id_ist
             act_spalten = ['timestamp', 'pv_x', 'pv_y', 'pv_z', 'ov_x', 'ov_y', 'ov_z', 'ov_w',
                            'pt_x', 'pt_y', 'pt_z', 'ot_x', 'ot_y', 'ot_z', 'ot_w', 'tcp_speedv',
                            'tcp_angularv', 'tcp_accelv', 'tcp_accel_pi',
                            'tcp_angular_vel_pi', 'segment_id_ist']
 
-            # SOLL-Spalten: ps_x, ps_y, ps_z, os_x, os_y, os_z, os_w, tcp_speeds, joint_1, joint_2,
-            # joint_3, joint_4, joint_5, joint_6, ap_x, ap_y, ap_z, aq_x, aq_y, aq_z, aq_w, DO_Signal,
-            # Movement Type, Weight, Velocity Picking, Velocity Handling, segment_cmd_id
             cmd_spalten = ['ps_x', 'ps_y', 'ps_z', 'os_x', 'os_y', 'os_z', 'os_w', 'tcp_speedbs', 'tcp_accelbs',
                             'joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5', 'joint_6',
                             'ap_x', 'ap_y', 'ap_z', 'aq_x', 'aq_y', 'aq_z', 'aq_w', 'DO_Signal',
@@ -476,19 +461,15 @@ class CSVProcessor:
                     if traj_key in act_processed_data[mapping_name]:
                         traj_data[mapping_name] = act_processed_data[mapping_name][traj_key]
 
-                # Sammle SOLL-Daten für diese Bahn
                 for mapping_name in cmd_processed_data.keys():
                     traj_key = f"{traj_idx}"
                     if traj_key in cmd_processed_data[mapping_name]:
                         traj_data[mapping_name] = cmd_processed_data[mapping_name][traj_key]
 
-                # Wenn keine Daten für diese Bahn vorhanden sind, überspringe sie
                 has_data = any(len(traj_data[key]) > 0 for key in traj_data.keys())
                 if not has_data:
                     continue
 
-
-                # Bestimme Zeitstempel der Bahn
                 all_timestamps = []
                 for key, data in traj_data.items():
                     for row in data:
@@ -501,7 +482,6 @@ class CSVProcessor:
                     end_time = str(self.convert_timestamp(all_timestamps[-1]))
                     recording_date = start_time
                 else:
-                    # Fallback auf globale Zeitstempel
                     start_time = str(self.convert_timestamp(rows[0]['timestamp']))
                     end_time = str(self.convert_timestamp(rows[-1]['timestamp']))
                     recording_date = start_time
@@ -512,7 +492,6 @@ class CSVProcessor:
                         traj_id = data[0][0]  # Nehme die erste Komponente der ersten Zeile
                         break
 
-                # Berechne Punktzahlen für diese Bahn
                 traj_point_counts = {'number_setpoints': len(traj_data.get('RAPID_SETPOINTS_MAPPING', [])),
                                      'number_pose_act': len(traj_data.get('POSE_MAPPING', [])),
                                      'number_vel_act': len(traj_data.get('VEL_ACT_MAPPING', [])),
@@ -523,9 +502,6 @@ class CSVProcessor:
                                      'number_vel_cmd': len(traj_data.get('VEL_CMD_MAPPING', [])),
                                      'number_joint_states': len(traj_data.get('JOINT_MAPPING', []))}
 
-                # Berechne AP-Ereignisse basierend auf RAPID_SETPOINTS
-
-                # Berechne Frequenzen basierend auf den Zeitstempeln
                 traj_frequencies = {
                     'freq_pose': self.calculate_freq_from_data(traj_data.get('POSE_MAPPING', [])),
                     'freq_position_cmd': self.calculate_freq_from_data(
@@ -617,7 +593,6 @@ class CSVProcessor:
         Returns:
             Tuple mit (rows_processed, processed_data, point_counts, max_bahn, traj_ids)
         """
-        # Definiere, welche Mappings für den Datentyp verwendet werden
         if data_type.lower() == "ist":
             segment_id_field = 'segment_id_ist'
             mappings_to_use = ['POSE_MAPPING', 'VEL_ACT_MAPPING', 'ACCEL_ACT_MAPPING', 'TRANSFORM_MAPPING']
@@ -647,49 +622,29 @@ class CSVProcessor:
             'number_joint_states': 0,
         }
 
-        # Sammle zuerst alle eindeutigen Segmente
         all_segments = []
         for row in rows:
             segment_id = row.get(segment_id_field)
             if segment_id is not None and segment_id != '' and segment_id not in all_segments:
                 all_segments.append(segment_id)
 
-        # print(f"{data_type.upper()}: Verarbeite {len(all_segments)} gefilterte Segmente: {', '.join(all_segments)}")
-        #print('Segment to Bahn Mapping:', segment_to_traj_mapping)
-        # Je nach Segmentierungsmethode unterschiedliche Verarbeitung
         if segmentation_method == "reference_position" and segment_to_traj_mapping:
-            # Bei reference_position wird das übergebene Mapping verwendet
-            # print(f"{data_type.upper()}: Verwende reference_position Segmentierung mit vorgegebenem Bahn-Mapping")
-
-            # Verwende das übergebene Mapping direkt
             segment_to_bahn = segment_to_traj_mapping
 
-            # Erstelle traj_to_segments (umgekehrtes Mapping)
             traj_to_segments = {}
             for segment_id, traj_key in segment_to_bahn.items():
                 if traj_key not in traj_to_segments:
                     traj_to_segments[traj_key] = []
                 traj_to_segments[traj_key].append(segment_id)
 
-            # Gib das verwendete Mapping aus
-            # print(f"{data_type.upper()}: Bahn-Segmente basierend auf reference_position:")
-            # for traj_key, segments in sorted(traj_to_segments.items(), key=lambda x: int(x[0])):
-            #     print(f"  Bahn {traj_key}: {', '.join(segments)}")
-
-            # Bestimme maximale Bahn-ID
             max_bahn = max([int(bahn) for bahn in traj_to_segments.keys()]) if traj_to_segments else 0
 
         else:
-            # Bei fixed_segments die ursprüngliche Segmentierung verwenden
-            # Teile die Segmente in Bahnen mit je num_segments Segmenten ein,
-            # wobei die letzte Bahn mehr Segmente haben kann, wenn Restsegmente übrig bleiben
             traj_to_segments = {}
 
-            # Wenn wir weniger Segmente haben als in einer Bahn sein sollten
             if len(all_segments) < num_segments:
-                # Keine Bahnen erstellen, da nicht genug Segmente vorhanden
                 traj_to_segments = {}
-                max_bahn = -1  # Keine Bahnen
+                max_bahn = -1 
                 print(
                     f"Warnung: Nur {len(all_segments)} Segmente vorhanden, benötigt werden {num_segments}. Keine Bahnen erstellt.")
             else:
@@ -699,13 +654,11 @@ class CSVProcessor:
                 # Berechne, wie viele Restsegmente übrig bleiben
                 remaining_segments = len(all_segments) % num_segments
 
-                # Erstelle nur vollständige Bahnen mit exakt num_segments Segmenten
                 for i in range(complete_bahnen):
                     start_idx = i * num_segments
                     end_idx = (i + 1) * num_segments
                     traj_to_segments[str(i)] = all_segments[start_idx:end_idx]
 
-                # Restsegmente werden NICHT verarbeitet (weggelassen)
                 if remaining_segments > 0:
                     remaining_segment_list = all_segments[complete_bahnen * num_segments:]
                     print(
@@ -718,57 +671,46 @@ class CSVProcessor:
             # for bahn, segments in sorted(traj_to_segments.items(), key=lambda x: int(x[0])):
             #     print(f"  Bahn {bahn}: {', '.join(segments)}")
 
-            # Erstelle ein Mapping von Segment-ID zu Bahn
             segment_to_bahn = {}
             for traj_key, segments in traj_to_segments.items():
                 for segment_id in segments:
                     segment_to_bahn[segment_id] = traj_key
 
-        # Erstelle ein Mapping für neu nummerierte Segment-IDs innerhalb jeder Bahn
         segment_id_mapping = {}
         for traj_key, segments in traj_to_segments.items():
             for i, segment_id in enumerate(segments):
                 segment_id_mapping[(traj_key, segment_id)] = i + 1  # Segment-IDs beginnen bei 1
 
-        # Neue Datenstruktur für Bahn-Zeitstempel
         traj_timestamps = {}
 
-        # Verarbeite jede Zeile
         for i, row in enumerate(rows):
             timestamp = row['timestamp']
             segment_id = row.get(segment_id_field)
 
-            # Überspringen, wenn keine gültige Segment-ID
             if segment_id is None or segment_id == '':
                 continue
 
-            # Bestimme die Bahn für dieses Segment
             traj_key = segment_to_bahn.get(segment_id)
             if traj_key is None:
                 continue  # Dieses Segment wurde keiner Bahn zugeordnet
 
-            # Initialisiere Bahn-Zeitstempel, falls noch nicht vorhanden
             if traj_key not in traj_timestamps:
                 traj_timestamps[traj_key] = []
             traj_timestamps[traj_key].append(timestamp)
 
-            # Verarbeite Mappings
             for mapping_name in mappings_to_use:
                 if mapping_name not in self.mappings:
                     continue
 
                 mapping = self.mappings[mapping_name]
 
-                # Verwende gemappte Segment-ID
                 traj_segment_id = str(segment_id_mapping.get((traj_key, segment_id), 0))
                 if traj_segment_id == '0':
                     continue  # Keine gültige Zuordnung gefunden
 
-                # Erstelle die Bahn-Schlüssel, falls noch nicht vorhanden
                 if traj_key not in processed_data[mapping_name]:
                     processed_data[mapping_name][traj_key] = []
 
-                # Verarbeite die Daten und speichere sie nach Bahn gruppiert
                 result = self.process_mapping_row(
                     row, mapping, traj_key, traj_segment_id, timestamp,
                     source_data, point_counts, mapping_name
@@ -778,7 +720,6 @@ class CSVProcessor:
                     processed_data[mapping_name][traj_key].append(result)
                     rows_processed[mapping_name] += 1
 
-        # Generiere für jede Bahn eine eindeutige ID basierend auf dem ersten Zeitstempel
         traj_ids = {}
         for traj_key, timestamps in traj_timestamps.items():
             if timestamps:
@@ -811,7 +752,6 @@ class CSVProcessor:
         #         segment_list.append(f"{segment} (ID: {mapped_id})")
         #     print(f"  Bahn {traj_key} (ID: {traj_id}): Segmente = {', '.join(segment_list)}")
 
-        # Detaillierte Ausgabe der Bahn-ID-Zuordnungen
         print(f"\n{data_type.upper()}-Bahn-ID-Zuordnungen:")
         for traj_key, traj_id in sorted(traj_ids.items(), key=lambda x: int(x[0])):
             print(f"  Bahn {traj_key} hat ID: {traj_id}")
@@ -823,10 +763,9 @@ class CSVProcessor:
                 mapped_segments.append(f"{segment} → {mapped_id}")
             print(f"    Segment-Mapping: {', '.join(mapped_segments)}")
 
-        # print(f"{data_type.upper()}-Datenverarbeitung: {sum(rows_processed.values())} Zeilen, {max_bahn + 1} Bahnen")
         return rows_processed, processed_data, point_counts, max_bahn, traj_ids
 
-    def process_mapping_row(self, row, mapping, traj_id, segment_id, timestamp, source_data,
+    def process_mapping_row(self, row, mapping, traj_id, segment_id, timestamp,
                             point_counts, mapping_name, movement_types=None):
         """
         Verarbeitet eine Zeile gemäß einem bestimmten Mapping und gibt die Datenzeile zurück.
@@ -1079,44 +1018,6 @@ class CSVProcessor:
             match = re.search(r'(record_\d{8}_\d{6})', record_filename)
             if match:
                 return match.group(1)
-        return None
-
-    @staticmethod
-    def extract_velocity_from_filename(filename):
-        match = re.search(r'_v(\d+)_', filename)
-        if match:
-            return int(match.group(1))
-        return None
-
-    @staticmethod
-    def extract_tool_weight_from_filename(filename):
-        tool_weights = {
-            'Goodarzi35': 15.5,
-            'Goodarzi75': 19.5,
-            'Goodarzi100': 22.0,
-            'Goodarzi': 12.0,
-            'Prototyp3D': 2.4,
-        }
-
-        # Sortiere nach Länge (längste zuerst)
-        for tool_name in sorted(tool_weights.keys(), key=len, reverse=True):
-            if tool_name in filename:
-                return tool_weights[tool_name]
-
-        return None
-
-    @staticmethod
-    def extract_stop_point_from_filename(filename):
-        match = re.search(r'_inpos(\d+(?:\.\d+)?)_', filename)
-        if match:
-            return float(match.group(1))
-        return None
-
-    @staticmethod
-    def extract_wait_time_from_filename(filename):
-        match = re.search(r'_wt(\d+(?:\.\d+)?)_', filename)
-        if match:
-            return float(match.group(1))
         return None
 
     @staticmethod
