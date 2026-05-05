@@ -148,39 +148,6 @@ class MetadataCalculatorService:
             result = await conn.execute(query, traj_ids)
             return int(result.split()[-1]) if result.startswith("DELETE") else 0
 
-    def detect_movement_type(self, x_data, y_data, z_data) -> str:
-        """Erkennt Movement-Type - VEKTORISIERT"""
-        try:
-            if len(x_data) < 3:
-                return "linear"
-
-            # Alle Punkte als Matrix
-            points = np.column_stack([x_data, y_data, z_data])
-
-            # Vektorisierte Distanz-Berechnung
-            deltas = np.diff(points, axis=0)
-            distances = np.linalg.norm(deltas, axis=1)
-            path_length = float(np.sum(distances))
-
-            if path_length < 1e-6:
-                return "linear"
-
-            # Direkte Distanz
-            direct_distance = float(np.linalg.norm(points[-1] - points[0]))
-            ratio = direct_distance / path_length
-
-            # Offene Form
-            if ratio > 0.9:
-                return "linear"
-            elif ratio > 0.3:
-                return "circular"
-            else:
-                return "linear"
-
-        except Exception as e:
-            logger.warning(f"Fehler bei Movement-Type-Erkennung: {e}")
-            return "linear"
-
     async def _fetch_all_traj_data(self, conn: asyncpg.Connection, traj_id: str) -> Dict:
         """
         Holt ALLE benötigten Daten für eine Bahn
@@ -292,7 +259,6 @@ class MetadataCalculatorService:
         self,
         traj_id: str,
         traj_data: Dict,
-        waypoints: list[dict] | None = None,
     ) -> List[Dict]:
         """
         Berechnet SIMPLIFIED Metadaten (nur 14 Spalten!)
@@ -677,7 +643,7 @@ class MetadataCalculatorService:
                     traj_data['wp_lookup'] = {}
 
                 metadata_rows = self._calculate_all_metadata_in_memory(
-                    traj_id, traj_data, waypoints=waypoints
+                    traj_id, traj_data
                 )
                 result['metadata'] = metadata_rows
                 result['segments_processed'] = len(metadata_rows) - 1

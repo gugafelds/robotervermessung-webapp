@@ -20,22 +20,24 @@ class ShapeSearcher:
             self,
             target_id: str,
             mode: str
-    ) -> Optional[List[float]]:
+    ) -> Optional[Dict]:
         """
-        Holt Embedding für Target ID
-
-        Args:
-            target_id: Segment/Bahn ID
-            mode: 'joint', 'position', 'orientation'
+        Holt Embedding und parent traj_id für Target ID.
 
         Returns:
-            Embedding als List[float] oder None
+            {
+                "embedding": List[float],
+                "traj_id": str
+            }
+            oder None
         """
         try:
             embedding_col = f"{mode}_embedding"
 
             query = f"""
-                SELECT {embedding_col}
+                SELECT 
+                    traj_id,
+                    {embedding_col}
                 FROM motion.traj_embeddings
                 WHERE seg_id = $1
             """
@@ -46,9 +48,10 @@ class ShapeSearcher:
                 logger.warning(f"No {mode} embedding found for {target_id}")
                 return None
 
-            embedding = result[embedding_col]
-
-            return embedding
+            return {
+                "embedding": result[embedding_col],
+                "traj_id": result["traj_id"]
+            }
 
         except Exception as e:
             logger.error(f"Error getting {mode} embedding for {target_id}: {e}")
@@ -79,19 +82,16 @@ class ShapeSearcher:
         """
 
         try:
-            # 1. Hole Target Embedding
-            target_embedding = await self.get_target_embedding(target_id, mode)
+            target_data = await self.get_target_embedding(target_id, mode)
 
-            if target_embedding is None:
+            if target_data is None:
                 logger.error(f"Cannot get {mode} embedding for {target_id}")
                 return []
 
-            embedding_col = f"{mode}_embedding"
+            target_embedding = target_data["embedding"]
+            parent_traj_id = target_data["traj_id"]
 
-            # 2. Parent-Trajectory-ID ableiten:
-            #    "1773409661_1" → "1773409661"
-            #    "1773409661"   → "1773409661"
-            parent_traj_id = target_id.rsplit('_', 1)[0] if '_' in target_id else target_id
+            embedding_col = f"{mode}_embedding"
 
             # 3. Baue WHERE Conditions
             #    - e.seg_id != $2        → schließt das Segment selbst aus
@@ -111,7 +111,7 @@ class ShapeSearcher:
             where_clause = " AND ".join(where_conditions)
 
             # 4. SET HNSW parameter (außerhalb der Query)
-            await self.connection.execute("SET hnsw.ef_search = 200;")
+            await self.connection.execute("SET hnsw.ef_search = 500;")
 
             # 5. Query
             if candidate_ids is not None and len(candidate_ids) > 0:
@@ -126,7 +126,7 @@ class ShapeSearcher:
                         e.{embedding_col} <=> $1::vector as distance
                     FROM motion.traj_embeddings e
                     WHERE {where_clause}
-                    ORDER BY distance
+                    ORDER BY distance, e.seg_id
                     LIMIT $5
                 """
 
@@ -147,7 +147,7 @@ class ShapeSearcher:
                         e.{embedding_col} <=> $1::vector as distance
                     FROM motion.traj_embeddings e
                     WHERE {where_clause}
-                    ORDER BY distance
+                    ORDER BY distance, e.seg_id
                     LIMIT $4
                 """
 

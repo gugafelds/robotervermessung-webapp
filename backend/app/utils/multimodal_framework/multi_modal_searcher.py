@@ -82,6 +82,7 @@ class MultiModalSearcher:
             prefilter_features: Optional[List[str]] = None,
             limit: int = 10,
             metric: str = 'sidtw',
+            buffer_factor: int = 5,
     ) -> Dict:
         """
         HIERARCHICAL Similarity Search — vollständig parallelisiert (bei Pool).
@@ -133,6 +134,7 @@ class MultiModalSearcher:
                     limit=limit,
                     prefilter_features=prefilter_features,
                     metric=metric,
+                    buffer_factor=buffer_factor,
                 ),
                 self._get_traj_segments(target_traj_id),
             )
@@ -157,6 +159,7 @@ class MultiModalSearcher:
                         limit=limit,
                         prefilter_features=prefilter_features,
                         metric=metric,
+                        buffer_factor=buffer_factor,
                     ),
                 )
                 return {
@@ -201,6 +204,7 @@ class MultiModalSearcher:
             limit: int,
             prefilter_features: List[str],
             metric: str = 'sidtw',
+            buffer_factor: int = 5,
     ) -> Dict:
         """Sucht ähnliche BAHNEN — Modi-Queries parallel, jede mit eigener Connection."""
         try:
@@ -209,6 +213,8 @@ class MultiModalSearcher:
                 shape, _ = self._make_helpers(conn)
                 embedding_status = await shape.check_embeddings_exist(target_traj_id)
             available_modes = [m for m in modes if embedding_status.get(m, False)]
+
+            search_limit = max(limit, limit * buffer_factor)
 
             if not available_modes:
                 return {
@@ -238,7 +244,7 @@ class MultiModalSearcher:
                     results = await shape.search_by_embedding(
                         target_id=target_traj_id,
                         mode=mode,
-                        limit=limit,
+                        limit=search_limit,
                         candidate_ids=candidate_ids,
                         only_traj=True,
                     )
@@ -275,6 +281,7 @@ class MultiModalSearcher:
             limit: int,
             prefilter_features: List[str],
             metric: str = 'sidtw',
+            buffer_factor: int = 5,
     ) -> Dict:
         """Sucht ähnliche SEGMENTE — Modi-Queries parallel, jede mit eigener Connection."""
         try:
@@ -283,6 +290,8 @@ class MultiModalSearcher:
                 shape, _ = self._make_helpers(conn)
                 embedding_status = await shape.check_embeddings_exist(target_seg_id)
             available_modes = [m for m in modes if embedding_status.get(m, False)]
+
+            search_limit = max(limit, limit * buffer_factor)
 
             if not available_modes:
                 return {
@@ -312,7 +321,7 @@ class MultiModalSearcher:
                     results = await shape.search_by_embedding(
                         target_id=target_seg_id,
                         mode=mode,
-                        limit=limit,
+                        limit=search_limit,
                         candidate_ids=candidate_ids,
                         only_segments=True,
                     )

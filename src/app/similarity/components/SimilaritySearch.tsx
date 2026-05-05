@@ -217,7 +217,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
                 <button
                   key={mode}
                   onClick={() => toggleMode(mode)}
-                  className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                  className={`m-1 rounded-full px-3 py-1 text-sm transition-colors ${
                     activeModes.has(mode)
                       ? 'bg-blue-500 text-white'
                       : 'bg-gray-200 text-gray-700 hover:bg-gray-300'

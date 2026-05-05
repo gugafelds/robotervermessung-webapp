@@ -49,21 +49,21 @@ const PrognosisRow: React.FC<PrognosisRowProps> = ({
   gtMax,
 }) => (
   <div className="grid grid-cols-4 items-center gap-x-4">
-    <p className="text-xs text-gray-400">{label}</p>
+    <p className="text-base text-gray-800">{label}</p>
     <p className={`font-mono text-sm font-medium ${getErrorColor(min, gtMin)}`}>
       {formatVal(min)}
       {gtMin != null && min != null && (
-        <span className="ml-1 text-xs text-gray-400">
+        <span className="ml-1 text-sm text-gray-500">
           ±{formatError(min, gtMin)}
         </span>
       )}
     </p>
     <p
-      className={`font-mono text-sm font-medium ${getErrorColor(mean, gtMean)}`}
+      className={`font-mono text-base font-medium ${getErrorColor(mean, gtMean)}`}
     >
       {formatVal(mean)}
       {gtMean != null && mean != null && (
-        <span className="ml-1 text-xs text-gray-400">
+        <span className="ml-1 text-sm text-gray-500">
           ±{formatError(mean, gtMean)}
         </span>
       )}
@@ -71,7 +71,7 @@ const PrognosisRow: React.FC<PrognosisRowProps> = ({
     <p className={`font-mono text-sm font-medium ${getErrorColor(max, gtMax)}`}>
       {formatVal(max)}
       {gtMax != null && max != null && (
-        <span className="ml-1 text-xs text-gray-400">
+        <span className="ml-1 text-sm text-gray-500">
           ±{formatError(max, gtMax)}
         </span>
       )}
@@ -96,20 +96,20 @@ const PrognosisCard: React.FC<PrognosisCardProps> = ({
   gtMax,
   confidence,
 }) => (
-  <div className="flex flex-col gap-3 rounded-lg border border-gray-300 bg-white p-4">
-    <p className="text-xs font-medium uppercase tracking-wider text-gray-500">
+  <div className="flex flex-col gap-3 rounded-lg border border-gray-400 bg-white p-4">
+    <p className="text-lg font-medium uppercase tracking-wider text-primary">
       {label}
     </p>
 
     <div className="grid grid-cols-4 gap-x-4">
       <span />
-      <p className="text-xs font-medium text-gray-500">Min</p>
-      <p className="text-xs font-medium text-gray-500">Mean</p>
-      <p className="text-xs font-medium text-gray-500">Max</p>
+      <p className="text-sm font-medium text-gray-800">Min.</p>
+      <p className="text-sm font-medium text-gray-800">Mean</p>
+      <p className="text-sm font-medium text-gray-800">Max.</p>
     </div>
 
     <div className="flex flex-col gap-2">
-      <PrognosisRow
+      {/* <PrognosisRow
         label="Simple"
         min={fields.min.simple}
         mean={fields.mean.simple}
@@ -117,7 +117,7 @@ const PrognosisCard: React.FC<PrognosisCardProps> = ({
         gtMin={gtMin}
         gtMean={gtMean}
         gtMax={gtMax}
-      />
+      /> */}
       <PrognosisRow
         label="Weighted"
         min={fields.min.weighted}
@@ -131,7 +131,7 @@ const PrognosisCard: React.FC<PrognosisCardProps> = ({
 
     {confidence != null && (
       <div className="mt-2 border-t pt-2">
-        <p className="text-xs text-gray-400">Confidence</p>
+        <p className="text-base text-gray-800">Confidence</p>
         <p
           className={`font-mono text-sm font-medium ${getConfidenceColor(confidence)}`}
         >
