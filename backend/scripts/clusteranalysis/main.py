@@ -42,7 +42,7 @@ def showmesh_trajs(points_np, solid, additional, worst):
 
     scene = trimesh.Scene()
     scene.add_geometry(solid)
-    scene.add_geometry(points)
+    #scene.add_geometry(points)
     scene.add_geometry(additional_mesh)
 
     for traj in worst:
@@ -95,7 +95,7 @@ def showmesh_trajs(points_np, solid, additional, worst):
             scene.add_geometry(geometry=path)
 
     scene.export(
-        "C:/Users/muell/Desktop/Arbeit/Robotervermessung/assets/additional_trajs.glb"
+        "C:/Users/muell/Desktop/Arbeit/Robotervermessung/assets/additional_trajs_only.glb"
     )
     scene.show(resolution=(800, 600))
 
@@ -139,7 +139,7 @@ traj_data = pd.read_csv(
 )
 
 prev_trajs = pd.read_csv(
-    "C:/Users/muell/Desktop/Arbeit/Robotervermessung/csvs/worsttrajs.csv"
+    "C:/Users/muell/Desktop/Arbeit/Robotervermessung/csvs/worsttrajs2.csv"
 )
 prev_trajs = prev_trajs[
     ["x_start", "y_start", "z_start", "x_end", "y_end", "z_end", "movement"]
@@ -177,6 +177,86 @@ bounds = trimesh.creation.box(bounds=corners)
 
 solid = trimesh.boolean.intersection([mesh, bounds])
 
+"""centers = pd.read_csv(
+    "C:/Users/muell/Desktop/Arbeit/Robotervermessung/csvs/centers_newdata.csv"
+)
+centers.drop("weight", axis=1, inplace=True)
+
+# Convert to dict for mutation
+centers_dict = centers.to_dict("records")
+
+for row in centers_dict:
+    row["x_start"] = descale(400.0, 1993.35, row["x_start"])
+    row["x_end"] = descale(400.0, 1993.35, row["x_end"])
+    row["y_start"] = descale(-1161.82, 1094.0, row["y_start"])
+    row["y_end"] = descale(-1161.82, 1094.0, row["y_end"])
+    row["z_start"] = descale(326.39, 2005.24, row["z_start"])
+    row["z_end"] = descale(326.39, 2005.24, row["z_end"])
+
+random_trajs = []
+
+x_distances = []
+y_distances = []
+z_distances = []
+
+for i in traj_data.head().itertuples(index=False):
+    x_distances.append(abs(i.x_start - i.x_end))
+    y_distances.append(abs(i.y_start - i.y_end))
+    z_distances.append(abs(i.z_start - i.z_end))
+
+max_x_dist = max(x_distances)
+max_y_dist = max(y_distances)
+max_z_dist = max(z_distances)
+
+x_min, x_max = 500, 1900
+y_min, y_max = -1100, 1100
+z_min, z_max = 400, 2000
+
+for i in range(100000):
+    x_start = random.uniform(x_min, x_max)
+    y_start = random.uniform(y_min, y_max)
+    z_start = random.uniform(z_min, z_max)
+
+    x_end = calculate_end_point(x_min, x_max, x_start, max_x_dist)
+    y_end = calculate_end_point(y_min, y_max, y_start, max_y_dist)
+    z_end = calculate_end_point(z_min, z_max, z_start, max_z_dist)
+
+    movement = random.randint(0, 1)  # 0: circular, 1: linear
+
+    point = [x_start, y_start, z_start, x_end, y_end, z_end, movement]
+    if solid.contains([[point[0],point[1],point[2]]]) and solid.contains([[point[3],point[4],point[5]]]):
+        random_trajs.append(point)
+
+
+
+greatest_distances = {}
+count = 0
+for i in random_trajs:
+    if count < 100:
+        worst_trajs = list(greatest_distances.values())
+        worst_trajs = np.array(worst_trajs)
+        greatest_distances[calculate_clusterdistance(i, centers_dict, prev_trajs, worst_trajs)] = i
+        count += 1
+    else:
+        greatest_distances = collections.OrderedDict(sorted(greatest_distances.items()))
+        first_key = next(iter(greatest_distances))
+        worst_trajs = list(greatest_distances.values())
+        worst_trajs = np.array(worst_trajs)
+        dist = calculate_clusterdistance(i, centers_dict, prev_trajs, worst_trajs)
+        if dist > first_key:
+            greatest_distances.pop(first_key)
+            greatest_distances[dist] = i
+        count += 1
+
+# das weitest entfernte Prozent behalten
+worst_trajs = list(greatest_distances.values())
+worst_trajs = np.array(worst_trajs)
+worst_trajs = np.concatenate((worst_trajs, prev_trajs), axis=0)
+
+df = pd.DataFrame(worst_trajs, columns=['x_start', 'y_start', 'z_start', 'x_end', 'y_end', 'z_end', 'movement'])
+df.to_csv('C:/Users/muell/Desktop/Arbeit/Robotervermessung/csvs/worsttrajs2.csv', index=False)
+
+"""
 mesh.vertices[:, 0] *= 1.1
 mesh.apply_scale(1 / 50)
 bounds.apply_scale(1 / 50)

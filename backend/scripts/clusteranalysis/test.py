@@ -12,14 +12,24 @@ points_np = setpoints.to_numpy()
 mesh = trimesh.load_mesh(
     "C:/Users/muell/Desktop/Arbeit/Robotervermessung/assets/Arbeitsbereich.STL"
 )
-corners = np.array([[500, -1100, 400], [1900, 1100, 2000]])  # min corner  # max corner
+corners = np.array([[495, -1105, 395], [1905, 1105, 2005]])  # min corner  # max corner
 bounds = trimesh.creation.box(bounds=corners)
 
-mesh.vertices[:, 0] *= 1.1
+mesh.apply_scale(1.07)
+
+solid = trimesh.boolean.intersection([mesh, bounds])
+
+print(solid.contains(points_np).all())
+
+"""for point in points_np:
+    if not solid.contains(point.reshape(1,-1)):
+        print(point)"""
+
 mesh.apply_scale(1 / 50)
 bounds.apply_scale(1 / 50)
 
 solid = trimesh.boolean.intersection([mesh, bounds])
+
 points_np = points_np / 50
 
 points = trimesh.points.PointCloud(points_np)
@@ -31,5 +41,4 @@ scene = trimesh.Scene()
 scene.add_geometry(solid)
 scene.add_geometry(points)
 
-print(solid.bounds*50)
 scene.show(resolution=(800, 600))
