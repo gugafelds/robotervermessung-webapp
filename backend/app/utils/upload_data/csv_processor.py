@@ -547,7 +547,6 @@ class CSVProcessor:
                     traj_frequencies['freq_accel_cmd'],
                     traj_comments.get('velocity'),
                     traj_comments.get('stop_point'),
-                    traj_comments.get('wait_time'),
                 ]
 
                 traj_info_data = tuple(base_info)
@@ -919,13 +918,6 @@ class CSVProcessor:
                     except ValueError:
                         pass
 
-                # wait_time
-                elif content.startswith('wait_time:'):
-                    try:
-                        result['wait_time'] = float(content.split(':', 1)[1].strip())
-                    except ValueError:
-                        pass
-
                 # seg_N: move_type; pos=[...]; quat=[...]; support_pos=[...]; support_quat=[...]
                 elif content.startswith('seg_'):
                     try:
@@ -945,6 +937,16 @@ class CSVProcessor:
                                 wp['support_pos'] = parse_vec(part[12:])
                             elif part.startswith('support_quat='):
                                 wp['support_quat'] = parse_vec(part[13:])
+                            elif part.startswith('velocity='):
+                                try:
+                                    wp['velocity'] = float(part.split('=', 1)[1])
+                                except ValueError:
+                                    pass
+                            elif part.startswith('stop_point='):
+                                try:
+                                    wp['stop_point'] = float(part.split('=', 1)[1])
+                                except ValueError:
+                                    pass
 
                         result['waypoints'].append(wp)
                     except Exception as e:
@@ -991,13 +993,14 @@ class CSVProcessor:
             if wp and wp.get('move_type') == 'circular' and wp.get('support_pos'):
                 sp = wp['support_pos']
                 sq = wp.get('support_quat') or [None, None, None, None]
-                record = list(record) + [
-                    sp[0], sp[1], sp[2],
-                    sq[0], sq[1], sq[2], sq[3]
-                ]
+                vel  = wp.get('velocity')
+                stop = wp.get('stop_point')
+                record = list(record) + [sp[0], sp[1], sp[2], sq[0], sq[1], sq[2], sq[3], vel, stop]
             else:
                 # linear or no match — support columns are NULL
-                record = list(record) + [None, None, None, None, None, None, None]
+                vel  = wp.get('velocity')  if wp else None
+                stop = wp.get('stop_point') if wp else None
+                record = list(record) + [None, None, None, None, None, None, None, vel, stop]
 
             updated.append(tuple(record))
 

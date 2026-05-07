@@ -48,7 +48,6 @@ async def get_dashboard_data(conn=Depends(get_db)):
                                                     b.weight,
                                                     b.number_setpoints as waypoints,
                                                     b.stop_point,
-                                                    b.wait_time,
                                                     m.max_vel_act as max_velocity,
                                                     m.max_accel_act as max_acceleration
                                                 FROM evaluation.sidtw_info i
@@ -69,7 +68,6 @@ async def get_dashboard_data(conn=Depends(get_db)):
                                                     b.weight,
                                                     b.number_setpoints as waypoints,
                                                     b.stop_point,
-                                                    b.wait_time,
                                                     m.max_vel_act as max_velocity,
                                                     m.max_accel_act as max_acceleration
                                                 FROM evaluation.sidtw_info i
@@ -99,7 +97,6 @@ async def get_dashboard_data(conn=Depends(get_db)):
                 "weight": perf["weight"],
                 "waypoints": perf["waypoints"],
                 "stop_point": perf["stop_point"],
-                "wait_time": perf["wait_time"],
                 "max_velocity": perf["max_velocity"],
                 "max_acceleration": perf["max_acceleration"],
                 "trajectory": [{"x": p["x_cmd"], "y": p["y_cmd"], "z": p["z_cmd"]} for p in trajectory]
@@ -121,7 +118,6 @@ async def get_dashboard_data(conn=Depends(get_db)):
                 "weight": perf["weight"],
                 "waypoints": perf["waypoints"],
                 "stop_point": perf["stop_point"],
-                "wait_time": perf["wait_time"],
                 "max_velocity": perf["max_velocity"],
                 "max_acceleration": perf["max_acceleration"],
                 "trajectory": [{"x": p["x_cmd"], "y": p["y_cmd"], "z": p["z_cmd"]} for p in trajectory]
@@ -260,24 +256,6 @@ async def get_dashboard_data(conn=Depends(get_db)):
             }
         }
 
-        # Wait Time Distribution
-        wait_query = """
-            SELECT wait_time AS bucket, COUNT(*)
-            FROM motion.traj_info
-            WHERE wait_time IS NOT NULL
-            GROUP BY bucket
-            ORDER BY bucket
-        """
-        wait_rows = await conn.fetch(wait_query)
-        stats["waitTimeDistribution"] = {
-            "data": [{"bucket": r["bucket"], "count": r["count"]} for r in wait_rows],
-            "meta": {
-                "useRanges": False,
-                "unit": "s",
-                "label": "Wait time"
-            }
-        }
-
         return {
             "segmentsCount": segments_count,
             "trajsCount": trajs_count,
@@ -349,7 +327,6 @@ async def get_dashboard_influence(conn=Depends(get_db)):
                                              bm.max_accel_act     as acceleration, \
                                              bi.weight                   as weight, \
                                              bi.stop_point               as stop_point, \
-                                             bi.wait_time                as wait_time \
                                       FROM evaluation.sidtw_info info \
                                                INNER JOIN motion.traj_metadata bm \
                                                           ON info.traj_id = bm.traj_id \
@@ -364,7 +341,6 @@ async def get_dashboard_influence(conn=Depends(get_db)):
                                         AND bm.max_accel_act IS NOT NULL \
                                         AND bi.weight IS NOT NULL \
                                         AND bi.stop_point IS NOT NULL \
-                                        AND bi.wait_time IS NOT NULL \
                                       ORDER BY RANDOM()
                     LIMIT 5000
                     )
@@ -383,7 +359,6 @@ async def get_dashboard_influence(conn=Depends(get_db)):
                     "acceleration": float(row['acceleration']),
                     "weight": float(row['weight']),
                     "stop_point": float(row['stop_point']),
-                    "wait_time": float(row['wait_time'])
                 }
                 for row in rows
             ]

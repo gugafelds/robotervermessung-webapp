@@ -233,7 +233,7 @@ class BatchProcessor:
                                 'number_pose_act', 'number_vel_act', 'number_accel_act', 'number_position_cmd', 'number_orientation_cmd',
                                 'number_vel_cmd', 'number_joint_states', 'weight',
                                 'transformation_matrix',
-                                'number_accel_cmd', 'freq_accel_cmd', 'setted_velocity', 'stop_point', 'wait_time'
+                                'number_accel_cmd', 'freq_accel_cmd', 'setted_velocity', 'stop_point'
                             ]
 
                             # Ensure all records have proper length
@@ -273,10 +273,11 @@ class BatchProcessor:
                              ['traj_id', 'seg_id', 'timestamp', 'tcp_accel_cmd']),
                             (filtered_setpoints, 'traj_setpoints',
                              ['traj_id', 'seg_id', 'timestamp',
-                              'x_reached', 'y_reached', 'z_reached',
-                              'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached',
-                              'x_support', 'y_support', 'z_support',
-                              'qx_support', 'qy_support', 'qz_support', 'qw_support']),
+                             'x_reached', 'y_reached', 'z_reached',
+                             'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached',
+                             'x_support', 'y_support', 'z_support',
+                             'qx_support', 'qy_support', 'qz_support', 'qw_support',
+                             'vel_set', 'stop_point']),
                             (filtered_joint, 'traj_joint_states',
                              ['traj_id', 'seg_id', 'timestamp', 'joint_1', 'joint_2', 'joint_3', 'joint_4',
                               'joint_5', 'joint_6']),
