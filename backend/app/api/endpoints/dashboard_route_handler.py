@@ -322,30 +322,30 @@ async def get_dashboard_influence(conn=Depends(get_db)):
     """
     try:
         query = """
-                WITH sampled_data AS (SELECT info.sidtw_average_distance as sidtw, \
-                                             bm.max_vel_act           as velocity, \
-                                             bm.max_accel_act     as acceleration, \
-                                             bi.weight                   as weight, \
-                                             bi.stop_point               as stop_point, \
-                                      FROM evaluation.sidtw_info info \
-                                               INNER JOIN motion.traj_metadata bm \
-                                                          ON info.traj_id = bm.traj_id \
-                                                              AND info.traj_id = bm.seg_id \
-                                                              AND bm.traj_id = bm.seg_id \
-                                               INNER JOIN motion.traj_info bi \
-                                                          ON info.traj_id = bi.traj_id \
-                                      WHERE info.traj_id = info.seg_id \
-                                        AND info.sidtw_average_distance IS NOT NULL \
-                                        AND bi.source_data_act = 'leica_at960' \
-                                        AND bm.max_vel_act IS NOT NULL \
-                                        AND bm.max_accel_act IS NOT NULL \
-                                        AND bi.weight IS NOT NULL \
-                                        AND bi.stop_point IS NOT NULL \
-                                      ORDER BY RANDOM()
-                    LIMIT 5000
-                    )
-                SELECT * \
-                FROM sampled_data \
+                WITH sampled_data AS (
+                SELECT info.sidtw_average_distance as sidtw,
+                    bm.max_vel_act              as velocity,
+                    bm.max_accel_act            as acceleration,
+                    bi.weight                   as weight,
+                    bi.stop_point               as stop_point
+                FROM evaluation.sidtw_info info
+                        INNER JOIN motion.traj_metadata bm
+                                    ON info.traj_id = bm.traj_id
+                                        AND info.traj_id = bm.seg_id
+                                        AND bm.traj_id = bm.seg_id
+                        INNER JOIN motion.traj_info bi
+                                    ON info.traj_id = bi.traj_id
+                WHERE info.traj_id = info.seg_id
+                AND info.sidtw_average_distance IS NOT NULL
+                AND bm.max_vel_act IS NOT NULL
+                AND bm.max_accel_act IS NOT NULL
+                AND bi.weight IS NOT NULL
+                AND bi.stop_point IS NOT NULL
+                ORDER BY RANDOM()
+                LIMIT 5000
+            )
+            SELECT *
+            FROM sampled_data;
                 """
 
         rows = await conn.fetch(query)

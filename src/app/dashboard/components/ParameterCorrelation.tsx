@@ -16,7 +16,6 @@ type ParameterType =
   | 'acceleration'
   | 'weight'
   | 'stop_point'
-  | 'wait_time';
 
 interface ParameterData {
   sidtw: number;
@@ -24,7 +23,6 @@ interface ParameterData {
   acceleration: number;
   weight: number;
   stop_point: number;
-  wait_time: number;
 }
 
 interface ParameterConfig {
@@ -83,13 +81,6 @@ function ParameterCorrelationContent({
       label: 'Stop point',
       unit: '%',
       xLabel: 'Stop point',
-      useRanges: false,
-    },
-    {
-      id: 'wait_time',
-      label: 'Wait time',
-      unit: 's',
-      xLabel: 'Wait time',
       useRanges: false,
     },
   ];

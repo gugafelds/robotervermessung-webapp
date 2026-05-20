@@ -37,7 +37,6 @@ export function PerformersTable({
               <th className="px-4 py-3">Accel. [mm/s²]</th>
               <th className="px-4 py-3">Setpoints</th>
               <th className="px-4 py-3">Stop [%]</th>
-              <th className="px-4 py-3">Wait Time [s]</th>
             </tr>
           </thead>
           <tbody>
@@ -70,7 +69,6 @@ export function PerformersTable({
                   </td>
                   <td className="px-4 py-3">{performer.waypoints ?? 'N/A'}</td>
                   <td className="px-4 py-3">{performer.stop_point ?? 'N/A'}</td>
-                  <td className="px-4 py-3">{performer.wait_time ?? 'N/A'}</td>
                 </tr>
               ))
             )}

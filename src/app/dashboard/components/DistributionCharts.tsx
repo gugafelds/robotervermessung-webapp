@@ -18,7 +18,6 @@ type TabType =
   | 'waypoint'
   | 'performance_sidtw'
   | 'stopPoint'
-  | 'waitTime';
 
 interface TabConfig {
   id: TabType;
@@ -55,7 +54,6 @@ function DistributionChartsContent({
     { id: 'waypoint', label: 'Setpoint' },
     { id: 'performance_sidtw', label: 'Accuracy' },
     { id: 'stopPoint', label: 'Stop point' },
-    { id: 'waitTime', label: 'Wait time' },
   ];
 
   // Mapping von TabType zu Distribution
@@ -71,8 +69,6 @@ function DistributionChartsContent({
         return stats.performanceSIDTWDistribution;
       case 'stopPoint':
         return stats.stopPointDistribution;
-      case 'waitTime':
-        return stats.waitTimeDistribution;
       default:
         return stats.weightDistribution;
     }

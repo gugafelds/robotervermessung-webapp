@@ -24,7 +24,6 @@ export interface PerformerData {
   weight: number;
   waypoints: number;
   stop_point: number;
-  wait_time: number;
   max_velocity: number;
   max_acceleration: number;
   trajectory: Array<{
@@ -47,7 +46,6 @@ export interface DashboardData {
     waypointDistribution: Distribution;
     performanceSIDTWDistribution: Distribution;
     stopPointDistribution: Distribution;
-    waitTimeDistribution: Distribution;
   };
   workareaPoints?: Array<{
     x: number;
