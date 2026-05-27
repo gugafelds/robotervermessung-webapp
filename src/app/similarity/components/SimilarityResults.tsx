@@ -88,8 +88,8 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
 
   const renderRows = (data: SimilarityResult[]) => {
     const formatVelocityProfile = (result: SimilarityResult) => {
-      if (!result.mean_vel_act) return '-';
-      return `[${result.max_vel_act?.toFixed(0) || '-'}, ${result.mean_vel_act?.toFixed(0) || '-'}, ${result.std_vel_act?.toFixed(0) || '-'}]`;
+      if (!result.mean_vel) return '-';
+      return `[${result.max_vel?.toFixed(0) || '-'}, ${result.mean_vel?.toFixed(0) || '-'}, ${result.std_vel?.toFixed(0) || '-'}]`;
     };
 
     const formatPosition3D = (result: SimilarityResult) => {
@@ -98,8 +98,8 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
     };
 
     const formatAccelerationProfile = (result: SimilarityResult) => {
-      if (!result.mean_accel_act) return '-';
-      return `[${result.min_accel_act?.toFixed(0) || '-'}, ${result.max_accel_act?.toFixed(0) || '-'}, ${result.mean_accel_act?.toFixed(0) || '-'}, ${result.std_accel_act?.toFixed(0) || '-'}]`;
+      if (!result.mean_accel) return '-';
+      return `[${result.min_accel?.toFixed(0) || '-'}, ${result.max_accel?.toFixed(0) || '-'}, ${result.mean_accel?.toFixed(0) || '-'}, ${result.std_accel?.toFixed(0) || '-'}]`;
     };
 
     const formatAccuracy = (result: SimilarityResult) => {
@@ -191,13 +191,13 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
     weight: f.weight,
     length: f.length,
     movement_type: f.movement_type,
-    mean_vel_act: f.mean_vel_act,
-    max_vel_act: f.max_vel_act,
-    std_vel_act: f.std_vel_act,
-    min_accel_act: f.min_accel_act,
-    max_accel_act: f.max_accel_act,
-    mean_accel_act: f.mean_accel_act,
-    std_accel_act: f.std_accel_act,
+    mean_vel: f.mean_vel,
+    max_vel: f.max_vel,
+    std_vel: f.std_vel,
+    min_accel: f.min_accel,
+    max_accel: f.max_accel,
+    mean_accel: f.mean_accel,
+    std_accel: f.std_accel,
     min_distance: f.min_distance,
     mean_distance: f.mean_distance,
     max_distance: f.max_distance,

@@ -386,7 +386,6 @@ async def get_dashboard_workarea(conn=Depends(get_db)):
                                                     AND be.x_reached IS NOT NULL \
                                                     AND be.y_reached IS NOT NULL \
                                                     AND be.z_reached IS NOT NULL \
-                                                    AND bi.recording_date >= '2025-03-01'
                          )
                          SELECT x_reached, y_reached, z_reached, sidtw_average_distance
                          FROM numbered_events

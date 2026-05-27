@@ -147,13 +147,13 @@ export class SimilarityService {
       weight: result.features?.weight ?? 0,
       length: result.features?.length ?? 0,
       movement_type: result.features?.movement_type ?? '',
-      mean_vel_act: result.features?.mean_vel_act ?? 0,
-      max_vel_act: result.features?.max_vel_act ?? 0,
-      std_vel_act: result.features?.std_vel_act ?? 0,
-      mean_accel_act: result.features?.mean_accel_act ?? 0,
-      max_accel_act: result.features?.max_accel_act ?? 0,
-      min_accel_act: result.features?.min_accel_act ?? 0,
-      std_accel_act: result.features?.std_accel_act ?? 0,
+      mean_vel: result.features?.mean_vel ?? 0,
+      max_vel: result.features?.max_vel ?? 0,
+      std_vel: result.features?.std_vel ?? 0,
+      mean_accel: result.features?.mean_accel ?? 0,
+      max_accel: result.features?.max_accel ?? 0,
+      min_accel: result.features?.min_accel ?? 0,
+      std_accel: result.features?.std_accel ?? 0,
       min_distance: result.features?.min_distance, // NEU
       mean_distance: result.features?.mean_distance, // NEU
       max_distance: result.features?.max_distance, // NEU

@@ -80,13 +80,13 @@ export interface EmbeddingSimilarityResult {
     weight?: number;
     length: number;
     movement_type?: string;
-    mean_vel_act?: number;
-    max_vel_act?: number;
-    std_vel_act?: number;
-    mean_accel_act?: number;
-    max_accel_act?: number;
-    min_accel_act?: number;
-    std_accel_act?: number;
+    mean_vel?: number;
+    max_vel?: number;
+    std_vel?: number;
+    mean_accel?: number;
+    max_accel?: number;
+    min_accel?: number;
+    std_accel?: number;
     min_distance?: number; // NEU
     mean_distance?: number; // NEU
     max_distance?: number; // NEU
@@ -125,13 +125,13 @@ export interface SimilarityResult {
   weight?: number;
   length?: number;
   movement_type?: string;
-  mean_vel_act?: number;
-  max_vel_act?: number;
-  std_vel_act?: number;
-  mean_accel_act?: number;
-  max_accel_act?: number;
-  min_accel_act?: number;
-  std_accel_act?: number;
+  mean_vel?: number;
+  max_vel?: number;
+  std_vel?: number;
+  mean_accel?: number;
+  max_accel?: number;
+  min_accel?: number;
+  std_accel?: number;
   min_distance?: number; // NEU
   mean_distance?: number; // NEU
   max_distance?: number; // NEU
@@ -147,13 +147,13 @@ export interface TargetFeatures {
   weight?: number;
   length?: number;
   movement_type?: string;
-  mean_vel_act?: number;
-  max_vel_act?: number;
-  std_vel_act?: number;
-  mean_accel_act?: number;
-  max_accel_act?: number;
-  min_accel_act?: number;
-  std_accel_act?: number;
+  mean_vel?: number;
+  max_vel?: number;
+  std_vel?: number;
+  mean_accel?: number;
+  max_accel?: number;
+  min_accel?: number;
+  std_accel?: number;
   min_distance?: number; // NEU
   mean_distance?: number; // NEU
   max_distance?: number; // NEU

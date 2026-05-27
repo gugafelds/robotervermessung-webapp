@@ -224,18 +224,16 @@ class MetadataCalculatorService:
         """
         orientations = await conn.fetch(orientation_query, traj_id)
 
-        # Twist Stats mit Downsampling
         twist_query = """
             SELECT seg_id,
-                   array_agg(tcp_vel_act ORDER BY timestamp) as twist_values
-            FROM rmpd.motion.traj_vel_act
+                   array_agg(tcp_vel_cmd ORDER BY timestamp) as twist_values
+            FROM rmpd.motion.traj_vel_cmd
             WHERE traj_id = $1
             GROUP BY seg_id
         """
 
         twists = await conn.fetch(twist_query, traj_id)
 
-        # Acceleration Stats mit Downsampling
         accel_query = """
             SELECT seg_id,
                    array_agg(tcp_accel_cmd ORDER BY timestamp) as accel_values
@@ -349,16 +347,16 @@ class MetadataCalculatorService:
                 'duration': round(segment_duration, 3),
                 'weight': round(weight, 3),
                 'length': round(length, 3),
-                'min_vel_act': round(min_twist, 3),
-                'max_vel_act': round(max_twist, 3),
-                'mean_vel_act': round(mean_twist, 3),
-                'median_vel_act': round(median_twist, 3),
-                'std_vel_act': round(std_twist, 3),
-                'min_accel_act': round(min_accel, 3),
-                'max_accel_act': round(max_accel, 3),
-                'mean_accel_act': round(mean_accel, 3),
-                'median_accel_act': round(median_accel, 3),
-                'std_accel_act': round(std_accel, 3),
+                'min_vel': round(min_twist, 3),
+                'max_vel': round(max_twist, 3),
+                'mean_vel': round(mean_twist, 3),
+                'median_vel': round(median_twist, 3),
+                'std_vel': round(std_twist, 3),
+                'min_accel': round(min_accel, 3),
+                'max_accel': round(max_accel, 3),
+                'mean_accel': round(mean_accel, 3),
+                'median_accel': round(median_accel, 3),
+                'std_accel': round(std_accel, 3),
                 'position_x': centroid['position_x'],
                 'position_y': centroid['position_y'],
                 'position_z': centroid['position_z']
@@ -379,12 +377,12 @@ class MetadataCalculatorService:
             all_accel = []
             for row in metadata_rows:
                 all_twist.extend([
-                    row['min_vel_act'], row['max_vel_act'],
-                    row['mean_vel_act'], row['median_vel_act']
+                    row['min_vel'], row['max_vel'],
+                    row['mean_vel'], row['median_vel']
                 ])
                 all_accel.extend([
-                    row['min_accel_act'], row['max_accel_act'],
-                    row['mean_accel_act'], row['median_accel_act']
+                    row['min_accel'], row['max_accel'],
+                    row['mean_accel'], row['median_accel']
                 ])
 
             total_metadata = {
@@ -394,16 +392,16 @@ class MetadataCalculatorService:
                 'duration': round(total_duration, 3),
                 'weight': round(weight, 3),
                 'length': round(total_length, 3),
-                'min_vel_act': round(float(min(all_twist)), 3) if all_twist else 0.0,
-                'max_vel_act': round(float(max(all_twist)), 3) if all_twist else 0.0,
-                'mean_vel_act': round(float(np.mean(all_twist)), 3) if all_twist else 0.0,
-                'median_vel_act': round(float(np.median(all_twist)), 3) if all_twist else 0.0,
-                'std_vel_act': round(float(np.std(all_twist)), 3) if all_twist else 0.0,
-                'min_accel_act': round(float(min(all_accel)), 3) if all_accel else 0.0,
-                'max_accel_act': round(float(max(all_accel)), 3) if all_accel else 0.0,
-                'mean_accel_act': round(float(np.mean(all_accel)), 3) if all_accel else 0.0,
-                'median_accel_act': round(float(np.median(all_accel)), 3) if all_accel else 0.0,
-                'std_accel_act': round(float(np.std(all_accel)), 3) if all_accel else 0.0,
+                'min_vel': round(float(min(all_twist)), 3) if all_twist else 0.0,
+                'max_vel': round(float(max(all_twist)), 3) if all_twist else 0.0,
+                'mean_vel': round(float(np.mean(all_twist)), 3) if all_twist else 0.0,
+                'median_vel': round(float(np.median(all_twist)), 3) if all_twist else 0.0,
+                'std_vel': round(float(np.std(all_twist)), 3) if all_twist else 0.0,
+                'min_accel': round(float(min(all_accel)), 3) if all_accel else 0.0,
+                'max_accel': round(float(max(all_accel)), 3) if all_accel else 0.0,
+                'mean_accel': round(float(np.mean(all_accel)), 3) if all_accel else 0.0,
+                'median_accel': round(float(np.median(all_accel)), 3) if all_accel else 0.0,
+                'std_accel': round(float(np.std(all_accel)), 3) if all_accel else 0.0,
                 'position_x': round(float(total_centroid['position_x']), 3),
                 'position_y': round(float(total_centroid['position_y']), 3),
                 'position_z': round(float(total_centroid['position_z']), 3)
@@ -690,10 +688,10 @@ class MetadataCalculatorService:
         """
         query = """
             SELECT traj_id, seg_id, movement_type, duration, weight, length,
-                min_vel_act, max_vel_act, mean_vel_act, 
-                median_vel_act, std_vel_act,
-                min_accel_act, max_accel_act, mean_accel_act,
-                median_accel_act, std_accel_act
+                min_vel, max_vel, mean_vel, 
+                median_vel, std_vel,
+                min_accel, max_accel, mean_accel,
+                median_accel, std_accel
             FROM rmpd.motion.traj_metadata
             WHERE traj_id = $1
             ORDER BY seg_id
@@ -715,10 +713,10 @@ class MetadataCalculatorService:
         columns = [
             'traj_id', 'seg_id', 'movement_type',
             'duration', 'weight', 'length',
-            'min_vel_act', 'max_vel_act', 'mean_vel_act',
-            'median_vel_act', 'std_vel_act',
-            'min_accel_act', 'max_accel_act', 'mean_accel_act',
-            'median_accel_act', 'std_accel_act',
+            'min_vel', 'max_vel', 'mean_vel',
+            'median_vel', 'std_vel',
+            'min_accel', 'max_accel', 'mean_accel',
+            'median_accel', 'std_accel',
             'position_x', 'position_y', 'position_z'
         ]
 
