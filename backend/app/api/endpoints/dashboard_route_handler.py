@@ -48,8 +48,8 @@ async def get_dashboard_data(conn=Depends(get_db)):
                                                     b.weight,
                                                     b.number_setpoints as waypoints,
                                                     b.stop_point,
-                                                    m.max_vel_act as max_velocity,
-                                                    m.max_accel_act as max_acceleration
+                                                    m.max_vel as max_velocity,
+                                                    m.max_accel as max_acceleration
                                                 FROM evaluation.sidtw_info i
                                                 INNER JOIN motion.traj_info b ON i.traj_id = b.traj_id
                                                 LEFT JOIN motion.traj_metadata m ON i.seg_id = m.seg_id
@@ -68,8 +68,8 @@ async def get_dashboard_data(conn=Depends(get_db)):
                                                     b.weight,
                                                     b.number_setpoints as waypoints,
                                                     b.stop_point,
-                                                    m.max_vel_act as max_velocity,
-                                                    m.max_accel_act as max_acceleration
+                                                    m.max_vel as max_velocity,
+                                                    m.max_accel as max_acceleration
                                                 FROM evaluation.sidtw_info i
                                                 INNER JOIN motion.traj_info b ON i.traj_id = b.traj_id
                                                 LEFT JOIN motion.traj_metadata m ON i.seg_id = m.seg_id
@@ -128,18 +128,18 @@ async def get_dashboard_data(conn=Depends(get_db)):
         # Velocity Distribution - mit festen Buckets
         velocity_query = """
                          SELECT CASE \
-                                    WHEN max_vel_act < 500 THEN 1 \
-                                    WHEN max_vel_act >= 500 AND max_vel_act < 1000 THEN 2 \
-                                    WHEN max_vel_act >= 1000 AND max_vel_act < 1500 THEN 3 \
-                                    WHEN max_vel_act >= 1500 AND max_vel_act < 2000 THEN 4 \
-                                    WHEN max_vel_act >= 2000 AND max_vel_act < 2500 THEN 5 \
-                                    WHEN max_vel_act >= 2500 AND max_vel_act < 3000 THEN 6 \
-                                    WHEN max_vel_act >= 3000 THEN 7 \
+                                    WHEN max_vel < 500 THEN 1 \
+                                    WHEN max_vel >= 500 AND max_vel < 1000 THEN 2 \
+                                    WHEN max_vel >= 1000 AND max_vel < 1500 THEN 3 \
+                                    WHEN max_vel >= 1500 AND max_vel < 2000 THEN 4 \
+                                    WHEN max_vel >= 2000 AND max_vel < 2500 THEN 5 \
+                                    WHEN max_vel >= 2500 AND max_vel < 3000 THEN 6 \
+                                    WHEN max_vel >= 3000 THEN 7 \
                                     END AS bucket, \
                                 COUNT(*)
                          FROM motion.traj_metadata
                          WHERE traj_id != seg_id
-                           AND max_vel_act IS NOT NULL
+                           AND max_vel IS NOT NULL
                          GROUP BY bucket
                          ORDER BY bucket \
                          """
@@ -324,8 +324,8 @@ async def get_dashboard_influence(conn=Depends(get_db)):
         query = """
                 WITH sampled_data AS (
                 SELECT info.sidtw_average_distance as sidtw,
-                    bm.max_vel_act              as velocity,
-                    bm.max_accel_act            as acceleration,
+                    bm.max_vel              as velocity,
+                    bm.max_accel            as acceleration,
                     bi.weight                   as weight,
                     bi.stop_point               as stop_point
                 FROM evaluation.sidtw_info info
@@ -337,8 +337,8 @@ async def get_dashboard_influence(conn=Depends(get_db)):
                                     ON info.traj_id = bi.traj_id
                 WHERE info.traj_id = info.seg_id
                 AND info.sidtw_average_distance IS NOT NULL
-                AND bm.max_vel_act IS NOT NULL
-                AND bm.max_accel_act IS NOT NULL
+                AND bm.max_vel IS NOT NULL
+                AND bm.max_accel IS NOT NULL
                 AND bi.weight IS NOT NULL
                 AND bi.stop_point IS NOT NULL
                 ORDER BY RANDOM()
