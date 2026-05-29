@@ -27,7 +27,8 @@ class BatchProcessor:
             segmentation_method,
             num_segments,
             conn,
-            reference_position=None  # Tuple mit (x, y, z)
+            reference_position=None,  # Tuple mit (x, y, z)
+            tag=None,
     ):
         """Process multiple CSV files in a batch and upload them at once"""
 
@@ -233,18 +234,19 @@ class BatchProcessor:
                                 'number_pose_act', 'number_vel_act', 'number_accel_act', 'number_position_cmd', 'number_orientation_cmd',
                                 'number_vel_cmd', 'number_joint_states', 'weight',
                                 'transformation_matrix',
-                                'number_accel_cmd', 'freq_accel_cmd', 'setted_velocity', 'stop_point'
+                                'number_accel_cmd', 'freq_accel_cmd', 'setted_velocity', 'stop_point', 'tag'
                             ]
 
-                            # Ensure all records have proper length
                             padded_records = []
                             for record in filtered_traj_info:
-                                if len(record) < 46:
-                                    padded_record = list(record)
-                                    padded_record.extend([None] * (46 - len(padded_record)))
-                                    padded_records.append(tuple(padded_record))
-                                else:
-                                    padded_records.append(record)
+                                padded_record = list(record)
+                                # record hat 30 Felder aus CSVProcessor
+                                # auf 30 auffüllen falls weniger
+                                if len(padded_record) < 30:
+                                    padded_record.extend([None] * (30 - len(padded_record)))
+                                # tag anhängen als 31. Feld
+                                padded_record.append(tag or None)
+                                padded_records.append(tuple(padded_record))
 
                             await db_ops.copy_data_to_table(conn, 'traj_info', padded_records, columns)
                             logger.info(f"Inserted {len(padded_records)} new traj_info records in batch")

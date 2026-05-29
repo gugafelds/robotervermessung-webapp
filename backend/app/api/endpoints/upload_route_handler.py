@@ -28,6 +28,7 @@ async def process_csv_batch(
         segmentation_method: str = Form(default="fixed_segments"),  # Geändert zu fixed_segments als Standard
         num_segments: int = Form(default=3),  # Standardwert auf 3 erhöht
         reference_position: Optional[str] = Form(default=None),  # JSON-String für [x, y, z]
+        tag: Optional[str] = Form(default=None),
         conn=Depends(get_db)
 ):
     """Process multiple CSV files in a single batch upload"""
@@ -86,7 +87,8 @@ async def process_csv_batch(
             segmentation_method,
             num_segments,
             conn,
-            ref_pos_tuple  # Übergabe als Tuple, nicht als separate Parameter
+            ref_pos_tuple,
+            tag=tag
         )
 
         # Clean up temporary files
