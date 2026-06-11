@@ -296,13 +296,4 @@ async def get_traj_events_by_id(traj_id: str, conn = Depends(get_db)):
     )
     return [dict(row) for row in rows]
 
-@router.get("/seg_setpoints/{segment_id}")
-@cache(expire=2400)
-async def get_segment_events_by_id(segment_id: str, conn = Depends(get_db)):
-    rows = await conn.fetch(
-        "SELECT * FROM motion.traj_setpoints WHERE seg_id = $1 ORDER BY timestamp ASC",
-        segment_id
-    )
-    return [dict(row) for row in rows]
-
 

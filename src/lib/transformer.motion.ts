@@ -262,6 +262,16 @@ export const transformTrajSetpointsResult = (
       qyReached: event.qy_reached,
       qzReached: event.qz_reached,
       qwReached: event.qw_reached,
+      xSupport: event.x_support,
+      ySupport: event.y_support,
+      zSupport: event.z_support,
+      qxSupport: event.qx_support,
+      qySupport: event.qy_support,
+      qzSupport: event.qz_support,
+      qwSupport: event.qw_support,
+      velocitySet: event.vel_set,
+      stopPoint: event.stop_point,
+      timestampSupport: event.timestamp_support,
     }),
   );
 };

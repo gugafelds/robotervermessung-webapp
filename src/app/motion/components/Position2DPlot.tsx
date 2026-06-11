@@ -91,6 +91,10 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
       })),
     );
 
+    const supportX = currentTrajSetpoints.map(
+      (b) => (Number(b.timestampSupport) - globalStartTime) / 1e9,
+    );
+
     const getMaxTimePos = () => {
       let maxTime = 0;
 
@@ -139,6 +143,14 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
         y: currentTrajSetpoints.map((b) => b.xReached),
         marker: { color: 'red', size: 12, symbol: 'circle' },
       },
+      {
+        type: 'scatter',
+        mode: 'markers',
+        name: 'X (SP)',
+        x: supportX,
+        y: currentTrajSetpoints.map((b) => b.xSupport),
+        marker: { color: 'red', size: 8, symbol: 'square' },
+      },
       // Y Position
       {
         type: 'scatter',
@@ -166,6 +178,14 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
         y: currentTrajSetpoints.map((b) => b.yReached),
         marker: { color: 'green', size: 12, symbol: 'circle' },
       },
+      {
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Y (SP)',
+        x: supportX,
+        y: currentTrajSetpoints.map((b) => b.ySupport),
+        marker: { color: 'green', size: 8, symbol: 'square' },
+      },
       // Z Position
       {
         type: 'scatter',
@@ -192,6 +212,14 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = ({
         ),
         y: currentTrajSetpoints.map((b) => b.zReached),
         marker: { color: 'blue', size: 12, symbol: 'circle' },
+      },
+      {
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Z (SP)',
+        x: supportX,
+        y: currentTrajSetpoints.map((b) => b.zSupport),
+        marker: { color: 'blue', size: 8, symbol: 'square' },
       },
     ];
 

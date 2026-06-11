@@ -995,7 +995,7 @@ class CSVProcessor:
                 sq = wp.get('support_quat') or [None, None, None, None]
                 vel  = wp.get('velocity')
                 stop = wp.get('stop_point')
-                record = list(record) + [sp[0], sp[1], sp[2], sq[0], sq[1], sq[2], sq[3], vel, stop]
+                record = list(record) + [sp[0], sp[1], sp[2], sq[1], sq[2], sq[3], sq[0], vel, stop]
             else:
                 # linear or no match — support columns are NULL
                 vel  = wp.get('velocity')  if wp else None

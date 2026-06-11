@@ -223,6 +223,16 @@ export interface TrajSetpoints {
   qyReached: number;
   qzReached: number;
   qwReached: number;
+  xSupport: number;
+  ySupport: number;
+  zSupport: number;
+  qxSupport: number;
+  qySupport: number;
+  qzSupport: number;
+  qwSupport: number;
+  velocitySet: number;
+  stopPoint: number;
+  timestampSupport: string;
 }
 
 export interface TrajSetpointsRaw {
@@ -236,4 +246,14 @@ export interface TrajSetpointsRaw {
   qy_reached: number;
   qz_reached: number;
   qw_reached: number;
+  x_support: number;
+  y_support: number;
+  z_support: number;
+  qx_support: number;
+  qy_support: number;
+  qz_support: number;
+  qw_support: number;
+  vel_set: number;
+  stop_point: number;
+  timestamp_support: string;
 }

@@ -95,6 +95,27 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
     visible: true,
   };
 
+  // Stützpunkte
+  const supportPointsData: Partial<PlotData> = {
+    type: 'scatter3d',
+    mode: 'markers',
+    name: 'Support',
+    x: currentTrajSetpoints.map((row) => row.xSupport),
+    y: currentTrajSetpoints.map((row) => row.ySupport),
+    z: currentTrajSetpoints.map((row) => row.zSupport),
+    marker: {
+      size: 2,
+      color: 'blue',
+      symbol: 'square',
+      opacity: 1,
+      sizeref: 2,
+    },
+    hoverlabel: {
+      bgcolor: 'blue',
+    },
+    visible: true,
+  };
+
   // Verbindungslinien zwischen den Zielpunkten
   const targetLinesData: Partial<PlotData> = {
     type: 'scatter3d',
@@ -152,6 +173,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
           idealTrajectoryData,
           targetLinesData,
           targetPointsData,
+          supportPointsData,
           startPointData,
         ]}
         layout={layout}

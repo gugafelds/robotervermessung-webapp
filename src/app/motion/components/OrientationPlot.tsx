@@ -123,9 +123,25 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
       ),
     );
 
+    const processedSupportEulerAngles = fixGimbalLockBatch(
+      currentTrajSetpoints.map((event) =>
+        quaternionToEuler(
+          event.qxSupport,
+          event.qySupport,
+          event.qzSupport,
+          event.qwSupport,
+        ),
+      ),
+    );
+
     const eventEulerAngles = currentTrajSetpoints.map((event, index) => ({
       time: (Number(event.timestamp) - globalStartTime) / 1e9,
       angles: processedEulerAngles[index],
+    }));
+
+    const supportEulerAngles = currentTrajSetpoints.map((event, index) => ({
+      time: (Number(event.timestampSupport) - globalStartTime) / 1e9,
+      angles: processedSupportEulerAngles[index],
     }));
 
     const getMaxTimeOrientation = () => {
@@ -170,6 +186,14 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
         y: eventEulerAngles.map((e) => e.angles[0]),
         marker: { color: 'blue', size: 12, symbol: 'circle' },
       },
+      {
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Roll (SP)',
+        x: supportEulerAngles.map((e) => e.time),
+        y: supportEulerAngles.map((e) => e.angles[0]),
+        marker: { color: 'blue', size: 8, symbol: 'square' },
+      },
 
       // Pitch (Y-Rotation) - Grün-Töne wie Y-Position
       {
@@ -196,6 +220,14 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
         y: eventEulerAngles.map((e) => e.angles[1]),
         marker: { color: 'green', size: 12, symbol: 'circle' },
       },
+      {
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Pitch (SP)',
+        x: supportEulerAngles.map((e) => e.time),
+        y: supportEulerAngles.map((e) => e.angles[1]),
+        marker: { color: 'green', size: 8, symbol: 'square' },
+      },
 
       // Yaw (Z-Rotation) - Rot-Töne wie Z-Position
       {
@@ -221,6 +253,14 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = ({
         x: eventEulerAngles.map((e) => e.time),
         y: eventEulerAngles.map((e) => e.angles[2]),
         marker: { color: 'red', size: 12, symbol: 'circle' },
+      },
+      {
+        type: 'scatter',
+        mode: 'markers',
+        name: 'Yaw (SP)',
+        x: supportEulerAngles.map((e) => e.time),
+        y: supportEulerAngles.map((e) => e.angles[2]),
+        marker: { color: 'red', size: 8, symbol: 'square' },
       },
     ];
     return { plotData, maxTimeOrientation };
