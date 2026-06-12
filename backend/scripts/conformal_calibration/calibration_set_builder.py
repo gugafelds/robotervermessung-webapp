@@ -120,8 +120,12 @@ async def ensure_calibration_table(conn: asyncpg.Connection) -> None:
     logger.info("Table evaluation.confidence_calibration ready.")
 
 
-async def get_all_seg_ids(conn, metric, max_segments=None):
-    query = f"""
+async def get_all_seg_ids(conn, metric, max_trajectories=None):
+    limit_clause = ""
+    if max_trajectories:
+        limit_clause = f"AND m.traj_id = ANY(SELECT traj_id FROM motion.traj_metadata WHERE seg_id = traj_id ORDER BY RANDOM() LIMIT {max_trajectories})"
+
+    rows = await conn.fetch(f"""
         SELECT
             m.seg_id,
             m.traj_id,
@@ -130,10 +134,8 @@ async def get_all_seg_ids(conn, metric, max_segments=None):
         JOIN evaluation.{metric}_info ei ON m.seg_id = ei.seg_id
         WHERE m.seg_id != m.traj_id
           AND ei.{metric}_average_distance IS NOT NULL
-        ORDER BY m.seg_id
-        {f'LIMIT {max_segments}' if max_segments else ''}
-    """
-    rows = await conn.fetch(query)
+          {limit_clause}
+    """)
     return [(r['seg_id'], r['traj_id'], float(r['mean_distance'])) for r in rows]
 
 
@@ -438,7 +440,7 @@ async def main(k: int, batch_size: int, resume: bool) -> None:
     try:
         async with pool.acquire() as conn:
             await ensure_calibration_table(conn)
-            all_segments = await get_all_seg_ids(conn, METRIC, max_segments=args.limit)
+            all_segments = await get_all_seg_ids(conn, METRIC, max_trajectories=args.limit)
             already_done = await get_already_computed(conn) if resume else set()
 
         logger.info(f"Total segments with performance data : {len(all_segments):,}")
@@ -514,7 +516,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
     '--limit', type=int, default=None,
-    help='Max. Anzahl Segmente aus der DB (nicht K-Nachbarn)'
+    help='Max. Anzahl Trajektorien (random sampling, default: alle)'
     )
     parser.add_argument(
         '--resume', action='store_true', default=True,
