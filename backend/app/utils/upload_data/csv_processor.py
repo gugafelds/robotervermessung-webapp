@@ -1014,7 +1014,7 @@ class CSVProcessor:
                 # linear or no match — support columns are NULL
                 vel  = wp.get('velocity')  if wp else None
                 stop = wp.get('stop_point') if wp else None
-                record = list(record) + [None, None, None, None, None, None, None, vel, stop]
+                record = list(record) + [None, None, None, None, None, None, None, vel, stop, None]
 
             updated.append(tuple(record))
 
