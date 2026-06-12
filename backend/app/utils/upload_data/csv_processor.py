@@ -558,7 +558,8 @@ class CSVProcessor:
                 if waypoints and traj_data.get('RAPID_SETPOINTS_MAPPING'):
                     traj_data['RAPID_SETPOINTS_MAPPING'] = self._match_waypoints_to_setpoints(
                         traj_data['RAPID_SETPOINTS_MAPPING'],
-                        waypoints
+                        waypoints,
+                        traj_data.get('POSITION_CMD_MAPPING', []),
                     )
 
                 all_processed_data.append(traj_data)
@@ -957,8 +958,10 @@ class CSVProcessor:
     def _match_waypoints_to_setpoints(
         self,
         setpoints_data: list,
-        waypoints: list[dict]
+        waypoints: list[dict],
+        position_cmd_data: list = None,
     ) -> list:
+
         """
         Match waypoints from CSV comments to setpoints via exact position match.
         Fills move_type and support columns for circular waypoints.
@@ -995,7 +998,18 @@ class CSVProcessor:
                 sq = wp.get('support_quat') or [None, None, None, None]
                 vel  = wp.get('velocity')
                 stop = wp.get('stop_point')
-                record = list(record) + [sp[0], sp[1], sp[2], sq[1], sq[2], sq[3], sq[0], vel, stop]
+
+                ts_support = None
+                if position_cmd_data:
+                    seg_id = record[1]
+                    seg_cmd = [r for r in position_cmd_data if r[1] == seg_id]
+                    if seg_cmd:
+                        best = min(seg_cmd, key=lambda r: 
+                            (r[3]-sp[0])**2 + (r[4]-sp[1])**2 + (r[5]-sp[2])**2
+                            if r[3] is not None else float('inf'))
+                        ts_support = best[2]
+
+                record = list(record) + [sp[0], sp[1], sp[2], sq[1], sq[2], sq[3], sq[0], vel, stop, ts_support]
             else:
                 # linear or no match — support columns are NULL
                 vel  = wp.get('velocity')  if wp else None

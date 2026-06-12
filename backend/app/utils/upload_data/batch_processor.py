@@ -279,7 +279,7 @@ class BatchProcessor:
                              'qx_reached', 'qy_reached', 'qz_reached', 'qw_reached',
                              'x_support', 'y_support', 'z_support',
                              'qx_support', 'qy_support', 'qz_support', 'qw_support',
-                             'vel_set', 'stop_point']),
+                             'vel_set', 'stop_point', 'timestamp_support']),
                             (filtered_joint, 'traj_joint_states',
                              ['traj_id', 'seg_id', 'timestamp', 'joint_1', 'joint_2', 'joint_3', 'joint_4',
                               'joint_5', 'joint_6']),
