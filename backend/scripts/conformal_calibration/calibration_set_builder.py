@@ -120,8 +120,8 @@ async def ensure_calibration_table(conn: asyncpg.Connection) -> None:
     logger.info("Table evaluation.confidence_calibration ready.")
 
 
-async def get_all_seg_ids(conn, metric, limit=None):
-    rows = await conn.fetch(f"""
+async def get_all_seg_ids(conn, metric, max_segments=None):
+    query = f"""
         SELECT
             m.seg_id,
             m.traj_id,
@@ -131,8 +131,9 @@ async def get_all_seg_ids(conn, metric, limit=None):
         WHERE m.seg_id != m.traj_id
           AND ei.{metric}_average_distance IS NOT NULL
         ORDER BY m.seg_id
-        {'LIMIT $1' if limit else ''}
-    """, *([limit] if limit else []))
+        {f'LIMIT {max_segments}' if max_segments else ''}
+    """
+    rows = await conn.fetch(query)
     return [(r['seg_id'], r['traj_id'], float(r['mean_distance'])) for r in rows]
 
 
@@ -193,99 +194,103 @@ async def process_segment(
     pool: asyncpg.Pool,
     k: int,
 ) -> Optional[Dict]:
-    """
-    Run LOO similarity search for one segment and compute its
-    nonconformity score α.
-
-    Returns a dict ready to INSERT, or None on failure.
-    """
     try:
+        searcher = MultiModalSearcher(pool)
+
+        search_result = await searcher.search_similar(
+            target_id=seg_id,
+            modes=SEARCH_MODES,
+            limit=k,
+            metric=METRIC,
+            exclude_ids=[seg_id],
+        )
+
+        # Segment-Ergebnisse rausziehen
+        seg_results_raw = []
+        for group in search_result.get('segment_similarity', []):
+            if group.get('target_segment') == seg_id:
+                seg_results_raw = group.get('similar_segments', {}).get('results', [])
+                break
+
+        if not seg_results_raw:
+            return None
+
+        # ── DTW reranking — exakt wie in similarity_route_handler.py ──────
+        def seg_id_to_traj_id(s: str) -> str:
+            return s.rsplit('_', 1)[0]
+
         async with pool.acquire() as conn:
-            searcher = MultiModalSearcher(conn)
-
-            # Stage 1: embedding search, exclude self
-            search_result = await searcher.search_similar(
-                target_id=seg_id,
-                modes=SEARCH_MODES,
-                limit=k,
-                metric=METRIC,
-                exclude_ids=[seg_id],   # LOO: exclude itself
-            )
-
-            # Extract segment-level results for this seg_id
-            seg_results_raw = []
-            for group in search_result.get('segment_similarity', []):
-                if group.get('target_segment') == seg_id:
-                    seg_results_raw = group.get('similar_segments', {}).get('results', [])
-                    break
-
-            if not seg_results_raw:
-                logger.debug(f"No Stage 1 results for {seg_id}, skipping.")
-                return None
-
-            # Stage 2: DTW reranking
             loader = TrajectoryLoader(conn)
-            query_data = await loader.load_trajectory_data(seg_id, mode=DTW_MODE)
-            if query_data is None:
-                return None
 
-            query_arr = query_data['segments'].get(seg_id)
-            if query_arr is None or len(query_arr) == 0:
-                return None
+            # Alle benötigten traj_ids sammeln — query + kandidaten
+            all_traj_ids = set()
+            all_traj_ids.add(seg_id_to_traj_id(seg_id))   # Query-Trajektorie
+            for r in seg_results_raw:
+                all_traj_ids.add(seg_id_to_traj_id(r['seg_id']))  # Kandidaten
 
-            # Build candidate arrays
-            cand_seg_ids = [r['seg_id'] for r in seg_results_raw]
-            cand_traj_ids = list({r.get('traj_id', r['seg_id']) for r in seg_results_raw})
-
-            cand_data_map: Dict[str, np.ndarray] = {}
-            for cand_traj_id in cand_traj_ids:
-                traj_data = await loader.load_trajectory_data(cand_traj_id, mode=DTW_MODE)
-                if traj_data:
-                    for s_id, arr in traj_data['segments'].items():
-                        if s_id in cand_seg_ids:
-                            cand_data_map[s_id] = arr
-
-            if not cand_data_map:
-                return None
-
-            dtw_results = rerank(
-                query_seq=query_arr,
-                candidates=cand_data_map,
-                limit=k,
-                mode=DTW_MODE,
+            # Batch-Load — exakt wie im route_handler
+            seg_batch = await loader.load_trajectories_batch(
+                list(all_traj_ids), DTW_MODE
             )
 
-            # Build lookup: seg_id → dtw_distance
-            dtw_lookup = {r['id']: r['dtw_distance'] for r in dtw_results}
+        # Query-Array holen
+        query_traj_data = seg_batch.get(seg_id_to_traj_id(seg_id))
+        if query_traj_data is None:
+            return None
 
-            # Enrich Stage 1 results with DTW distances + performance values
-            enriched = []
-            for r in seg_results_raw:
-                sid = r['seg_id']
-                dtw_dist = dtw_lookup.get(sid)
-                mean_dist = r.get('features', {}).get('mean_distance') if r.get('features') else None
-                if dtw_dist is not None and mean_dist is not None:
-                    enriched.append({
-                        'seg_id':       sid,
-                        'dtw_distance': dtw_dist,
-                        'mean_distance': mean_dist,
-                    })
+        query_arr = query_traj_data['segments'].get(seg_id)
+        if query_arr is None or len(query_arr) == 0:
+            return None
 
-            if len(enriched) < 2:
-                logger.debug(f"Not enough enriched neighbors for {seg_id}")
-                return None
+        # Kandidaten-Arrays aufbauen
+        candidates_flat = {}
+        for r in seg_results_raw:
+            cand_seg_id  = r['seg_id']
+            cand_traj_id = seg_id_to_traj_id(cand_seg_id)
+            cand_data    = seg_batch.get(cand_traj_id)
+            if cand_data:
+                arr = cand_data['segments'].get(cand_seg_id)
+                if arr is not None:
+                    candidates_flat[cand_seg_id] = arr
 
-            # Sort by DTW distance ascending (best first)
-            enriched.sort(key=lambda x: x['dtw_distance'])
+        if not candidates_flat:
+            return None
 
-        # Compute LOO prediction and nonconformity score
+        # DTW reranking
+        dtw_results = rerank(
+            query_seq=query_arr,
+            candidates=candidates_flat,
+            limit=k,
+            mode=DTW_MODE,
+        )
+
+        dtw_lookup = {r['id']: r['dtw_distance'] for r in dtw_results}
+
+        # Anreichern mit Performance-Werten
+        enriched = []
+        for r in seg_results_raw:
+            sid       = r['seg_id']
+            dtw_dist  = dtw_lookup.get(sid)
+            mean_dist = r.get('features', {}).get('mean_distance') if r.get('features') else None
+            if dtw_dist is not None and mean_dist is not None:
+                enriched.append({
+                    'seg_id':        sid,
+                    'dtw_distance':  dtw_dist,
+                    'mean_distance': float(mean_dist),  # Decimal → float
+                })
+
+        if len(enriched) < 2:
+            return None
+
+        enriched.sort(key=lambda x: x['dtw_distance'])
+
+        # Nonconformity Score berechnen
         p_hat, d_min, perf_std, neighbor_ids = compute_loo_prediction(enriched)
-
         if p_hat is None:
             return None
 
         prediction_error = abs(p_actual - p_hat)
-        sigma            = d_min * perf_std           # local spread normalizer
+        sigma            = d_min * perf_std
         alpha            = prediction_error / (sigma + EPSILON)
 
         return {
@@ -433,7 +438,7 @@ async def main(k: int, batch_size: int, resume: bool) -> None:
     try:
         async with pool.acquire() as conn:
             await ensure_calibration_table(conn)
-            all_segments = await get_all_seg_ids(conn, METRIC)
+            all_segments = await get_all_seg_ids(conn, METRIC, max_segments=args.limit)
             already_done = await get_already_computed(conn) if resume else set()
 
         logger.info(f"Total segments with performance data : {len(all_segments):,}")
@@ -506,6 +511,10 @@ if __name__ == '__main__':
     parser.add_argument(
         '--batch', type=int, default=50,
         help='Concurrent segments per batch (default: 50)'
+    )
+    parser.add_argument(
+    '--limit', type=int, default=None,
+    help='Max. Anzahl Segmente aus der DB (nicht K-Nachbarn)'
     )
     parser.add_argument(
         '--resume', action='store_true', default=True,

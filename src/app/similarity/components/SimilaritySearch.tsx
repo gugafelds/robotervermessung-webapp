@@ -38,7 +38,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
   hasResults,
 }) => {
   const [id, setId] = useState('');
-  const [limit, setLimit] = useState(5);
+  const [limit, setLimit] = useState(10);
   const [showDropdown, setShowDropdown] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
