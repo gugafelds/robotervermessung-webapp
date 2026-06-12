@@ -7,6 +7,8 @@ import type {
   TrajInfoRaw,
   TrajJointStates,
   TrajJointStatesRaw,
+  TrajMetadata,
+  TrajMetadataRaw,
   TrajOrientationCmd,
   TrajOrientationCmdRaw,
   TrajPoseAct,
