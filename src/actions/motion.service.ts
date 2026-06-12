@@ -8,6 +8,7 @@ import {
   transformTrajInfobyIDResult,
   transformTrajInfoResponse,
   transformTrajJointStatesResult,
+  transformTrajMetadataResult,
   transformTrajOrientationCmdResult,
   transformTrajPoseActResult,
   transformTrajPositionCmdResult,
@@ -20,6 +21,7 @@ import type {
   TrajAccelCmd,
   TrajInfo,
   TrajJointStates,
+  TrajMetadataResult,
   TrajOrientationCmd,
   TrajPoseAct,
   TrajPositionCmd,
@@ -299,6 +301,23 @@ export const getSegmentSetpointsById = async (
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error fetching Traj events by ID:', error);
+    throw error;
+  }
+};
+
+export const getTrajMetadataById = async (
+  id: string,
+): Promise<TrajMetadataResult> => {
+  try {
+    const result = await fetchFromAPI(`/traj/traj_metadata/${id}`, true);
+    const all = transformTrajMetadataResult(result);
+    return {
+      trajectory: all.find((m) => m.segID === m.trajID)!,
+      segments: all.filter((m) => m.segID !== m.trajID),
+    };
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching Traj metadata by ID:', error);
     throw error;
   }
 };

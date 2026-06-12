@@ -1,10 +1,13 @@
+/* eslint-disable react/button-has-type */
+/* eslint-disable jsx-a11y/no-static-element-interactions */
+
 'use client';
 
 import { ChartBarIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import ErrorIcon from '@heroicons/react/24/outline/FaceFrownIcon';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import React from 'react';
+import React, { useState } from 'react';
 
 import { Typography } from '@/src/components/Typography';
 import { formatDate, formatNumber } from '@/src/lib/functions';
@@ -51,7 +54,16 @@ const InfoSection: React.FC<InfoSectionProps> = ({ title, children }) => (
 
 export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
   const { currentTrajInfo } = useTrajectory();
+  const { currentTrajMetadata } = useTrajectory();
   const pathname = usePathname();
+
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const selectedMeta =
+    selectedId && selectedId !== currentTrajInfo!.trajID
+      ? currentTrajMetadata?.segments.find((s) => s.segID === selectedId)
+      : currentTrajMetadata?.trajectory;
 
   // Prüfe, ob wir uns auf der Auswertungsseite befinden
   const isOnEvaluationPage = pathname.includes('/evaluation');
@@ -68,16 +80,46 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
   }
 
   return (
-    <div className="flex h-full min-w-80 flex-col border-r border-gray-500 bg-gray-50 p-4 lg:h-fullscreen lg:overflow-scroll">
+    <div className="flex h-full min-w-80 flex-col border-r border-gray-500 bg-gray-50 p-3 lg:h-fullscreen lg:overflow-scroll">
       {currentTrajInfo && Object.keys(currentTrajInfo).length !== 0 && (
         <>
           <div className="rounded-xl p-4 text-primary ">
-            <div className="text-sm font-medium">Traj-ID</div>
-            <div className="text-2xl font-bold">
-              {currentTrajInfo.trajID || '-'}
+            <div className="text-sm font-medium">ID</div>
+            <div className="relative">
+              <button
+                className="cursor-pointer text-2xl font-bold hover:underline"
+                onClick={() => setDropdownOpen((prev) => !prev)}
+              >
+                {selectedId || currentTrajInfo.trajID || '-'}
+              </button>
+              {dropdownOpen && currentTrajMetadata && (
+                <div className="absolute z-10 mt-1 rounded-lg border border-gray-200 bg-white shadow-md">
+                  <button
+                    className="cursor-pointer px-4 py-2 text-lg hover:bg-gray-100"
+                    onClick={() => {
+                      setSelectedId(currentTrajInfo.trajID);
+                      setDropdownOpen(false);
+                    }}
+                  >
+                    {currentTrajInfo.trajID}
+                  </button>
+                  {currentTrajMetadata.segments.map((seg) => (
+                    <button
+                      key={seg.segID}
+                      className="cursor-pointer px-4 py-2 text-lg hover:bg-gray-100"
+                      onClick={() => {
+                        setSelectedId(seg.segID);
+                        setDropdownOpen(false);
+                      }}
+                    >
+                      {seg.segID}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="pt-2">
-              <div className="text-sm font-medium">Record data</div>
+              <div className="text-sm font-medium">Filename</div>
               <div className="text-xl font-semibold">
                 {currentTrajInfo.recordFilename || '-'}
               </div>
@@ -111,7 +153,39 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
           </div>
 
           <InfoSection title="General">
+            <InfoRow
+              label="Movement Type"
+              value={selectedMeta?.movType || '-'}
+            />
+            <InfoRow
+              label="Duration"
+              value={`${selectedMeta?.duration || '-'} s`}
+            />
+            <InfoRow
+              label="Length"
+              value={`${formatNumber(selectedMeta?.length) || '-'} mm`}
+            />
+            <InfoRow
+              label="Max. Velocity"
+              value={`${formatNumber(selectedMeta?.maxVel) || '-'} mm/s`}
+            />
+            <InfoRow
+              label="Max. Accel."
+              value={`${formatNumber(selectedMeta?.maxAccel) || '-'} mm/s²`}
+            />
+            <InfoRow
+              label="Load"
+              value={`${formatNumber(selectedMeta?.weight) || '-'} kg`}
+            />
             <InfoRow label="Robot" value={currentTrajInfo.robotModel || '-'} />
+            <InfoRow
+              label="Source (M)"
+              value={currentTrajInfo.sourceDataAct || '-'}
+            />
+            <InfoRow
+              label="Source (C)"
+              value={currentTrajInfo.sourceDataCmd || '-'}
+            />
             <InfoRow
               label="Start"
               value={
@@ -127,38 +201,6 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
                   ? formatDate(currentTrajInfo.endTime)
                   : '-'
               }
-            />
-            <InfoRow
-              label="Duration"
-              value={
-                currentTrajInfo.startTime && currentTrajInfo.endTime
-                  ? `${((new Date(currentTrajInfo.endTime).getTime() - new Date(currentTrajInfo.startTime).getTime()) / 1000).toFixed(1)} s`
-                  : 'n. a.'
-              }
-            />
-            <InfoRow
-              label="Source (M)"
-              value={currentTrajInfo.sourceDataAct || '-'}
-            />
-            <InfoRow
-              label="Source (C)"
-              value={currentTrajInfo.sourceDataCmd || '-'}
-            />
-            <InfoRow
-              label="Payload"
-              value={`${formatNumber(currentTrajInfo.weight) || '-'} kg`}
-            />
-            <InfoRow
-              label="Stop-Point"
-              value={`${formatNumber(currentTrajInfo.stopPoint) || '-'} %`}
-            />
-            <InfoRow
-              label="Wait Time"
-              value={`${formatNumber(currentTrajInfo.waitTime) || '-'} s`}
-            />
-            <InfoRow
-              label="Velocity"
-              value={`${formatNumber(currentTrajInfo.settedVelocity) || '-'} mm/s`}
             />
           </InfoSection>
 

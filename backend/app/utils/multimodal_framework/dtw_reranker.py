@@ -125,8 +125,6 @@ def rerank(
     def _preprocess(seq: np.ndarray) -> np.ndarray:
         seq = seq.astype(np.float64)
 
-        print(mode)
-
         if mode == 'joint':
             min_vals = seq.min(axis=0)
             max_vals = seq.max(axis=0)

@@ -17,7 +17,7 @@ type TabType =
   | 'velocity'
   | 'waypoint'
   | 'performance_sidtw'
-  | 'stopPoint'
+  | 'stopPoint';
 
 interface TabConfig {
   id: TabType;

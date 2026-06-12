@@ -257,3 +257,52 @@ export interface TrajSetpointsRaw {
   stop_point: number;
   timestamp_support: string;
 }
+
+export interface TrajMetadata {
+  segID: string;
+  trajID: string;
+  movType: string;
+  duration: number;
+  weight: number;
+  length: number;
+  minVel: number;
+  maxVel: number;
+  meanVel: number;
+  medianVel: number;
+  stdVel: number;
+  minAccel: number;
+  maxAccel: number;
+  meanAccel: number;
+  medianAccel: number;
+  stdAccel: number;
+  posX: number;
+  posY: number;
+  posZ: number;
+}
+
+export interface TrajMetadataRaw {
+  seg_id: string;
+  traj_id: string;
+  movement_type: string;
+  duration: number;
+  weight: number;
+  length: number;
+  min_vel: number;
+  max_vel: number;
+  mean_vel: number;
+  median_vel: number;
+  std_vel: number;
+  min_accel: number;
+  max_accel: number;
+  mean_accel: number;
+  median_accel: number;
+  std_accel: number;
+  position_x: number;
+  position_y: number;
+  position_z: number;
+}
+
+export interface TrajMetadataResult {
+  trajectory: TrajMetadata;
+  segments: TrajMetadata[];
+}

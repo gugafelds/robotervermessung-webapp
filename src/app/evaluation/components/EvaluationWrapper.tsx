@@ -7,7 +7,10 @@ import {
   checkOrientationDataAvailability,
   checkPositionDataAvailability,
 } from '@/src/actions/evaluation.service';
-import { getTrajInfoById } from '@/src/actions/motion.service';
+import {
+  getTrajInfoById,
+  getTrajMetadataById,
+} from '@/src/actions/motion.service';
 import { DeviationsPlot } from '@/src/app/evaluation/components/DeviationsPlot';
 import { MetricsPanel } from '@/src/app/evaluation/components/MetricsPanel';
 import { TrajectoryInfo } from '@/src/app/motion/components/TrajectoryInfo';
@@ -24,6 +27,7 @@ export function EvaluationWrapper() {
   const id = params?.id as string;
 
   const { currentTrajInfo, setCurrentTrajInfo } = useTrajectory();
+  const { currentTrajMetadata, setCurrentTrajMetadata } = useTrajectory();
 
   // Handler für Segmentauswahl - WICHTIG: useCallback verwenden!
   const handleSegmentChange = useCallback((segment: string) => {
@@ -56,22 +60,25 @@ export function EvaluationWrapper() {
   // Lade Bahn-Info wenn sie noch nicht geladen ist
   const fetchInfoData = useCallback(async () => {
     if (!id) return;
-
     try {
-      const trajInfo = await getTrajInfoById(id);
+      const [trajInfo, trajMetadata] = await Promise.all([
+        getTrajInfoById(id),
+        getTrajMetadataById(id),
+      ]);
       setCurrentTrajInfo(trajInfo);
+      setCurrentTrajMetadata(trajMetadata);
     } catch (err) {
       /* empty */
     }
-  }, [id, setCurrentTrajInfo]);
+  }, [id, setCurrentTrajInfo, setCurrentTrajMetadata]);
 
   useEffect(() => {
-    if (currentTrajInfo?.trajID === id) {
+    if (currentTrajInfo?.trajID === id && currentTrajMetadata) {
       return;
     }
 
     fetchInfoData();
-  }, [id, fetchInfoData, currentTrajInfo]);
+  }, [id, fetchInfoData, currentTrajInfo, currentTrajMetadata]);
 
   return (
     <>

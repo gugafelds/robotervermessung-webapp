@@ -11,11 +11,7 @@ import { Typography } from '@/src/components/Typography';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
-type ParameterType =
-  | 'velocity'
-  | 'acceleration'
-  | 'weight'
-  | 'stop_point'
+type ParameterType = 'velocity' | 'acceleration' | 'weight' | 'stop_point';
 
 interface ParameterData {
   sidtw: number;

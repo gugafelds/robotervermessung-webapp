@@ -10,6 +10,7 @@ import { useTrajectory } from '@/src/providers/trajectory.provider';
 import { JointStatesPlot } from './JointStatesPlot';
 import { OrientationPlot } from './OrientationPlot';
 import { Position2DPlot } from './Position2DPlot';
+import { SetpointsInfo } from './SetpointsInfo';
 import { TCPAccelPlot } from './TCPAccelPlot';
 import { TCPVelPlot } from './TCPVelPlot';
 
@@ -56,47 +57,52 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
   }
 
   return (
-    <div className="grid h-fullscreen w-full grid-cols-2 place-items-center overflow-scroll py-4">
-      {plotAvailability.position && (
-        <>
-          <Position2DPlot
-            currentTrajSetpoints={currentTrajSetpoints}
-            idealTrajectory={currentTrajPositionCmd}
+    <div className="flex h-fullscreen w-full flex-col overflow-scroll">
+      <div className="px-4 pt-4">
+        <SetpointsInfo />
+      </div>
+      <div className="grid h-fullscreen w-full grid-cols-2 place-items-center overflow-scroll py-4">
+        {plotAvailability.position && (
+          <>
+            <Position2DPlot
+              currentTrajSetpoints={currentTrajSetpoints}
+              idealTrajectory={currentTrajPositionCmd}
+              currentTrajPoseAct={currentTrajPoseAct}
+            />
+            <Position3DPlot
+              currentTrajPoseAct={currentTrajPoseAct}
+              currentTrajSetpoints={currentTrajSetpoints}
+              idealTrajectory={currentTrajPositionCmd}
+            />
+          </>
+        )}
+
+        {plotAvailability.orientation && (
+          <OrientationPlot
+            currentTrajOrientationCmd={currentTrajOrientationCmd}
             currentTrajPoseAct={currentTrajPoseAct}
-          />
-          <Position3DPlot
-            currentTrajPoseAct={currentTrajPoseAct}
             currentTrajSetpoints={currentTrajSetpoints}
-            idealTrajectory={currentTrajPositionCmd}
           />
-        </>
-      )}
+        )}
 
-      {plotAvailability.orientation && (
-        <OrientationPlot
-          currentTrajOrientationCmd={currentTrajOrientationCmd}
-          currentTrajPoseAct={currentTrajPoseAct}
-          currentTrajSetpoints={currentTrajSetpoints}
-        />
-      )}
+        {plotAvailability.joints && (
+          <JointStatesPlot currentTrajJointStates={currentTrajJointStates} />
+        )}
 
-      {plotAvailability.joints && (
-        <JointStatesPlot currentTrajJointStates={currentTrajJointStates} />
-      )}
+        {plotAvailability.velocity && (
+          <TCPVelPlot
+            currentTrajVelAct={currentTrajVelAct}
+            currentTrajVelCmd={currentTrajVelCmd}
+          />
+        )}
 
-      {plotAvailability.velocity && (
-        <TCPVelPlot
-          currentTrajVelAct={currentTrajVelAct}
-          currentTrajVelCmd={currentTrajVelCmd}
-        />
-      )}
-
-      {plotAvailability.acceleration && (
-        <TCPAccelPlot
-          currentTrajAccelAct={currentTrajAccelAct}
-          currentTrajAccelCmd={currentTrajAccelCmd}
-        />
-      )}
+        {plotAvailability.acceleration && (
+          <TCPAccelPlot
+            currentTrajAccelAct={currentTrajAccelAct}
+            currentTrajAccelCmd={currentTrajAccelCmd}
+          />
+        )}
+      </div>
     </div>
   );
 };

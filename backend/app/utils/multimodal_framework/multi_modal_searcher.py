@@ -11,16 +11,7 @@ from .filter_searcher import FilterSearcher
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Hilfklasse: simuliert pool.acquire() für eine einzelne Connection
-# ---------------------------------------------------------------------------
-
 class _SingleConnContext:
-    """
-    Erlaubt "async with self._acquire() as conn:" auch wenn nur eine
-    einzelne Connection (kein Pool) vorhanden ist.
-    Die Connection wird NICHT freigegeben — sie gehört dem Aufrufer.
-    """
     def __init__(self, conn: asyncpg.Connection):
         self._conn = conn
 
@@ -31,24 +22,7 @@ class _SingleConnContext:
         pass
 
 
-# ===========================================================================
-# MultiModalSearcher
-# ===========================================================================
-
 class MultiModalSearcher:
-    """
-    Orchestrator für HIERARCHICAL Multi-Modal Similarity Search.
-
-    Akzeptiert Pool ODER einzelne Connection:
-      - asyncpg.Pool       → parallele Queries (empfohlen, jede Coroutine
-                             bekommt eine eigene Connection aus dem Pool)
-      - asyncpg.Connection → Fallback / Backward-Kompatibilität,
-                             Queries laufen sequentiell auf einer Connection
-
-    Flow:
-    1. Bahn-Level:    Finde ähnliche Bahnen     (Modi parallel)
-    2. Segment-Level: Finde ähnliche Segmente   (Segmente + Modi parallel)
-    """
 
     def __init__(self, conn_or_pool: Union[asyncpg.Pool, asyncpg.Connection]):
         if isinstance(conn_or_pool, asyncpg.Pool):
@@ -61,7 +35,6 @@ class MultiModalSearcher:
         self.ranker = RRFRanker(k=60)
 
     def _acquire(self):
-        """Gibt einen async context manager zurück, der eine Connection liefert."""
         if self._pool:
             return self._pool.acquire()
         return _SingleConnContext(self._conn)
@@ -83,13 +56,10 @@ class MultiModalSearcher:
             limit: int = 10,
             metric: str = 'sidtw',
             buffer_factor: int = 5,
+            include_tags: Optional[List[str]] = None,
+            exclude_tags: Optional[List[str]] = None,
+            exclude_ids: Optional[List[str]] = None,
     ) -> Dict:
-        """
-        HIERARCHICAL Similarity Search — vollständig parallelisiert (bei Pool).
-
-        Phase 1: Target BAHN vs andere Bahnen      (Modi parallel)
-        Phase 2: Target SEGMENTE vs andere Segmente (Segmente + Modi parallel)
-        """
         try:
             if modes is None:
                 modes = ['joint', 'position', 'orientation', 'velocity', 'metadata']
@@ -98,7 +68,6 @@ class MultiModalSearcher:
             if prefilter_features is None:
                 prefilter_features = []
 
-            # ── Basis-Infos parallel holen ────────────────────────────────
             target_traj_id, target_traj_features = await asyncio.gather(
                 self._get_traj_id(target_id),
                 self._get_features(target_id, metric),
@@ -123,9 +92,6 @@ class MultiModalSearcher:
                 'metadata': {}
             }
 
-            logger.info(f"[Phase 1+2 parallel] {target_traj_id}")
-
-            # ── Phase 1 + Segment-IDs gleichzeitig starten ───────────────
             traj_results, target_segments = await asyncio.gather(
                 self._search_trajs(
                     target_traj_id=target_traj_id,
@@ -135,6 +101,9 @@ class MultiModalSearcher:
                     prefilter_features=prefilter_features,
                     metric=metric,
                     buffer_factor=buffer_factor,
+                    include_tags=include_tags,
+                    exclude_tags=exclude_tags,
+                    exclude_ids=exclude_ids,
                 ),
                 self._get_traj_segments(target_traj_id),
             )
@@ -142,13 +111,11 @@ class MultiModalSearcher:
             result['traj_similarity'] = traj_results
 
             if not target_segments:
-                logger.warning(f"No segments found for traj {target_traj_id}")
                 result['metadata']['target_segments_count'] = 0
                 return result
 
             result['metadata']['target_segments_count'] = len(target_segments)
 
-            # ── Phase 2: alle Segmente parallel ──────────────────────────
             async def _search_one_segment(seg_id: str) -> Dict:
                 features, seg_result = await asyncio.gather(
                     self._get_features(seg_id, metric),
@@ -160,6 +127,9 @@ class MultiModalSearcher:
                         prefilter_features=prefilter_features,
                         metric=metric,
                         buffer_factor=buffer_factor,
+                        include_tags=include_tags,
+                        exclude_tags=exclude_tags,
+                        exclude_ids=exclude_ids,
                     ),
                 )
                 return {
@@ -174,12 +144,6 @@ class MultiModalSearcher:
 
             result['segment_similarity'] = list(segment_results)
             result['metadata']['segments_processed'] = len(segment_results)
-
-            logger.info(
-                f"Hierarchical search complete for {target_id}: "
-                f"{len(traj_results.get('results', []))} trajs, "
-                f"{len(segment_results)} segment groups"
-            )
 
             return result
 
@@ -205,10 +169,11 @@ class MultiModalSearcher:
             prefilter_features: List[str],
             metric: str = 'sidtw',
             buffer_factor: int = 5,
+            include_tags: Optional[List[str]] = None,
+            exclude_tags: Optional[List[str]] = None,
+            exclude_ids: Optional[List[str]] = None,
     ) -> Dict:
-        """Sucht ähnliche BAHNEN — Modi-Queries parallel, jede mit eigener Connection."""
         try:
-            # Embedding-Check
             async with self._acquire() as conn:
                 shape, _ = self._make_helpers(conn)
                 embedding_status = await shape.check_embeddings_exist(target_traj_id)
@@ -222,14 +187,24 @@ class MultiModalSearcher:
                     'results': []
                 }
 
-            # Optional: Pre-Filter
+            # Pre-Filter (Feature + Tag/ID)
             candidate_ids = None
-            if prefilter_features:
+            need_prefilter = (
+                prefilter_features
+                or include_tags
+                or exclude_tags
+                or exclude_ids
+            )
+
+            if need_prefilter:
                 async with self._acquire() as conn:
                     _, prefilter = self._make_helpers(conn)
-                    logger.info(f"[Pre-Filter Bahn] Features: {prefilter_features}")
                     candidate_ids = await prefilter.get_filtered_candidates(
-                        target_traj_id, features_to_use=prefilter_features
+                        target_traj_id,
+                        features_to_use=prefilter_features,
+                        include_tags=include_tags,
+                        exclude_tags=exclude_tags,
+                        exclude_ids=exclude_ids,
                     )
                     traj_candidates = await prefilter._filter_only_trajs(candidate_ids)
                     logger.info(f"[Pre-Filter Bahn] {len(traj_candidates)} candidates")
@@ -237,7 +212,7 @@ class MultiModalSearcher:
                         return {'error': 'No candidates after pre-filter', 'results': []}
                     candidate_ids = traj_candidates
 
-            # ── Alle Modi parallel ────────────────────────────────────────
+            # Embedding-Suche
             async def _one_mode(mode: str):
                 async with self._acquire() as conn:
                     shape, _ = self._make_helpers(conn)
@@ -266,7 +241,7 @@ class MultiModalSearcher:
             }
 
         except Exception as e:
-            logger.error(f"Error searching trajs. for {target_traj_id}: {e}")
+            logger.error(f"Error searching trajs for {target_traj_id}: {e}")
             return {'error': str(e), 'results': []}
 
     # =========================================================================
@@ -282,10 +257,11 @@ class MultiModalSearcher:
             prefilter_features: List[str],
             metric: str = 'sidtw',
             buffer_factor: int = 5,
+            include_tags: Optional[List[str]] = None,
+            exclude_tags: Optional[List[str]] = None,
+            exclude_ids: Optional[List[str]] = None,
     ) -> Dict:
-        """Sucht ähnliche SEGMENTE — Modi-Queries parallel, jede mit eigener Connection."""
         try:
-            # Embedding-Check
             async with self._acquire() as conn:
                 shape, _ = self._make_helpers(conn)
                 embedding_status = await shape.check_embeddings_exist(target_seg_id)
@@ -299,14 +275,24 @@ class MultiModalSearcher:
                     'results': []
                 }
 
-            # Optional: Pre-Filter
+            # Pre-Filter (Feature + Tag/ID)
             candidate_ids = None
-            if prefilter_features:
+            need_prefilter = (
+                prefilter_features
+                or include_tags
+                or exclude_tags
+                or exclude_ids
+            )
+
+            if need_prefilter:
                 async with self._acquire() as conn:
                     _, prefilter = self._make_helpers(conn)
-                    logger.info(f"[Pre-Filter Segment] Features: {prefilter_features}")
                     candidate_ids = await prefilter.get_filtered_candidates(
-                        target_seg_id, features_to_use=prefilter_features
+                        target_seg_id,
+                        features_to_use=prefilter_features,
+                        include_tags=include_tags,
+                        exclude_tags=exclude_tags,
+                        exclude_ids=exclude_ids,
                     )
                     segment_candidates = await prefilter._filter_only_segments(candidate_ids)
                     logger.info(f"[Pre-Filter Segment] {len(segment_candidates)} candidates")
@@ -314,7 +300,7 @@ class MultiModalSearcher:
                         return {'error': 'No candidates after pre-filter', 'results': []}
                     candidate_ids = segment_candidates
 
-            # ── Alle Modi parallel ────────────────────────────────────────
+            # Embedding-Suche
             async def _one_mode(mode: str):
                 async with self._acquire() as conn:
                     shape, _ = self._make_helpers(conn)
@@ -347,7 +333,7 @@ class MultiModalSearcher:
             return {'error': str(e), 'results': []}
 
     # =========================================================================
-    # PRIVATE — HELPERS
+    # PRIVATE — HELPERS (unverändert)
     # =========================================================================
 
     async def _enrich_results(
@@ -356,53 +342,37 @@ class MultiModalSearcher:
             conn: asyncpg.Connection,
             metric: str = 'sidtw',
     ) -> List[Dict]:
-        """Reichert Ergebnisse mit Features aus traj_metadata an."""
         if not results:
             return []
-        
+
         allowed_metrics = {'sidtw', 'qdtw'}
         if metric not in allowed_metrics:
-            logger.warning(f"Invalid metric '{metric}', falling back to 'sidtw'")
             metric = 'sidtw'
- 
-        metric_table = f"evaluation.{metric}_info"
 
+        metric_table = f"evaluation.{metric}_info"
         seg_ids = [r['seg_id'] for r in results]
 
         try:
             query = f"""
                 SELECT
-                    bm.seg_id,
-                    bm.traj_id,
-                    bm.duration,
-                    bm.weight,
-                    bm.length,
-                    bm.movement_type,
-                    bm.mean_vel,
-                    bm.max_vel,
-                    bm.std_vel,
-                    bm.min_accel,
-                    bm.mean_accel,
-                    bm.max_accel,
-                    bm.std_accel,
-                    bm.position_x,
-                    bm.position_y,
-                    bm.position_z,
+                    bm.seg_id, bm.traj_id, bm.duration, bm.weight, bm.length,
+                    bm.movement_type, bm.mean_vel, bm.max_vel, bm.std_vel,
+                    bm.min_accel, bm.mean_accel, bm.max_accel, bm.std_accel,
+                    bm.position_x, bm.position_y, bm.position_z,
                     mi.{metric}_min_distance,
                     mi.{metric}_average_distance,
                     mi.{metric}_max_distance
                 FROM motion.traj_metadata bm
-                LEFT JOIN {metric_table} mi
-                    ON bm.seg_id = mi.seg_id
+                LEFT JOIN {metric_table} mi ON bm.seg_id = mi.seg_id
                 WHERE bm.seg_id = ANY($1)
             """
             metadata_rows = await conn.fetch(query, seg_ids)
             metadata_lookup = {row['seg_id']: dict(row) for row in metadata_rows}
 
             for row_dict in metadata_lookup.values():
-                row_dict['min_distance'] = row_dict.pop(f'{metric}_min_distance', None)
+                row_dict['min_distance']  = row_dict.pop(f'{metric}_min_distance', None)
                 row_dict['mean_distance'] = row_dict.pop(f'{metric}_average_distance', None)
-                row_dict['max_distance'] = row_dict.pop(f'{metric}_max_distance', None)
+                row_dict['max_distance']  = row_dict.pop(f'{metric}_max_distance', None)
 
             enriched = []
             for result in results:
@@ -449,7 +419,7 @@ class MultiModalSearcher:
         allowed_metrics = {'sidtw', 'qdtw'}
         if metric not in allowed_metrics:
             metric = 'sidtw'
- 
+
         metric_table = f"evaluation.{metric}_info"
 
         try:
@@ -460,15 +430,13 @@ class MultiModalSearcher:
                         bm.seg_id, bm.traj_id, bm.duration, bm.weight,
                         bm.length, bm.movement_type,
                         bm.mean_vel, bm.max_vel, bm.std_vel,
-                        bm.min_accel, bm.mean_accel,
-                        bm.max_accel, bm.std_accel,
+                        bm.min_accel, bm.mean_accel, bm.max_accel, bm.std_accel,
                         bm.position_x, bm.position_y, bm.position_z,
                         mi.{metric}_min_distance,
                         mi.{metric}_average_distance,
                         mi.{metric}_max_distance
                     FROM motion.traj_metadata bm
-                    LEFT JOIN {metric_table} mi
-                        ON bm.seg_id = mi.seg_id
+                    LEFT JOIN {metric_table} mi ON bm.seg_id = mi.seg_id
                     WHERE bm.seg_id = $1
                     """,
                     seg_id
@@ -476,9 +444,9 @@ class MultiModalSearcher:
                 if result is None:
                     return None
                 row_dict = dict(result)
-                row_dict['min_distance'] = row_dict.pop(f'{metric}_min_distance', None)
+                row_dict['min_distance']  = row_dict.pop(f'{metric}_min_distance', None)
                 row_dict['mean_distance'] = row_dict.pop(f'{metric}_average_distance', None)
-                row_dict['max_distance'] = row_dict.pop(f'{metric}_max_distance', None)
+                row_dict['max_distance']  = row_dict.pop(f'{metric}_max_distance', None)
                 return row_dict
         except Exception as e:
             logger.error(f"Error getting features for {seg_id}: {e}")

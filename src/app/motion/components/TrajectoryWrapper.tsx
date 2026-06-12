@@ -8,6 +8,7 @@ import {
   getTrajAccelCmdById,
   getTrajInfoById,
   getTrajJointStatesById,
+  getTrajMetadataById,
   getTrajOrientationCmdById,
   getTrajPoseActById,
   getTrajPositionCmdById,
@@ -100,7 +101,9 @@ export function TrajectoryWrapper() {
 
   const {
     currentTrajInfo,
+    currentTrajMetadata,
     setCurrentTrajInfo,
+    setCurrentTrajMetadata,
     setCurrentTrajPoseAct,
     setCurrentTrajVelAct,
     setCurrentTrajAccelAct,
@@ -131,12 +134,20 @@ export function TrajectoryWrapper() {
         cache.set(cacheKey, trajInfo);
       }
 
+      const metaCacheKey = `metadata_${id}`;
+      let trajMetadata = cache.get(metaCacheKey);
+      if (!trajMetadata) {
+        trajMetadata = await getTrajMetadataById(id);
+        cache.set(metaCacheKey, trajMetadata);
+      }
+      setCurrentTrajMetadata(trajMetadata);
+
       setCurrentTrajInfo(trajInfo);
       setIsInfoLoaded(true);
     } catch (err) {
       setError('Traj. info could not be loaded.');
     }
-  }, [id, setCurrentTrajInfo]);
+  }, [id, setCurrentTrajInfo, setCurrentTrajMetadata]);
 
   const fetchPlotData = useCallback(async () => {
     if (!id) return;
@@ -241,13 +252,13 @@ export function TrajectoryWrapper() {
   ]);
 
   useEffect(() => {
-    if (currentTrajInfo?.trajID === id) {
+    if (currentTrajInfo?.trajID === id && currentTrajMetadata) {
       setIsInfoLoaded(true);
       return;
     }
 
     fetchInfoData();
-  }, [id, fetchInfoData, currentTrajInfo]);
+  }, [id, fetchInfoData, currentTrajInfo, currentTrajMetadata]);
 
   useEffect(() => {
     if (!isInfoLoaded) {

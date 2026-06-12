@@ -44,11 +44,11 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = ({
   const getStartPointCoordinate = (coordinate: 'x' | 'y' | 'z'): number => {
     if (realTrajectory.length === 0) return 0;
 
-    const firstPoint = realTrajectory[0];
-    const istPoint = firstPoint as TrajPoseAct;
-    if (coordinate === 'x') return istPoint.xAct;
-    if (coordinate === 'y') return istPoint.yAct;
-    return istPoint.zAct;
+    const firstPoint = idealTrajectory[0];
+    const istPoint = firstPoint as TrajPositionCmd;
+    if (coordinate === 'x') return istPoint.xCmd;
+    if (coordinate === 'y') return istPoint.yCmd;
+    return istPoint.zCmd;
   };
 
   const startPointData: Partial<PlotData> = {

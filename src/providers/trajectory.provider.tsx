@@ -16,6 +16,7 @@ import type {
   TrajAccelCmd,
   TrajInfo,
   TrajJointStates,
+  TrajMetadataResult,
   TrajOrientationCmd,
   TrajPoseAct,
   TrajPositionCmd,
@@ -34,6 +35,10 @@ export interface TrajectoryState {
   prevPage: () => Promise<void>;
   currentTrajInfo: TrajInfo | null;
   setCurrentTrajInfo: React.Dispatch<React.SetStateAction<TrajInfo | null>>;
+  currentTrajMetadata: TrajMetadataResult | null;
+  setCurrentTrajMetadata: React.Dispatch<
+    React.SetStateAction<TrajMetadataResult | null>
+  >;
   currentTrajPoseAct: TrajPoseAct[];
   setCurrentTrajPoseAct: React.Dispatch<React.SetStateAction<TrajPoseAct[]>>;
   currentTrajVelAct: TrajVelAct[];
@@ -81,6 +86,8 @@ export const TrajectoryProvider = ({
   );
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [currentTrajInfo, setCurrentTrajInfo] = useState<TrajInfo | null>(null);
+  const [currentTrajMetadata, setCurrentTrajMetadata] =
+    useState<TrajMetadataResult | null>(null);
   const [currentTrajPoseAct, setCurrentTrajPoseAct] = useState<TrajPoseAct[]>(
     [],
   );
@@ -176,6 +183,8 @@ export const TrajectoryProvider = ({
       setCurrentTrajJointStates,
       currentTrajSetpoints,
       setCurrentTrajSetpoints,
+      currentTrajMetadata,
+      setCurrentTrajMetadata,
     }),
     [
       trajInfo,
@@ -194,6 +203,7 @@ export const TrajectoryProvider = ({
       currentTrajVelCmd,
       currentTrajJointStates,
       currentTrajSetpoints,
+      currentTrajMetadata,
     ],
   );
 

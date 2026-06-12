@@ -275,3 +275,31 @@ export const transformTrajSetpointsResult = (
     }),
   );
 };
+
+export const transformTrajMetadataResult = (
+  trajMetadataRaw: TrajMetadataRaw[],
+): TrajMetadata[] => {
+  return trajMetadataRaw.map(
+    (metadata): TrajMetadata => ({
+      segID: metadata.seg_id,
+      trajID: metadata.traj_id,
+      movType: metadata.movement_type,
+      duration: metadata.duration,
+      weight: metadata.weight,
+      length: metadata.length,
+      minVel: metadata.min_vel,
+      maxVel: metadata.max_vel,
+      meanVel: metadata.mean_vel,
+      medianVel: metadata.median_vel,
+      stdVel: metadata.std_vel,
+      minAccel: metadata.min_accel,
+      maxAccel: metadata.max_accel,
+      meanAccel: metadata.mean_accel,
+      medianAccel: metadata.median_accel,
+      stdAccel: metadata.std_accel,
+      posX: metadata.position_x,
+      posY: metadata.position_y,
+      posZ: metadata.position_z,
+    }),
+  );
+};
