@@ -166,6 +166,7 @@ export interface SegmentGroup {
   target_segment: string;
   target_segment_features?: TargetFeatures;
   results: SimilarityResult[];
+  conformal_interval?: ConformalInterval | null;
 }
 
 export interface SearchTiming {
@@ -178,7 +179,7 @@ export interface SearchTiming {
 export interface HierarchicalSimilarityResponse {
   target_id: string;
   target_traj_id: string;
-  target_traj_features?: TargetFeatures; // vereinfacht — nutzt jetzt TargetFeatures
+  target_traj_features?: TargetFeatures;
   modes: string[];
   weights: {
     joint: number;
@@ -188,11 +189,11 @@ export interface HierarchicalSimilarityResponse {
     acceleration: number;
     metadata: number;
   };
-  metric: 'sidtw' | 'qdtw'; // NEU
+  metric: 'sidtw' | 'qdtw';
   traj_similarity: TrajSimilarityResponse;
   segment_similarity: {
     target_segment: string;
-    target_segment_features?: TargetFeatures; // vereinfacht
+    target_segment_features?: TargetFeatures;
     similar_segments: {
       target: string;
       results: EmbeddingSimilarityResult[];
@@ -208,15 +209,17 @@ export interface HierarchicalSimilarityResponse {
         };
       };
     };
+    conformal_interval?: ConformalInterval | null; // NEU
   }[];
   metadata: {
     target_segments_count: number;
     segments_processed: number;
   };
-  // Stage 2 response fields
+  // Stage 2
   stage2_active: boolean;
   stage2_dtw_mode?: 'position' | 'joint';
   timing?: SearchTiming;
+  conformal_interval?: ConformalInterval | null; // NEU — Trajektorie-Ebene
 }
 
 export interface PrognosisValues {
@@ -238,6 +241,7 @@ export interface PrognosisResult {
     mean: number | null;
     max: number | null;
   };
+  // Alte confidence bleibt vorerst für Stage 1 (ohne Stage 2)
   confidence: {
     direct: number | null;
     decomposed: {
@@ -246,4 +250,16 @@ export interface PrognosisResult {
       harmonicMean: number | null;
     };
   };
+  // NEU — nur befüllt wenn stage2Active === true
+  conformalInterval?: ConformalInterval | null;
+}
+
+export interface ConformalInterval {
+  p_hat: number; // inverse-DTW gewichtete Prognose [mm]
+  low: number; // untere Intervallgrenze [mm]
+  high: number; // obere Intervallgrenze [mm]
+  coverage: number; // Ziel-Coverage z.B. 0.90
+  n_segments?: number; // Anzahl Segmente (nur auf Trajektorie-Ebene)
+  n?: number; // Anzahl Nachbarn (nur auf Segment-Ebene)
+  sigma?: number; // lokaler Spread d_min × std(perf) — optional für Debug
 }

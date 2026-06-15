@@ -6,47 +6,50 @@ for the trajectory performance prediction framework.
 
 For each segment in the database:
   1. Run LOO similarity search (exclude self) → Top-K neighbors via Stage 2 (DTW)
-  2. Compute LOO prediction p̂_i  (length-weighted, inverse-DTW)
-  3. Compute local spread σ_i     (d_min × std of neighbor performance values)
-  4. Compute nonconformity score  α_i = |p_i - p̂_i| / (σ_i + ε)
-  5. Store everything in evaluation.confidence_calibration
+  2. Compute LOO prediction p̂_i  (inverse-DTW weighted)
+  3. Compute σ_i = perf_std  (std of neighbor performance values)
+  4. Compute nonconformity score α_i = |p_i - p̂_i| / (σ_i + ε)
+  5. Store DTW-geometry features for later σ-model training
+  6. Store everything in evaluation.confidence_calibration
 
-The stored calibration set is then used online to produce valid
-prediction intervals:
-    interval = [p̂ ± q · σ(x_new)]
-where q is the (1-α)-quantile of the stored α_i values.
+DTW-geometry features stored per segment:
+  d_min, d_mean, d_max, d_spread, d_rel, d_cv, perf_std, perf_cv, perf_mean
+
+These allow us to later train a learned σ-model:
+  σ(x) = f(d_min, d_spread, perf_cv, ...)
+  which replaces the global quantile q with an adaptive, geometry-aware one.
 
 Usage
 -----
-    python calibration_set_builder.py [--k 10] [--batch 100] [--coverage 0.90]
+    python calibration_set_builder.py [--k 10] [--batch 10] [--limit 1000]
+    python calibration_set_builder.py --full-rebuild
 
 Requirements
 ------------
-    pip install asyncpg numpy tqdm --break-system-packages
+    pip install asyncpg numpy tqdm python-dotenv --break-system-packages
 """
 
 import asyncio
 import argparse
+import json
 import logging
 import math
-import json
 import os
+import random
 import sys
-import numpy as np
-from typing import List, Dict, Optional, Tuple
-from tqdm import tqdm
-from dotenv import load_dotenv
-
-# ── Path setup ────────────────────────────────────────────────────────────────
-# Adjust this to point at your backend app folder so imports work
-sys.path.append(
-    os.path.join(os.path.dirname(__file__), '..', '..', 'app')
-)
+from typing import Dict, List, Optional, Tuple
 
 import asyncpg
+import numpy as np
+from dotenv import load_dotenv
+from tqdm import tqdm
+
+# ── Path setup ────────────────────────────────────────────────────────────────
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'app'))
+
 from utils.multimodal_framework.dtw_reranker import rerank
-from utils.metadata_embeddings.trajectory_loader import TrajectoryLoader
 from utils.multimodal_framework.multi_modal_searcher import MultiModalSearcher
+from utils.metadata_embeddings.trajectory_loader import TrajectoryLoader
 
 load_dotenv()
 logging.basicConfig(
@@ -62,10 +65,10 @@ DATABASE_URL = os.getenv(
 )
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-EPSILON        = 1e-6   # avoid division by zero in σ and weighting
-DTW_MODE       = 'position'   # 'position' | 'joint'  — matches paper best result
-METRIC         = 'sidtw'      # performance metric stored in evaluation schema
-SEARCH_MODES   = ['position', 'joint', 'orientation', 'velocity', 'metadata']
+EPSILON      = 1e-6
+DTW_MODE     = 'position'
+METRIC       = 'sidtw'
+SEARCH_MODES = ['position', 'joint', 'orientation', 'velocity', 'metadata']
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -89,24 +92,25 @@ async def ensure_calibration_table(conn: asyncpg.Connection) -> None:
             traj_id             TEXT        NOT NULL,
 
             -- LOO prediction
-            p_actual            FLOAT       NOT NULL,   -- measured mean_distance
-            p_predicted         FLOAT       NOT NULL,   -- LOO weighted prediction
-            prediction_error    FLOAT       NOT NULL,   -- |p_actual - p_predicted|
+            p_actual            FLOAT       NOT NULL,
+            p_predicted         FLOAT       NOT NULL,
+            prediction_error    FLOAT       NOT NULL,
 
-            -- Local spread
-            d_min               FLOAT       NOT NULL,   -- min DTW distance among neighbors
-            perf_std            FLOAT       NOT NULL,   -- std of neighbor mean_distances
-            sigma               FLOAT       NOT NULL,   -- d_min * perf_std  (normalizer)
+            -- σ = perf_std (consistent with online scorer)
+            sigma               FLOAT       NOT NULL,
 
-            -- Nonconformity score
-            alpha               FLOAT       NOT NULL,   -- prediction_error / (sigma + eps)
+            -- Nonconformity score: α = prediction_error / (σ + ε)
+            alpha               FLOAT       NOT NULL,
 
-            -- Metadata for diagnostics
-            k_neighbors         INT         NOT NULL,   -- actual number of valid neighbors
-            neighbor_ids        TEXT[]      NOT NULL,   -- seg_ids of neighbors used
+            -- DTW-geometry features for σ-model training
+            dtw_features        JSONB       NOT NULL,
+
+            -- Metadata
+            k_neighbors         INT         NOT NULL,
+            neighbor_ids        TEXT[]      NOT NULL,
             computed_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-            -- Config snapshot (so you know which run produced this row)
+            -- Config snapshot
             config_k            INT         NOT NULL,
             config_dtw_mode     TEXT        NOT NULL,
             config_metric       TEXT        NOT NULL
@@ -116,31 +120,60 @@ async def ensure_calibration_table(conn: asyncpg.Connection) -> None:
             ON evaluation.confidence_calibration (traj_id);
         CREATE INDEX IF NOT EXISTS idx_cc_alpha
             ON evaluation.confidence_calibration (alpha);
+        CREATE INDEX IF NOT EXISTS idx_cc_dtw_features
+            ON evaluation.confidence_calibration USING gin (dtw_features);
     """)
     logger.info("Table evaluation.confidence_calibration ready.")
 
 
-async def get_all_seg_ids(conn, metric, max_trajectories=None):
-    limit_clause = ""
-    if max_trajectories:
-        limit_clause = f"AND m.traj_id = ANY(SELECT traj_id FROM motion.traj_metadata WHERE seg_id = traj_id ORDER BY RANDOM() LIMIT {max_trajectories})"
+async def get_all_seg_ids(
+    conn: asyncpg.Connection,
+    metric: str,
+    max_trajectories: Optional[int] = None,
+) -> List[Tuple[str, str, float]]:
+    """
+    Return (seg_id, traj_id, actual_mean_distance) for segments.
 
-    rows = await conn.fetch(f"""
-        SELECT
-            m.seg_id,
-            m.traj_id,
-            ei.{metric}_average_distance AS mean_distance
-        FROM motion.traj_metadata m
-        JOIN evaluation.{metric}_info ei ON m.seg_id = ei.seg_id
-        WHERE m.seg_id != m.traj_id
-          AND ei.{metric}_average_distance IS NOT NULL
-          {limit_clause}
-    """)
+    If max_trajectories is set: randomly sample that many trajectories
+    first, then return all their segments. This ensures representative
+    sampling across the parameter space rather than always taking the
+    first N segments.
+    """
+    if max_trajectories:
+        # Random sample at trajectory level, then get all their segments
+        rows = await conn.fetch(f"""
+            SELECT
+                m.seg_id,
+                m.traj_id,
+                ei.{metric}_average_distance AS mean_distance
+            FROM motion.traj_metadata m
+            JOIN evaluation.{metric}_info ei ON m.seg_id = ei.seg_id
+            WHERE m.seg_id != m.traj_id
+              AND ei.{metric}_average_distance IS NOT NULL
+              AND m.traj_id = ANY(
+                  SELECT traj_id
+                  FROM motion.traj_metadata
+                  WHERE seg_id = traj_id
+                  ORDER BY RANDOM()
+                  LIMIT {max_trajectories}
+              )
+        """)
+    else:
+        rows = await conn.fetch(f"""
+            SELECT
+                m.seg_id,
+                m.traj_id,
+                ei.{metric}_average_distance AS mean_distance
+            FROM motion.traj_metadata m
+            JOIN evaluation.{metric}_info ei ON m.seg_id = ei.seg_id
+            WHERE m.seg_id != m.traj_id
+              AND ei.{metric}_average_distance IS NOT NULL
+        """)
+
     return [(r['seg_id'], r['traj_id'], float(r['mean_distance'])) for r in rows]
 
 
 async def get_already_computed(conn: asyncpg.Connection) -> set:
-    """Return set of seg_ids already in the calibration table."""
     rows = await conn.fetch(
         "SELECT seg_id FROM evaluation.confidence_calibration"
     )
@@ -153,19 +186,13 @@ async def get_already_computed(conn: asyncpg.Connection) -> set:
 
 def compute_loo_prediction(
     neighbors: List[Dict],
-) -> Tuple[float, float, float, List[str]]:
+) -> Optional[Dict]:
     """
-    Given a list of neighbor dicts (each with 'dtw_distance' and
-    'mean_distance'), compute:
+    Given enriched neighbor list (dtw_distance + mean_distance),
+    compute LOO prediction and all DTW-geometry features.
 
-    Returns
-    -------
-    p_hat    : inverse-DTW weighted prediction
-    d_min    : minimum DTW distance
-    perf_std : std of neighbor performance values (unweighted)
-    ids      : list of seg_ids used
+    Returns dict with all fields, or None if not enough neighbors.
     """
-    # Filter out neighbors without both fields
     valid = [
         n for n in neighbors
         if n.get('dtw_distance') is not None
@@ -173,20 +200,51 @@ def compute_loo_prediction(
     ]
 
     if len(valid) < 2:
-        return None, None, None, []
+        return None
+
+    valid.sort(key=lambda x: x['dtw_distance'])
 
     dtw_dists   = np.array([n['dtw_distance']  for n in valid], dtype=float)
     perf_values = np.array([n['mean_distance'] for n in valid], dtype=float)
     ids         = [n['seg_id'] for n in valid]
 
-    # Inverse-DTW weights (Eq. 3 in paper)
-    weights  = 1.0 / (dtw_dists + EPSILON)
-    p_hat    = float(np.dot(weights, perf_values) / weights.sum())
+    # Inverse-DTW weighted prediction (Eq. 3 in paper)
+    weights = 1.0 / (dtw_dists + EPSILON)
+    p_hat   = float(np.dot(weights, perf_values) / weights.sum())
 
+    # σ = perf_std — consistent with conformal_predictor.py online
+    perf_std  = float(perf_values.std())
+    perf_mean = float(perf_values.mean())
+    perf_cv   = perf_std / (perf_mean + EPSILON)
+
+    # DTW-geometry features for σ-model training
     d_min    = float(dtw_dists.min())
-    perf_std = float(perf_values.std())
+    d_mean   = float(dtw_dists.mean())
+    d_max    = float(dtw_dists.max())
+    d_spread = d_max - d_min
+    d_rel    = d_spread / (d_max + EPSILON)      # 0–1: relative spread
+    d_cv     = float(dtw_dists.std() / (d_mean + EPSILON))  # variationskoeff.
 
-    return p_hat, d_min, perf_std, ids
+    return {
+        'p_hat':      p_hat,
+        'sigma':      perf_std,
+        'ids':        ids,
+        'dtw_features': {
+            'd_min':     d_min,
+            'd_mean':    d_mean,
+            'd_max':     d_max,
+            'd_spread':  d_spread,
+            'd_rel':     d_rel,
+            'd_cv':      d_cv,
+            'perf_std':  perf_std,
+            'perf_cv':   perf_cv,
+            'perf_mean': perf_mean,
+        },
+    }
+
+
+def seg_id_to_traj_id(seg_id: str) -> str:
+    return seg_id.rsplit('_', 1)[0]
 
 
 async def process_segment(
@@ -196,18 +254,22 @@ async def process_segment(
     pool: asyncpg.Pool,
     k: int,
 ) -> Optional[Dict]:
+    """
+    Run LOO similarity search for one segment and compute its
+    nonconformity score α plus all DTW-geometry features.
+    """
     try:
+        # Stage 1 — MultiModalSearcher gets the pool directly
         searcher = MultiModalSearcher(pool)
-
         search_result = await searcher.search_similar(
             target_id=seg_id,
             modes=SEARCH_MODES,
             limit=k,
             metric=METRIC,
-            exclude_ids=[seg_id],
+            exclude_ids=[seg_id],   # LOO: exclude itself
         )
 
-        # Segment-Ergebnisse rausziehen
+        # Extract segment-level results
         seg_results_raw = []
         for group in search_result.get('segment_similarity', []):
             if group.get('target_segment') == seg_id:
@@ -215,27 +277,25 @@ async def process_segment(
                 break
 
         if not seg_results_raw:
+            logger.debug(f"No Stage 1 results for {seg_id}, skipping.")
             return None
 
-        # ── DTW reranking — exakt wie in similarity_route_handler.py ──────
-        def seg_id_to_traj_id(s: str) -> str:
-            return s.rsplit('_', 1)[0]
-
+        # Stage 2 — load trajectory data and DTW rerank
         async with pool.acquire() as conn:
             loader = TrajectoryLoader(conn)
 
-            # Alle benötigten traj_ids sammeln — query + kandidaten
+            # Collect all traj_ids needed (query + candidates)
             all_traj_ids = set()
-            all_traj_ids.add(seg_id_to_traj_id(seg_id))   # Query-Trajektorie
+            all_traj_ids.add(seg_id_to_traj_id(seg_id))
             for r in seg_results_raw:
-                all_traj_ids.add(seg_id_to_traj_id(r['seg_id']))  # Kandidaten
+                all_traj_ids.add(seg_id_to_traj_id(r['seg_id']))
 
-            # Batch-Load — exakt wie im route_handler
+            # Batch load — one round trip for all
             seg_batch = await loader.load_trajectories_batch(
                 list(all_traj_ids), DTW_MODE
             )
 
-        # Query-Array holen
+        # Query array
         query_traj_data = seg_batch.get(seg_id_to_traj_id(seg_id))
         if query_traj_data is None:
             return None
@@ -244,8 +304,9 @@ async def process_segment(
         if query_arr is None or len(query_arr) == 0:
             return None
 
-        # Kandidaten-Arrays aufbauen
-        candidates_flat = {}
+        # Candidate arrays
+        cand_seg_ids = [r['seg_id'] for r in seg_results_raw]
+        candidates_flat: Dict[str, np.ndarray] = {}
         for r in seg_results_raw:
             cand_seg_id  = r['seg_id']
             cand_traj_id = seg_id_to_traj_id(cand_seg_id)
@@ -258,7 +319,7 @@ async def process_segment(
         if not candidates_flat:
             return None
 
-        # DTW reranking
+        # DTW reranking (in-memory, no DB)
         dtw_results = rerank(
             query_seq=query_arr,
             candidates=candidates_flat,
@@ -268,7 +329,7 @@ async def process_segment(
 
         dtw_lookup = {r['id']: r['dtw_distance'] for r in dtw_results}
 
-        # Anreichern mit Performance-Werten
+        # Enrich with performance values
         enriched = []
         for r in seg_results_raw:
             sid       = r['seg_id']
@@ -278,21 +339,24 @@ async def process_segment(
                 enriched.append({
                     'seg_id':        sid,
                     'dtw_distance':  dtw_dist,
-                    'mean_distance': float(mean_dist),  # Decimal → float
+                    'mean_distance': float(mean_dist),
                 })
 
         if len(enriched) < 2:
+            logger.debug(f"Not enough enriched neighbors for {seg_id}")
             return None
 
-        enriched.sort(key=lambda x: x['dtw_distance'])
-
-        # Nonconformity Score berechnen
-        p_hat, d_min, perf_std, neighbor_ids = compute_loo_prediction(enriched)
-        if p_hat is None:
+        # Compute LOO prediction + DTW features
+        result = compute_loo_prediction(enriched)
+        if result is None:
             return None
+
+        p_hat            = result['p_hat']
+        sigma            = result['sigma']
+        neighbor_ids     = result['ids']
+        dtw_features     = result['dtw_features']
 
         prediction_error = abs(p_actual - p_hat)
-        sigma            = d_min * perf_std
         alpha            = prediction_error / (sigma + EPSILON)
 
         return {
@@ -301,10 +365,9 @@ async def process_segment(
             'p_actual':         p_actual,
             'p_predicted':      p_hat,
             'prediction_error': prediction_error,
-            'd_min':            d_min,
-            'perf_std':         perf_std,
             'sigma':            sigma,
             'alpha':            alpha,
+            'dtw_features':     json.dumps(dtw_features),
             'k_neighbors':      len(enriched),
             'neighbor_ids':     neighbor_ids,
             'config_k':         k,
@@ -323,20 +386,20 @@ async def insert_batch(conn: asyncpg.Connection, batch: List[Dict]) -> None:
         INSERT INTO evaluation.confidence_calibration (
             seg_id, traj_id,
             p_actual, p_predicted, prediction_error,
-            d_min, perf_std, sigma, alpha,
+            sigma, alpha,
+            dtw_features,
             k_neighbors, neighbor_ids,
             config_k, config_dtw_mode, config_metric
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
         )
         ON CONFLICT (seg_id) DO UPDATE SET
             p_actual         = EXCLUDED.p_actual,
             p_predicted      = EXCLUDED.p_predicted,
             prediction_error = EXCLUDED.prediction_error,
-            d_min            = EXCLUDED.d_min,
-            perf_std         = EXCLUDED.perf_std,
             sigma            = EXCLUDED.sigma,
             alpha            = EXCLUDED.alpha,
+            dtw_features     = EXCLUDED.dtw_features,
             k_neighbors      = EXCLUDED.k_neighbors,
             neighbor_ids     = EXCLUDED.neighbor_ids,
             computed_at      = NOW(),
@@ -347,7 +410,8 @@ async def insert_batch(conn: asyncpg.Connection, batch: List[Dict]) -> None:
         (
             r['seg_id'], r['traj_id'],
             r['p_actual'], r['p_predicted'], r['prediction_error'],
-            r['d_min'], r['perf_std'], r['sigma'], r['alpha'],
+            r['sigma'], r['alpha'],
+            r['dtw_features'],
             r['k_neighbors'], r['neighbor_ids'],
             r['config_k'], r['config_dtw_mode'], r['config_metric'],
         )
@@ -356,10 +420,7 @@ async def insert_batch(conn: asyncpg.Connection, batch: List[Dict]) -> None:
 
 
 async def compute_and_store_quantiles(conn: asyncpg.Connection) -> None:
-    """
-    After the full calibration run, compute and log coverage quantiles.
-    Also stores a summary row in a small metadata table.
-    """
+    """Compute coverage quantiles and store in confidence_quantiles."""
     rows = await conn.fetch("""
         SELECT
             percentile_cont(0.80) WITHIN GROUP (ORDER BY alpha) AS q80,
@@ -388,13 +449,13 @@ async def compute_and_store_quantiles(conn: asyncpg.Connection) -> None:
     logger.info("=" * 60)
     logger.info(
         "Online usage:\n"
-        "  σ(x)     = d_min(x) * std(neighbor_perf)\n"
-        "  interval = p̂ ± q90 * σ(x)\n"
-        f"  → q90 = {r['q90']:.4f}"
+        "  σ(x)     = std(neighbor_perf)\n"
+        "  interval = p̂ ± q90 × σ(x)\n"
+        f"  → q90 = {r['q90']:.4f}\n"
+        "Next step: run correlation analysis to check if DTW features\n"
+        "predict α → then train σ-model if correlations are strong."
     )
 
-    # Upsert metadata table so the online service can read q without
-    # querying all rows every time.
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS evaluation.confidence_quantiles (
             id              SERIAL      PRIMARY KEY,
@@ -427,20 +488,60 @@ async def compute_and_store_quantiles(conn: asyncpg.Connection) -> None:
 
     logger.info("Quantiles saved to evaluation.confidence_quantiles.")
 
+    # Print correlation hints for σ-model decision
+    corr_rows = await conn.fetch("""
+        SELECT
+            CORR(alpha, (dtw_features->>'d_min')::float)    AS corr_d_min,
+            CORR(alpha, (dtw_features->>'d_spread')::float) AS corr_d_spread,
+            CORR(alpha, (dtw_features->>'d_rel')::float)    AS corr_d_rel,
+            CORR(alpha, (dtw_features->>'d_cv')::float)     AS corr_d_cv,
+            CORR(alpha, (dtw_features->>'perf_std')::float) AS corr_perf_std,
+            CORR(alpha, (dtw_features->>'perf_cv')::float)  AS corr_perf_cv
+        FROM evaluation.confidence_calibration
+        WHERE config_dtw_mode = $1 AND config_metric = $2
+    """, DTW_MODE, METRIC)
+
+    if corr_rows:
+        c = corr_rows[0]
+        logger.info("=" * 60)
+        logger.info("Correlation of DTW features with α (nonconformity score):")
+        logger.info(f"  d_min    : {c['corr_d_min']:+.4f}")
+        logger.info(f"  d_spread : {c['corr_d_spread']:+.4f}")
+        logger.info(f"  d_rel    : {c['corr_d_rel']:+.4f}")
+        logger.info(f"  d_cv     : {c['corr_d_cv']:+.4f}")
+        logger.info(f"  perf_std : {c['corr_perf_std']:+.4f}")
+        logger.info(f"  perf_cv  : {c['corr_perf_cv']:+.4f}")
+        logger.info("=" * 60)
+        logger.info(
+            "→ Features with |corr| > 0.3 are worth including in σ-model.\n"
+            "→ If all |corr| < 0.1, σ = perf_std (global q) is sufficient."
+        )
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Main
 # ═════════════════════════════════════════════════════════════════════════════
 
-async def main(k: int, batch_size: int, resume: bool) -> None:
-    logger.info(f"Starting calibration build  k={k}  batch={batch_size}")
+async def main(
+    k: int,
+    batch_size: int,
+    resume: bool,
+    max_trajectories: Optional[int],
+) -> None:
+    logger.info(
+        f"Starting calibration build  "
+        f"k={k}  batch={batch_size}  "
+        f"max_trajectories={max_trajectories or 'all'}"
+    )
 
     pool = await create_pool(DATABASE_URL)
 
     try:
         async with pool.acquire() as conn:
             await ensure_calibration_table(conn)
-            all_segments = await get_all_seg_ids(conn, METRIC, max_trajectories=args.limit)
+            all_segments = await get_all_seg_ids(
+                conn, METRIC, max_trajectories=max_trajectories
+            )
             already_done = await get_already_computed(conn) if resume else set()
 
         logger.info(f"Total segments with performance data : {len(all_segments):,}")
@@ -459,11 +560,8 @@ async def main(k: int, batch_size: int, resume: bool) -> None:
                 await compute_and_store_quantiles(conn)
             return
 
-        # Process in batches with concurrency
-        # We process batch_size segments concurrently.  Keep this moderate
-        # (50–100) to avoid saturating the DB connection pool.
         results_buffer: List[Dict] = []
-        n_ok = 0
+        n_ok   = 0
         n_fail = 0
 
         with tqdm(total=len(todo), unit='seg', desc='Calibrating') as pbar:
@@ -483,7 +581,6 @@ async def main(k: int, batch_size: int, resume: bool) -> None:
                     else:
                         n_fail += 1
 
-                # Flush to DB every batch
                 if results_buffer:
                     async with pool.acquire() as conn:
                         await insert_batch(conn, results_buffer)
@@ -494,7 +591,6 @@ async def main(k: int, batch_size: int, resume: bool) -> None:
 
         logger.info(f"Done.  ok={n_ok:,}  failed/skipped={n_fail:,}")
 
-        # Compute and store quantiles
         async with pool.acquire() as conn:
             await compute_and_store_quantiles(conn)
 
@@ -508,26 +604,31 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--k', type=int, default=10,
-        help='Number of LOO neighbors for Stage 2 (default: 10, paper optimum)'
+        help='Number of LOO neighbors for Stage 2 (default: 10)'
     )
     parser.add_argument(
-        '--batch', type=int, default=50,
-        help='Concurrent segments per batch (default: 50)'
+        '--batch', type=int, default=10,
+        help='Concurrent segments per batch (default: 10)'
     )
     parser.add_argument(
-    '--limit', type=int, default=None,
-    help='Max. Anzahl Trajektorien (random sampling, default: alle)'
+        '--limit', type=int, default=None,
+        help='Max. Anzahl Trajektorien — random sampling (default: alle)'
     )
     parser.add_argument(
         '--resume', action='store_true', default=True,
-        help='Skip segments already in the calibration table (default: True)'
+        help='Skip segments already computed (default: True)'
     )
     parser.add_argument(
         '--full-rebuild', action='store_true', default=False,
-        help='Ignore existing rows and recompute everything'
+        help='Recompute everything from scratch'
     )
     args = parser.parse_args()
 
     resume = args.resume and not args.full_rebuild
 
-    asyncio.run(main(k=args.k, batch_size=args.batch, resume=resume))
+    asyncio.run(main(
+        k=args.k,
+        batch_size=args.batch,
+        resume=resume,
+        max_trajectories=args.limit,
+    ))

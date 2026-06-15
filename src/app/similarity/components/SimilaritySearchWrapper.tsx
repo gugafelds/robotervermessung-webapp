@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { SimilarityService } from '@/src/actions/similarity.service';
 import type { TrajInfo } from '@/types/motion.types';
 import type {
+  ConformalInterval,
   SearchTiming,
   SegmentGroup,
   SimilarityResult,
@@ -36,6 +37,8 @@ export default function SimilaritySearchWrapper({
   const [stage2Active, setStage2Active] = useState(false);
   const [dtwMode, setDtwMode] = useState<'position' | 'joint'>('position');
   const [metric, setMetric] = useState<'sidtw' | 'qdtw'>('sidtw');
+  const [conformalInterval, setConformalInterval] =
+    useState<ConformalInterval | null>(null);
 
   const hasResults = trajResults.length > 0 || segmentGroups.length > 0;
 
@@ -64,6 +67,7 @@ export default function SimilaritySearchWrapper({
     setTiming(undefined);
     setStage2Active(false);
     setMetric(search_metric);
+    setConformalInterval(null);
 
     try {
       await SimilarityService.searchSimilarityEmbedding(
@@ -94,6 +98,9 @@ export default function SimilaritySearchWrapper({
           },
           onSegmentsFound: (groups) => {
             setSegmentGroups(groups);
+          },
+          onConformalInterval: (interval) => {
+            setConformalInterval(interval);
           },
           onError: (errorMsg) => {
             setError(`Error on the search: ${errorMsg}`);
@@ -139,8 +146,7 @@ export default function SimilaritySearchWrapper({
             segmentGroups={segmentGroups}
             targetTrajFeatures={targetTrajFeatures}
             stage2Active={stage2Active}
-            dtwMode={dtwMode}
-            metric={metric}
+            conformalInterval={conformalInterval} // NEU
           />
         </div>
 

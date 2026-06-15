@@ -1,4 +1,5 @@
 import type {
+  ConformalInterval,
   EmbeddingSimilarityParams,
   EmbeddingSimilarityResult,
   HierarchicalSimilarityResponse,
@@ -23,6 +24,7 @@ export class SimilarityService {
         dtwMode?: 'position' | 'joint',
       ) => void;
       onSegmentsFound?: (groups: SegmentGroup[]) => void;
+      onConformalInterval?: (interval: ConformalInterval | null) => void; // NEU
       onError?: (error: string) => void;
     },
   ): Promise<void> {
@@ -69,11 +71,9 @@ export class SimilarityService {
         queryParams.append('dtw_mode', params.dtw_mode);
       }
 
-      // Metric Parameter                                                  // NEU
       if (params.metric) {
-        // NEU
-        queryParams.append('metric', params.metric); // NEU
-      } // NEU
+        queryParams.append('metric', params.metric);
+      }
 
       const response = await fetch(
         `${this.BASE_URL}/api/similarity/search/${targetId}?${queryParams.toString()}`,
@@ -89,7 +89,7 @@ export class SimilarityService {
 
       const data: HierarchicalSimilarityResponse = await response.json();
 
-      // 1. Target Bahn Features — direkt spreaden, kein manuelles Mapping
+      // 1. Target Bahn Features
       const targetTrajFeatures: TargetFeatures | undefined =
         data.target_traj_features ?? undefined;
 
@@ -113,7 +113,7 @@ export class SimilarityService {
         const segmentGroups: SegmentGroup[] = data.segment_similarity.map(
           (seg) => ({
             target_segment: seg.target_segment,
-            target_segment_features: seg.target_segment_features ?? undefined, // direkt
+            target_segment_features: seg.target_segment_features ?? undefined,
             results: this.transformEmbeddingResults(
               seg.similar_segments?.results ?? [],
               'segment',
@@ -123,6 +123,8 @@ export class SimilarityService {
 
         callbacks.onSegmentsFound?.(segmentGroups);
       }
+
+      callbacks.onConformalInterval?.(data.conformal_interval ?? null);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -154,9 +156,9 @@ export class SimilarityService {
       max_accel: result.features?.max_accel ?? 0,
       min_accel: result.features?.min_accel ?? 0,
       std_accel: result.features?.std_accel ?? 0,
-      min_distance: result.features?.min_distance, // NEU
-      mean_distance: result.features?.mean_distance, // NEU
-      max_distance: result.features?.max_distance, // NEU
+      min_distance: result.features?.min_distance,
+      mean_distance: result.features?.mean_distance,
+      max_distance: result.features?.max_distance,
       position_x: result.features?.position_x ?? 0,
       position_y: result.features?.position_y ?? 0,
       position_z: result.features?.position_z ?? 0,

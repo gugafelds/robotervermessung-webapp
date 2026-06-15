@@ -2,6 +2,7 @@ import React from 'react';
 
 import { computePrognosis } from '@/src/lib/prognosis';
 import type {
+  ConformalInterval,
   PrognosisFields,
   SegmentGroup,
   SimilarityResult,
@@ -23,9 +24,11 @@ const getErrorColor = (v: number | null, gt: number | null): string => {
   return 'text-red-600';
 };
 
-const getConfidenceColor = (v: number): string => {
-  if (v > 0.7) return 'text-green-600';
-  if (v > 0.4) return 'text-yellow-600';
+// NEU — ersetzt getConfidenceColor
+const getIntervalColor = (low: number, high: number): string => {
+  const width = high - low;
+  if (width < 0.05) return 'text-green-600';
+  if (width < 0.15) return 'text-yellow-600';
   return 'text-red-600';
 };
 
@@ -85,7 +88,7 @@ interface PrognosisCardProps {
   gtMin: number | null;
   gtMean: number | null;
   gtMax: number | null;
-  confidence?: number | null;
+  conformalInterval?: ConformalInterval | null; // NEU — ersetzt confidence
 }
 
 const PrognosisCard: React.FC<PrognosisCardProps> = ({
@@ -94,7 +97,7 @@ const PrognosisCard: React.FC<PrognosisCardProps> = ({
   gtMin,
   gtMean,
   gtMax,
-  confidence,
+  conformalInterval,
 }) => (
   <div className="flex flex-col gap-3 rounded-lg border border-gray-400 bg-white p-4">
     <p className="text-lg font-medium uppercase tracking-wider text-primary">
@@ -129,13 +132,23 @@ const PrognosisCard: React.FC<PrognosisCardProps> = ({
       />
     </div>
 
-    {confidence != null && (
+    {/* NEU — ersetzt alte confidence Anzeige, gleiches Layout */}
+    {conformalInterval != null && (
       <div className="mt-2 border-t pt-2">
-        <p className="text-base text-gray-800">Confidence</p>
+        <p className="text-base text-gray-800">
+          Prediction Interval{' '}
+          <span className="text-sm text-gray-400">
+            ({(conformalInterval.coverage * 100).toFixed(0)}% coverage)
+          </span>
+        </p>
         <p
-          className={`font-mono text-sm font-medium ${getConfidenceColor(confidence)}`}
+          className={`font-mono text-sm font-medium ${getIntervalColor(
+            conformalInterval.low,
+            conformalInterval.high,
+          )}`}
         >
-          {(confidence * 100).toFixed(1)}%
+          [{conformalInterval.low.toFixed(4)},{' '}
+          {conformalInterval.high.toFixed(4)}] mm
         </p>
       </div>
     )}
@@ -149,6 +162,7 @@ interface PrognosisProps {
   stage2Active: boolean;
   dtwMode?: 'position' | 'joint';
   metric?: 'sidtw' | 'qdtw';
+  conformalInterval?: ConformalInterval | null; // NEU
 }
 
 const Prognosis: React.FC<PrognosisProps> = ({
@@ -158,11 +172,12 @@ const Prognosis: React.FC<PrognosisProps> = ({
   stage2Active,
   dtwMode = 'position',
   metric = 'sidtw',
+  conformalInterval, // NEU
 }) => {
   const hasData = trajResults.length > 0 || segmentGroups.length > 0;
   if (!hasData) return null;
 
-  const { direct, decomposed, groundTruth, confidence } = computePrognosis(
+  const { direct, decomposed, groundTruth } = computePrognosis(
     trajResults,
     segmentGroups,
     targetTrajFeatures,
@@ -208,7 +223,7 @@ const Prognosis: React.FC<PrognosisProps> = ({
           gtMin={groundTruth.min}
           gtMean={groundTruth.mean}
           gtMax={groundTruth.max}
-          confidence={confidence.direct}
+          // Direct hat kein Segment-basiertes Intervall
         />
         <PrognosisCard
           label="Decomposed (Segments)"
@@ -216,7 +231,7 @@ const Prognosis: React.FC<PrognosisProps> = ({
           gtMin={groundTruth.min}
           gtMean={groundTruth.mean}
           gtMax={groundTruth.max}
-          confidence={confidence.decomposed.weightedMean}
+          conformalInterval={conformalInterval} // NEU — nur Decomposed
         />
       </div>
     </div>

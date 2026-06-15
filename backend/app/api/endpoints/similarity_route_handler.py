@@ -8,6 +8,7 @@ import time
 from ...database import get_db, get_db_pool
 from ...utils.multimodal_framework.multi_modal_searcher import MultiModalSearcher
 from ...utils.metadata_embeddings.trajectory_loader import TrajectoryLoader
+from ...utils.conformal_calibration.conformal_predictor import compute_conformal_intervals
 from ...utils.multimodal_framework.dtw_reranker import rerank
 
 logger = logging.getLogger(__name__)
@@ -267,12 +268,15 @@ async def search_similar(
             group['similar_segments']['results'] = enriched_seg
  
         stage2_ms = (time.time() - t2) * 1000
+        
+        result = await compute_conformal_intervals(result, conn, dtw_mode=dtw_mode)
+
         result['stage2_active'] = True
         result['stage2_dtw_mode'] = dtw_mode
         result['timing']['data_loading_ms'] = round(data_load_ms, 1)
         result['timing']['stage2_ms'] = round(stage2_ms, 1)
         result['timing']['total_ms'] = round((time.time() - t_start) * 1000, 1)
- 
+
         return result
  
     except HTTPException:
