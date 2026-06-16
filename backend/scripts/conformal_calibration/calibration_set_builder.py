@@ -1,5 +1,5 @@
 """
-calibration_set_builder_v2.py
+calibration_set_builder_v4.py
 ================================
 Offline script to build conformal calibration and test sets for the
 retrieval-based robot trajectory performance prediction framework.
@@ -10,7 +10,7 @@ Main changes vs. v1
    conformal error level alpha.
 2. Stores and filters by a `config_hash`, including K, DTW mode, metric,
    search modes, distance normalization, sigma floor, and split settings.
-3. Builds segment-level calibration rows and derives trajectory-level rows.
+3. Supports bundled calibration: one search_similar(target_id=traj_id) can build both direct and decomposed outputs.
 4. Uses conservative split-conformal quantiles via rank ceil((n+1)*coverage).
 5. Adds a sigma floor to avoid exploding scores when neighbor performance std
    is close to zero.
@@ -21,12 +21,14 @@ Main changes vs. v1
 9. Computes empirical coverage on a held-out test split.
 10. Stores log_prediction_error for sigma-model training.
 11. Creates a per-call MultiModalSearcher instance to avoid sharing mutable searcher state across concurrent tasks.
+12. Supports direct trajectory calibration in addition to decomposed segment aggregation.
+13. For --retrieval-strategy both, processes one trajectory bundle at a time so Direct and Decomposed reuse the same search_similar result.
 
 Usage
 -----
-    python calibration_set_builder_v2.py --k 10 --batch 10 --limit 1000
-    python calibration_set_builder_v2.py --full-rebuild
-    python calibration_set_builder_v2.py --distance-normalization per_point --test-ratio 0.2
+    python calibration_set_builder_v4.py --k 10 --batch 10 --limit 1000
+    python calibration_set_builder_v4.py --full-rebuild
+    python calibration_set_builder_v4.py --distance-normalization per_point --test-ratio 0.2
 
 Requirements
 ------------
@@ -44,7 +46,7 @@ import math
 import os
 import sys
 from collections import defaultdict
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Any, Dict, Iterable, List, Literal, Optional, Sequence, Tuple
 
 import asyncpg
@@ -81,6 +83,7 @@ ALLOWED_DTW_MODES = {'position', 'joint', 'orientation', 'velocity', 'metadata'}
 DistanceNorm = Literal['raw', 'per_point', 'per_path_length']
 SplitRole = Literal['calibration', 'test']
 Level = Literal['segment', 'trajectory']
+RetrievalStrategy = Literal['decomposed', 'direct']
 
 
 @dataclass(frozen=True)
@@ -93,6 +96,7 @@ class CalibrationConfig:
     sigma_floor: float
     test_ratio: float
     split_seed: int
+    retrieval_strategy: RetrievalStrategy = 'decomposed'
     prediction_level: str = 'segment_and_trajectory'
     sigma_source: str = 'neighbor_perf_std_with_floor'
     trajectory_sigma_strategy: str = 'weighted_mean_segment_sigma'
@@ -208,10 +212,12 @@ async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
     await conn.execute("""
         CREATE SCHEMA IF NOT EXISTS evaluation;
 
-        CREATE TABLE IF NOT EXISTS evaluation.confidence_calibration_segments (
+        CREATE TABLE IF NOT EXISTS evaluation.confidence_calibration_seg (
             seg_id                 TEXT        NOT NULL,
             traj_id                TEXT        NOT NULL,
             split_role             TEXT        NOT NULL CHECK (split_role IN ('calibration', 'test')),
+            retrieval_strategy     TEXT        NOT NULL DEFAULT 'decomposed'
+                                      CHECK (retrieval_strategy IN ('decomposed', 'direct')),
 
             -- LOO prediction
             p_actual               FLOAT       NOT NULL,
@@ -243,9 +249,11 @@ async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
             PRIMARY KEY (seg_id, config_hash)
         );
 
-        CREATE TABLE IF NOT EXISTS evaluation.confidence_calibration_trajectories (
+        CREATE TABLE IF NOT EXISTS evaluation.confidence_calibration_traj (
             traj_id                TEXT        NOT NULL,
             split_role             TEXT        NOT NULL CHECK (split_role IN ('calibration', 'test')),
+            retrieval_strategy     TEXT        NOT NULL DEFAULT 'decomposed'
+                                      CHECK (retrieval_strategy IN ('decomposed', 'direct')),
 
             -- Aggregated trajectory-level prediction
             p_actual               FLOAT       NOT NULL,
@@ -272,44 +280,59 @@ async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
         );
 
         -- Backward-compatible schema migration for tables created by earlier v2 drafts.
-        ALTER TABLE evaluation.confidence_calibration_segments
+        ALTER TABLE evaluation.confidence_calibration_seg
             ADD COLUMN IF NOT EXISTS log_prediction_error FLOAT;
-        ALTER TABLE evaluation.confidence_calibration_trajectories
+        ALTER TABLE evaluation.confidence_calibration_traj
             ADD COLUMN IF NOT EXISTS log_prediction_error FLOAT;
 
-        UPDATE evaluation.confidence_calibration_segments
+        ALTER TABLE evaluation.confidence_calibration_seg
+            ADD COLUMN IF NOT EXISTS retrieval_strategy TEXT DEFAULT 'decomposed';
+        ALTER TABLE evaluation.confidence_calibration_traj
+            ADD COLUMN IF NOT EXISTS retrieval_strategy TEXT DEFAULT 'decomposed';
+        UPDATE evaluation.confidence_calibration_seg
+        SET retrieval_strategy = 'decomposed'
+        WHERE retrieval_strategy IS NULL;
+        UPDATE evaluation.confidence_calibration_traj
+        SET retrieval_strategy = 'decomposed'
+        WHERE retrieval_strategy IS NULL;
+
+        UPDATE evaluation.confidence_calibration_seg
         SET log_prediction_error = LN(prediction_error + 1e-6)
         WHERE log_prediction_error IS NULL;
-        UPDATE evaluation.confidence_calibration_trajectories
+        UPDATE evaluation.confidence_calibration_traj
         SET log_prediction_error = LN(prediction_error + 1e-6)
         WHERE log_prediction_error IS NULL;
 
-        ALTER TABLE evaluation.confidence_calibration_segments
+        ALTER TABLE evaluation.confidence_calibration_seg
             ALTER COLUMN log_prediction_error SET NOT NULL;
-        ALTER TABLE evaluation.confidence_calibration_trajectories
+        ALTER TABLE evaluation.confidence_calibration_traj
             ALTER COLUMN log_prediction_error SET NOT NULL;
 
         CREATE INDEX IF NOT EXISTS idx_ccs_config_role
-            ON evaluation.confidence_calibration_segments (config_hash, split_role);
+            ON evaluation.confidence_calibration_seg (config_hash, split_role);
         CREATE INDEX IF NOT EXISTS idx_ccs_traj_id
-            ON evaluation.confidence_calibration_segments (traj_id);
+            ON evaluation.confidence_calibration_seg (traj_id);
         CREATE INDEX IF NOT EXISTS idx_ccs_score
-            ON evaluation.confidence_calibration_segments (nonconformity_score);
+            ON evaluation.confidence_calibration_seg (nonconformity_score);
         CREATE INDEX IF NOT EXISTS idx_ccs_features
-            ON evaluation.confidence_calibration_segments USING gin (dtw_features);
+            ON evaluation.confidence_calibration_seg USING gin (dtw_features);
 
         CREATE INDEX IF NOT EXISTS idx_cct_config_role
-            ON evaluation.confidence_calibration_trajectories (config_hash, split_role);
+            ON evaluation.confidence_calibration_traj (config_hash, split_role);
+        CREATE INDEX IF NOT EXISTS idx_cct_strategy
+            ON evaluation.confidence_calibration_traj (retrieval_strategy, config_hash, split_role);
         CREATE INDEX IF NOT EXISTS idx_cct_score
-            ON evaluation.confidence_calibration_trajectories (nonconformity_score);
+            ON evaluation.confidence_calibration_traj (nonconformity_score);
         CREATE INDEX IF NOT EXISTS idx_cct_features
-            ON evaluation.confidence_calibration_trajectories USING gin (traj_features);
+            ON evaluation.confidence_calibration_traj USING gin (traj_features);
 
         CREATE TABLE IF NOT EXISTS evaluation.confidence_quantiles (
             id                     SERIAL      PRIMARY KEY,
             level                  TEXT        NOT NULL CHECK (level IN ('segment', 'trajectory')),
             config_hash            TEXT        NOT NULL,
             config                 JSONB       NOT NULL,
+            retrieval_strategy     TEXT        NOT NULL DEFAULT 'decomposed'
+                                      CHECK (retrieval_strategy IN ('decomposed', 'direct')),
             dtw_mode               TEXT        NOT NULL,
             metric                 TEXT        NOT NULL,
             config_k               INT         NOT NULL,
@@ -326,6 +349,12 @@ async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
 
             UNIQUE (level, config_hash, coverage)
         );
+
+        ALTER TABLE evaluation.confidence_quantiles
+            ADD COLUMN IF NOT EXISTS retrieval_strategy TEXT DEFAULT 'decomposed';
+        UPDATE evaluation.confidence_quantiles
+        SET retrieval_strategy = 'decomposed'
+        WHERE retrieval_strategy IS NULL;
     """)
     logger.info("Calibration tables ready.")
 
@@ -336,11 +365,11 @@ async def delete_config_rows(conn: asyncpg.Connection, config_hash: str) -> None
         config_hash,
     )
     await conn.execute(
-        "DELETE FROM evaluation.confidence_calibration_trajectories WHERE config_hash = $1",
+        "DELETE FROM evaluation.confidence_calibration_traj WHERE config_hash = $1",
         config_hash,
     )
     await conn.execute(
-        "DELETE FROM evaluation.confidence_calibration_segments WHERE config_hash = $1",
+        "DELETE FROM evaluation.confidence_calibration_seg WHERE config_hash = $1",
         config_hash,
     )
     logger.info(f"Deleted previous rows for config_hash={config_hash}")
@@ -398,7 +427,7 @@ async def get_already_computed_segments(conn: asyncpg.Connection, config_hash: s
     rows = await conn.fetch(
         """
         SELECT seg_id
-        FROM evaluation.confidence_calibration_segments
+        FROM evaluation.confidence_calibration_seg
         WHERE config_hash = $1
         """,
         config_hash,
@@ -431,6 +460,283 @@ async def get_actual_trajectory_values(
     """, list(traj_ids))
 
     return {r['traj_id']: float(r['mean_distance']) for r in rows}
+
+
+async def get_all_traj_ids(
+    conn: asyncpg.Connection,
+    metric: str,
+    max_trajectories: Optional[int] = None,
+) -> List[Tuple[str, float]]:
+    """Return (traj_id, actual_mean_distance) for whole trajectories."""
+    metric = validate_metric(metric)
+    table_name = f"evaluation.{metric}_info"
+    value_col = f"{metric}_average_distance"
+
+    limit_sql = "ORDER BY RANDOM() LIMIT $1" if max_trajectories else "ORDER BY m.traj_id"
+    args: Tuple[Any, ...] = (max_trajectories,) if max_trajectories else ()
+
+    rows = await conn.fetch(f"""
+        SELECT
+            m.traj_id,
+            ei.{value_col} AS mean_distance
+        FROM motion.traj_metadata m
+        JOIN {table_name} ei ON m.seg_id = ei.seg_id
+        WHERE m.seg_id = m.traj_id
+          AND ei.{value_col} IS NOT NULL
+        {limit_sql}
+    """, *args)
+
+    return [(r['traj_id'], float(r['mean_distance'])) for r in rows]
+
+
+async def get_all_segments_for_trajectories(
+    conn: asyncpg.Connection,
+    traj_ids: Sequence[str],
+) -> Dict[str, List[str]]:
+    """Return traj_id -> all segment IDs, used to avoid same-trajectory leakage."""
+    if not traj_ids:
+        return {}
+
+    rows = await conn.fetch("""
+        SELECT traj_id, seg_id
+        FROM motion.traj_metadata
+        WHERE traj_id = ANY($1::text[])
+    """, list(traj_ids))
+
+    out: Dict[str, List[str]] = defaultdict(list)
+    for r in rows:
+        out[r['traj_id']].append(r['seg_id'])
+    return out
+
+
+
+
+async def get_segment_actual_values_for_trajectories(
+    conn: asyncpg.Connection,
+    traj_ids: Sequence[str],
+    metric: str,
+) -> Dict[str, float]:
+    """Return seg_id -> actual segment-level performance values."""
+    if not traj_ids:
+        return {}
+
+    metric = validate_metric(metric)
+    table_name = f"evaluation.{metric}_info"
+    value_col = f"{metric}_average_distance"
+
+    rows = await conn.fetch(f"""
+        SELECT
+            m.seg_id,
+            ei.{value_col} AS mean_distance
+        FROM motion.traj_metadata m
+        JOIN {table_name} ei ON m.seg_id = ei.seg_id
+        WHERE m.seg_id != m.traj_id
+          AND m.traj_id = ANY($1::text[])
+          AND ei.{value_col} IS NOT NULL
+    """, list(traj_ids))
+
+    return {r['seg_id']: float(r['mean_distance']) for r in rows}
+
+async def get_already_computed_trajectories(conn: asyncpg.Connection, config_hash: str) -> set[str]:
+    rows = await conn.fetch(
+        """
+        SELECT traj_id
+        FROM evaluation.confidence_calibration_traj
+        WHERE config_hash = $1
+        """,
+        config_hash,
+    )
+    return {r['traj_id'] for r in rows}
+
+
+def get_candidate_id(row: Dict[str, Any], level: Level) -> Optional[str]:
+    """Best-effort candidate id extraction from MultiModalSearcher result rows."""
+    keys = (
+        ['traj_id', 'trajectory_id', 'id', 'seg_id']
+        if level == 'trajectory'
+        else ['seg_id', 'segment_id', 'id']
+    )
+    for key in keys:
+        value = row.get(key)
+        if value is not None:
+            return str(value)
+    return None
+
+
+def extract_results_from_search(search_result: Dict[str, Any], level: Level, target_id: str) -> List[Dict[str, Any]]:
+    """
+    Robustly extract trajectory/segment candidate rows from MultiModalSearcher output.
+
+    The exact payload differs between framework versions, so we first look inside the
+    expected subtree and then recursively collect lists named `results`.
+    """
+    if level == 'trajectory':
+        root = search_result.get('trajectory_similarity', search_result)
+    else:
+        root = search_result.get('segment_similarity', search_result)
+
+    collected: List[Dict[str, Any]] = []
+
+    def visit(obj: Any) -> None:
+        if isinstance(obj, dict):
+            if isinstance(obj.get('results'), list):
+                collected.extend([x for x in obj['results'] if isinstance(x, dict)])
+            for value in obj.values():
+                visit(value)
+        elif isinstance(obj, list):
+            for item in obj:
+                # For segment results, prefer the group belonging to the target segment.
+                if level == 'segment' and isinstance(item, dict):
+                    target = item.get('target_segment') or item.get('target_id')
+                    if target is not None and str(target) != str(target_id):
+                        continue
+                visit(item)
+
+    visit(root)
+
+    # Deduplicate while preserving order.
+    seen: set[str] = set()
+    unique: List[Dict[str, Any]] = []
+    for row in collected:
+        cid = get_candidate_id(row, level)
+        if cid is None or cid in seen:
+            continue
+        seen.add(cid)
+        unique.append(row)
+    return unique
+
+
+
+
+def extract_segment_groups_from_search(
+    search_result: Dict[str, Any],
+    target_segment_ids: Sequence[str],
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Extract target_segment -> candidate rows from the segment part of a trajectory search.
+
+    MultiModalSearcher(target_id=<traj_id>) returns both whole-trajectory results and
+    one segment-similarity group per query segment. This helper keeps that grouping so
+    decomposed predictions can be built without calling search_similar again per segment.
+    """
+    target_set = {str(x) for x in target_segment_ids}
+    groups: Dict[str, List[Dict[str, Any]]] = {}
+    root = search_result.get('segment_similarity', [])
+
+    def add_group(target: Any, results: Any) -> None:
+        if target is None or not isinstance(results, list):
+            return
+        target_s = str(target)
+        if target_set and target_s not in target_set:
+            return
+        rows = [r for r in results if isinstance(r, dict)]
+        if rows:
+            # Deduplicate candidates while preserving rank order.
+            seen: set[str] = set()
+            unique: List[Dict[str, Any]] = []
+            for row in rows:
+                cid = get_candidate_id(row, 'segment')
+                if cid is None or cid in seen:
+                    continue
+                seen.add(cid)
+                unique.append(row)
+            groups[target_s] = unique
+
+    def visit(obj: Any, inherited_target: Any = None) -> None:
+        if isinstance(obj, dict):
+            target = obj.get('target_segment') or obj.get('target_id') or inherited_target
+
+            # Common payload shape from the current framework.
+            similar_segments = obj.get('similar_segments')
+            if isinstance(similar_segments, dict):
+                add_group(target, similar_segments.get('results'))
+
+            # Fallback shapes.
+            add_group(target, obj.get('results'))
+
+            for value in obj.values():
+                visit(value, target)
+        elif isinstance(obj, list):
+            for item in obj:
+                visit(item, inherited_target)
+
+    visit(root)
+    return groups
+
+
+def collect_candidate_traj_ids_from_search(search_result: Dict[str, Any]) -> List[str]:
+    """Collect trajectory IDs needed for loading direct and decomposed candidates."""
+    out: List[str] = []
+
+    for row in extract_results_from_search(search_result, 'trajectory', target_id=''):
+        cid = get_candidate_id(row, 'trajectory')
+        if cid:
+            out.append(seg_id_to_traj_id(cid) if '_' in cid else cid)
+
+    segment_groups = extract_segment_groups_from_search(search_result, target_segment_ids=[])
+    # If target_segment_ids is empty, the helper filters nothing only if we explicitly recurse below.
+    if not segment_groups:
+        # Manual fallback: collect all result rows under segment_similarity.
+        def visit(obj: Any) -> None:
+            if isinstance(obj, dict):
+                if isinstance(obj.get('results'), list):
+                    for row in obj['results']:
+                        if isinstance(row, dict):
+                            sid = get_candidate_id(row, 'segment')
+                            if sid:
+                                out.append(row.get('traj_id') or seg_id_to_traj_id(sid))
+                for value in obj.values():
+                    visit(value)
+            elif isinstance(obj, list):
+                for item in obj:
+                    visit(item)
+        visit(search_result.get('segment_similarity', []))
+    else:
+        for rows in segment_groups.values():
+            for row in rows:
+                sid = get_candidate_id(row, 'segment')
+                if sid:
+                    out.append(row.get('traj_id') or seg_id_to_traj_id(sid))
+
+    return list(dict.fromkeys(str(x) for x in out if x))
+
+def get_sequence_from_loaded_trajectory(data: Optional[Dict[str, Any]], entity_id: str) -> Optional[np.ndarray]:
+    """Return whole-trajectory sequence from TrajectoryLoader output.
+
+    Preferred: data['segments'][traj_id], because in this project whole trajectories
+    are stored with seg_id == traj_id. Fallback: concatenate non-empty segments.
+    """
+    if not data:
+        return None
+
+    for key in ('trajectory', 'sequence', 'data', 'points'):
+        value = data.get(key)
+        if value is not None and sequence_len(value) > 0:
+            return np.asarray(value, dtype=float)
+
+    segments = data.get('segments') or {}
+    if entity_id in segments and sequence_len(segments[entity_id]) > 0:
+        return np.asarray(segments[entity_id], dtype=float)
+
+    arrays: List[np.ndarray] = []
+    for sid in sorted(segments.keys()):
+        if sid == entity_id:
+            continue
+        arr = segments.get(sid)
+        if arr is not None and sequence_len(arr) > 0:
+            arrays.append(np.asarray(arr, dtype=float))
+
+    if not arrays:
+        return None
+    return np.concatenate(arrays, axis=0)
+
+
+def count_real_segments(data: Optional[Dict[str, Any]], traj_id: str) -> int:
+    if not data:
+        return 0
+    segments = data.get('segments') or {}
+    real = [sid for sid in segments.keys() if sid != traj_id]
+    return len(real) if real else len(segments)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -548,6 +854,7 @@ async def process_segment(
     split_role: SplitRole,
     pool: asyncpg.Pool,
     cfg: CalibrationConfig,
+    exclude_ids: Optional[Sequence[str]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Run LOO retrieval for one segment and compute its conformal calibration row."""
     try:
@@ -560,7 +867,7 @@ async def process_segment(
             modes=list(cfg.search_modes),
             limit=cfg.k,
             metric=cfg.metric,
-            exclude_ids=[seg_id],
+            exclude_ids=list(exclude_ids or [seg_id]),
         )
 
         seg_results_raw: List[Dict[str, Any]] = []
@@ -683,6 +990,7 @@ async def process_segment(
             'seg_id': seg_id,
             'traj_id': traj_id,
             'split_role': split_role,
+            'retrieval_strategy': 'decomposed',
             'p_actual': p_actual,
             'p_predicted': p_hat,
             'prediction_error': prediction_error,
@@ -708,8 +1016,8 @@ async def process_segment(
 
 async def insert_segment_batch(conn: asyncpg.Connection, batch: List[Dict[str, Any]]) -> None:
     await conn.executemany("""
-        INSERT INTO evaluation.confidence_calibration_segments (
-            seg_id, traj_id, split_role,
+        INSERT INTO evaluation.confidence_calibration_seg (
+            seg_id, traj_id, split_role, retrieval_strategy,
             p_actual, p_predicted, prediction_error, log_prediction_error,
             sigma, nonconformity_score,
             dtw_features,
@@ -718,18 +1026,19 @@ async def insert_segment_batch(conn: asyncpg.Connection, batch: List[Dict[str, A
             config_hash, config,
             config_k, config_dtw_mode, config_metric
         ) VALUES (
-            $1, $2, $3,
-            $4, $5, $6, $7,
-            $8, $9,
-            $10::jsonb,
-            $11, $12,
-            $13, $14,
-            $15, $16::jsonb,
-            $17, $18, $19
+            $1, $2, $3, $4,
+            $5, $6, $7, $8,
+            $9, $10,
+            $11::jsonb,
+            $12, $13,
+            $14, $15,
+            $16, $17::jsonb,
+            $18, $19, $20
         )
         ON CONFLICT (seg_id, config_hash) DO UPDATE SET
             traj_id              = EXCLUDED.traj_id,
             split_role           = EXCLUDED.split_role,
+            retrieval_strategy   = EXCLUDED.retrieval_strategy,
             p_actual             = EXCLUDED.p_actual,
             p_predicted          = EXCLUDED.p_predicted,
             prediction_error     = EXCLUDED.prediction_error,
@@ -748,12 +1057,208 @@ async def insert_segment_batch(conn: asyncpg.Connection, batch: List[Dict[str, A
             computed_at          = NOW()
     """, [
         (
-            r['seg_id'], r['traj_id'], r['split_role'],
+            r['seg_id'], r['traj_id'], r['split_role'], r['retrieval_strategy'],
             r['p_actual'], r['p_predicted'], r['prediction_error'], r['log_prediction_error'],
             r['sigma'], r['nonconformity_score'],
             r['dtw_features'],
             r['k_neighbors'], r['neighbor_ids'],
             r['query_length'], r['query_path_length'],
+            r['config_hash'], r['config'],
+            r['config_k'], r['config_dtw_mode'], r['config_metric'],
+        )
+        for r in batch
+    ])
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Direct trajectory-level core computation
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+async def process_trajectory_direct(
+    traj_id: str,
+    p_actual: float,
+    split_role: SplitRole,
+    pool: asyncpg.Pool,
+    cfg: CalibrationConfig,
+) -> Optional[Dict[str, Any]]:
+    """Run LOO retrieval for one whole trajectory and compute a direct trajectory row."""
+    try:
+        searcher = MultiModalSearcher(pool)
+        search_result = await searcher.search_similar(
+            target_id=traj_id,
+            modes=list(cfg.search_modes),
+            limit=cfg.k,
+            metric=cfg.metric,
+            exclude_ids=[traj_id],
+        )
+
+        traj_results_raw = extract_results_from_search(search_result, 'trajectory', traj_id)
+        if not traj_results_raw:
+            logger.debug(f"No trajectory Stage 1 results for {traj_id}, skipping.")
+            return None
+
+        candidate_traj_ids: List[str] = []
+        for row in traj_results_raw:
+            cid = get_candidate_id(row, 'trajectory')
+            if cid is not None and cid != traj_id:
+                candidate_traj_ids.append(cid)
+        candidate_traj_ids = list(dict.fromkeys(candidate_traj_ids))[: cfg.k]
+        if not candidate_traj_ids:
+            return None
+
+        async with pool.acquire() as conn:
+            loader = TrajectoryLoader(conn)
+            all_traj_ids = [traj_id] + candidate_traj_ids
+            batch = await loader.load_trajectories_batch(all_traj_ids, cfg.dtw_mode)
+            actual_map = await get_actual_trajectory_values(conn, candidate_traj_ids, cfg.metric)
+
+        query_data = batch.get(traj_id)
+        query_arr = get_sequence_from_loaded_trajectory(query_data, traj_id)
+        if query_arr is None or sequence_len(query_arr) == 0:
+            return None
+
+        query_length = sequence_len(query_arr)
+        query_path_len = path_length(query_arr)
+        n_segments = count_real_segments(query_data, traj_id)
+
+        candidates_flat: Dict[str, np.ndarray] = {}
+        candidate_meta: Dict[str, Dict[str, float]] = {}
+        for cid in candidate_traj_ids:
+            arr = get_sequence_from_loaded_trajectory(batch.get(cid), cid)
+            if arr is None or sequence_len(arr) == 0:
+                continue
+            candidates_flat[cid] = arr
+            candidate_meta[cid] = {
+                'candidate_length': float(sequence_len(arr)),
+                'candidate_path_length': float(path_length(arr)),
+            }
+
+        if not candidates_flat:
+            return None
+
+        dtw_results = rerank(
+            query_seq=query_arr,
+            candidates=candidates_flat,
+            limit=cfg.k,
+            mode=cfg.dtw_mode,
+        )
+
+        dtw_lookup: Dict[str, float] = {}
+        for row in dtw_results:
+            row_id = row.get('id') or row.get('traj_id') or row.get('seg_id')
+            if row_id is not None and row.get('dtw_distance') is not None:
+                dtw_lookup[str(row_id)] = float(row['dtw_distance'])
+
+        enriched: List[Dict[str, Any]] = []
+        for cid in candidate_traj_ids:
+            raw_dtw_dist = dtw_lookup.get(cid)
+            mean_dist = actual_map.get(cid)
+            candidate_arr = candidates_flat.get(cid)
+            if raw_dtw_dist is None or mean_dist is None or candidate_arr is None:
+                continue
+
+            normalized_dtw_dist = normalize_dtw_distance(
+                raw_distance=raw_dtw_dist,
+                query_seq=query_arr,
+                candidate_seq=candidate_arr,
+                method=cfg.distance_normalization,
+                query_path_len=query_path_len,
+            )
+            enriched.append({
+                'seg_id': cid,  # generic id field consumed by compute_loo_prediction
+                'dtw_distance': normalized_dtw_dist,
+                'dtw_distance_raw': raw_dtw_dist,
+                'mean_distance': float(mean_dist),
+                **candidate_meta.get(cid, {}),
+            })
+
+        result = compute_loo_prediction(enriched, sigma_floor=cfg.sigma_floor)
+        if result is None:
+            return None
+
+        p_hat = result['p_hat']
+        sigma = result['sigma']
+        prediction_error = abs(p_actual - p_hat)
+        log_prediction_error = math.log(prediction_error + EPSILON)
+        nonconformity_score = prediction_error / max(sigma, cfg.sigma_floor, EPSILON)
+
+        traj_features = result['dtw_features']
+        traj_features.update({
+            'n_segments': n_segments,
+            'query_length': query_length,
+            'query_path_length': query_path_len,
+            'total_query_length': query_length,
+            'total_query_path_length': query_path_len,
+            'distance_normalization': cfg.distance_normalization,
+            'retrieval_strategy': 'direct',
+        })
+
+        return {
+            'traj_id': traj_id,
+            'split_role': split_role,
+            'retrieval_strategy': 'direct',
+            'p_actual': p_actual,
+            'p_predicted': p_hat,
+            'prediction_error': prediction_error,
+            'log_prediction_error': log_prediction_error,
+            'sigma': sigma,
+            'nonconformity_score': nonconformity_score,
+            'traj_features': json.dumps(traj_features, sort_keys=True),
+            'segment_ids': [],
+            'n_segments': n_segments,
+            'config_hash': cfg.hash(),
+            'config': cfg.to_json(),
+            'config_k': cfg.k,
+            'config_dtw_mode': cfg.dtw_mode,
+            'config_metric': cfg.metric,
+        }
+
+    except Exception as e:
+        logger.warning(f"Direct trajectory failed for {traj_id}: {e}")
+        return None
+
+
+async def insert_trajectory_batch(conn: asyncpg.Connection, batch: List[Dict[str, Any]]) -> None:
+    await conn.executemany("""
+        INSERT INTO evaluation.confidence_calibration_traj (
+            traj_id, split_role, retrieval_strategy,
+            p_actual, p_predicted, prediction_error, log_prediction_error,
+            sigma, nonconformity_score,
+            traj_features, segment_ids, n_segments,
+            config_hash, config,
+            config_k, config_dtw_mode, config_metric
+        ) VALUES (
+            $1, $2, $3,
+            $4, $5, $6, $7,
+            $8, $9,
+            $10::jsonb, $11, $12,
+            $13, $14::jsonb,
+            $15, $16, $17
+        )
+        ON CONFLICT (traj_id, config_hash) DO UPDATE SET
+            split_role           = EXCLUDED.split_role,
+            retrieval_strategy   = EXCLUDED.retrieval_strategy,
+            p_actual             = EXCLUDED.p_actual,
+            p_predicted          = EXCLUDED.p_predicted,
+            prediction_error     = EXCLUDED.prediction_error,
+            log_prediction_error = EXCLUDED.log_prediction_error,
+            sigma                = EXCLUDED.sigma,
+            nonconformity_score  = EXCLUDED.nonconformity_score,
+            traj_features        = EXCLUDED.traj_features,
+            segment_ids          = EXCLUDED.segment_ids,
+            n_segments           = EXCLUDED.n_segments,
+            config               = EXCLUDED.config,
+            config_k             = EXCLUDED.config_k,
+            config_dtw_mode      = EXCLUDED.config_dtw_mode,
+            config_metric        = EXCLUDED.config_metric,
+            computed_at          = NOW()
+    """, [
+        (
+            r['traj_id'], r['split_role'], r['retrieval_strategy'],
+            r['p_actual'], r['p_predicted'], r['prediction_error'], r['log_prediction_error'],
+            r['sigma'], r['nonconformity_score'],
+            r['traj_features'], r['segment_ids'], r['n_segments'],
             r['config_hash'], r['config'],
             r['config_k'], r['config_dtw_mode'], r['config_metric'],
         )
@@ -849,11 +1354,13 @@ def build_trajectory_row(
         # Useful as a risk proxy: one badly supported segment can make a whole trajectory risky.
         'worst_segment_d_min': float(d_min.max()),
         'worst_segment_perf_std': float(perf_std.max()),
+        'retrieval_strategy': 'decomposed',
     }
 
     return {
         'traj_id': traj_id,
         'split_role': split_role,
+        'retrieval_strategy': 'decomposed',
         'p_actual': p_actual,
         'p_predicted': p_predicted,
         'prediction_error': prediction_error,
@@ -875,7 +1382,7 @@ async def build_and_store_trajectory_rows(conn: asyncpg.Connection, cfg: Calibra
     config_hash = cfg.hash()
     rows = await conn.fetch("""
         SELECT *
-        FROM evaluation.confidence_calibration_segments
+        FROM evaluation.confidence_calibration_seg
         WHERE config_hash = $1
     """, config_hash)
 
@@ -901,52 +1408,510 @@ async def build_and_store_trajectory_rows(conn: asyncpg.Connection, cfg: Calibra
         logger.warning("No trajectory rows built.")
         return
 
-    await conn.executemany("""
-        INSERT INTO evaluation.confidence_calibration_trajectories (
-            traj_id, split_role,
-            p_actual, p_predicted, prediction_error, log_prediction_error,
-            sigma, nonconformity_score,
-            traj_features, segment_ids, n_segments,
-            config_hash, config,
-            config_k, config_dtw_mode, config_metric
-        ) VALUES (
-            $1, $2,
-            $3, $4, $5, $6,
-            $7, $8,
-            $9::jsonb, $10, $11,
-            $12, $13::jsonb,
-            $14, $15, $16
-        )
-        ON CONFLICT (traj_id, config_hash) DO UPDATE SET
-            split_role           = EXCLUDED.split_role,
-            p_actual             = EXCLUDED.p_actual,
-            p_predicted          = EXCLUDED.p_predicted,
-            prediction_error     = EXCLUDED.prediction_error,
-            log_prediction_error = EXCLUDED.log_prediction_error,
-            sigma                = EXCLUDED.sigma,
-            nonconformity_score  = EXCLUDED.nonconformity_score,
-            traj_features        = EXCLUDED.traj_features,
-            segment_ids          = EXCLUDED.segment_ids,
-            n_segments           = EXCLUDED.n_segments,
-            config               = EXCLUDED.config,
-            config_k             = EXCLUDED.config_k,
-            config_dtw_mode      = EXCLUDED.config_dtw_mode,
-            config_metric        = EXCLUDED.config_metric,
-            computed_at          = NOW()
-    """, [
-        (
-            r['traj_id'], r['split_role'],
-            r['p_actual'], r['p_predicted'], r['prediction_error'], r['log_prediction_error'],
-            r['sigma'], r['nonconformity_score'],
-            r['traj_features'], r['segment_ids'], r['n_segments'],
-            r['config_hash'], r['config'],
-            r['config_k'], r['config_dtw_mode'], r['config_metric'],
-        )
-        for r in out_rows
-    ])
+    await insert_trajectory_batch(conn, out_rows)
 
     logger.info(f"Trajectory-level rows stored: {len(out_rows):,}")
 
+
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Bundled trajectory processing: one search_similar call builds both strategies
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+def build_segment_row_from_search_group(
+    seg_id: str,
+    traj_id: str,
+    p_actual: float,
+    split_role: SplitRole,
+    seg_results_raw: List[Dict[str, Any]],
+    loaded_batch: Dict[str, Any],
+    cfg: CalibrationConfig,
+) -> Optional[Dict[str, Any]]:
+    """Build one decomposed segment calibration row from an existing search result group."""
+    if not seg_results_raw:
+        return None
+
+    query_traj_data = loaded_batch.get(seg_id_to_traj_id(seg_id)) or loaded_batch.get(traj_id)
+    if query_traj_data is None:
+        return None
+
+    query_arr = (query_traj_data.get('segments') or {}).get(seg_id)
+    if query_arr is None or sequence_len(query_arr) == 0:
+        return None
+
+    query_length = sequence_len(query_arr)
+    query_path_len = path_length(query_arr)
+
+    candidates_flat: Dict[str, np.ndarray] = {}
+    candidate_meta: Dict[str, Dict[str, float]] = {}
+
+    for r in seg_results_raw:
+        cand_seg_id = get_candidate_id(r, 'segment')
+        if not cand_seg_id:
+            continue
+        cand_traj_id = r.get('traj_id') or seg_id_to_traj_id(cand_seg_id)
+        cand_data = loaded_batch.get(cand_traj_id)
+        if not cand_data:
+            continue
+        arr = (cand_data.get('segments') or {}).get(cand_seg_id)
+        if arr is None or sequence_len(arr) == 0:
+            continue
+        candidates_flat[cand_seg_id] = arr
+        candidate_meta[cand_seg_id] = {
+            'candidate_length': float(sequence_len(arr)),
+            'candidate_path_length': float(path_length(arr)),
+        }
+
+    if not candidates_flat:
+        return None
+
+    dtw_results = rerank(
+        query_seq=query_arr,
+        candidates=candidates_flat,
+        limit=cfg.k,
+        mode=cfg.dtw_mode,
+    )
+
+    dtw_lookup: Dict[str, float] = {}
+    for row in dtw_results:
+        row_id = row.get('id') or row.get('seg_id')
+        if row_id is not None and row.get('dtw_distance') is not None:
+            dtw_lookup[str(row_id)] = float(row['dtw_distance'])
+
+    enriched: List[Dict[str, Any]] = []
+    for r in seg_results_raw:
+        sid = get_candidate_id(r, 'segment')
+        if not sid:
+            continue
+        raw_dtw_dist = dtw_lookup.get(sid)
+        features = r.get('features') or {}
+        mean_dist = features.get('mean_distance')
+        candidate_arr = candidates_flat.get(sid)
+
+        if raw_dtw_dist is None or mean_dist is None or candidate_arr is None:
+            continue
+
+        normalized_dtw_dist = normalize_dtw_distance(
+            raw_distance=raw_dtw_dist,
+            query_seq=query_arr,
+            candidate_seq=candidate_arr,
+            method=cfg.distance_normalization,
+            query_path_len=query_path_len,
+        )
+
+        enriched.append({
+            'seg_id': sid,
+            'dtw_distance': normalized_dtw_dist,
+            'dtw_distance_raw': raw_dtw_dist,
+            'mean_distance': float(mean_dist),
+            **candidate_meta.get(sid, {}),
+        })
+
+    result = compute_loo_prediction(enriched, sigma_floor=cfg.sigma_floor)
+    if result is None:
+        return None
+
+    p_hat = result['p_hat']
+    sigma = result['sigma']
+    prediction_error = abs(p_actual - p_hat)
+    log_prediction_error = math.log(prediction_error + EPSILON)
+    nonconformity_score = prediction_error / max(sigma, cfg.sigma_floor, EPSILON)
+
+    dtw_features = result['dtw_features']
+    dtw_features.update({
+        'query_length': query_length,
+        'query_path_length': query_path_len,
+        'distance_normalization': cfg.distance_normalization,
+        'retrieval_strategy': 'decomposed',
+        'bundle_search': True,
+    })
+
+    return {
+        'seg_id': seg_id,
+        'traj_id': traj_id,
+        'split_role': split_role,
+        'retrieval_strategy': 'decomposed',
+        'p_actual': p_actual,
+        'p_predicted': p_hat,
+        'prediction_error': prediction_error,
+        'log_prediction_error': log_prediction_error,
+        'sigma': sigma,
+        'nonconformity_score': nonconformity_score,
+        'dtw_features': json.dumps(dtw_features, sort_keys=True),
+        'k_neighbors': len(enriched),
+        'neighbor_ids': result['ids'],
+        'query_length': query_length,
+        'query_path_length': query_path_len,
+        'config_hash': cfg.hash(),
+        'config': cfg.to_json(),
+        'config_k': cfg.k,
+        'config_dtw_mode': cfg.dtw_mode,
+        'config_metric': cfg.metric,
+    }
+
+
+def build_direct_trajectory_row_from_search_result(
+    traj_id: str,
+    p_actual: float,
+    split_role: SplitRole,
+    traj_results_raw: List[Dict[str, Any]],
+    loaded_batch: Dict[str, Any],
+    actual_traj_map: Dict[str, float],
+    cfg: CalibrationConfig,
+) -> Optional[Dict[str, Any]]:
+    """Build direct whole-trajectory calibration row from an existing search result."""
+    if not traj_results_raw:
+        return None
+
+    query_data = loaded_batch.get(traj_id)
+    query_arr = get_sequence_from_loaded_trajectory(query_data, traj_id)
+    if query_arr is None or sequence_len(query_arr) == 0:
+        return None
+
+    query_length = sequence_len(query_arr)
+    query_path_len = path_length(query_arr)
+    n_segments = count_real_segments(query_data, traj_id)
+
+    candidate_traj_ids: List[str] = []
+    for row in traj_results_raw:
+        cid = get_candidate_id(row, 'trajectory')
+        if cid is None:
+            continue
+        cid = seg_id_to_traj_id(cid) if '_' in cid else cid
+        if cid != traj_id:
+            candidate_traj_ids.append(cid)
+    candidate_traj_ids = list(dict.fromkeys(candidate_traj_ids))[: cfg.k]
+    if not candidate_traj_ids:
+        return None
+
+    candidates_flat: Dict[str, np.ndarray] = {}
+    candidate_meta: Dict[str, Dict[str, float]] = {}
+    for cid in candidate_traj_ids:
+        arr = get_sequence_from_loaded_trajectory(loaded_batch.get(cid), cid)
+        if arr is None or sequence_len(arr) == 0:
+            continue
+        candidates_flat[cid] = arr
+        candidate_meta[cid] = {
+            'candidate_length': float(sequence_len(arr)),
+            'candidate_path_length': float(path_length(arr)),
+        }
+
+    if not candidates_flat:
+        return None
+
+    dtw_results = rerank(
+        query_seq=query_arr,
+        candidates=candidates_flat,
+        limit=cfg.k,
+        mode=cfg.dtw_mode,
+    )
+    dtw_lookup = {
+        str(row.get('id') or row.get('traj_id')): float(row['dtw_distance'])
+        for row in dtw_results
+        if (row.get('id') or row.get('traj_id')) is not None and row.get('dtw_distance') is not None
+    }
+
+    enriched: List[Dict[str, Any]] = []
+    for cid in candidate_traj_ids:
+        raw_dtw_dist = dtw_lookup.get(cid)
+        mean_dist = actual_traj_map.get(cid)
+        candidate_arr = candidates_flat.get(cid)
+        if raw_dtw_dist is None or mean_dist is None or candidate_arr is None:
+            continue
+
+        normalized_dtw_dist = normalize_dtw_distance(
+            raw_distance=raw_dtw_dist,
+            query_seq=query_arr,
+            candidate_seq=candidate_arr,
+            method=cfg.distance_normalization,
+            query_path_len=query_path_len,
+        )
+
+        enriched.append({
+            'seg_id': cid,  # generic ID field consumed by compute_loo_prediction
+            'dtw_distance': normalized_dtw_dist,
+            'dtw_distance_raw': raw_dtw_dist,
+            'mean_distance': float(mean_dist),
+            **candidate_meta.get(cid, {}),
+        })
+
+    result = compute_loo_prediction(enriched, sigma_floor=cfg.sigma_floor)
+    if result is None:
+        return None
+
+    p_hat = result['p_hat']
+    sigma = result['sigma']
+    prediction_error = abs(p_actual - p_hat)
+    log_prediction_error = math.log(prediction_error + EPSILON)
+    nonconformity_score = prediction_error / max(sigma, cfg.sigma_floor, EPSILON)
+
+    traj_features = result['dtw_features']
+    traj_features.update({
+        'n_segments': n_segments,
+        'query_length': query_length,
+        'query_path_length': query_path_len,
+        'total_query_length': query_length,
+        'total_query_path_length': query_path_len,
+        'distance_normalization': cfg.distance_normalization,
+        'retrieval_strategy': 'direct',
+        'bundle_search': True,
+    })
+
+    return {
+        'traj_id': traj_id,
+        'split_role': split_role,
+        'retrieval_strategy': 'direct',
+        'p_actual': p_actual,
+        'p_predicted': p_hat,
+        'prediction_error': prediction_error,
+        'log_prediction_error': log_prediction_error,
+        'sigma': sigma,
+        'nonconformity_score': nonconformity_score,
+        'traj_features': json.dumps(traj_features, sort_keys=True),
+        'segment_ids': [],
+        'n_segments': n_segments,
+        'config_hash': cfg.hash(),
+        'config': cfg.to_json(),
+        'config_k': cfg.k,
+        'config_dtw_mode': cfg.dtw_mode,
+        'config_metric': cfg.metric,
+    }
+
+
+async def process_trajectory_bundle(
+    traj_id: str,
+    p_actual_traj: float,
+    split_role: SplitRole,
+    pool: asyncpg.Pool,
+    decomposed_cfg: Optional[CalibrationConfig],
+    direct_cfg: Optional[CalibrationConfig],
+    own_segment_ids: Sequence[str],
+    segment_actuals: Dict[str, float],
+    build_decomposed_trajectory: bool,
+) -> Optional[Dict[str, Any]]:
+    """
+    Run search_similar once for a whole trajectory and derive both outputs:
+      - direct trajectory calibration from trajectory_similarity
+      - decomposed segment rows + decomposed trajectory aggregation from segment_similarity
+    """
+    cfg_for_search = decomposed_cfg or direct_cfg
+    if cfg_for_search is None:
+        return None
+
+    try:
+        searcher = MultiModalSearcher(pool)
+        exclude_ids = list(dict.fromkeys([traj_id, *own_segment_ids]))
+        search_result = await searcher.search_similar(
+            target_id=traj_id,
+            modes=list(cfg_for_search.search_modes),
+            limit=cfg_for_search.k,
+            metric=cfg_for_search.metric,
+            exclude_ids=exclude_ids,
+        )
+
+        target_segment_ids = [sid for sid in own_segment_ids if sid != traj_id]
+        segment_groups = extract_segment_groups_from_search(search_result, target_segment_ids)
+        traj_results_raw = extract_results_from_search(search_result, 'trajectory', traj_id)
+
+        candidate_traj_ids = [traj_id]
+        candidate_traj_ids.extend(collect_candidate_traj_ids_from_search(search_result))
+        for rows in segment_groups.values():
+            for row in rows:
+                sid = get_candidate_id(row, 'segment')
+                if sid:
+                    candidate_traj_ids.append(row.get('traj_id') or seg_id_to_traj_id(sid))
+        for row in traj_results_raw:
+            cid = get_candidate_id(row, 'trajectory')
+            if cid:
+                candidate_traj_ids.append(seg_id_to_traj_id(cid) if '_' in cid else cid)
+        candidate_traj_ids = list(dict.fromkeys(str(x) for x in candidate_traj_ids if x))
+
+        async with pool.acquire() as conn:
+            loader = TrajectoryLoader(conn)
+            loaded_batch = await loader.load_trajectories_batch(candidate_traj_ids, cfg_for_search.dtw_mode)
+            actual_traj_map = await get_actual_trajectory_values(
+                conn,
+                [tid for tid in candidate_traj_ids if tid != traj_id],
+                cfg_for_search.metric,
+            )
+
+        segment_rows: List[Dict[str, Any]] = []
+        decomposed_traj_row: Optional[Dict[str, Any]] = None
+        direct_traj_row: Optional[Dict[str, Any]] = None
+
+        if decomposed_cfg is not None:
+            for seg_id, rows in segment_groups.items():
+                p_actual_seg = segment_actuals.get(seg_id)
+                if p_actual_seg is None:
+                    continue
+                seg_row = build_segment_row_from_search_group(
+                    seg_id=seg_id,
+                    traj_id=traj_id,
+                    p_actual=p_actual_seg,
+                    split_role=split_role,
+                    seg_results_raw=rows,
+                    loaded_batch=loaded_batch,
+                    cfg=decomposed_cfg,
+                )
+                if seg_row is not None:
+                    segment_rows.append(seg_row)
+
+            if build_decomposed_trajectory and segment_rows:
+                decomposed_traj_row = build_trajectory_row(
+                    traj_id=traj_id,
+                    rows=segment_rows,  # dicts support the same access pattern as asyncpg.Record here
+                    actual_traj_value=p_actual_traj,
+                    cfg=decomposed_cfg,
+                )
+
+        if direct_cfg is not None:
+            direct_traj_row = build_direct_trajectory_row_from_search_result(
+                traj_id=traj_id,
+                p_actual=p_actual_traj,
+                split_role=split_role,
+                traj_results_raw=traj_results_raw,
+                loaded_batch=loaded_batch,
+                actual_traj_map=actual_traj_map,
+                cfg=direct_cfg,
+            )
+
+        return {
+            'segment_rows': segment_rows,
+            'decomposed_traj_row': decomposed_traj_row,
+            'direct_traj_row': direct_traj_row,
+        }
+
+    except Exception as e:
+        logger.warning(f"Bundle processing failed for {traj_id}: {e}")
+        return None
+
+
+async def get_done_trajectory_ids_for_bundle(
+    conn: asyncpg.Connection,
+    decomposed_cfg: Optional[CalibrationConfig],
+    direct_cfg: Optional[CalibrationConfig],
+    build_decomposed_trajectory: bool,
+) -> set[str]:
+    """Return traj_ids that are complete for the requested bundled outputs."""
+    done_sets: List[set[str]] = []
+
+    if decomposed_cfg is not None and build_decomposed_trajectory:
+        done_sets.append(await get_already_computed_trajectories(conn, decomposed_cfg.hash()))
+
+    if direct_cfg is not None:
+        done_sets.append(await get_already_computed_trajectories(conn, direct_cfg.hash()))
+
+    if not done_sets:
+        return set()
+    return set.intersection(*done_sets) if done_sets else set()
+
+
+async def run_bundle_calibration(
+    pool: asyncpg.Pool,
+    decomposed_cfg: Optional[CalibrationConfig],
+    direct_cfg: Optional[CalibrationConfig],
+    batch_size: int,
+    resume: bool,
+    max_trajectories: Optional[int],
+    coverages: Sequence[float],
+    build_decomposed_trajectory: bool,
+) -> None:
+    """Process trajectories once and reuse each search_result for Direct and Decomposed."""
+    cfg_for_query = decomposed_cfg or direct_cfg
+    if cfg_for_query is None:
+        return
+
+    async with pool.acquire() as conn:
+        all_trajs = await get_all_traj_ids(conn, cfg_for_query.metric, max_trajectories=max_trajectories)
+        traj_ids = [traj_id for traj_id, _ in all_trajs]
+        traj_to_seg_ids = await get_all_segments_for_trajectories(conn, traj_ids)
+        segment_actuals = await get_segment_actual_values_for_trajectories(conn, traj_ids, cfg_for_query.metric)
+        already_done = await get_done_trajectory_ids_for_bundle(
+            conn,
+            decomposed_cfg=decomposed_cfg,
+            direct_cfg=direct_cfg,
+            build_decomposed_trajectory=build_decomposed_trajectory,
+        ) if resume else set()
+
+    logger.info(f"Total trajectories with performance data : {len(all_trajs):,}")
+    logger.info(f"Already complete for requested outputs   : {len(already_done):,}")
+
+    todo: List[Tuple[str, float, SplitRole]] = []
+    for traj_id, p_actual in all_trajs:
+        if traj_id in already_done:
+            continue
+        role = split_role_for_traj(traj_id, cfg_for_query.test_ratio, cfg_for_query.split_seed)
+        todo.append((traj_id, p_actual, role))
+
+    n_cal = sum(1 for _, _, role in todo if role == 'calibration')
+    n_test = sum(1 for _, _, role in todo if role == 'test')
+    logger.info(f"Trajectories to process                  : {len(todo):,}")
+    logger.info(f"  calibration split                      : {n_cal:,}")
+    logger.info(f"  test split                             : {n_test:,}")
+
+    if todo:
+        seg_buffer: List[Dict[str, Any]] = []
+        traj_buffer: List[Dict[str, Any]] = []
+        n_ok = 0
+        n_fail = 0
+
+        with tqdm(total=len(todo), unit='traj', desc='Calibrating trajectory bundles') as pbar:
+            for batch_start in range(0, len(todo), batch_size):
+                batch = todo[batch_start: batch_start + batch_size]
+                tasks = [
+                    process_trajectory_bundle(
+                        traj_id=traj_id,
+                        p_actual_traj=p_actual,
+                        split_role=role,
+                        pool=pool,
+                        decomposed_cfg=decomposed_cfg,
+                        direct_cfg=direct_cfg,
+                        own_segment_ids=traj_to_seg_ids.get(traj_id, []),
+                        segment_actuals=segment_actuals,
+                        build_decomposed_trajectory=build_decomposed_trajectory,
+                    )
+                    for traj_id, p_actual, role in batch
+                ]
+
+                batch_results = await asyncio.gather(*tasks, return_exceptions=False)
+
+                for res in batch_results:
+                    if res is None:
+                        n_fail += 1
+                        continue
+                    seg_buffer.extend(res.get('segment_rows') or [])
+                    for key in ('decomposed_traj_row', 'direct_traj_row'):
+                        row = res.get(key)
+                        if row is not None:
+                            traj_buffer.append(row)
+                    n_ok += 1
+
+                async with pool.acquire() as conn:
+                    if seg_buffer:
+                        await insert_segment_batch(conn, seg_buffer)
+                        seg_buffer.clear()
+                    if traj_buffer:
+                        await insert_trajectory_batch(conn, traj_buffer)
+                        traj_buffer.clear()
+
+                pbar.update(len(batch))
+                pbar.set_postfix(ok=n_ok, fail=n_fail)
+
+        logger.info(f"Bundle build done. ok={n_ok:,} failed/skipped={n_fail:,}")
+    else:
+        logger.info("No bundle rows to process — requested outputs are up to date.")
+
+    async with pool.acquire() as conn:
+        if decomposed_cfg is not None:
+            await compute_and_store_quantiles(conn, decomposed_cfg, coverages, 'segment')
+            if build_decomposed_trajectory:
+                await compute_and_store_quantiles(conn, decomposed_cfg, coverages, 'trajectory')
+            await print_correlation_hints(conn, decomposed_cfg)
+
+        if direct_cfg is not None:
+            await compute_and_store_quantiles(conn, direct_cfg, coverages, 'trajectory')
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Quantiles and coverage evaluation
@@ -978,9 +1943,9 @@ async def fetch_level_rows(
     split_role: SplitRole,
 ) -> List[asyncpg.Record]:
     table = (
-        'evaluation.confidence_calibration_segments'
+        'evaluation.confidence_calibration_seg'
         if level == 'segment'
-        else 'evaluation.confidence_calibration_trajectories'
+        else 'evaluation.confidence_calibration_traj'
     )
     return await conn.fetch(f"""
         SELECT
@@ -1056,7 +2021,7 @@ async def compute_and_store_quantiles(
 
         await conn.execute("""
             INSERT INTO evaluation.confidence_quantiles (
-                level, config_hash, config,
+                level, config_hash, config, retrieval_strategy,
                 dtw_mode, metric, config_k,
                 coverage, quantile_value,
                 n_calibration, n_test,
@@ -1065,17 +2030,18 @@ async def compute_and_store_quantiles(
                 mean_interval_width,
                 median_interval_width
             ) VALUES (
-                $1, $2, $3::jsonb,
-                $4, $5, $6,
-                $7, $8,
-                $9, $10,
-                $11, $12,
-                $13,
+                $1, $2, $3::jsonb, $4,
+                $5, $6, $7,
+                $8, $9,
+                $10, $11,
+                $12, $13,
                 $14,
-                $15
+                $15,
+                $16
             )
             ON CONFLICT (level, config_hash, coverage) DO UPDATE SET
                 config                 = EXCLUDED.config,
+                retrieval_strategy     = EXCLUDED.retrieval_strategy,
                 dtw_mode               = EXCLUDED.dtw_mode,
                 metric                 = EXCLUDED.metric,
                 config_k               = EXCLUDED.config_k,
@@ -1092,6 +2058,7 @@ async def compute_and_store_quantiles(
             level,
             config_hash,
             cfg.to_json(),
+            cfg.retrieval_strategy,
             cfg.dtw_mode,
             cfg.metric,
             cfg.k,
@@ -1124,7 +2091,7 @@ async def print_correlation_hints(conn: asyncpg.Connection, cfg: CalibrationConf
             prediction_error,
             log_prediction_error,
             dtw_features
-        FROM evaluation.confidence_calibration_segments
+        FROM evaluation.confidence_calibration_seg
         WHERE config_hash = $1
           AND split_role = 'calibration'
     """, config_hash)
@@ -1181,6 +2148,179 @@ async def print_correlation_hints(conn: asyncpg.Connection, cfg: CalibrationConf
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+async def run_decomposed_calibration(
+    pool: asyncpg.Pool,
+    cfg: CalibrationConfig,
+    batch_size: int,
+    resume: bool,
+    max_trajectories: Optional[int],
+    coverages: Sequence[float],
+    build_trajectories: bool,
+) -> None:
+    async with pool.acquire() as conn:
+        all_segments = await get_all_seg_ids(
+            conn,
+            cfg.metric,
+            max_trajectories=max_trajectories,
+        )
+        already_done = await get_already_computed_segments(conn, cfg.hash()) if resume else set()
+        traj_to_seg_ids = await get_all_segments_for_trajectories(
+            conn,
+            list({traj_id for _, traj_id, _ in all_segments}),
+        )
+
+    logger.info(f"Total segments with performance data : {len(all_segments):,}")
+    logger.info(f"Already computed for config          : {len(already_done):,}")
+
+    todo: List[Tuple[str, str, float, SplitRole]] = []
+    for seg_id, traj_id, p_actual in all_segments:
+        if seg_id in already_done:
+            continue
+        role = split_role_for_traj(traj_id, cfg.test_ratio, cfg.split_seed)
+        todo.append((seg_id, traj_id, p_actual, role))
+
+    n_cal = sum(1 for _, _, _, role in todo if role == 'calibration')
+    n_test = sum(1 for _, _, _, role in todo if role == 'test')
+    logger.info(f"Segments to process                  : {len(todo):,}")
+    logger.info(f"  calibration split                  : {n_cal:,}")
+    logger.info(f"  test split                         : {n_test:,}")
+
+    if todo:
+        results_buffer: List[Dict[str, Any]] = []
+        n_ok = 0
+        n_fail = 0
+
+        with tqdm(total=len(todo), unit='seg', desc='Calibrating decomposed segments') as pbar:
+            for batch_start in range(0, len(todo), batch_size):
+                batch = todo[batch_start: batch_start + batch_size]
+
+                tasks = []
+                for seg_id, traj_id, p_actual, role in batch:
+                    # Important: for trajectory-level decomposed calibration, exclude all
+                    # segments from the same physical trajectory, not only the current segment.
+                    # This prevents same-execution leakage and better matches online usage.
+                    exclude_ids = traj_to_seg_ids.get(traj_id) or [seg_id]
+                    tasks.append(process_segment(
+                        seg_id=seg_id,
+                        traj_id=traj_id,
+                        p_actual=p_actual,
+                        split_role=role,
+                        pool=pool,
+                        cfg=cfg,
+                        exclude_ids=exclude_ids,
+                    ))
+
+                batch_results = await asyncio.gather(*tasks, return_exceptions=False)
+
+                for res in batch_results:
+                    if res is not None:
+                        results_buffer.append(res)
+                        n_ok += 1
+                    else:
+                        n_fail += 1
+
+                if results_buffer:
+                    async with pool.acquire() as conn:
+                        await insert_segment_batch(conn, results_buffer)
+                    results_buffer.clear()
+
+                pbar.update(len(batch))
+                pbar.set_postfix(ok=n_ok, fail=n_fail)
+
+        logger.info(f"Segment build done. ok={n_ok:,} failed/skipped={n_fail:,}")
+    else:
+        logger.info("No segment rows to process — current decomposed config is up to date.")
+
+    async with pool.acquire() as conn:
+        if build_trajectories:
+            await conn.execute(
+                "DELETE FROM evaluation.confidence_calibration_traj WHERE config_hash = $1",
+                cfg.hash(),
+            )
+            await build_and_store_trajectory_rows(conn, cfg)
+
+        await compute_and_store_quantiles(conn, cfg, coverages, 'segment')
+        if build_trajectories:
+            await compute_and_store_quantiles(conn, cfg, coverages, 'trajectory')
+
+        await print_correlation_hints(conn, cfg)
+
+
+async def run_direct_calibration(
+    pool: asyncpg.Pool,
+    cfg: CalibrationConfig,
+    batch_size: int,
+    resume: bool,
+    max_trajectories: Optional[int],
+    coverages: Sequence[float],
+) -> None:
+    async with pool.acquire() as conn:
+        all_trajs = await get_all_traj_ids(
+            conn,
+            cfg.metric,
+            max_trajectories=max_trajectories,
+        )
+        already_done = await get_already_computed_trajectories(conn, cfg.hash()) if resume else set()
+
+    logger.info(f"Total trajectories with performance data : {len(all_trajs):,}")
+    logger.info(f"Already computed for config              : {len(already_done):,}")
+
+    todo: List[Tuple[str, float, SplitRole]] = []
+    for traj_id, p_actual in all_trajs:
+        if traj_id in already_done:
+            continue
+        role = split_role_for_traj(traj_id, cfg.test_ratio, cfg.split_seed)
+        todo.append((traj_id, p_actual, role))
+
+    n_cal = sum(1 for _, _, role in todo if role == 'calibration')
+    n_test = sum(1 for _, _, role in todo if role == 'test')
+    logger.info(f"Trajectories to process                  : {len(todo):,}")
+    logger.info(f"  calibration split                      : {n_cal:,}")
+    logger.info(f"  test split                             : {n_test:,}")
+
+    if todo:
+        results_buffer: List[Dict[str, Any]] = []
+        n_ok = 0
+        n_fail = 0
+
+        with tqdm(total=len(todo), unit='traj', desc='Calibrating direct trajectories') as pbar:
+            for batch_start in range(0, len(todo), batch_size):
+                batch = todo[batch_start: batch_start + batch_size]
+                tasks = [
+                    process_trajectory_direct(
+                        traj_id=traj_id,
+                        p_actual=p_actual,
+                        split_role=role,
+                        pool=pool,
+                        cfg=cfg,
+                    )
+                    for traj_id, p_actual, role in batch
+                ]
+                batch_results = await asyncio.gather(*tasks, return_exceptions=False)
+
+                for res in batch_results:
+                    if res is not None:
+                        results_buffer.append(res)
+                        n_ok += 1
+                    else:
+                        n_fail += 1
+
+                if results_buffer:
+                    async with pool.acquire() as conn:
+                        await insert_trajectory_batch(conn, results_buffer)
+                    results_buffer.clear()
+
+                pbar.update(len(batch))
+                pbar.set_postfix(ok=n_ok, fail=n_fail)
+
+        logger.info(f"Direct trajectory build done. ok={n_ok:,} failed/skipped={n_fail:,}")
+    else:
+        logger.info("No direct trajectory rows to process — current config is up to date.")
+
+    async with pool.acquire() as conn:
+        await compute_and_store_quantiles(conn, cfg, coverages, 'trajectory')
+
+
 async def main(
     cfg: CalibrationConfig,
     batch_size: int,
@@ -1191,10 +2331,11 @@ async def main(
     build_trajectories: bool,
 ) -> None:
     logger.info("Starting conformal calibration build")
-    logger.info(f"  config_hash : {cfg.hash()}")
-    logger.info(f"  config      : {cfg.to_json()}")
-    logger.info(f"  batch       : {batch_size}")
-    logger.info(f"  limit       : {max_trajectories or 'all trajectories'}")
+    logger.info(f"  retrieval_strategy : {cfg.retrieval_strategy}")
+    logger.info(f"  config_hash        : {cfg.hash()}")
+    logger.info(f"  config             : {cfg.to_json()}")
+    logger.info(f"  batch              : {batch_size}")
+    logger.info(f"  limit              : {max_trajectories or 'all trajectories'}")
 
     pool = await create_pool(DATABASE_URL)
 
@@ -1204,84 +2345,27 @@ async def main(
             if full_rebuild:
                 await delete_config_rows(conn, cfg.hash())
 
-            all_segments = await get_all_seg_ids(
-                conn,
-                cfg.metric,
+        if cfg.retrieval_strategy == 'decomposed':
+            await run_decomposed_calibration(
+                pool=pool,
+                cfg=cfg,
+                batch_size=batch_size,
+                resume=resume,
                 max_trajectories=max_trajectories,
+                coverages=coverages,
+                build_trajectories=build_trajectories,
             )
-            already_done = await get_already_computed_segments(conn, cfg.hash()) if resume else set()
-
-        logger.info(f"Total segments with performance data : {len(all_segments):,}")
-        logger.info(f"Already computed for config          : {len(already_done):,}")
-
-        todo: List[Tuple[str, str, float, SplitRole]] = []
-        for seg_id, traj_id, p_actual in all_segments:
-            if seg_id in already_done:
-                continue
-            role = split_role_for_traj(traj_id, cfg.test_ratio, cfg.split_seed)
-            todo.append((seg_id, traj_id, p_actual, role))
-
-        n_cal = sum(1 for _, _, _, role in todo if role == 'calibration')
-        n_test = sum(1 for _, _, _, role in todo if role == 'test')
-        logger.info(f"Segments to process                  : {len(todo):,}")
-        logger.info(f"  calibration split                  : {n_cal:,}")
-        logger.info(f"  test split                         : {n_test:,}")
-
-        if todo:
-            results_buffer: List[Dict[str, Any]] = []
-            n_ok = 0
-            n_fail = 0
-
-            with tqdm(total=len(todo), unit='seg', desc='Calibrating') as pbar:
-                for batch_start in range(0, len(todo), batch_size):
-                    batch = todo[batch_start: batch_start + batch_size]
-
-                    tasks = [
-                        process_segment(
-                            seg_id=seg_id,
-                            traj_id=traj_id,
-                            p_actual=p_actual,
-                            split_role=role,
-                            pool=pool,
-                            cfg=cfg,
-                        )
-                        for seg_id, traj_id, p_actual, role in batch
-                    ]
-                    batch_results = await asyncio.gather(*tasks, return_exceptions=False)
-
-                    for res in batch_results:
-                        if res is not None:
-                            results_buffer.append(res)
-                            n_ok += 1
-                        else:
-                            n_fail += 1
-
-                    if results_buffer:
-                        async with pool.acquire() as conn:
-                            await insert_segment_batch(conn, results_buffer)
-                        results_buffer.clear()
-
-                    pbar.update(len(batch))
-                    pbar.set_postfix(ok=n_ok, fail=n_fail)
-
-            logger.info(f"Segment build done. ok={n_ok:,} failed/skipped={n_fail:,}")
+        elif cfg.retrieval_strategy == 'direct':
+            await run_direct_calibration(
+                pool=pool,
+                cfg=cfg,
+                batch_size=batch_size,
+                resume=resume,
+                max_trajectories=max_trajectories,
+                coverages=coverages,
+            )
         else:
-            logger.info("No segment rows to process — current config is up to date.")
-
-        async with pool.acquire() as conn:
-            if build_trajectories:
-                # Rebuild trajectory aggregation for this config from all available segment rows.
-                await conn.execute(
-                    "DELETE FROM evaluation.confidence_calibration_trajectories WHERE config_hash = $1",
-                    cfg.hash(),
-                )
-                await build_and_store_trajectory_rows(conn, cfg)
-
-            await compute_and_store_quantiles(conn, cfg, coverages, 'segment')
-            if build_trajectories:
-                await compute_and_store_quantiles(conn, cfg, coverages, 'trajectory')
-
-            await print_correlation_hints(conn, cfg)
+            raise ValueError(f"Unknown retrieval_strategy={cfg.retrieval_strategy}")
 
         logger.info("Online usage:")
         logger.info("  q = SELECT quantile_value FROM evaluation.confidence_quantiles")
@@ -1339,6 +2423,13 @@ if __name__ == '__main__':
     parser.add_argument('--resume', action='store_true', default=True, help='Skip segments already computed.')
     parser.add_argument('--full-rebuild', action='store_true', default=False, help='Delete and recompute active config.')
     parser.add_argument(
+        '--retrieval-strategy',
+        type=str,
+        default='both',
+        choices=['decomposed', 'direct', 'both'],
+        help='Calibration strategy: decomposed segment aggregation, direct whole-trajectory retrieval, or both.',
+    )
+    parser.add_argument(
         '--no-trajectory-level',
         action='store_true',
         default=False,
@@ -1358,7 +2449,7 @@ if __name__ == '__main__':
     if any(c <= 0.0 or c >= 1.0 for c in args.coverage):
         raise SystemExit('--coverage values must be in (0, 1)')
 
-    config = CalibrationConfig(
+    base_config = CalibrationConfig(
         k=args.k,
         dtw_mode=validate_dtw_mode(args.dtw_mode),
         metric=validate_metric(args.metric),
@@ -1367,16 +2458,61 @@ if __name__ == '__main__':
         sigma_floor=float(args.sigma_floor),
         test_ratio=float(args.test_ratio),
         split_seed=int(args.split_seed),
+        retrieval_strategy='decomposed',
     )
 
     use_resume = bool(args.resume and not args.full_rebuild)
 
-    asyncio.run(main(
-        cfg=config,
-        batch_size=args.batch,
-        resume=use_resume,
-        full_rebuild=args.full_rebuild,
-        max_trajectories=args.limit,
-        coverages=args.coverage,
-        build_trajectories=not args.no_trajectory_level,
-    ))
+    async def run_selected_strategies() -> None:
+        if args.retrieval_strategy == 'both':
+            decomposed_cfg = replace(base_config, retrieval_strategy='decomposed')
+            direct_cfg = replace(base_config, retrieval_strategy='direct')
+
+            logger.info("Starting bundled conformal calibration build")
+            logger.info("  mode               : both (one search_similar per trajectory)")
+            logger.info(f"  decomposed_hash    : {decomposed_cfg.hash()}")
+            logger.info(f"  direct_hash        : {direct_cfg.hash()}")
+            logger.info(f"  shared config      : {base_config.to_json()}")
+            logger.info(f"  batch              : {args.batch}")
+            logger.info(f"  limit              : {args.limit or 'all trajectories'}")
+
+            pool = await create_pool(DATABASE_URL)
+            try:
+                async with pool.acquire() as conn:
+                    await ensure_calibration_tables(conn)
+                    if args.full_rebuild:
+                        await delete_config_rows(conn, decomposed_cfg.hash())
+                        await delete_config_rows(conn, direct_cfg.hash())
+
+                await run_bundle_calibration(
+                    pool=pool,
+                    decomposed_cfg=decomposed_cfg,
+                    direct_cfg=direct_cfg,
+                    batch_size=args.batch,
+                    resume=use_resume,
+                    max_trajectories=args.limit,
+                    coverages=args.coverage,
+                    build_decomposed_trajectory=(not args.no_trajectory_level),
+                )
+
+                logger.info("Online usage:")
+                logger.info("  decomposed q = SELECT quantile_value FROM evaluation.confidence_quantiles")
+                logger.info("      WHERE level = 'trajectory' AND retrieval_strategy = 'decomposed' AND config_hash = <decomposed_hash> AND coverage = 0.90")
+                logger.info("  direct q = SELECT quantile_value FROM evaluation.confidence_quantiles")
+                logger.info("      WHERE level = 'trajectory' AND retrieval_strategy = 'direct' AND config_hash = <direct_hash> AND coverage = 0.90")
+            finally:
+                await pool.close()
+
+        else:
+            cfg = replace(base_config, retrieval_strategy=args.retrieval_strategy)
+            await main(
+                cfg=cfg,
+                batch_size=args.batch,
+                resume=use_resume,
+                full_rebuild=args.full_rebuild,
+                max_trajectories=args.limit,
+                coverages=args.coverage,
+                build_trajectories=(not args.no_trajectory_level),
+            )
+
+    asyncio.run(run_selected_strategies())
