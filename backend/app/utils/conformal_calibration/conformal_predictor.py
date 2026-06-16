@@ -1,221 +1,311 @@
-# ═══════════════════════════════════════════════════════════════════════════
-# conformal_predictor.py
-# Gehört nach: backend/app/utils/conformal_calibration/conformal_predictor.py
-#
-# Wird aufgerufen am Ende des Stage-2-Blocks in similarity_route_handler.py
-# NUR wenn stage2_active == True.
-# ═══════════════════════════════════════════════════════════════════════════
+"""
+conformal_predictor.py
+======================
+Online conformal prediction interval computation.
 
-import math
+Integrated into similarity_route_handler.py at the end of the Stage-2 block:
+
+    from utils.conformal_calibration.conformal_predictor import (
+        compute_conformal_intervals,
+    )
+    result = await compute_conformal_intervals(result, conn, strategy='decomposed')
+
+Only called when stage2_active == True.
+
+Key design decision:
+    DTW distances from Stage 2 are normalized by query segment duration
+    before weighting — consistent with calibration_set_builder_v3.py which
+    uses distance_normalization='per_point'. Duration is used as a proxy
+    for sequence length (proportional at constant sampling rate).
+"""
+
+from __future__ import annotations
+
 import logging
-from typing import Dict, List, Optional
+import math
+from typing import Any, Dict, List, Optional
 
 import asyncpg
 
+from .conformal_config import (
+    CalibrationConfig,
+    RetrievalStrategy,
+    get_active_config,
+)
+
 logger = logging.getLogger(__name__)
 
-EPSILON = 1e-6
-DEFAULT_COVERAGE = 0.90
+EPSILON     = 1e-6
+DEFAULT_COV = 0.90
 
 
-# ── 1. Quantil aus DB lesen (gecacht pro Request) ───────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# Quantile cache — one DB hit per (config_hash, coverage, level)
+# ═════════════════════════════════════════════════════════════════════════════
+
+_quantile_cache: Dict[str, float] = {}
+
 
 async def get_calibration_quantile(
-    conn: asyncpg.Connection,
-    dtw_mode: str = 'position',
-    metric: str = 'sidtw',
-    coverage: float = DEFAULT_COVERAGE,
+    conn:     asyncpg.Connection,
+    cfg:      CalibrationConfig,
+    coverage: float = DEFAULT_COV,
+    level:    str   = 'trajectory',
 ) -> Optional[float]:
     """
-    Liest das gespeicherte Konfidenz-Quantil aus evaluation.confidence_quantiles.
-    Gibt None zurück wenn kein Eintrag gefunden wird.
+    Read the stored conformal quantile for this exact config + coverage.
+    Returns None when no matching row exists (calibration not yet run).
     """
+    cache_key = f"{cfg.hash()}:{coverage}:{level}"
+    if cache_key in _quantile_cache:
+        return _quantile_cache[cache_key]
+
     row = await conn.fetchrow("""
         SELECT quantile_value
         FROM evaluation.confidence_quantiles
-        WHERE dtw_mode = $1
-          AND metric   = $2
-          AND coverage = $3
+        WHERE config_hash        = $1
+          AND coverage           = $2
+          AND level              = $3
+          AND retrieval_strategy = $4
         ORDER BY computed_at DESC
         LIMIT 1
-    """, dtw_mode, metric, coverage)
+    """, cfg.hash(), float(coverage), level, cfg.retrieval_strategy)
 
     if row is None:
         logger.warning(
-            f"No calibration quantile found for "
-            f"dtw_mode={dtw_mode}, metric={metric}, coverage={coverage}. "
-            f"Run calibration_set_builder.py first."
+            f"No conformal quantile found — "
+            f"config_hash={cfg.hash()}  coverage={coverage}  "
+            f"level={level}  strategy={cfg.retrieval_strategy}. "
+            f"Run calibration_set_builder_v3.py first."
         )
         return None
 
-    return float(row['quantile_value'])
+    q = float(row['quantile_value'])
+    _quantile_cache[cache_key] = q
+    return q
 
 
-# ── 2. Segment-Intervall berechnen ──────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# Segment-level interval
+# ═════════════════════════════════════════════════════════════════════════════
 
-def compute_segment_interval(
-    seg_results: List[Dict],
-    q: float,
-) -> Optional[Dict]:
+def _normalize_dtw(raw_dtw: float, query_duration: float) -> float:
     """
-    Berechnet das Conformal Prediction Intervall für ein einzelnes Segment.
+    Normalize raw DTW distance by query duration.
 
-    Eingabe: seg_results — Liste von Nachbarn mit 'dtw_distance' und
-             features.mean_distance (nach Stage-2-Reranking)
+    This mirrors calibration_set_builder_v3.py with
+    distance_normalization='per_point', using duration as a proxy
+    for sequence length (valid at constant sampling rate).
 
-    Ausgabe:
-        p_hat    : inverse-DTW gewichtete Prognose [mm]
-        sigma    : lokaler Spread = d_min × std(perf)
-        low      : untere Intervallgrenze [mm]
-        high     : obere Intervallgrenze [mm]
-        coverage : Ziel-Coverage (z.B. 0.90)
-        n        : Anzahl genutzter Nachbarn
+    Builder uses: raw / max(len_query, len_candidate)
+    Online uses:  raw / query_duration  (duration ∝ sequence_length)
+
+    The absolute scale differs but the relative ordering and
+    weighting ratios are preserved — which is what matters for
+    inverse-DTW weighted prediction.
     """
-    # Nur Nachbarn mit beiden Feldern
+    return raw_dtw / max(query_duration, EPSILON)
+
+
+def _compute_segment_interval(
+    seg_results:    List[Dict[str, Any]],
+    q:              float,
+    sigma_floor:    float,
+    query_duration: float,
+) -> Optional[Dict[str, Any]]:
+    """
+    Compute a conformal prediction interval for one segment.
+
+    σ = max(std(neighbor_perf), sigma_floor)   — consistent with builder
+    interval = [p̂ - q·σ,  p̂ + q·σ]
+
+    DTW distances are normalized by query_duration before weighting
+    to match the builder's per_point normalization.
+    """
     valid = []
     for r in seg_results:
-        dtw_dist  = r.get('dtw_distance')
-        mean_dist = None
-        if r.get('features'):
-            mean_dist = r['features'].get('mean_distance')
-        if dtw_dist is not None and mean_dist is not None:
-            valid.append({
-                'dtw_distance':  float(dtw_dist),
-                'mean_distance': float(mean_dist),
-            })
+        raw_dtw   = r.get('dtw_distance')
+        features  = r.get('features') or {}
+        mean_dist = features.get('mean_distance')
+
+        if raw_dtw is None or mean_dist is None:
+            continue
+
+        norm_dtw = _normalize_dtw(float(raw_dtw), query_duration)
+
+        valid.append({
+            'dtw_distance':  norm_dtw,
+            'mean_distance': float(mean_dist),
+        })
 
     if len(valid) < 2:
         return None
 
-    # Sortiert nach DTW-Distanz (Stage 2 macht das schon, aber sicher ist sicher)
     valid.sort(key=lambda x: x['dtw_distance'])
 
     dtw_dists   = [v['dtw_distance']  for v in valid]
     perf_values = [v['mean_distance'] for v in valid]
 
-    # Inverse-DTW Gewichtung (Gleichung 3 im Paper)
+    # Inverse-DTW weighted prediction — same as paper Eq. 3
     weights = [1.0 / (d + EPSILON) for d in dtw_dists]
     w_sum   = sum(weights)
     p_hat   = sum(w * p for w, p in zip(weights, perf_values)) / w_sum
 
-    # Lokaler Spread: σ = d_min × std(perf)
-    d_min    = dtw_dists[0]
+    # σ — consistent with builder: perf_std with floor
     n        = len(perf_values)
     mean_p   = sum(perf_values) / n
     perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / n)
-    d_min_norm = d_min / (d_min + sum(dtw_dists) / len(dtw_dists) + EPSILON)
-    sigma = d_min_norm * perf_std
+    sigma    = max(perf_std, sigma_floor)
 
-    # Conformal Intervall
-    half_width = q * sigma
+    half = q * sigma
+
     return {
-        'p_hat':    round(p_hat,          4),
-        'sigma':    round(sigma,          6),
-        'low':      round(max(0.0, p_hat - half_width), 4),
-        'high':     round(p_hat + half_width,           4),
-        'coverage': DEFAULT_COVERAGE,
+        'p_hat':    round(p_hat,                  4),
+        'sigma':    round(sigma,                  6),
+        'low':      round(max(0.0, p_hat - half), 4),
+        'high':     round(p_hat + half,           4),
+        'coverage': DEFAULT_COV,
         'n':        n,
     }
 
 
-# ── 3. Trajektorie-Intervall aggregieren (längengewichtet) ──────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# Trajectory-level aggregation (Decomposed)
+# ═════════════════════════════════════════════════════════════════════════════
 
-def aggregate_trajectory_interval(
-    seg_intervals: List[Dict],
+def _aggregate_trajectory_interval(
+    seg_intervals: List[Dict[str, Any]],
     seg_durations: List[float],
-) -> Optional[Dict]:
+    q:             float,
+    sigma_floor:   float,
+) -> Optional[Dict[str, Any]]:
     """
-    Kombiniert Segment-Intervalle zu einem Trajektorie-Intervall.
-    Längengewichtung wie im Paper (Gleichung für p_gs).
+    Combine segment intervals into a trajectory interval.
 
-    Für die Intervallgrenzen: konservativ — wir nehmen den
-    längengewichteten Mittelwert der Grenzen.
-    Das ist konsistent mit der Decomposed-Prognose im Paper.
+    Length-weighted aggregation following paper Eq. p_gs:
+      p̂_traj  = Σ (duration_i · p̂_i)   / Σ duration_i
+      σ_traj   = max(Σ (duration_i · σ_i) / Σ duration_i, sigma_floor)
+      interval = [p̂_traj - q·σ_traj,  p̂_traj + q·σ_traj]
+
+    Note: q here is the trajectory-level quantile, not the segment one.
     """
     valid = [
         (iv, dur)
         for iv, dur in zip(seg_intervals, seg_durations)
-        if iv is not None and dur is not None and dur > 0
+        if iv is not None and dur is not None and dur > EPSILON
     ]
-
     if not valid:
         return None
 
-    total_dur = sum(dur for _, dur in valid)
-    if total_dur == 0:
+    total = sum(dur for _, dur in valid)
+    if total <= EPSILON:
         return None
 
-    p_hat = sum(iv['p_hat'] * dur for iv, dur in valid) / total_dur
-    low   = sum(iv['low']   * dur for iv, dur in valid) / total_dur
-    high  = sum(iv['high']  * dur for iv, dur in valid) / total_dur
+    p_hat = sum(iv['p_hat'] * dur for iv, dur in valid) / total
+    sigma = max(
+        sum(iv['sigma'] * dur for iv, dur in valid) / total,
+        sigma_floor,
+    )
+
+    half = q * sigma
 
     return {
-        'p_hat':    round(p_hat, 4),
-        'low':      round(max(0.0, low),  4),
-        'high':     round(high,           4),
-        'coverage': DEFAULT_COVERAGE,
+        'p_hat':      round(p_hat,                  4),
+        'sigma':      round(sigma,                  6),
+        'low':        round(max(0.0, p_hat - half), 4),
+        'high':       round(p_hat + half,           4),
+        'coverage':   DEFAULT_COV,
         'n_segments': len(valid),
     }
 
 
-# ── 4. Haupt-Einstiegspunkt für similarity_route_handler.py ─────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# Main entry point — called from similarity_route_handler.py
+# ═════════════════════════════════════════════════════════════════════════════
 
 async def compute_conformal_intervals(
-    result: Dict,
-    conn: asyncpg.Connection,
-    dtw_mode: str = 'position',
-    metric: str = 'sidtw',
-) -> Dict:
+    result:   Dict[str, Any],
+    conn:     asyncpg.Connection,
+    strategy: RetrievalStrategy = 'decomposed',
+    coverage: float             = DEFAULT_COV,
+) -> Dict[str, Any]:
     """
-    Ergänzt das bestehende similarity_route_handler Result-Dict um
-    'conformal_interval' auf Segment- und Trajektorie-Ebene.
+    Enrich the similarity search result with conformal prediction intervals.
 
-    Aufruf am Ende des Stage-2-Blocks:
+    Called ONLY when stage2_active == True.
 
-        from utils.conformal_calibration.conformal_predictor import (
-            compute_conformal_intervals
-        )
-        result = await compute_conformal_intervals(
-            result, conn, dtw_mode=dtw_mode
-        )
+    Adds to result:
+      result['conformal_interval']                            — trajectory-level
+      result['segment_similarity'][i]['conformal_interval']   — per segment
 
-    Gibt das erweiterte result-Dict zurück.
+    Usage in similarity_route_handler.py:
+        if stage2_active:
+            from utils.conformal_calibration.conformal_predictor import (
+                compute_conformal_intervals,
+            )
+            result = await compute_conformal_intervals(
+                result, conn, strategy='decomposed'
+            )
     """
-    # Quantil aus DB laden
-    q = await get_calibration_quantile(conn, dtw_mode=dtw_mode, metric=metric)
-    if q is None:
-        # Kein Calibration Set vorhanden — Intervall weglassen, kein Crash
+    cfg = get_active_config(strategy)
+
+    # Load quantiles — segment level for per-segment intervals,
+    # trajectory level for the aggregated result.
+    q_seg  = await get_calibration_quantile(conn, cfg, coverage, level='segment')
+    q_traj = await get_calibration_quantile(conn, cfg, coverage, level='trajectory')
+
+    if q_seg is None and q_traj is None:
         result['conformal_interval'] = None
         return result
 
+    # Fallback: if one level is missing use the other
+    q_for_seg  = q_seg  if q_seg  is not None else q_traj
+    q_for_traj = q_traj if q_traj is not None else q_seg
+
+    sigma_floor    = cfg.sigma_floor
     segment_groups = result.get('segment_similarity', [])
-    seg_intervals  = []
-    seg_durations  = []
+
+    seg_intervals: List[Optional[Dict]] = []
+    seg_durations: List[float]          = []
 
     for group in segment_groups:
         seg_results = group.get('similar_segments', {}).get('results', [])
-        duration    = (
-            group.get('target_segment_features', {}) or {}
-        ).get('duration')
+        seg_features = group.get('target_segment_features') or {}
 
-        interval = compute_segment_interval(seg_results, q)
+        # duration as proxy for sequence length — used for DTW normalization
+        query_duration = float(seg_features.get('duration') or 1.0)
 
-        # Interval ans jeweilige Segment-Group anhängen
+        interval = _compute_segment_interval(
+            seg_results    = seg_results,
+            q              = q_for_seg,
+            sigma_floor    = sigma_floor,
+            query_duration = query_duration,
+        )
+
+        # Attach interval to the segment group in the response
         group['conformal_interval'] = interval
 
-        if interval is not None and duration is not None:
+        if interval is not None:
             seg_intervals.append(interval)
-            seg_durations.append(float(duration))
+            seg_durations.append(query_duration)
 
-    # Trajektorie-Intervall aggregieren
-    traj_interval = aggregate_trajectory_interval(seg_intervals, seg_durations)
+    # Trajectory-level interval — use trajectory q and duration-weighted aggregation
+    traj_interval = _aggregate_trajectory_interval(
+        seg_intervals = seg_intervals,
+        seg_durations = seg_durations,
+        q             = q_for_traj,
+        sigma_floor   = sigma_floor,
+    ) if seg_intervals else None
+
     result['conformal_interval'] = traj_interval
 
     logger.debug(
-        f"Conformal interval computed: "
-        f"p_hat={traj_interval['p_hat'] if traj_interval else 'N/A'} "
+        "Conformal interval: "
+        f"p̂={traj_interval['p_hat'] if traj_interval else 'N/A'}  "
         f"[{traj_interval['low'] if traj_interval else 'N/A'}, "
-        f"{traj_interval['high'] if traj_interval else 'N/A'}] mm"
+        f"{traj_interval['high'] if traj_interval else 'N/A'}] mm  "
+        f"q_seg={q_for_seg:.4f}  q_traj={q_for_traj:.4f}  "
+        f"strategy={strategy}"
     )
 
     return result

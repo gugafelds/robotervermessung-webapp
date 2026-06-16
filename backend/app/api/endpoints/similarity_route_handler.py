@@ -269,7 +269,9 @@ async def search_similar(
  
         stage2_ms = (time.time() - t2) * 1000
         
-        result = await compute_conformal_intervals(result, conn, dtw_mode=dtw_mode)
+        result = await compute_conformal_intervals(
+        result, conn, strategy='decomposed'
+        )
 
         result['stage2_active'] = True
         result['stage2_dtw_mode'] = dtw_mode
