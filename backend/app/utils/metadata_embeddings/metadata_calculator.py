@@ -306,13 +306,12 @@ class MetadataCalculatorService:
             except:
                 pass
 
-            # Length (Euclidean distance)
-            delta = np.array([
-                x_data[-1] - x_data[0],
-                y_data[-1] - y_data[0],
-                z_data[-1] - z_data[0]
-            ])
-            length = float(np.linalg.norm(delta))
+            # Length
+            if movement_type == 'circular':
+                length = self._circular_arc_length_from_points(x_data, y_data, z_data)
+            else:
+                length = self._polyline_length_3d(x_data, y_data, z_data)
+
             total_length += length
 
             # Twist Stats
@@ -882,3 +881,114 @@ class MetadataCalculatorService:
             logger.info(f"EmbeddingCalculator für '{robot_model}' initialisiert")
 
         return self._calculator_cache[robot_model]
+    
+    @staticmethod
+    def _polyline_length_3d(x_data, y_data, z_data) -> float:
+        points = np.column_stack([
+            np.asarray(x_data, dtype=float),
+            np.asarray(y_data, dtype=float),
+            np.asarray(z_data, dtype=float),
+        ])
+
+        if points.shape[0] < 2:
+            return 0.0
+
+        diffs = np.diff(points, axis=0)
+        return float(np.linalg.norm(diffs, axis=1).sum())
+
+
+    @staticmethod
+    def _circular_arc_length_from_points(x_data, y_data, z_data) -> float:
+        """
+        Estimate circular arc length from sampled 3D points.
+
+        This does not use support points. It:
+        1. fits a best-fit plane,
+        2. projects the points into that plane,
+        3. fits a circle in 2D,
+        4. computes radius * angular travel.
+        """
+        points = np.column_stack([
+            np.asarray(x_data, dtype=float),
+            np.asarray(y_data, dtype=float),
+            np.asarray(z_data, dtype=float),
+        ])
+
+        if points.shape[0] < 3:
+            return MetadataCalculatorService._polyline_length_3d(x_data, y_data, z_data)
+
+        # Remove non-finite points
+        points = points[np.all(np.isfinite(points), axis=1)]
+        if points.shape[0] < 3:
+            return 0.0
+
+        # Fallback: robust geometric length from samples
+        fallback_length = float(np.linalg.norm(np.diff(points, axis=0), axis=1).sum())
+
+        # Center points
+        centroid = points.mean(axis=0)
+        centered = points - centroid
+
+        # Best-fit plane via PCA/SVD
+        try:
+            _, _, vh = np.linalg.svd(centered, full_matrices=False)
+        except np.linalg.LinAlgError:
+            return fallback_length
+
+        # First two principal directions span the plane
+        e1 = vh[0]
+        e2 = vh[1]
+
+        # Project 3D points to 2D plane coordinates
+        x = centered @ e1
+        y = centered @ e2
+
+        # Fit circle:
+        # x^2 + y^2 = 2*cx*x + 2*cy*y + c
+        A = np.column_stack([2.0 * x, 2.0 * y, np.ones_like(x)])
+        b = x**2 + y**2
+
+        try:
+            cx, cy, c = np.linalg.lstsq(A, b, rcond=None)[0]
+        except np.linalg.LinAlgError:
+            return fallback_length
+
+        radius_sq = cx**2 + cy**2 + c
+        if radius_sq <= 0:
+            return fallback_length
+
+        radius = float(np.sqrt(radius_sq))
+
+        # Reject degenerate fits
+        if not np.isfinite(radius) or radius <= 1e-9:
+            return fallback_length
+
+        # Check circular fit quality
+        radial_distances = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+        radial_rmse = float(np.sqrt(np.mean((radial_distances - radius) ** 2)))
+        relative_rmse = radial_rmse / max(radius, 1e-9)
+
+        # If points do not look circular enough, fallback to polyline.
+        # You can tune this threshold.
+        if relative_rmse > 0.05:
+            return fallback_length
+
+        # Angular travel in original point order
+        angles = np.arctan2(y - cy, x - cx)
+        angles_unwrapped = np.unwrap(angles)
+
+        # For normal MoveC-like arcs this is the intended angular sweep.
+        theta = float(abs(angles_unwrapped[-1] - angles_unwrapped[0]))
+
+        if not np.isfinite(theta) or theta <= 1e-9:
+            return fallback_length
+
+        arc_length = radius * theta
+
+        # Safety: avoid obviously broken values.
+        # For a proper circular arc, arc_length should not be wildly smaller than chord.
+        chord = float(np.linalg.norm(points[-1] - points[0]))
+        if arc_length < chord * 0.99:
+            return fallback_length
+
+        return float(arc_length)

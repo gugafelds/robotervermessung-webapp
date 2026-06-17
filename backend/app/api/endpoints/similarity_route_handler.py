@@ -5,11 +5,9 @@ from typing import Optional, Literal
 import logging
 import time
 
+
 from ...database import get_db, get_db_pool
-from ...utils.multimodal_framework.multi_modal_searcher import MultiModalSearcher
-from ...utils.metadata_embeddings.trajectory_loader import TrajectoryLoader
-from ...utils.conformal_calibration.conformal_predictor import compute_conformal_intervals
-from ...utils.multimodal_framework.dtw_reranker import rerank
+from ...utils.multimodal_framework.similarity_pipeline import run_similarity_pipeline
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -60,6 +58,7 @@ async def search_similar(
             "sidtw",
             description="Evaluation metric for prognosis: 'sidtw' or 'qdtw'"
         ),
+        prognosis_active: bool = Query(False, description="Enable performance prognosis"),
         pool=Depends(get_db_pool),
         conn=Depends(get_db)
 ):
@@ -120,164 +119,31 @@ async def search_similar(
             if exclude_ids else None
         )
  
-        # ── Stage 1: MultiModalSearcher ──────────────────────────────────
-        t1 = time.time()
-        searcher = MultiModalSearcher(pool)
-        result = await searcher.search_similar(
+        result = await run_similarity_pipeline(
             target_id=target_id,
+            pool=pool,
+            conn=conn,
+
             modes=mode_list,
             weights=weights,
             limit=limit,
+            buffer_factor=5,
             prefilter_features=prefilter_list,
             metric=metric,
+
             include_tags=include_tags_list,
             exclude_tags=exclude_tags_list,
             exclude_ids=exclude_ids_list,
-        )
- 
-        if result.get('error'):
-            raise HTTPException(status_code=404, detail=result['error'])
- 
-        stage1_ms = (time.time() - t1) * 1000
- 
-        # rank → rank_stage1
-        for r in result.get('traj_similarity', {}).get('results', []):
-            if 'rank' in r:
-                r['rank_stage1'] = r.pop('rank')
-        for group in result.get('segment_similarity', []):
-            for r in group.get('similar_segments', {}).get('results', []):
-                if 'rank' in r:
-                    r['rank_stage1'] = r.pop('rank')
- 
-        result['timing'] = {'stage1_ms': round(stage1_ms, 1)}
- 
-        # ── Stage 2: DTW reranking (optional) ────────────────────────────
-        if not stage2_active:
-            result['stage2_active'] = False
-            result['timing']['total_ms'] = round((time.time() - t_start) * 1000, 1)
-            return result
- 
-        t2 = time.time()
-        loader = TrajectoryLoader(conn)
-        data_load_ms = 0.0
- 
-        # ── Trajectory-level reranking ────────────────────────────────────
-        traj_results = result.get('traj_similarity', {}).get('results', [])
- 
-        if traj_results:
-            traj_candidate_ids = [r['seg_id'] for r in traj_results]
- 
-            t_load = time.time()
-            query_traj_data = await loader.load_trajectory_data(target_id, dtw_mode)
- 
-            if query_traj_data is not None:
-                candidates_traj = await loader.load_trajectories_batch(
-                    traj_candidate_ids, dtw_mode
-                )
-                data_load_ms = (time.time() - t_load) * 1000
- 
-                candidates_flat = {
-                    traj_id: data['trajectory']
-                    for traj_id, data in candidates_traj.items()
-                }
- 
-                dtw_traj = rerank(
-                    query_seq=query_traj_data['trajectory'],
-                    candidates=candidates_flat,
-                    limit=limit,
-                    mode=dtw_mode,
-                )
- 
-                dtw_lookup = {r['id']: r for r in dtw_traj}
-                enriched_traj = []
-                for r in traj_results:
-                    sid = r['seg_id']
-                    if sid in dtw_lookup:
-                        r['dtw_distance'] = dtw_lookup[sid]['dtw_distance']
-                        r['similarity_score'] = dtw_lookup[sid]['similarity_score']
-                        r['rank_stage2'] = dtw_lookup[sid]['rank']
-                    enriched_traj.append(r)
- 
-                enriched_traj.sort(key=lambda x: x.get('dtw_distance', float('inf')))
-                result['traj_similarity']['results'] = enriched_traj
- 
-        # ── Segment-level reranking ───────────────────────────────────────
-        def seg_id_to_traj_id(seg_id: str) -> str:
-            return seg_id.rsplit('_', 1)[0]
- 
-        segment_groups = result.get('segment_similarity', [])
- 
-        all_seg_traj_ids: set = set()
-        for group in segment_groups:
-            for r in group.get('similar_segments', {}).get('results', []):
-                all_seg_traj_ids.add(seg_id_to_traj_id(r['seg_id']))
-        all_seg_traj_ids.add(target_id)
- 
-        seg_batch = await loader.load_trajectories_batch(
-            list(all_seg_traj_ids), dtw_mode
-        )
- 
-        for group in segment_groups:
-            query_seg_id = group['target_segment']
-            query_traj_id_local = seg_id_to_traj_id(query_seg_id)
-            seg_results = group.get('similar_segments', {}).get('results', [])
- 
-            if not seg_results:
-                continue
- 
-            query_traj_data = seg_batch.get(query_traj_id_local)
-            if query_traj_data is None:
-                continue
- 
-            query_arr = query_traj_data['segments'].get(query_seg_id)
-            if query_arr is None:
-                continue
- 
-            candidates_seg_flat = {}
-            for r in seg_results:
-                cand_seg_id = r['seg_id']
-                cand_traj_id = seg_id_to_traj_id(cand_seg_id)
-                cand_traj_data = seg_batch.get(cand_traj_id)
-                if cand_traj_data is None:
-                    continue
-                cand_arr = cand_traj_data['segments'].get(cand_seg_id)
-                if cand_arr is not None:
-                    candidates_seg_flat[cand_seg_id] = cand_arr
- 
-            if not candidates_seg_flat:
-                continue
- 
-            dtw_seg = rerank(
-                query_seq=query_arr,
-                candidates=candidates_seg_flat,
-                limit=limit,
-                mode=dtw_mode,
-            )
- 
-            dtw_seg_lookup = {r['id']: r for r in dtw_seg}
-            enriched_seg = []
-            for r in seg_results:
-                sid = r['seg_id']
-                if sid in dtw_seg_lookup:
-                    r['dtw_distance'] = dtw_seg_lookup[sid]['dtw_distance']
-                    r['similarity_score'] = dtw_seg_lookup[sid]['similarity_score']
-                    r['rank_stage2'] = dtw_seg_lookup[sid]['rank']
-                enriched_seg.append(r)
- 
-            enriched_seg.sort(key=lambda x: x.get('dtw_distance', float('inf')))
-            group['similar_segments']['results'] = enriched_seg
- 
-        stage2_ms = (time.time() - t2) * 1000
-        
-        result = await compute_conformal_intervals(
-        result, conn, strategy='decomposed'
+
+            stage2_active=stage2_active,
+            dtw_mode=dtw_mode,
+
+            prognosis_active=prognosis_active,
+            conformal_active=True,
         )
 
-        result['stage2_active'] = True
-        result['stage2_dtw_mode'] = dtw_mode
-        result['timing']['data_loading_ms'] = round(data_load_ms, 1)
-        result['timing']['stage2_ms'] = round(stage2_ms, 1)
-        result['timing']['total_ms'] = round((time.time() - t_start) * 1000, 1)
+        if result.get('error'):
+            raise HTTPException(status_code=404, detail=result['error'])
 
         return result
  

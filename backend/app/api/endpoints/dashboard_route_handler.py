@@ -206,14 +206,13 @@ async def get_dashboard_data(conn=Depends(get_db)):
                 width_bucket(i.sidtw_average_distance, 
                     0, 
                     (SELECT max_val FROM sidtw_stats), 
-                    8
+                    11
                 ) AS bucket, 
                 COUNT(*)
             FROM evaluation.sidtw_info i
             INNER JOIN motion.traj_info b ON i.traj_id = b.traj_id
             WHERE i.traj_id != i.seg_id
               AND i.sidtw_average_distance IS NOT NULL
-              AND b.source_data_act = 'leica_at960'
             GROUP BY bucket
             ORDER BY bucket
         """
@@ -222,9 +221,8 @@ async def get_dashboard_data(conn=Depends(get_db)):
             SELECT MAX(sidtw_average_distance) 
             FROM evaluation.sidtw_info i
             INNER JOIN motion.traj_info b ON i.traj_id = b.traj_id
-            WHERE i.traj_id != i.seg_id 
+            WHERE i.traj_id = i.seg_id 
               AND i.sidtw_average_distance IS NOT NULL
-              AND b.source_data_act = 'leica_at960'
         """)
         stats["performanceSIDTWDistribution"] = {
             "data": [{"bucket": r["bucket"], "count": r["count"]} for r in sidtw_rows],
@@ -232,7 +230,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
                 "useRanges": True,
                 "min": 0,
                 "max": sidtw_max,
-                "numBuckets": 9,
+                "numBuckets": 11,
                 "unit": "mm",
                 "label": "Accuracy"
             }
@@ -241,7 +239,7 @@ async def get_dashboard_data(conn=Depends(get_db)):
         # Stop Point Distribution
         stop_query = """
             SELECT stop_point AS bucket, COUNT(*)
-            FROM motion.traj_info
+            FROM motion.traj_setpoints
             WHERE stop_point IS NOT NULL
             GROUP BY bucket
             ORDER BY bucket
@@ -326,21 +324,20 @@ async def get_dashboard_influence(conn=Depends(get_db)):
                 SELECT info.sidtw_average_distance as sidtw,
                     bm.max_vel              as velocity,
                     bm.max_accel            as acceleration,
-                    bi.weight                   as weight,
-                    bi.stop_point               as stop_point
+                    bm.weight                   as weight,
+                    bx.stop_point               as stop_point
                 FROM evaluation.sidtw_info info
                         INNER JOIN motion.traj_metadata bm
-                                    ON info.traj_id = bm.traj_id
-                                        AND info.traj_id = bm.seg_id
-                                        AND bm.traj_id = bm.seg_id
-                        INNER JOIN motion.traj_info bi
-                                    ON info.traj_id = bi.traj_id
-                WHERE info.traj_id = info.seg_id
+                                    ON info.seg_id = bm.seg_id
+                                        AND info.seg_id = bm.seg_id
+                                        AND bm.seg_id = bm.seg_id
+                        INNER JOIN motion.traj_setpoints bx
+                                    ON info.seg_id = bx.seg_id
+                WHERE info.seg_id = info.seg_id
                 AND info.sidtw_average_distance IS NOT NULL
                 AND bm.max_vel IS NOT NULL
                 AND bm.max_accel IS NOT NULL
-                AND bi.weight IS NOT NULL
-                AND bi.stop_point IS NOT NULL
+                AND bx.stop_point IS NOT NULL
                 ORDER BY RANDOM()
                 LIMIT 5000
             )

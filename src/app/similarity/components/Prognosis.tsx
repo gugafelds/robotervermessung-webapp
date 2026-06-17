@@ -1,6 +1,5 @@
 import React from 'react';
 
-import { computePrognosis } from '@/src/lib/prognosis';
 import type {
   ConformalInterval,
   PrognosisFields,
@@ -158,7 +157,6 @@ const PrognosisCard: React.FC<PrognosisCardProps> = ({
 interface PrognosisProps {
   trajResults: SimilarityResult[];
   segmentGroups: SegmentGroup[];
-  targetTrajFeatures?: TargetFeatures;
   stage2Active: boolean;
   dtwMode?: 'position' | 'joint';
   metric?: 'sidtw' | 'qdtw';
@@ -168,7 +166,6 @@ interface PrognosisProps {
 const Prognosis: React.FC<PrognosisProps> = ({
   trajResults,
   segmentGroups,
-  targetTrajFeatures,
   stage2Active,
   dtwMode = 'position',
   metric = 'sidtw',
@@ -177,12 +174,6 @@ const Prognosis: React.FC<PrognosisProps> = ({
   const hasData = trajResults.length > 0 || segmentGroups.length > 0;
   if (!hasData) return null;
 
-  const { direct, decomposed, groundTruth } = computePrognosis(
-    trajResults,
-    segmentGroups,
-    targetTrajFeatures,
-    stage2Active,
-  );
 
   return (
     <div className="flex flex-col overflow-y-auto rounded-lg border border-gray-400 bg-white shadow-md">

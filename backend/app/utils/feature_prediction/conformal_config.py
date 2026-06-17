@@ -25,7 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict, dataclass
-from typing import Literal, Optional, Tuple
+from typing import Literal, Tuple
 
 # ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -87,21 +87,17 @@ class CalibrationConfig:
         return replace(self, retrieval_strategy=strategy)
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Default config — must match what calibration_set_builder_v3.py used
-# ═════════════════════════════════════════════════════════════════════════════
 
 DEFAULT_CONFIG = CalibrationConfig(
     k                      = 10,
     dtw_mode               = 'position',
     metric                 = 'sidtw',
     search_modes           = ('position', 'joint', 'orientation', 'velocity', 'metadata'),
-    distance_normalization = 'per_point',
+    distance_normalization = 'per_path_length',
     retrieval_strategy     = 'decomposed',
     sigma_floor            = 0.005,
     test_ratio             = 0.2,
-    split_seed             = 42,
-    # config_hash = 43472d17cc981706
+    split_seed             = 3,
 )
 
 
