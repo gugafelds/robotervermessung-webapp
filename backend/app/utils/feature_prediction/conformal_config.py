@@ -1,116 +1,98 @@
 """
 conformal_config.py
 ===================
-Shared configuration dataclass for the conformal prediction pipeline.
+Shared configuration for the conformal prediction pipeline.
 
-Used by BOTH:
-  - calibration_set_builder_v3.py  (offline, builds calibration set)
-  - conformal_predictor.py         (online, computes intervals)
+Used by:
+  - calibration_set_builder.py  (offline)
+  - conformal_predictor.py      (online)
 
-This ensures the config_hash is identical in both places —
-which is required for the online scorer to find the correct
-quantile rows in evaluation.confidence_quantiles.
+Lookup key for quantiles
+-------------------------
+metric + dtw_mode + retrieval_strategy + level + k + search_modes + calibration_tag
 
-Usage
------
-    from utils.conformal_calibration.conformal_config import (
-        CalibrationConfig,
-        DEFAULT_CONFIG,
-        get_active_config,
-    )
+config_hash is stored for audit only — NOT used for DB lookup.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Literal, Tuple
 
-# ── Types ─────────────────────────────────────────────────────────────────────
-
-DistanceNorm      = Literal['raw', 'per_point', 'per_path_length']
 RetrievalStrategy = Literal['decomposed', 'direct']
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# CalibrationConfig
-# ═════════════════════════════════════════════════════════════════════════════
+def _search_modes_str(modes: Tuple[str, ...]) -> str:
+    """Stable, order-independent serialization of search modes."""
+    return ','.join(sorted(modes))
+
 
 @dataclass(frozen=True)
 class CalibrationConfig:
     """
-    Immutable configuration that uniquely identifies a calibration run.
+    Immutable configuration for a calibration run.
 
-    Every field that affects the nonconformity scores or quantiles is
-    included so that config_hash = SHA256(to_json())[:16] is a reliable
-    cache key. Changing ANY field produces a new hash and a separate set
-    of rows in the DB.
+    config_hash = SHA256(to_json())[:16] is stored for audit.
+    DB lookups use explicit columns, not the hash.
     """
 
-    # Retrieval
-    k:                      int
-    dtw_mode:               str
-    metric:                 str
-    search_modes:           Tuple[str, ...]
-    distance_normalization: DistanceNorm
-    retrieval_strategy:     RetrievalStrategy
+    # Lookup key fields
+    k:                  int
+    dtw_mode:           str
+    metric:             str
+    search_modes:       Tuple[str, ...]
+    retrieval_strategy: RetrievalStrategy
+    calibration_tag:    str = 'all'
 
-    # σ computation
-    sigma_floor:            float
+    # Not in lookup key — tuning params stored in config JSONB only
+    sigma_floor:        float = 0.005
+    test_ratio:         float = 0.2
+    split_seed:         int   = 3
 
-    # Split
-    test_ratio:             float
-    split_seed:             int
-
-    # Metadata — included in hash so changes are tracked
-    prediction_level:           str = 'segment_and_trajectory'
-    sigma_source:               str = 'neighbor_perf_std_with_floor'
-    trajectory_sigma_strategy:  str = 'weighted_mean_segment_sigma'
-    weighting:                  str = 'inverse_normalized_dtw_distance'
-
-    # ── Serialisation ─────────────────────────────────────────────────────
+    # Metadata
+    prediction_level:          str = 'segment_and_trajectory'
+    sigma_source:              str = 'neighbor_perf_std_with_floor'
+    trajectory_sigma_strategy: str = 'weighted_mean_segment_sigma'
+    weighting:                 str = 'inverse_raw_dtw_distance'
 
     def to_json(self) -> str:
-        """Stable JSON string — used to compute the hash."""
         return json.dumps(asdict(self), sort_keys=True)
 
     def hash(self) -> str:
-        """16-char hex prefix of SHA-256(to_json()).  Matches DB config_hash column."""
+        """Audit hash only — not used for DB lookup."""
         return hashlib.sha256(self.to_json().encode('utf-8')).hexdigest()[:16]
 
-    # ── Convenience ───────────────────────────────────────────────────────
+    def search_modes_str(self) -> str:
+        return _search_modes_str(self.search_modes)
 
     def with_strategy(self, strategy: RetrievalStrategy) -> 'CalibrationConfig':
-        """Return a copy with a different retrieval_strategy (different hash)."""
-        from dataclasses import replace
         return replace(self, retrieval_strategy=strategy)
 
+    def with_tag(self, tag: str) -> 'CalibrationConfig':
+        return replace(self, calibration_tag=tag)
 
 
 DEFAULT_CONFIG = CalibrationConfig(
-    k                      = 10,
-    dtw_mode               = 'position',
-    metric                 = 'sidtw',
-    search_modes           = ('position', 'joint', 'orientation', 'velocity', 'metadata'),
-    distance_normalization = 'per_path_length',
-    retrieval_strategy     = 'decomposed',
-    sigma_floor            = 0.005,
-    test_ratio             = 0.2,
-    split_seed             = 3,
+    k                  = 10,
+    dtw_mode           = 'position',
+    metric             = 'sidtw',
+    search_modes       = ('position', 'joint', 'orientation', 'velocity', 'metadata'),
+    retrieval_strategy = 'decomposed',
+    calibration_tag    = 'all',
+    sigma_floor        = 0.005,
+    test_ratio         = 0.2,
+    split_seed         = 3,
 )
 
 
 def get_active_config(
     retrieval_strategy: RetrievalStrategy = 'decomposed',
+    calibration_tag:    str               = 'all',
 ) -> CalibrationConfig:
     """
-    Return the active config for a given retrieval strategy.
-
-    The online scorer calls this to get the config_hash it needs
-    to query evaluation.confidence_quantiles.
-
-    If you rebuild the calibration set with different parameters,
-    update DEFAULT_CONFIG above — the hash will change automatically.
+    Return the active config for online use.
+    Update DEFAULT_CONFIG when pipeline parameters change.
     """
-    return DEFAULT_CONFIG.with_strategy(retrieval_strategy)
+    return DEFAULT_CONFIG.with_strategy(retrieval_strategy).with_tag(calibration_tag)
