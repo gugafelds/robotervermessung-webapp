@@ -272,12 +272,13 @@ def _aggregate_trajectory_decomposed(
 # ═══════════════════════════════════════════════════════════════════════════
 
 async def predict_performance(
-    result:          Dict[str, Any],
-    seg_batch:       Dict[str, Any],
-    conn:            asyncpg.Connection,
-    feature:         str   = 'mean_distance',
-    coverage:        float = 0.90,
-    calibration_tag: str   = 'all',
+    result:           Dict[str, Any],
+    seg_batch:        Dict[str, Any],
+    conn:             asyncpg.Connection,
+    feature:          str   = 'mean_distance',
+    coverage:         float = 0.90,
+    calibration_tag:  str   = 'all',
+    conformal_active: bool  = True,
 ) -> Dict[str, Any]:
     """
     Compute performance predictions and attach conformal intervals.
@@ -373,7 +374,7 @@ async def predict_performance(
     }
 
     # ── Conformal intervals (Stage 2 only) ────────────────────────────────
-    if stage2_active:
+    if stage2_active and conformal_active:
         result = await compute_conformal_intervals(
             result          = result,
             conn            = conn,

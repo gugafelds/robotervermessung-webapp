@@ -74,6 +74,7 @@ async def run_similarity_pipeline(
     prognosis_active: bool  = False,
     calibration_tag:  str   = 'all',
     coverage:         float = 0.90,
+    conformal_active: bool  = True,
 ) -> Dict[str, Any]:
     t_start = time.time()
 
@@ -111,7 +112,8 @@ async def run_similarity_pipeline(
         if prognosis_active:
             result = await predict_performance(
                 result=result, seg_batch={}, conn=conn,
-                traj_batch=None, feature='mean_distance', coverage=coverage,
+                feature='mean_distance', coverage=coverage,
+                conformal_active=False,
             )
         result['timing']['total_ms'] = round((time.time() - t_start) * 1000, 1)
         return result
@@ -224,6 +226,7 @@ async def run_similarity_pipeline(
             feature='mean_distance',
             coverage=coverage,
             calibration_tag=calibration_tag,
+            conformal_active=conformal_active,
         )
 
     result['timing']['data_loading_ms'] = round(data_load_ms, 1)

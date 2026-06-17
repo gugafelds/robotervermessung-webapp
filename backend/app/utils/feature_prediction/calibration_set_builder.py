@@ -749,6 +749,7 @@ async def process_trajectory_bundle(
                 dtw_mode=cfg_for_pipeline.dtw_mode,
                 prognosis_active=True,
                 coverage=0.90,
+                conformal_active=False,
             )
 
         if result.get('error'):
