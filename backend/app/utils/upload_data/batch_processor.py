@@ -44,6 +44,7 @@ class BatchProcessor:
         # Collect all data
         all_processed_data = []
         file_results = []
+        filtered_traj_info = []
 
         for file_info in files_and_paths:
             try:
