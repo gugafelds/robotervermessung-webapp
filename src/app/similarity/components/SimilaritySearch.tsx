@@ -23,6 +23,7 @@ type SimilaritySearchProps = {
     stage2Active: boolean,
     dtwMode: 'position' | 'joint',
     metric: 'sidtw' | 'qdtw',
+    prognosisActive: boolean,
   ) => void;
   trajInfo?: TrajInfo[];
   showPlots: boolean;
@@ -57,8 +58,9 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
   const [prefilterFeatures, setPrefilterFeatures] = useState<Set<string>>(
     new Set(['']),
   );
-  const [stage2Active, setStage2Active] = useState(false);
+  const [stage2Active, setStage2Active] = useState(true);
   const [dtwMode, setDtwMode] = useState<'position' | 'joint'>('position');
+  const [prognosisActive, setPrognosisActive] = useState(true);
 
   const recentBahnIds = trajInfo ? trajInfo.map((traj) => traj.trajID) : [];
 
@@ -122,6 +124,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
         stage2Active,
         dtwMode,
         metric,
+        prognosisActive,
       );
       setShowDropdown(false);
     }
@@ -342,14 +345,13 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
           </div>
         </div>
 
-        {/* Stage 2: DTW Reranking */}
+        {/* Stage 2 + Prognosis */}
         <div className="flex flex-row rounded-lg bg-white p-3">
+          {/* Stage 2 DTW */}
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium text-gray-700">
               Stage 2 DTW:
             </span>
-
-            {/* Toggle */}
             {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
             <button
               onClick={() => setStage2Active((prev) => !prev)}
@@ -366,7 +368,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
               />
             </button>
 
-            {/* DTW Mode Dropdown — nur sichtbar wenn aktiv */}
+            {/* DTW Mode — nur sichtbar wenn Stage 2 aktiv */}
             {stage2Active && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500">Mode:</span>
@@ -383,23 +385,47 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
               </div>
             )}
           </div>
-          <div className="ml-auto flex items-center gap-2">
+
+          {/* Prognosis */}
+          <div className="ml-auto flex items-center gap-4">
             <span className="text-sm font-medium text-gray-700">
               Prognosis:
             </span>
-            {(['sidtw', 'qdtw'] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setMetric(m)}
-                className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                  metric === m
-                    ? 'bg-blue-950 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
+            <button
+              onClick={() => setPrognosisActive((prev) => !prev)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                prognosisActive ? 'bg-blue-600' : 'bg-gray-300'
+              }`}
+              role="switch"
+              aria-checked={prognosisActive}
+              aria-label="Toggle prognosis"
+            >
+              <span
+                className={`inline-block size-4 rounded-full bg-white shadow transition-transform ${
+                  prognosisActive ? 'translate-x-6' : 'translate-x-1'
                 }`}
-              >
-                {m.toUpperCase()}
-              </button>
-            ))}
+              />
+            </button>
+
+            {/* Metric selector — nur sichtbar wenn Prognose aktiv */}
+            {prognosisActive && (
+              <div className="flex items-center gap-2">
+                {(['sidtw', 'qdtw'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMetric(m)}
+                    className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                      metric === m
+                        ? 'bg-blue-950 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    {m.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -407,6 +433,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
         <div className="text-xs text-gray-600">
           Stage 1 (RRF Fusion)
           {stage2Active && ' → Stage 2 (DTW Reranking)'}
+          {prognosisActive && ' → Prognosis'}
         </div>
 
         {/* Such-Button */}

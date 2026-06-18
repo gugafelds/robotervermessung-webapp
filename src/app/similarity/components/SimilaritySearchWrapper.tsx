@@ -5,14 +5,14 @@ import React, { useState } from 'react';
 import { SimilarityService } from '@/src/actions/similarity.service';
 import type { TrajInfo } from '@/types/motion.types';
 import type {
-  ConformalInterval,
+  Prognosis,
   SearchTiming,
   SegmentGroup,
   SimilarityResult,
   TargetFeatures,
 } from '@/types/similarity.types';
 
-import Prognosis from './Prognosis';
+import PrognosisView from './Prognosis';
 import { SimilarityPlot } from './SimilarityPlot';
 import SimilarityResults from './SimilarityResults';
 import SimilaritySearch from './SimilaritySearch';
@@ -37,8 +37,7 @@ export default function SimilaritySearchWrapper({
   const [stage2Active, setStage2Active] = useState(false);
   const [dtwMode, setDtwMode] = useState<'position' | 'joint'>('position');
   const [metric, setMetric] = useState<'sidtw' | 'qdtw'>('sidtw');
-  const [conformalInterval, setConformalInterval] =
-    useState<ConformalInterval | null>(null);
+  const [prognosis, setPrognosis] = useState<Prognosis | null>(null);
 
   const hasResults = trajResults.length > 0 || segmentGroups.length > 0;
 
@@ -57,6 +56,7 @@ export default function SimilaritySearchWrapper({
     stage2_active: boolean,
     dtw_mode: 'position' | 'joint',
     search_metric: 'sidtw' | 'qdtw',
+    prognosis_active: boolean,
   ) => {
     setIsLoading(true);
     setError('');
@@ -67,7 +67,7 @@ export default function SimilaritySearchWrapper({
     setTiming(undefined);
     setStage2Active(false);
     setMetric(search_metric);
-    setConformalInterval(null);
+    setPrognosis(null);
 
     try {
       await SimilarityService.searchSimilarityEmbedding(
@@ -80,6 +80,8 @@ export default function SimilaritySearchWrapper({
           stage2_active,
           dtw_mode,
           metric: search_metric,
+          prognosis_active,
+          coverage: 0.9,
         },
         {
           onTrajsFound: (
@@ -99,8 +101,8 @@ export default function SimilaritySearchWrapper({
           onSegmentsFound: (groups) => {
             setSegmentGroups(groups);
           },
-          onConformalInterval: (interval) => {
-            setConformalInterval(interval);
+          onPrognosisFound: (prog) => {
+            setPrognosis(prog);
           },
           onError: (errorMsg) => {
             setError(`Error on the search: ${errorMsg}`);
@@ -141,12 +143,12 @@ export default function SimilaritySearchWrapper({
         )}
 
         <div className="my-2 items-start gap-x-2 overflow-hidden">
-          <Prognosis
-            trajResults={trajResults}
-            segmentGroups={segmentGroups}
+          <PrognosisView
+            prognosis={prognosis}
             targetTrajFeatures={targetTrajFeatures}
             stage2Active={stage2Active}
-            conformalInterval={conformalInterval} // NEU
+            metric={metric}
+            dtwMode={dtwMode}
           />
         </div>
 

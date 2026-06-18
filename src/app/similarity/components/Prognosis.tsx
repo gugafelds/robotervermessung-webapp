@@ -1,232 +1,217 @@
+// src/app/similarity/components/Prognosis.tsx
 import React from 'react';
 
 import type {
   ConformalInterval,
-  PrognosisFields,
-  SegmentGroup,
-  SimilarityResult,
+  Prognosis,
   TargetFeatures,
+  TrajectoryPrognosis,
 } from '@/types/similarity.types';
 
-const formatVal = (v: number | null) => (v != null ? v.toFixed(4) : '—');
+// ═══════════════════════════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════════════════════════
 
-const formatError = (v: number | null, gt: number | null) => {
-  if (v == null || gt == null) return '—';
-  return Math.abs(v - gt).toFixed(4);
-};
+const fmt = (v: number | null | undefined, decimals = 4): string =>
+  v != null ? v.toFixed(decimals) : '—';
 
-const getErrorColor = (v: number | null, gt: number | null): string => {
-  if (v == null || gt == null) return 'text-gray-400';
-  const err = Math.abs(v - gt);
+const getErrorColor = (predicted: number | null, gt: number | null): string => {
+  if (predicted == null || gt == null) return 'text-gray-400';
+  const err = Math.abs(predicted - gt);
   if (err < 0.05) return 'text-green-600';
   if (err < 0.15) return 'text-yellow-600';
   return 'text-red-600';
 };
 
-// NEU — ersetzt getConfidenceColor
 const getIntervalColor = (low: number, high: number): string => {
   const width = high - low;
-  if (width < 0.05) return 'text-green-600';
-  if (width < 0.15) return 'text-yellow-600';
+  if (width < 0.1) return 'text-green-600';
+  if (width < 0.3) return 'text-yellow-600';
   return 'text-red-600';
 };
 
-interface PrognosisRowProps {
+// ═══════════════════════════════════════════════════════════════════════════
+// Subcomponents
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface PredictionRowProps {
   label: string;
-  min: number | null;
-  mean: number | null;
-  max: number | null;
-  gtMin: number | null;
-  gtMean: number | null;
-  gtMax: number | null;
+  predicted: number | null;
+  gt: number | null;
+  sigma?: number | null;
+  mismatchWarning?: string | null;
 }
 
-const PrognosisRow: React.FC<PrognosisRowProps> = ({
+const PredictionRow: React.FC<PredictionRowProps> = ({
   label,
-  min,
-  mean,
-  max,
-  gtMin,
-  gtMean,
-  gtMax,
+  predicted,
+  gt,
+  sigma,
+  mismatchWarning,
 }) => (
-  <div className="grid grid-cols-4 items-center gap-x-4">
-    <p className="text-base text-gray-800">{label}</p>
-    <p className={`font-mono text-sm font-medium ${getErrorColor(min, gtMin)}`}>
-      {formatVal(min)}
-      {gtMin != null && min != null && (
-        <span className="ml-1 text-sm text-gray-500">
-          ±{formatError(min, gtMin)}
-        </span>
-      )}
-    </p>
+  <div className="flex items-center justify-between gap-4 py-1">
+    <p className="w-32 text-lg text-gray-800">{label}</p>
     <p
-      className={`font-mono text-base font-medium ${getErrorColor(mean, gtMean)}`}
+      className={`font-mono text-base font-semibold ${getErrorColor(predicted, gt)}`}
     >
-      {formatVal(mean)}
-      {gtMean != null && mean != null && (
-        <span className="ml-1 text-sm text-gray-500">
-          ±{formatError(mean, gtMean)}
+      {fmt(predicted)}
+      {gt != null && predicted != null && (
+        <span className="ml-2 text-base font-semibold">
+          ({fmt(Math.abs(predicted - gt))})
+        </span>
+      )}
+      {mismatchWarning != null && (
+        <span
+          className="ml-2 cursor-help text-amber-500"
+          title={mismatchWarning}
+        >
+          ⚠️
         </span>
       )}
     </p>
-    <p className={`font-mono text-sm font-medium ${getErrorColor(max, gtMax)}`}>
-      {formatVal(max)}
-      {gtMax != null && max != null && (
-        <span className="ml-1 text-sm text-gray-500">
-          ±{formatError(max, gtMax)}
+    {sigma != null && (
+      <p className="font-mono text-sm text-primary">
+        Consistency: {fmt(sigma, 3)}
+      </p>
+    )}
+  </div>
+);
+
+interface IntervalDisplayProps {
+  interval: ConformalInterval;
+}
+
+const IntervalDisplay: React.FC<IntervalDisplayProps> = ({ interval }) => (
+  <div className="mt-2 rounded-md bg-gray-50 px-3 py-2">
+    <div className="flex items-center justify-between">
+      <p className="py-1 text-base text-primary">
+        Conformal interval{' '}
+        <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-sm text-blue-800">
+          {(interval.coverage * 100).toFixed(0)}%
         </span>
+      </p>
+      {interval.n_segments != null && (
+        <p className="text-sm text-gray-800">{interval.n_segments} segments</p>
       )}
+    </div>
+    <p
+      className={`mt-1 font-mono text-base font-semibold ${getIntervalColor(interval.low, interval.high)}`}
+    >
+      [{fmt(interval.low)}, {fmt(interval.high)}] mm
     </p>
   </div>
 );
 
 interface PrognosisCardProps {
   label: string;
-  fields: PrognosisFields;
-  gtMin: number | null;
-  gtMean: number | null;
-  gtMax: number | null;
-  conformalInterval?: ConformalInterval | null; // NEU — ersetzt confidence
+  prediction: TrajectoryPrognosis | null;
+  gt: number | null;
+  interval: ConformalInterval | null;
 }
 
 const PrognosisCard: React.FC<PrognosisCardProps> = ({
   label,
-  fields,
-  gtMin,
-  gtMean,
-  gtMax,
-  conformalInterval,
+  prediction,
+  gt,
+  interval,
 }) => (
-  <div className="flex flex-col gap-3 rounded-lg border border-gray-400 bg-white p-4">
+  <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-4">
     <p className="text-lg font-medium uppercase tracking-wider text-primary">
       {label}
     </p>
 
-    <div className="grid grid-cols-4 gap-x-4">
-      <span />
-      <p className="text-sm font-medium text-gray-800">Min.</p>
-      <p className="text-sm font-medium text-gray-800">Mean</p>
-      <p className="text-sm font-medium text-gray-800">Max.</p>
-    </div>
-
-    <div className="flex flex-col gap-2">
-      {/* <PrognosisRow
-        label="Simple"
-        min={fields.min.simple}
-        mean={fields.mean.simple}
-        max={fields.max.simple}
-        gtMin={gtMin}
-        gtMean={gtMean}
-        gtMax={gtMax}
-      /> */}
-      <PrognosisRow
-        label="Weighted"
-        min={fields.min.weighted}
-        mean={fields.mean.weighted}
-        max={fields.max.weighted}
-        gtMin={gtMin}
-        gtMean={gtMean}
-        gtMax={gtMax}
-      />
-    </div>
-
-    {/* NEU — ersetzt alte confidence Anzeige, gleiches Layout */}
-    {conformalInterval != null && (
-      <div className="mt-2 border-t pt-2">
-        <p className="text-base text-gray-800">
-          Prediction Interval{' '}
-          <span className="text-sm text-gray-400">
-            ({(conformalInterval.coverage * 100).toFixed(0)}% coverage)
-          </span>
-        </p>
-        <p
-          className={`font-mono text-sm font-medium ${getIntervalColor(
-            conformalInterval.low,
-            conformalInterval.high,
-          )}`}
-        >
-          [{conformalInterval.low.toFixed(4)},{' '}
-          {conformalInterval.high.toFixed(4)}] mm
-        </p>
-      </div>
+    {prediction != null ? (
+      <>
+        <PredictionRow
+          label="p̂ (error)"
+          predicted={prediction.p_hat}
+          gt={gt}
+          sigma={prediction.sigma}
+          mismatchWarning={interval?.calibration_mismatch?.warning ?? null}
+        />
+        {interval != null && <IntervalDisplay interval={interval} />}
+      </>
+    ) : (
+      <p className="text-lg text-gray-800">—</p>
     )}
   </div>
 );
 
-interface PrognosisProps {
-  trajResults: SimilarityResult[];
-  segmentGroups: SegmentGroup[];
+// ═══════════════════════════════════════════════════════════════════════════
+// Main component
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface PrognosisViewProps {
+  prognosis: Prognosis | null;
+  targetTrajFeatures?: TargetFeatures;
   stage2Active: boolean;
   dtwMode?: 'position' | 'joint';
   metric?: 'sidtw' | 'qdtw';
-  conformalInterval?: ConformalInterval | null; // NEU
 }
 
-const Prognosis: React.FC<PrognosisProps> = ({
-  trajResults,
-  segmentGroups,
+const PrognosisView: React.FC<PrognosisViewProps> = ({
+  prognosis,
+  targetTrajFeatures,
   stage2Active,
   dtwMode = 'position',
   metric = 'sidtw',
-  conformalInterval, // NEU
 }) => {
-  const hasData = trajResults.length > 0 || segmentGroups.length > 0;
-  if (!hasData) return null;
+  if (prognosis == null) return null;
 
+  const gt = targetTrajFeatures?.mean_distance ?? null;
 
   return (
     <div className="flex flex-col overflow-y-auto rounded-lg border border-gray-400 bg-white shadow-md">
+      {/* Header */}
       <div className="bg-gray-50 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-medium text-gray-900">
               Performance prognosis
             </h3>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 flex items-center gap-2 text-sm text-gray-600">
               <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium uppercase text-gray-700">
                 {metric}
               </span>
               {stage2Active && (
-                <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
                   DTW {dtwMode}
                 </span>
               )}
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                {prognosis.stage === 'stage2_dtw' ? 'Stage 2' : 'Stage 1'}
+              </span>
             </p>
           </div>
 
-          <div className="flex flex-col items-end gap-1">
-            <p className="text-xs text-gray-400">
-              Ground Truth [min, mean, max]
-            </p>
-            <p className="font-mono text-sm font-semibold text-blue-950">
-              [{formatVal(groundTruth.min)}, {formatVal(groundTruth.mean)},{' '}
-              {formatVal(groundTruth.max)}]
-            </p>
-          </div>
+          {gt != null && (
+            <div className="flex flex-col items-end gap-1">
+              <p className="text-xs text-gray-400">Ground truth (mean)</p>
+              <p className="font-mono text-sm font-semibold text-blue-950">
+                {fmt(gt)} mm
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Cards */}
       <div className="grid grid-cols-2 gap-4 border-t p-4">
         <PrognosisCard
-          label="Direct (Trajectories)"
-          fields={direct}
-          gtMin={groundTruth.min}
-          gtMean={groundTruth.mean}
-          gtMax={groundTruth.max}
-          // Direct hat kein Segment-basiertes Intervall
+          label="Direct (trajectories)"
+          prediction={prognosis.direct}
+          gt={gt}
+          interval={prognosis.direct_conformal_interval}
         />
         <PrognosisCard
-          label="Decomposed (Segments)"
-          fields={decomposed}
-          gtMin={groundTruth.min}
-          gtMean={groundTruth.mean}
-          gtMax={groundTruth.max}
-          conformalInterval={conformalInterval} // NEU — nur Decomposed
+          label="Decomposed (segments)"
+          prediction={prognosis.decomposed}
+          gt={gt}
+          interval={prognosis.decomposed_conformal_interval}
         />
       </div>
     </div>
   );
 };
 
-export default Prognosis;
+export default PrognosisView;

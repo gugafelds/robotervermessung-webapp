@@ -113,7 +113,7 @@ async def run_similarity_pipeline(
             result = await predict_performance(
                 result=result, seg_batch={}, conn=conn,
                 feature='mean_distance', coverage=coverage,
-                conformal_active=False,
+                conformal_active=False,  # no intervals without DTW distances
             )
         result['timing']['total_ms'] = round((time.time() - t_start) * 1000, 1)
         return result
@@ -227,6 +227,8 @@ async def run_similarity_pipeline(
             coverage=coverage,
             calibration_tag=calibration_tag,
             conformal_active=conformal_active,
+            k=limit,
+            search_modes=tuple(sorted(modes or [])),
         )
 
     result['timing']['data_loading_ms'] = round(data_load_ms, 1)

@@ -3,18 +3,30 @@ feature_prediction/conformal_predictor.py
 ==========================================
 Conformal prediction intervals.
 
-DB lookup key
---------------
-metric + dtw_mode + retrieval_strategy + level + k + search_modes + calibration_tag + coverage
+Lookup strategy (Problem 1 — fuzzy quantile lookup)
+-----------------------------------------------------
+Exact match first, then progressive fallback:
+  1. Exact:  metric + dtw_mode + strategy + level + k + search_modes + tag + coverage
+  2. k diff: same but nearest available k (closest abs diff)
+  3. modes:  same but ignore search_modes (any modes, same k preferred)
+  4. tag:    same but tag='all' (if original tag != 'all')
 
-Fallback: if calibration_tag != 'all' and no row found, retries with 'all'.
+Each fallback that fires attaches a CalibrationMismatch to the result
+so the frontend can show a warning.
+
+Problem 2 — Stage 1 conformal
+-------------------------------
+Stage 1 (RRF) produces no conformal interval — only p_hat/sigma.
+compute_conformal_intervals() is only called with stage2_active=True.
+This is enforced in predictor.py, not here.
 """
 
 from __future__ import annotations
 
 import logging
 import math
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 
@@ -25,27 +37,37 @@ logger = logging.getLogger(__name__)
 EPSILON     = 1e-6
 DEFAULT_COV = 0.90
 
-_quantile_cache: Dict[str, float] = {}
+# Simple in-process cache: key → (quantile, mismatch_or_None)
+_quantile_cache: Dict[str, Tuple[float, Optional['CalibrationMismatch']]] = {}
 
 
-def _cache_key(
-    metric: str, dtw_mode: str, strategy: str,
-    level: str, k: int, search_modes_str: str,
-    tag: str, coverage: float,
-) -> str:
-    return f"{metric}:{dtw_mode}:{strategy}:{level}:{k}:{search_modes_str}:{tag}:{coverage}"
+# ═══════════════════════════════════════════════════════════════════════════
+# Mismatch descriptor
+# ═══════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class CalibrationMismatch:
+    """Describes how the found quantile differs from what was requested."""
+    warning:           str
+    requested_k:       Optional[int]   = None
+    used_k:            Optional[int]   = None
+    requested_modes:   Optional[str]   = None
+    used_modes:        Optional[str]   = None
+    requested_tag:     Optional[str]   = None
+    used_tag:          Optional[str]   = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {k: v for k, v in self.__dict__.items() if v is not None}
 
 
-async def _fetch_quantile_row(
-    conn:             asyncpg.Connection,
-    metric:           str,
-    dtw_mode:         str,
-    strategy:         str,
-    level:            str,
-    k:                int,
-    search_modes_str: str,
-    tag:              str,
-    coverage:         float,
+# ═══════════════════════════════════════════════════════════════════════════
+# DB fetch helpers
+# ═══════════════════════════════════════════════════════════════════════════
+
+async def _fetch_exact(
+    conn: asyncpg.Connection,
+    metric: str, dtw_mode: str, strategy: str, level: str,
+    k: int, search_modes_str: str, tag: str, coverage: float,
 ) -> Optional[float]:
     row = await conn.fetchrow("""
         SELECT quantile_value
@@ -61,8 +83,65 @@ async def _fetch_quantile_row(
         ORDER BY computed_at DESC
         LIMIT 1
     """, metric, dtw_mode, strategy, level, k, search_modes_str, tag, float(coverage))
+    return float(row['quantile_value']) if row else None
 
-    return float(row['quantile_value']) if row is not None else None
+
+async def _fetch_nearest_k(
+    conn: asyncpg.Connection,
+    metric: str, dtw_mode: str, strategy: str, level: str,
+    k: int, search_modes_str: str, tag: str, coverage: float,
+) -> Optional[Tuple[float, int]]:
+    """Find row with nearest available k, same search_modes and tag."""
+    rows = await conn.fetch("""
+        SELECT quantile_value, config_k
+        FROM evaluation.confidence_quantiles
+        WHERE metric             = $1
+          AND dtw_mode           = $2
+          AND retrieval_strategy = $3
+          AND level              = $4
+          AND search_modes       = $5
+          AND calibration_tag    = $6
+          AND coverage           = $7
+        ORDER BY ABS(config_k - $8), computed_at DESC
+        LIMIT 1
+    """, metric, dtw_mode, strategy, level, search_modes_str, tag, float(coverage), k)
+    if rows:
+        return float(rows[0]['quantile_value']), int(rows[0]['config_k'])
+    return None
+
+
+async def _fetch_any_modes(
+    conn: asyncpg.Connection,
+    metric: str, dtw_mode: str, strategy: str, level: str,
+    k: int, tag: str, coverage: float,
+) -> Optional[Tuple[float, int, str]]:
+    """Find row ignoring search_modes, nearest k."""
+    rows = await conn.fetch("""
+        SELECT quantile_value, config_k, search_modes
+        FROM evaluation.confidence_quantiles
+        WHERE metric             = $1
+          AND dtw_mode           = $2
+          AND retrieval_strategy = $3
+          AND level              = $4
+          AND calibration_tag    = $5
+          AND coverage           = $6
+        ORDER BY ABS(config_k - $7), computed_at DESC
+        LIMIT 1
+    """, metric, dtw_mode, strategy, level, tag, float(coverage), k)
+    if rows:
+        return float(rows[0]['quantile_value']), int(rows[0]['config_k']), str(rows[0]['search_modes'])
+    return None
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Main quantile lookup — with fuzzy fallback
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _cache_key(
+    metric: str, dtw_mode: str, strategy: str, level: str,
+    k: int, search_modes_str: str, tag: str, coverage: float,
+) -> str:
+    return f"{metric}:{dtw_mode}:{strategy}:{level}:{k}:{search_modes_str}:{tag}:{coverage}"
 
 
 async def get_calibration_quantile(
@@ -70,10 +149,12 @@ async def get_calibration_quantile(
     cfg:      CalibrationConfig,
     coverage: float = DEFAULT_COV,
     level:    str   = 'trajectory',
-) -> Optional[float]:
+) -> Tuple[Optional[float], Optional[CalibrationMismatch]]:
     """
-    Lookup conformal quantile by explicit key columns (not config_hash).
-    Falls back to calibration_tag='all' if specific tag yields no result.
+    Lookup conformal quantile with progressive fuzzy fallback.
+
+    Returns (quantile_value, mismatch_or_None).
+    mismatch is None on exact match, otherwise describes what was used.
     """
     metric           = cfg.metric
     dtw_mode         = cfg.dtw_mode
@@ -86,39 +167,92 @@ async def get_calibration_quantile(
     if ck in _quantile_cache:
         return _quantile_cache[ck]
 
-    q = await _fetch_quantile_row(
-        conn, metric, dtw_mode, strategy, level, k, search_modes_str, tag, coverage,
+    # ── Step 1: Exact match ───────────────────────────────────────────────
+    q = await _fetch_exact(conn, metric, dtw_mode, strategy, level, k, search_modes_str, tag, coverage)
+    if q is not None:
+        _quantile_cache[ck] = (q, None)
+        return q, None
+
+    # ── Step 2: Nearest k, same modes + tag ──────────────────────────────
+    result = await _fetch_nearest_k(conn, metric, dtw_mode, strategy, level, k, search_modes_str, tag, coverage)
+    if result is not None:
+        q, used_k = result
+        mismatch = CalibrationMismatch(
+            warning=f"k mismatch: calibrated with k={used_k}, requested k={k}. Interval may be slightly miscalibrated.",
+            requested_k=k,
+            used_k=used_k,
+        )
+        logger.info(f"Fuzzy quantile lookup: k {k}→{used_k} ({metric}/{dtw_mode}/{strategy}/{level})")
+        _quantile_cache[ck] = (q, mismatch)
+        return q, mismatch
+
+    # ── Step 3: Nearest k, any modes, same tag ───────────────────────────
+    result2 = await _fetch_any_modes(conn, metric, dtw_mode, strategy, level, k, tag, coverage)
+    if result2 is not None:
+        q, used_k, used_modes = result2
+        mismatch = CalibrationMismatch(
+            warning=f"search_modes mismatch: calibrated with [{used_modes}], requested [{search_modes_str}]. "
+                    f"k={used_k} used. Interval may be miscalibrated.",
+            requested_k=k,
+            used_k=used_k,
+            requested_modes=search_modes_str,
+            used_modes=used_modes,
+        )
+        logger.info(f"Fuzzy quantile lookup: modes+k mismatch, using [{used_modes}] k={used_k}")
+        _quantile_cache[ck] = (q, mismatch)
+        return q, mismatch
+
+    # ── Step 4: Fallback to tag='all' ────────────────────────────────────
+    if tag != 'all':
+        # Try exact with tag='all'
+        q = await _fetch_exact(conn, metric, dtw_mode, strategy, level, k, search_modes_str, 'all', coverage)
+        if q is not None:
+            mismatch = CalibrationMismatch(
+                warning=f"calibration_tag '{tag}' not found, using tag='all'.",
+                requested_tag=tag,
+                used_tag='all',
+            )
+            _quantile_cache[ck] = (q, mismatch)
+            return q, mismatch
+
+        # Nearest k + any modes with tag='all'
+        result3 = await _fetch_any_modes(conn, metric, dtw_mode, strategy, level, k, 'all', coverage)
+        if result3 is not None:
+            q, used_k, used_modes = result3
+            mismatch = CalibrationMismatch(
+                warning=f"calibration_tag '{tag}' not found. Fell back to tag='all' with k={used_k}, modes=[{used_modes}]. "
+                        f"Interval is approximate.",
+                requested_k=k,
+                used_k=used_k,
+                requested_modes=search_modes_str,
+                used_modes=used_modes,
+                requested_tag=tag,
+                used_tag='all',
+            )
+            _quantile_cache[ck] = (q, mismatch)
+            return q, mismatch
+
+    logger.warning(
+        f"No conformal quantile found — "
+        f"metric={metric} dtw_mode={dtw_mode} strategy={strategy} "
+        f"level={level} k={k} modes={search_modes_str} "
+        f"tag={tag} coverage={coverage}. "
+        f"Run calibration_set_builder.py first."
     )
+    _quantile_cache[ck] = (None, None)
+    return None, None
 
-    # Fallback to 'all' tag if specific tag not found
-    if q is None and tag != 'all':
-        logger.info(
-            f"No quantile for tag='{tag}' — falling back to tag='all' "
-            f"({metric}/{dtw_mode}/{strategy}/{level}/k={k})"
-        )
-        q = await _fetch_quantile_row(
-            conn, metric, dtw_mode, strategy, level, k, search_modes_str, 'all', coverage,
-        )
 
-    if q is None:
-        logger.warning(
-            f"No conformal quantile found — "
-            f"metric={metric} dtw_mode={dtw_mode} strategy={strategy} "
-            f"level={level} k={k} modes={search_modes_str} "
-            f"tag={tag} coverage={coverage}. "
-            f"Run calibration_set_builder.py first."
-        )
-        return None
-
-    _quantile_cache[ck] = q
-    return q
-
+# ═══════════════════════════════════════════════════════════════════════════
+# Interval computation
+# ═══════════════════════════════════════════════════════════════════════════
 
 def _compute_segment_interval(
     group:       Dict[str, Any],
     q:           float,
     sigma_floor: float,
     coverage:    float,
+    mismatch:    Optional[CalibrationMismatch] = None,
 ) -> Optional[Dict[str, Any]]:
     prediction = group.get('prediction')
     if prediction is None or prediction.get('p_hat') is None:
@@ -128,13 +262,16 @@ def _compute_segment_interval(
     sigma = float(prediction['sigma'])
     half  = q * sigma
 
-    return {
+    result: Dict[str, Any] = {
         'p_hat':    round(p_hat,                  4),
         'sigma':    round(sigma,                  6),
         'low':      round(max(0.0, p_hat - half), 4),
         'high':     round(p_hat + half,           4),
         'coverage': coverage,
     }
+    if mismatch is not None:
+        result['calibration_mismatch'] = mismatch.to_dict()
+    return result
 
 
 def _aggregate_trajectory_interval(
@@ -143,6 +280,7 @@ def _aggregate_trajectory_interval(
     q:                float,
     sigma_floor:      float,
     coverage:         float,
+    mismatch:         Optional[CalibrationMismatch] = None,
 ) -> Optional[Dict[str, Any]]:
     valid = [
         (iv, pl)
@@ -160,7 +298,7 @@ def _aggregate_trajectory_interval(
     sigma = max(sum(iv['sigma'] * pl for iv, pl in valid) / total, sigma_floor)
     half  = q * sigma
 
-    return {
+    result: Dict[str, Any] = {
         'p_hat':      round(p_hat,                  4),
         'sigma':      round(sigma,                  6),
         'low':        round(max(0.0, p_hat - half), 4),
@@ -168,6 +306,9 @@ def _aggregate_trajectory_interval(
         'coverage':   coverage,
         'n_segments': len(valid),
     }
+    if mismatch is not None:
+        result['calibration_mismatch'] = mismatch.to_dict()
+    return result
 
 
 async def compute_conformal_intervals(
@@ -178,6 +319,8 @@ async def compute_conformal_intervals(
     calibration_tag: str                        = 'all',
     n_points_map:    Optional[Dict[str, int]]   = None,   # kept for API compat, unused
     path_length_map: Optional[Dict[str, float]] = None,
+    k:               Optional[int]              = None,
+    search_modes:    Optional[Tuple[str, ...]]  = None,
 ) -> Dict[str, Any]:
     """
     Compute and attach conformal intervals to result.
@@ -189,9 +332,10 @@ async def compute_conformal_intervals(
     if path_length_map is None:
         path_length_map = {}
 
-    cfg    = get_active_config(strategy, calibration_tag)
-    q_seg  = await get_calibration_quantile(conn, cfg, coverage, 'segment')
-    q_traj = await get_calibration_quantile(conn, cfg, coverage, 'trajectory')
+    cfg = get_active_config(strategy, calibration_tag, k=k, search_modes=search_modes)
+
+    q_seg,  mm_seg  = await get_calibration_quantile(conn, cfg, coverage, 'segment')
+    q_traj, mm_traj = await get_calibration_quantile(conn, cfg, coverage, 'trajectory')
 
     if q_seg is None and q_traj is None:
         if 'prognosis' in result:
@@ -199,7 +343,9 @@ async def compute_conformal_intervals(
         return result
 
     q_for_seg   = q_seg  if q_seg  is not None else q_traj
+    mm_for_seg  = mm_seg if q_seg  is not None else mm_traj
     q_for_traj  = q_traj if q_traj is not None else q_seg
+    mm_for_traj = mm_traj if q_traj is not None else mm_seg
     sigma_floor = cfg.sigma_floor
 
     segment_groups    = result.get('segment_similarity', [])
@@ -208,7 +354,8 @@ async def compute_conformal_intervals(
 
     for group in segment_groups:
         interval = _compute_segment_interval(
-            group=group, q=q_for_seg, sigma_floor=sigma_floor, coverage=coverage,
+            group=group, q=q_for_seg, sigma_floor=sigma_floor,
+            coverage=coverage, mismatch=mm_for_seg,
         )
         group['conformal_interval'] = interval
 
@@ -228,6 +375,7 @@ async def compute_conformal_intervals(
         q=q_for_traj,
         sigma_floor=sigma_floor,
         coverage=coverage,
+        mismatch=mm_for_traj,
     ) if seg_intervals else None
 
     if 'prognosis' in result:

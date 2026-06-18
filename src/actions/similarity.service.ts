@@ -1,8 +1,10 @@
+// src/actions/similarity.service.ts
+
 import type {
-  ConformalInterval,
   EmbeddingSimilarityParams,
   EmbeddingSimilarityResult,
   HierarchicalSimilarityResponse,
+  Prognosis,
   SearchTiming,
   SegmentGroup,
   SimilarityResult,
@@ -24,7 +26,7 @@ export class SimilarityService {
         dtwMode?: 'position' | 'joint',
       ) => void;
       onSegmentsFound?: (groups: SegmentGroup[]) => void;
-      onConformalInterval?: (interval: ConformalInterval | null) => void; // NEU
+      onPrognosisFound?: (prognosis: Prognosis | null) => void;
       onError?: (error: string) => void;
     },
   ): Promise<void> {
@@ -70,9 +72,20 @@ export class SimilarityService {
       if (params.dtw_mode) {
         queryParams.append('dtw_mode', params.dtw_mode);
       }
-
       if (params.metric) {
         queryParams.append('metric', params.metric);
+      }
+      if (params.prognosis_active !== undefined) {
+        queryParams.append(
+          'prognosis_active',
+          params.prognosis_active.toString(),
+        );
+      }
+      if (params.calibration_tag) {
+        queryParams.append('calibration_tag', params.calibration_tag);
+      }
+      if (params.coverage !== undefined) {
+        queryParams.append('coverage', params.coverage.toString());
       }
 
       const response = await fetch(
@@ -89,11 +102,10 @@ export class SimilarityService {
 
       const data: HierarchicalSimilarityResponse = await response.json();
 
-      // 1. Target Bahn Features
+      // 1. Target features + traj results
       const targetTrajFeatures: TargetFeatures | undefined =
         data.target_traj_features ?? undefined;
 
-      // 2. Traj-Ergebnisse
       if (data.traj_similarity?.results) {
         const trajResults = this.transformEmbeddingResults(
           data.traj_similarity.results,
@@ -108,7 +120,7 @@ export class SimilarityService {
         );
       }
 
-      // 3. Segment-Ergebnisse
+      // 2. Segment results
       if (data.segment_similarity && data.segment_similarity.length > 0) {
         const segmentGroups: SegmentGroup[] = data.segment_similarity.map(
           (seg) => ({
@@ -120,11 +132,11 @@ export class SimilarityService {
             ),
           }),
         );
-
         callbacks.onSegmentsFound?.(segmentGroups);
       }
 
-      callbacks.onConformalInterval?.(data.conformal_interval ?? null);
+      // 3. Prognosis — single source of truth
+      callbacks.onPrognosisFound?.(data.prognosis ?? null);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -140,11 +152,9 @@ export class SimilarityService {
       traj_id: type === 'traj' ? result.seg_id : result.traj_id,
       seg_id: type === 'segment' ? result.seg_id : undefined,
       similarity_score: result.rrf_score ?? 0,
-      // Stage 2
       rank_stage1: result.rank_stage1,
       rank_stage2: result.rank_stage2,
       dtw_distance: result.dtw_distance,
-      // Features
       duration: result.features?.duration ?? 0,
       weight: result.features?.weight ?? 0,
       length: result.features?.length ?? 0,
