@@ -21,6 +21,7 @@ export interface EmbeddingSimilarityParams {
   prognosis_active?: boolean;
   calibration_tag?: string;
   coverage?: number;
+  include_tags?: string[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -86,24 +87,34 @@ export interface TrajSimilarityResponse {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export interface CalibrationMismatch {
-  warning:         string;
-  requested_k?:    number;
-  used_k?:         number;
+  warning: string;
+  requested_k?: number;
+  used_k?: number;
   requested_modes?: string;
-  used_modes?:     string;
-  requested_tag?:  string;
-  used_tag?:       string;
+  used_modes?: string;
+  requested_tag?: string;
+  used_tag?: string;
 }
 
 export interface ConformalInterval {
-  p_hat: number;       // inverse-DTW weighted prediction [mm]
-  low: number;         // lower bound [mm]
-  high: number;        // upper bound [mm]
-  sigma: number;       // local spread
-  coverage: number;    // target coverage e.g. 0.90
-  n_segments?: number; // trajectory level only
-  strategy?: string;   // 'decomposed' | 'direct'
+  p_hat: number;
+  low: number;
+  high: number;
+  sigma: number;
+  coverage: number;
+  n_segments?: number;
+  strategy?: string;
   calibration_mismatch?: CalibrationMismatch | null;
+  match_quality?: MatchQuality | null;
+}
+
+export interface MatchQuality {
+  expected_error_mm: number;
+  tier: 'excellent' | 'good' | 'moderate' | 'poor';
+  bucket: number;
+  n_buckets: number;
+  n_samples: number;
+  calibration_tag_used: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -124,15 +135,15 @@ export interface SegmentPrognosis {
 export interface TrajectoryPrognosis {
   p_hat: number;
   sigma: number;
-  n_segments?: number;        // decomposed only
-  n_neighbors?: number;       // direct only
-  d_min?: number | null;      // direct only
-  d_mean?: number | null;     // direct only
+  n_segments?: number; // decomposed only
+  n_neighbors?: number; // direct only
+  d_min?: number | null; // direct only
+  d_mean?: number | null; // direct only
   d_min_per_path_length?: number | null;
 }
 
 export interface Prognosis {
-  feature: string;              // e.g. 'mean_distance'
+  feature: string;
   stage: 'stage2_dtw' | 'stage1_rrf';
   decomposed: TrajectoryPrognosis | null;
   direct: TrajectoryPrognosis | null;

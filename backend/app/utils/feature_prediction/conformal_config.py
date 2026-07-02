@@ -90,17 +90,15 @@ DEFAULT_CONFIG = CalibrationConfig(
 def get_active_config(
     retrieval_strategy: RetrievalStrategy          = 'decomposed',
     calibration_tag:    str                        = 'all',
-    k:                  Optional[int]              = None,
-    search_modes:       Optional[Tuple[str, ...]]  = None,
+    k:                  Optional[int]               = None,
+    search_modes:       Optional[Tuple[str, ...]]   = None,
+    dtw_mode:           Optional[str]                = None,
 ) -> CalibrationConfig:
-    """
-    Return the active config for online use.
-    k and search_modes override DEFAULT_CONFIG values when provided —
-    this enables the fuzzy quantile lookup to match the actual request.
-    """
     cfg = DEFAULT_CONFIG.with_strategy(retrieval_strategy).with_tag(calibration_tag)
     if k is not None:
         cfg = replace(cfg, k=k)
     if search_modes is not None and len(search_modes) > 0:
         cfg = replace(cfg, search_modes=tuple(sorted(search_modes)))
+    if dtw_mode is not None:
+        cfg = replace(cfg, dtw_mode=dtw_mode)
     return cfg

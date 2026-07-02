@@ -229,6 +229,7 @@ async def run_similarity_pipeline(
             conformal_active=conformal_active,
             k=limit,
             search_modes=tuple(sorted(modes or [])),
+            dtw_mode=dtw_mode,
         )
 
     result['timing']['data_loading_ms'] = round(data_load_ms, 1)

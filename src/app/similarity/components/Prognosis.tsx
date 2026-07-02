@@ -30,6 +30,13 @@ const getIntervalColor = (low: number, high: number): string => {
   return 'text-red-600';
 };
 
+const tierColor: Record<string, string> = {
+  excellent: 'bg-green-100 text-green-800',
+  good: 'bg-lime-100 text-lime-800',
+  moderate: 'bg-amber-100 text-amber-800',
+  poor: 'bg-red-100 text-red-800',
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Subcomponents
 // ═══════════════════════════════════════════════════════════════════════════
@@ -99,6 +106,22 @@ const IntervalDisplay: React.FC<IntervalDisplayProps> = ({ interval }) => (
     >
       [{fmt(interval.low)}, {fmt(interval.high)}] mm
     </p>
+    {interval.match_quality != null && (
+      <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-2">
+        <p className="text-sm text-gray-600">
+          Match quality{' '}
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${tierColor[interval.match_quality.tier]}`}
+            title={`Tag: ${interval.match_quality.calibration_tag_used}, n=${interval.match_quality.n_samples}`}
+          >
+            {interval.match_quality.tier}
+          </span>
+        </p>
+        <p className="font-mono text-xs text-gray-500">
+          ⌀ {interval.match_quality.expected_error_mm.toFixed(3)} mm
+        </p>
+      </div>
+    )}
   </div>
 );
 

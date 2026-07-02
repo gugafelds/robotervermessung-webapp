@@ -84,6 +84,9 @@ export class SimilarityService {
       if (params.calibration_tag) {
         queryParams.append('calibration_tag', params.calibration_tag);
       }
+      if (params.include_tags && params.include_tags.length > 0) {
+        queryParams.append('include_tags', params.include_tags.join(','));
+      }
       if (params.coverage !== undefined) {
         queryParams.append('coverage', params.coverage.toString());
       }

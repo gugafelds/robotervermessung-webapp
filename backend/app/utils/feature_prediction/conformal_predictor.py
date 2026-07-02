@@ -24,13 +24,13 @@ This is enforced in predictor.py, not here.
 from __future__ import annotations
 
 import logging
-import math
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
 
 from .conformal_config import CalibrationConfig, RetrievalStrategy, get_active_config
+from .quality_match import get_match_quality
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ async def _fetch_exact(
 ) -> Optional[float]:
     row = await conn.fetchrow("""
         SELECT quantile_value
-        FROM evaluation.confidence_quantiles
+        FROM prognosis.confidence_quantiles
         WHERE metric             = $1
           AND dtw_mode           = $2
           AND retrieval_strategy = $3
@@ -94,7 +94,7 @@ async def _fetch_nearest_k(
     """Find row with nearest available k, same search_modes and tag."""
     rows = await conn.fetch("""
         SELECT quantile_value, config_k
-        FROM evaluation.confidence_quantiles
+        FROM prognosis.confidence_quantiles
         WHERE metric             = $1
           AND dtw_mode           = $2
           AND retrieval_strategy = $3
@@ -118,7 +118,7 @@ async def _fetch_any_modes(
     """Find row ignoring search_modes, nearest k."""
     rows = await conn.fetch("""
         SELECT quantile_value, config_k, search_modes
-        FROM evaluation.confidence_quantiles
+        FROM prognosis.confidence_quantiles
         WHERE metric             = $1
           AND dtw_mode           = $2
           AND retrieval_strategy = $3
@@ -321,6 +321,7 @@ async def compute_conformal_intervals(
     path_length_map: Optional[Dict[str, float]] = None,
     k:               Optional[int]              = None,
     search_modes:    Optional[Tuple[str, ...]]  = None,
+    dtw_mode:        str                        = 'position',
 ) -> Dict[str, Any]:
     """
     Compute and attach conformal intervals to result.
@@ -332,7 +333,7 @@ async def compute_conformal_intervals(
     if path_length_map is None:
         path_length_map = {}
 
-    cfg = get_active_config(strategy, calibration_tag, k=k, search_modes=search_modes)
+    cfg = get_active_config(strategy, calibration_tag, k=k, search_modes=search_modes, dtw_mode=dtw_mode)
 
     q_seg,  mm_seg  = await get_calibration_quantile(conn, cfg, coverage, 'segment')
     q_traj, mm_traj = await get_calibration_quantile(conn, cfg, coverage, 'trajectory')
@@ -357,6 +358,18 @@ async def compute_conformal_intervals(
             group=group, q=q_for_seg, sigma_floor=sigma_floor,
             coverage=coverage, mismatch=mm_for_seg,
         )
+
+        if interval is not None:
+            prediction = group.get('prediction') or {}
+            match_quality = await get_match_quality(
+                conn, prediction.get('d_min_per_path_length'),
+                level='segment', retrieval_strategy=strategy,
+                calibration_tag=calibration_tag,
+                metric=cfg.metric, dtw_mode=cfg.dtw_mode,
+                k=cfg.k, search_modes=cfg.search_modes,
+            )
+            if match_quality is not None:
+                interval['match_quality'] = match_quality.__dict__
         group['conformal_interval'] = interval
 
         query_seg_id = group.get('target_segment', '')
@@ -378,7 +391,51 @@ async def compute_conformal_intervals(
         mismatch=mm_for_traj,
     ) if seg_intervals else None
 
+    if traj_interval is not None:
+        decomposed_pred = (result.get('prognosis') or {}).get('decomposed') or {}
+        match_quality = await get_match_quality(
+            conn, decomposed_pred.get('d_min_per_path_length'),
+            level='trajectory', retrieval_strategy=strategy,
+            calibration_tag=calibration_tag,
+            metric=cfg.metric, dtw_mode=cfg.dtw_mode,
+            k=cfg.k, search_modes=cfg.search_modes,
+        )
+        if match_quality is not None:
+            traj_interval['match_quality'] = match_quality.__dict__
+
     if 'prognosis' in result:
         result['prognosis']['decomposed_conformal_interval'] = traj_interval
 
+    return result
+
+async def _compute_direct_conformal_interval(
+    prediction:      Dict[str, Any],
+    conn:            asyncpg.Connection,
+    coverage:        float                       = 0.90,
+    calibration_tag: str                         = 'all',
+    k:               int                         = 10,
+    search_modes:    Optional[Tuple[str, ...]]   = None,
+    dtw_mode:        str                       = 'position',
+    ) -> Optional[Dict[str, Any]]:
+
+
+    cfg = get_active_config('direct', calibration_tag, k=k, search_modes=search_modes, dtw_mode=dtw_mode)
+    q, mismatch  = await get_calibration_quantile(conn, cfg, coverage, level='trajectory')
+    if q is None:
+        return None
+
+    p_hat = prediction['p_hat']
+    sigma = prediction['sigma']
+    half  = q * sigma
+
+    result: Dict[str, Any] = {
+        'p_hat':    p_hat,
+        'sigma':    round(sigma, 6),
+        'low':      round(max(0.0, p_hat - half), 4),
+        'high':     round(p_hat + half, 4),
+        'coverage': coverage,
+        'strategy': 'direct',
+    }
+    if mismatch is not None:
+        result['calibration_mismatch'] = mismatch.to_dict()
     return result

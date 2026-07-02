@@ -39,7 +39,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'app')
 from utils.multimodal_framework.similarity_pipeline import run_similarity_pipeline
 from utils.feature_prediction.conformal_config import (
     CalibrationConfig,
-    get_active_config,
 )
 
 load_dotenv()
@@ -115,9 +114,9 @@ def prediction_to_row_values(
 
 async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
     await conn.execute("""
-        CREATE SCHEMA IF NOT EXISTS evaluation;
+        CREATE SCHEMA IF NOT EXISTS prognosis;
 
-        CREATE TABLE IF NOT EXISTS evaluation.confidence_calibration_seg (
+        CREATE TABLE IF NOT EXISTS prognosis.confidence_calibration_seg (
             seg_id                 TEXT        NOT NULL,
             traj_id                TEXT        NOT NULL,
             split_role             TEXT        NOT NULL CHECK (split_role IN ('calibration', 'test')),
@@ -152,7 +151,7 @@ async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
             PRIMARY KEY (seg_id, config_hash, calibration_tag)
         );
 
-        CREATE TABLE IF NOT EXISTS evaluation.confidence_calibration_traj (
+        CREATE TABLE IF NOT EXISTS prognosis.confidence_calibration_traj (
             traj_id                TEXT        NOT NULL,
             split_role             TEXT        NOT NULL CHECK (split_role IN ('calibration', 'test')),
             retrieval_strategy     TEXT        NOT NULL DEFAULT 'decomposed',
@@ -183,7 +182,7 @@ async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
         );
 
         -- Quantiles table: lookup key = metric+dtw_mode+retrieval_strategy+level+k+search_modes+tag
-        CREATE TABLE IF NOT EXISTS evaluation.confidence_quantiles (
+        CREATE TABLE IF NOT EXISTS prognosis.confidence_quantiles (
             id                     SERIAL      PRIMARY KEY,
             level                  TEXT        NOT NULL CHECK (level IN ('segment', 'trajectory')),
 
@@ -216,29 +215,29 @@ async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
         );
 
         CREATE INDEX IF NOT EXISTS idx_ccs_config_tag
-            ON evaluation.confidence_calibration_seg (config_hash, calibration_tag, split_role);
+            ON prognosis.confidence_calibration_seg (config_hash, calibration_tag, split_role);
         CREATE INDEX IF NOT EXISTS idx_cct_config_tag
-            ON evaluation.confidence_calibration_traj (config_hash, calibration_tag, split_role);
+            ON prognosis.confidence_calibration_traj (config_hash, calibration_tag, split_role);
         CREATE INDEX IF NOT EXISTS idx_cq_lookup
-            ON evaluation.confidence_quantiles
+            ON prognosis.confidence_quantiles
             (metric, dtw_mode, retrieval_strategy, level, config_k, search_modes, calibration_tag, coverage);
     """)
 
     # Migrations for existing tables
     await conn.execute("""
-        ALTER TABLE evaluation.confidence_calibration_seg
+        ALTER TABLE prognosis.confidence_calibration_seg
             ADD COLUMN IF NOT EXISTS calibration_tag   TEXT NOT NULL DEFAULT 'all',
             ADD COLUMN IF NOT EXISTS search_modes      TEXT,
             ADD COLUMN IF NOT EXISTS d_min             FLOAT,
             ADD COLUMN IF NOT EXISTS d_min_per_path_length FLOAT,
             ADD COLUMN IF NOT EXISTS d_mean            FLOAT;
 
-        ALTER TABLE evaluation.confidence_calibration_traj
+        ALTER TABLE prognosis.confidence_calibration_traj
             ADD COLUMN IF NOT EXISTS calibration_tag   TEXT NOT NULL DEFAULT 'all',
             ADD COLUMN IF NOT EXISTS search_modes      TEXT,
             ADD COLUMN IF NOT EXISTS d_min_per_path_length FLOAT;
 
-        ALTER TABLE evaluation.confidence_quantiles
+        ALTER TABLE prognosis.confidence_quantiles
             ADD COLUMN IF NOT EXISTS search_modes      TEXT,
             ADD COLUMN IF NOT EXISTS calibration_tag   TEXT NOT NULL DEFAULT 'all';
     """)
@@ -250,15 +249,15 @@ async def delete_config_rows(
     conn: asyncpg.Connection, config_hash: str, calibration_tag: str,
 ) -> None:
     await conn.execute(
-        "DELETE FROM evaluation.confidence_quantiles WHERE config_hash=$1 AND calibration_tag=$2",
+        "DELETE FROM prognosis.confidence_quantiles WHERE config_hash=$1 AND calibration_tag=$2",
         config_hash, calibration_tag,
     )
     await conn.execute(
-        "DELETE FROM evaluation.confidence_calibration_traj WHERE config_hash=$1 AND calibration_tag=$2",
+        "DELETE FROM prognosis.confidence_calibration_traj WHERE config_hash=$1 AND calibration_tag=$2",
         config_hash, calibration_tag,
     )
     await conn.execute(
-        "DELETE FROM evaluation.confidence_calibration_seg WHERE config_hash=$1 AND calibration_tag=$2",
+        "DELETE FROM prognosis.confidence_calibration_seg WHERE config_hash=$1 AND calibration_tag=$2",
         config_hash, calibration_tag,
     )
     logger.info(f"Deleted rows for config_hash={config_hash} tag={calibration_tag}")
@@ -281,7 +280,7 @@ async def get_all_traj_ids(
     include_tags: Optional[List[str]] = None,
 ) -> List[Tuple[str, float]]:
     metric     = validate_metric(metric)
-    table_name = f"evaluation.{metric}_info"
+    table_name = f"prognosis.{metric}_info"
     value_col  = f"{metric}_average_distance"
 
     tag_join  = ""
@@ -289,7 +288,7 @@ async def get_all_traj_ids(
     args: List[Any] = []
 
     if include_tags:
-        tag_join  = "JOIN motion.traj_tags tt ON m.traj_id = tt.traj_id"
+        tag_join  = "JOIN motion.traj_info tt ON m.traj_id = tt.traj_id"
         tag_where = f"AND tt.tag = ANY(${len(args)+1}::text[])"
         args.append(include_tags)
 
@@ -331,7 +330,7 @@ async def get_segment_actual_values_for_trajectories(
     conn: asyncpg.Connection, traj_ids: List[str], metric: str,
 ) -> Dict[str, float]:
     metric     = validate_metric(metric)
-    table_name = f"evaluation.{metric}_info"
+    table_name = f"prognosis.{metric}_info"
     value_col  = f"{metric}_average_distance"
     rows = await conn.fetch(f"""
         SELECT m.seg_id, ei.{value_col} AS mean_distance
@@ -348,7 +347,7 @@ async def get_already_computed_trajectories(
     conn: asyncpg.Connection, config_hash: str, calibration_tag: str,
 ) -> set:
     rows = await conn.fetch("""
-        SELECT traj_id FROM evaluation.confidence_calibration_traj
+        SELECT traj_id FROM prognosis.confidence_calibration_traj
         WHERE config_hash = $1 AND calibration_tag = $2
     """, config_hash, calibration_tag)
     return {r['traj_id'] for r in rows}
@@ -490,7 +489,7 @@ async def insert_segment_batch(conn: asyncpg.Connection, batch: List[Dict[str, A
     if not batch:
         return
     await conn.executemany("""
-        INSERT INTO evaluation.confidence_calibration_seg (
+        INSERT INTO prognosis.confidence_calibration_seg (
             seg_id, traj_id, split_role, retrieval_strategy, calibration_tag,
             p_actual, p_predicted, prediction_error, log_prediction_error,
             sigma, nonconformity_score,
@@ -549,7 +548,7 @@ async def insert_trajectory_batch(conn: asyncpg.Connection, batch: List[Dict[str
     if not batch:
         return
     await conn.executemany("""
-        INSERT INTO evaluation.confidence_calibration_traj (
+        INSERT INTO prognosis.confidence_calibration_traj (
             traj_id, split_role, retrieval_strategy, calibration_tag,
             p_actual, p_predicted, prediction_error, log_prediction_error,
             sigma, nonconformity_score,
@@ -615,9 +614,9 @@ async def fetch_level_rows(
     config_hash: str, calibration_tag: str, split_role: SplitRole,
 ) -> List[asyncpg.Record]:
     table = (
-        'evaluation.confidence_calibration_seg'
+        'prognosis.confidence_calibration_seg'
         if level == 'segment'
-        else 'evaluation.confidence_calibration_traj'
+        else 'prognosis.confidence_calibration_traj'
     )
     return await conn.fetch(f"""
         SELECT p_actual, p_predicted, prediction_error,
@@ -670,7 +669,7 @@ async def compute_and_store_quantiles(
         t_stats  = coverage_stats(test_rows, q)
 
         await conn.execute("""
-            INSERT INTO evaluation.confidence_quantiles (
+            INSERT INTO prognosis.confidence_quantiles (
                 level, metric, dtw_mode, retrieval_strategy,
                 config_k, search_modes, calibration_tag, coverage,
                 quantile_value, n_calibration, n_test,

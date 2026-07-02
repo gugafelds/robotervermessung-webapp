@@ -24,6 +24,7 @@ type SimilaritySearchProps = {
     dtwMode: 'position' | 'joint',
     metric: 'sidtw' | 'qdtw',
     prognosisActive: boolean,
+    includeTags: string[],
   ) => void;
   trajInfo?: TrajInfo[];
   showPlots: boolean;
@@ -61,6 +62,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
   const [stage2Active, setStage2Active] = useState(true);
   const [dtwMode, setDtwMode] = useState<'position' | 'joint'>('position');
   const [prognosisActive, setPrognosisActive] = useState(true);
+  const [includeTags, setIncludeTags] = useState('');
 
   const recentBahnIds = trajInfo ? trajInfo.map((traj) => traj.trajID) : [];
 
@@ -125,6 +127,10 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
         dtwMode,
         metric,
         prognosisActive,
+        includeTags
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean),
       );
       setShowDropdown(false);
     }
@@ -329,6 +335,17 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
                   </button>
                 ),
               )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700">Tags:</span>
+              <input
+                type="text"
+                placeholder="z.B. new-map-test, pa-juengst-1"
+                value={includeTags}
+                onChange={(e) => setIncludeTags(e.target.value)}
+                className="w-56 rounded border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
 
             {/* Plot Toggle */}

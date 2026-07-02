@@ -57,6 +57,7 @@ export default function SimilaritySearchWrapper({
     dtw_mode: 'position' | 'joint',
     search_metric: 'sidtw' | 'qdtw',
     prognosis_active: boolean,
+    include_tags: string[],
   ) => {
     setIsLoading(true);
     setError('');
@@ -82,6 +83,7 @@ export default function SimilaritySearchWrapper({
           metric: search_metric,
           prognosis_active,
           coverage: 0.9,
+          include_tags,
         },
         {
           onTrajsFound: (

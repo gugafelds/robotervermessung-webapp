@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import asyncpg
 import numpy as np
 
-from .conformal_predictor import get_calibration_quantile, compute_conformal_intervals
+from .conformal_predictor import _compute_direct_conformal_interval, get_calibration_quantile, compute_conformal_intervals
 from .conformal_config import get_active_config
 
 logger = logging.getLogger(__name__)
@@ -119,6 +119,7 @@ def _predict_segment(
 
 def _predict_direct(
     traj_results: List[Dict[str, Any]],
+    query_path_length: float = 0.0,
     feature:      str   = 'mean_distance',
     sigma_floor:  float = 0.005,
 ) -> Optional[Dict[str, Any]]:
@@ -257,6 +258,7 @@ async def predict_performance(
     conformal_active: bool                      = True,
     k:                int                       = 10,
     search_modes:     Optional[Tuple[str, ...]] = None,
+    dtw_mode:         str                       = 'position',
 ) -> Dict[str, Any]:
     sigma_floor     = 0.005
     stage2_active   = bool(result.get('stage2_active'))
@@ -304,10 +306,11 @@ async def predict_performance(
 
     direct_prediction: Optional[Dict[str, Any]] = None
     traj_results = result.get('traj_similarity', {}).get('results', [])
+    total_query_path_length = sum(seg_path_lengths)
 
     if stage2_active:
         direct_prediction = _predict_direct(
-            traj_results=traj_results, feature=feature, sigma_floor=sigma_floor,
+            traj_results=traj_results, query_path_length=total_query_path_length, feature=feature, sigma_floor=sigma_floor,
         )
     else:
         direct_prediction = _predict_stage1_rrf(
@@ -332,50 +335,18 @@ async def predict_performance(
             result=result, conn=conn, strategy='decomposed',
             coverage=coverage, calibration_tag=calibration_tag,
             path_length_map=path_length_map,
-            k=k, search_modes=search_modes,
+            k=k, search_modes=search_modes, dtw_mode=dtw_mode
         )
 
         if direct_prediction is not None:
             direct_interval = await _compute_direct_conformal_interval(
                 prediction=direct_prediction, conn=conn,
                 coverage=coverage, calibration_tag=calibration_tag,
-                k=k, search_modes=search_modes,
+                k=k, search_modes=search_modes, dtw_mode=dtw_mode,
             )
             result['prognosis']['direct_conformal_interval'] = direct_interval
 
     for group in segment_groups:
         group.pop('prediction', None)
 
-    return result
-
-
-async def _compute_direct_conformal_interval(
-    prediction:      Dict[str, Any],
-    conn:            asyncpg.Connection,
-    coverage:        float                       = 0.90,
-    calibration_tag: str                         = 'all',
-    k:               int                         = 10,
-    search_modes:    Optional[Tuple[str, ...]]   = None,
-) -> Optional[Dict[str, Any]]:
-
-
-    cfg          = get_active_config('direct', calibration_tag, k=k, search_modes=search_modes)
-    q, mismatch  = await get_calibration_quantile(conn, cfg, coverage, level='trajectory')
-    if q is None:
-        return None
-
-    p_hat = prediction['p_hat']
-    sigma = prediction['sigma']
-    half  = q * sigma
-
-    result: Dict[str, Any] = {
-        'p_hat':    p_hat,
-        'sigma':    round(sigma, 6),
-        'low':      round(max(0.0, p_hat - half), 4),
-        'high':     round(p_hat + half, 4),
-        'coverage': coverage,
-        'strategy': 'direct',
-    }
-    if mismatch is not None:
-        result['calibration_mismatch'] = mismatch.to_dict()
     return result
