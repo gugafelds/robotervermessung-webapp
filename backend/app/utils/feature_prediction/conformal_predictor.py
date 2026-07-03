@@ -322,6 +322,7 @@ async def compute_conformal_intervals(
     k:               Optional[int]              = None,
     search_modes:    Optional[Tuple[str, ...]]  = None,
     dtw_mode:        str                        = 'position',
+    metric:          str                        = 'sidtw',
 ) -> Dict[str, Any]:
     """
     Compute and attach conformal intervals to result.
@@ -333,7 +334,7 @@ async def compute_conformal_intervals(
     if path_length_map is None:
         path_length_map = {}
 
-    cfg = get_active_config(strategy, calibration_tag, k=k, search_modes=search_modes, dtw_mode=dtw_mode)
+    cfg = get_active_config(strategy, calibration_tag, k=k, search_modes=search_modes, dtw_mode=dtw_mode, metric=metric)
 
     q_seg,  mm_seg  = await get_calibration_quantile(conn, cfg, coverage, 'segment')
     q_traj, mm_traj = await get_calibration_quantile(conn, cfg, coverage, 'trajectory')
@@ -416,10 +417,11 @@ async def _compute_direct_conformal_interval(
     k:               int                         = 10,
     search_modes:    Optional[Tuple[str, ...]]   = None,
     dtw_mode:        str                       = 'position',
+    metric:          str                       = 'sidtw',
     ) -> Optional[Dict[str, Any]]:
 
 
-    cfg = get_active_config('direct', calibration_tag, k=k, search_modes=search_modes, dtw_mode=dtw_mode)
+    cfg = get_active_config('direct', calibration_tag, k=k, search_modes=search_modes, dtw_mode=dtw_mode, metric=metric)
     q, mismatch  = await get_calibration_quantile(conn, cfg, coverage, level='trajectory')
     if q is None:
         return None

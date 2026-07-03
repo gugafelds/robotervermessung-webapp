@@ -93,6 +93,7 @@ def get_active_config(
     k:                  Optional[int]               = None,
     search_modes:       Optional[Tuple[str, ...]]   = None,
     dtw_mode:           Optional[str]                = None,
+    metric:             Optional[str]               = None,
 ) -> CalibrationConfig:
     cfg = DEFAULT_CONFIG.with_strategy(retrieval_strategy).with_tag(calibration_tag)
     if k is not None:
@@ -101,4 +102,6 @@ def get_active_config(
         cfg = replace(cfg, search_modes=tuple(sorted(search_modes)))
     if dtw_mode is not None:
         cfg = replace(cfg, dtw_mode=dtw_mode)
+    if metric is not None:
+        cfg = replace(cfg, metric=metric)
     return cfg

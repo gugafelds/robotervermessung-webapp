@@ -28,8 +28,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import asyncpg
 import numpy as np
 
-from .conformal_predictor import _compute_direct_conformal_interval, get_calibration_quantile, compute_conformal_intervals
-from .conformal_config import get_active_config
+from .conformal_predictor import _compute_direct_conformal_interval, compute_conformal_intervals
 
 logger = logging.getLogger(__name__)
 
@@ -259,6 +258,7 @@ async def predict_performance(
     k:                int                       = 10,
     search_modes:     Optional[Tuple[str, ...]] = None,
     dtw_mode:         str                       = 'position',
+    metric:           str                       = 'sidtw'
 ) -> Dict[str, Any]:
     sigma_floor     = 0.005
     stage2_active   = bool(result.get('stage2_active'))
@@ -335,14 +335,14 @@ async def predict_performance(
             result=result, conn=conn, strategy='decomposed',
             coverage=coverage, calibration_tag=calibration_tag,
             path_length_map=path_length_map,
-            k=k, search_modes=search_modes, dtw_mode=dtw_mode
+            k=k, search_modes=search_modes, dtw_mode=dtw_mode, metric=metric
         )
 
         if direct_prediction is not None:
             direct_interval = await _compute_direct_conformal_interval(
                 prediction=direct_prediction, conn=conn,
                 coverage=coverage, calibration_tag=calibration_tag,
-                k=k, search_modes=search_modes, dtw_mode=dtw_mode,
+                k=k, search_modes=search_modes, dtw_mode=dtw_mode, metric=metric
             )
             result['prognosis']['direct_conformal_interval'] = direct_interval
 
