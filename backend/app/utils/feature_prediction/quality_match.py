@@ -169,11 +169,11 @@ async def get_match_quality(
     if match is None:
         match = buckets[0] if d_min_per_path_length < buckets[0]['d_min_lower'] else buckets[-1]
 
-    best_error = min(b['mean_error'] for b in buckets)
-    tier       = _tier_for_bucket(match['mean_error'], best_error)
+    best_error = min(b['median_error'] for b in buckets)   # median statt mean
+    tier       = _tier_for_bucket(match['median_error'], best_error)
 
     return MatchQuality(
-        expected_error_mm    = round(float(match['mean_error']), 4),
+        expected_error_mm    = round(float(match['median_error']), 4),   # median statt mean
         tier                  = tier,
         bucket                = match['bucket'],
         n_buckets             = len(buckets),

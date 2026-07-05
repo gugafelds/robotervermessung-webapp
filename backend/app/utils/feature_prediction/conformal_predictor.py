@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import asyncpg
 
@@ -242,6 +242,71 @@ async def get_calibration_quantile(
     _quantile_cache[ck] = (None, None)
     return None, None
 
+async def get_calibration_quantile_for_tags(
+    conn:     asyncpg.Connection,
+    cfg:      CalibrationConfig,
+    tags:     Sequence[str],
+    coverage: float = DEFAULT_COV,
+    level:    str   = 'trajectory',
+) -> Tuple[Optional[float], Optional[CalibrationMismatch]]:
+    """
+    Weighted-average quantile over multiple tags.
+
+    Tags with n_calibration < MIN_N_CALIBRATION are skipped.
+    Falls back to tag='all' if no tag passes the threshold.
+    """
+    MIN_N_CALIBRATION = 500
+
+    if not tags or (len(tags) == 1 and tags[0] == 'all'):
+        return await get_calibration_quantile(conn, cfg, coverage, level)
+
+    metric           = cfg.metric
+    dtw_mode         = cfg.dtw_mode
+    strategy         = cfg.retrieval_strategy
+    k                = cfg.k
+    search_modes_str = cfg.search_modes_str()
+
+    weighted_sum = 0.0
+    total_weight = 0
+    used_tags    = []
+    skipped_tags = []
+
+    for tag in tags:
+        result = await _fetch_exact_with_n(
+            conn, metric, dtw_mode, strategy, level, k, search_modes_str, tag, coverage,
+        )
+        if result is None:
+            skipped_tags.append(tag)
+            continue
+        q, n_cal = result
+        if n_cal < MIN_N_CALIBRATION:
+            skipped_tags.append(f"{tag}(n={n_cal})")
+            continue
+        weighted_sum += q * n_cal
+        total_weight += n_cal
+        used_tags.append(tag)
+
+    if total_weight > 0:
+        q_avg    = weighted_sum / total_weight
+        mismatch = None
+        if skipped_tags:
+            mismatch = CalibrationMismatch(
+                warning=f"Tags {skipped_tags} skipped (n_calibration < {MIN_N_CALIBRATION}). "
+                        f"Weighted average over {used_tags}.",
+            )
+        return q_avg, mismatch
+
+    # Fallback auf 'all'
+    logger.warning(f"No tags passed threshold {MIN_N_CALIBRATION}, falling back to tag='all'")
+    q, mm = await get_calibration_quantile(conn, replace(cfg, calibration_tag='all'), coverage, level)
+    if q is not None:
+        mismatch = CalibrationMismatch(
+            warning=f"All tags {list(tags)} had n_calibration < {MIN_N_CALIBRATION}. Fell back to tag='all'.",
+            requested_tag=','.join(tags),
+            used_tag='all',
+        )
+        return q, mismatch
+    return None, None
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Interval computation
@@ -316,7 +381,7 @@ async def compute_conformal_intervals(
     conn:            asyncpg.Connection,
     strategy:        RetrievalStrategy          = 'decomposed',
     coverage:        float                      = DEFAULT_COV,
-    calibration_tag: str                        = 'all',
+    calibration_tag: str | List[str]            = 'all',
     n_points_map:    Optional[Dict[str, int]]   = None,   # kept for API compat, unused
     path_length_map: Optional[Dict[str, float]] = None,
     k:               Optional[int]              = None,
@@ -336,8 +401,9 @@ async def compute_conformal_intervals(
 
     cfg = get_active_config(strategy, calibration_tag, k=k, search_modes=search_modes, dtw_mode=dtw_mode, metric=metric)
 
-    q_seg,  mm_seg  = await get_calibration_quantile(conn, cfg, coverage, 'segment')
-    q_traj, mm_traj = await get_calibration_quantile(conn, cfg, coverage, 'trajectory')
+    tags = [calibration_tag] if isinstance(calibration_tag, str) else calibration_tag
+    q_seg,  mm_seg  = await get_calibration_quantile_for_tags(conn, cfg, tags, coverage, 'segment')
+    q_traj, mm_traj = await get_calibration_quantile_for_tags(conn, cfg, tags, coverage, 'trajectory')
 
     if q_seg is None and q_traj is None:
         if 'prognosis' in result:
@@ -412,17 +478,18 @@ async def compute_conformal_intervals(
 async def _compute_direct_conformal_interval(
     prediction:      Dict[str, Any],
     conn:            asyncpg.Connection,
-    coverage:        float                       = 0.90,
-    calibration_tag: str                         = 'all',
-    k:               int                         = 10,
-    search_modes:    Optional[Tuple[str, ...]]   = None,
+    coverage:        float                     = 0.90,
+    calibration_tag: str | List[str]           = 'all',
+    k:               int                       = 10,
+    search_modes:    Optional[Tuple[str, ...]] = None,
     dtw_mode:        str                       = 'position',
     metric:          str                       = 'sidtw',
-    ) -> Optional[Dict[str, Any]]:
+) -> Optional[Dict[str, Any]]:
 
+    tags = [calibration_tag] if isinstance(calibration_tag, str) else calibration_tag
+    cfg  = get_active_config('direct', tags[0], k=k, search_modes=search_modes, dtw_mode=dtw_mode, metric=metric)
 
-    cfg = get_active_config('direct', calibration_tag, k=k, search_modes=search_modes, dtw_mode=dtw_mode, metric=metric)
-    q, mismatch  = await get_calibration_quantile(conn, cfg, coverage, level='trajectory')
+    q, mismatch = await get_calibration_quantile_for_tags(conn, cfg, tags, coverage, level='trajectory')
     if q is None:
         return None
 
@@ -441,3 +508,26 @@ async def _compute_direct_conformal_interval(
     if mismatch is not None:
         result['calibration_mismatch'] = mismatch.to_dict()
     return result
+
+async def _fetch_exact_with_n(
+    conn: asyncpg.Connection,
+    metric: str, dtw_mode: str, strategy: str, level: str,
+    k: int, search_modes_str: str, tag: str, coverage: float,
+) -> Optional[Tuple[float, int]]:
+    """Fetch exact quantile + n_calibration for weighted averaging."""
+    rows = await conn.fetch("""
+        SELECT quantile_value, n_calibration
+        FROM prognosis.confidence_quantiles
+        WHERE metric             = $1
+          AND dtw_mode           = $2
+          AND retrieval_strategy = $3
+          AND level              = $4
+          AND search_modes       = $5
+          AND calibration_tag    = $6
+          AND coverage           = $7
+        ORDER BY ABS(config_k - $8), computed_at DESC
+        LIMIT 1
+    """, metric, dtw_mode, strategy, level, search_modes_str, tag, float(coverage), k)
+    if rows:
+        return float(rows[0]['quantile_value']), int(rows[0]['n_calibration'])
+    return None

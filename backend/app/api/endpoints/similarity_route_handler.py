@@ -55,10 +55,11 @@ async def search_similar(
         ),
         prognosis_active: bool = Query(False, description="Enable performance prognosis"),
         # --- Conformal interval parameters ---
-        calibration_tag: str = Query(
+        calibration_tag: Optional[str] = Query(
             'all',
             description=(
                 "Calibration context for conformal intervals. "
+                "Comma-separated for multiple tags — quantile is weighted average by n_calibration. "
                 "Use 'all' (default) for the full-DB calibration, or a specific tag "
                 "e.g. 'bandit_v1' when searching within a tagged subset. "
                 "Falls back to 'all' automatically if the specific tag has no calibration data."
@@ -130,6 +131,11 @@ async def search_similar(
             [i.strip() for i in exclude_ids.split(',') if i.strip()]
             if exclude_ids else None
         )
+        calibration_tags = (
+            [t.strip() for t in calibration_tag.split(',') if t.strip()]
+            if calibration_tag else ['all']
+        )
+        calibration_tag_param = calibration_tags if len(calibration_tags) > 1 else calibration_tags[0]
 
         result = await run_similarity_pipeline(
             target_id=target_id,
@@ -151,7 +157,7 @@ async def search_similar(
             dtw_mode=dtw_mode,
 
             prognosis_active=prognosis_active,
-            calibration_tag=calibration_tag,
+            calibration_tag=calibration_tag_param,
             coverage=coverage,
         )
 

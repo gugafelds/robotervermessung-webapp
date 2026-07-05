@@ -235,8 +235,8 @@ async def validate_buckets_for_level(
     rows = await conn.fetch(f"""
         SELECT
             b.metric, b.dtw_mode, b.retrieval_strategy, b.config_k, b.search_modes,
-            b.calibration_tag, b.bucket, b.mean_error AS bucket_predicted_error,
-            AVG(t.prediction_error) AS test_actual_error,
+            b.calibration_tag, b.bucket, b.median_error AS bucket_predicted_error,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY t.prediction_error) AS test_actual_error,
             COUNT(*) AS n_test
         FROM {SCHEMA}.confidence_match_quality b
         JOIN {source_table} t
@@ -251,7 +251,7 @@ async def validate_buckets_for_level(
           AND t.split_role = 'test'
           {tag_clause}
         GROUP BY b.metric, b.dtw_mode, b.retrieval_strategy, b.config_k, b.search_modes,
-                 b.calibration_tag, b.bucket, b.mean_error
+                 b.calibration_tag, b.bucket, b.median_error
         ORDER BY b.calibration_tag, b.retrieval_strategy, b.bucket
     """, *params)
 
