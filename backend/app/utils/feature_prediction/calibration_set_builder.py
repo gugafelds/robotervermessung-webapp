@@ -273,6 +273,9 @@ async def create_pool(url: str) -> asyncpg.Pool:
         server_settings={'search_path': 'motion, public'},
     )
 
+async def get_all_tags(conn: asyncpg.Connection) -> List[str]:
+    rows = await conn.fetch("SELECT tag FROM motion.tag_info ORDER BY tag")
+    return [r['tag'] for r in rows]
 
 async def get_all_traj_ids(
     conn: asyncpg.Connection, metric: str,
@@ -280,7 +283,7 @@ async def get_all_traj_ids(
     include_tags: Optional[List[str]] = None,
 ) -> List[Tuple[str, float]]:
     metric     = validate_metric(metric)
-    table_name = f"prognosis.{metric}_info"
+    table_name = f"evaluation.{metric}_info"
     value_col  = f"{metric}_average_distance"
 
     tag_join  = ""
@@ -330,7 +333,7 @@ async def get_segment_actual_values_for_trajectories(
     conn: asyncpg.Connection, traj_ids: List[str], metric: str,
 ) -> Dict[str, float]:
     metric     = validate_metric(metric)
-    table_name = f"prognosis.{metric}_info"
+    table_name = f"evaluation.{metric}_info"
     value_col  = f"{metric}_average_distance"
     rows = await conn.fetch(f"""
         SELECT m.seg_id, ei.{value_col} AS mean_distance
@@ -929,6 +932,8 @@ async def main() -> None:
                         help='Calibration tag, e.g. "all", "bandit_v1", "workspace_A"')
     parser.add_argument('--include-tags',       nargs='+',  default=None,
                         help='Only calibrate on trajectories with these DB tags')
+    parser.add_argument('--all-tags',           action='store_true', default=False,
+                        help='Run calibration for every tag found in motion.tag_info')
     parser.add_argument('--resume',             action='store_true', default=True)
     parser.add_argument('--full-rebuild',       action='store_true', default=False)
     parser.add_argument('--retrieval-strategy', type=str,   default='both',
@@ -947,30 +952,57 @@ async def main() -> None:
         split_seed=int(args.split_seed),
     )
 
-    decomposed_cfg = direct_cfg = None
-    if args.retrieval_strategy in ('decomposed', 'both'):
-        decomposed_cfg = replace(base_config, retrieval_strategy='decomposed')
-    if args.retrieval_strategy in ('direct', 'both'):
-        direct_cfg = replace(base_config, retrieval_strategy='direct')
-
-    logger.info(f"Starting calibration — tag='{args.tag}'")
-    if decomposed_cfg:
-        logger.info(f"  decomposed hash: {decomposed_cfg.hash()}")
-    if direct_cfg:
-        logger.info(f"  direct    hash: {direct_cfg.hash()}")
+    resume = args.resume and not args.full_rebuild
 
     pool = await create_pool(DATABASE_URL)
     try:
-        await run_calibration(
-            pool=pool,
-            decomposed_cfg=decomposed_cfg,
-            direct_cfg=direct_cfg,
-            batch_size=args.batch,
-            resume=args.resume and not args.full_rebuild,
-            max_trajectories=args.limit,
-            coverages=args.coverage,
-            include_tags=args.include_tags,
-        )
+        if args.all_tags:
+            async with pool.acquire() as conn:
+                all_tags = await get_all_tags(conn)
+            logger.info(f"--all-tags: found {len(all_tags)} tags: {all_tags}")
+
+            for i, tag in enumerate(all_tags, 1):
+                logger.info(f"=== [{i}/{len(all_tags)}] tag='{tag}' ===")
+                decomposed_cfg = direct_cfg = None
+                tag_base = replace(base_config, calibration_tag=tag)
+                if args.retrieval_strategy in ('decomposed', 'both'):
+                    decomposed_cfg = replace(tag_base, retrieval_strategy='decomposed')
+                if args.retrieval_strategy in ('direct', 'both'):
+                    direct_cfg = replace(tag_base, retrieval_strategy='direct')
+
+                await run_calibration(
+                    pool=pool,
+                    decomposed_cfg=decomposed_cfg,
+                    direct_cfg=direct_cfg,
+                    batch_size=args.batch,
+                    resume=resume,
+                    max_trajectories=args.limit,
+                    coverages=args.coverage,
+                    include_tags=[tag],
+                )
+        else:
+            decomposed_cfg = direct_cfg = None
+            if args.retrieval_strategy in ('decomposed', 'both'):
+                decomposed_cfg = replace(base_config, retrieval_strategy='decomposed')
+            if args.retrieval_strategy in ('direct', 'both'):
+                direct_cfg = replace(base_config, retrieval_strategy='direct')
+
+            logger.info(f"Starting calibration — tag='{args.tag}'")
+            if decomposed_cfg:
+                logger.info(f"  decomposed hash: {decomposed_cfg.hash()}")
+            if direct_cfg:
+                logger.info(f"  direct    hash: {direct_cfg.hash()}")
+
+            await run_calibration(
+                pool=pool,
+                decomposed_cfg=decomposed_cfg,
+                direct_cfg=direct_cfg,
+                batch_size=args.batch,
+                resume=resume,
+                max_trajectories=args.limit,
+                coverages=args.coverage,
+                include_tags=args.include_tags,
+            )
     finally:
         await pool.close()
 

@@ -153,13 +153,20 @@ def _predict_direct(
     perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / n)
     sigma    = max(perf_std, sigma_floor)
 
+    d_min_raw             = dtw_dists[0]
+    d_min_per_path_length = (
+        d_min_raw / max(query_path_length, EPSILON)
+        if query_path_length > EPSILON else None
+    )
+
     return {
-        'p_hat':        round(p_hat, 4),
-        'sigma':        round(sigma, 6),
-        'n_neighbors':  n,
-        'neighbor_ids': ids,
-        'd_min':        round(dtw_dists[0], 6),
-        'd_mean':       round(sum(dtw_dists) / len(dtw_dists), 6),
+        'p_hat':                 round(p_hat, 4),
+        'sigma':                 round(sigma, 6),
+        'n_neighbors':           n,
+        'neighbor_ids':          ids,
+        'd_min':                 round(d_min_raw, 6),
+        'd_min_per_path_length': round(d_min_per_path_length, 6) if d_min_per_path_length is not None else None,
+        'd_mean':                round(sum(dtw_dists) / len(dtw_dists), 6),
     }
 
 
