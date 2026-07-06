@@ -82,7 +82,10 @@ export class SimilarityService {
         );
       }
       if (params.calibration_tag) {
-        queryParams.append('calibration_tag', params.calibration_tag);
+        const tag = Array.isArray(params.calibration_tag)
+          ? params.calibration_tag.join(',')
+          : params.calibration_tag;
+        queryParams.append('calibration_tag', tag);
       }
       if (params.include_tags && params.include_tags.length > 0) {
         queryParams.append('include_tags', params.include_tags.join(','));

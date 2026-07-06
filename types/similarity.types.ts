@@ -19,7 +19,7 @@ export interface EmbeddingSimilarityParams {
   dtw_mode?: 'position' | 'joint';
   metric?: 'sidtw' | 'qdtw';
   prognosis_active?: boolean;
-  calibration_tag?: string;
+  calibration_tag?: string | string[];
   coverage?: number;
   include_tags?: string[];
 }

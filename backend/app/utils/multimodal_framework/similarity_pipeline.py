@@ -5,18 +5,8 @@ Two-stage trajectory similarity search with optional prognosis.
 
 Used by:
   - FastAPI search endpoint  (similarity_route_handler.py)
+  - FastAPI candidate endpoint (similarity_candidate_route_handler.py) — external/unsaved candidates
   - Offline calibration builder (calibration_set_builder.py)
-
-Changes vs. previous version
-------------------------------
-- conformal_active parameter removed — it was never accessed after the
-  _run_prediction() shim was removed. predict_performance() always runs
-  conformal intervals when stage2 is active; the calibration builder
-  passes conformal_active=False via the old route, but since the shim
-  is gone and predictor.py decides internally, this parameter is moot.
-- calibration_tag parameter added — passed through to predict_performance()
-  so the correct quantile set is used for online inference.
-- stage2_active flag set after DTW completes (not before).
 """
 
 from __future__ import annotations
@@ -28,7 +18,10 @@ from typing import Any, Dict, List, Literal, Optional
 import asyncpg
 
 from .multi_modal_searcher import MultiModalSearcher
+from .multi_modal_ext import MultiModalSearcherExternal
 from ..metadata_embeddings.trajectory_loader import TrajectoryLoader
+from ..metadata_embeddings.trajectory_loader_ext import TrajectoryLoaderExternal
+from ..metadata_embeddings.embedding_calculator_ext import build_external_embeddings, EXTERNAL_SEG_ID
 from ..feature_prediction.predictor import predict_performance
 from .dtw_reranker import rerank
 
@@ -51,9 +44,13 @@ def _normalize_stage1_ranks(result: Dict[str, Any]) -> None:
 
 async def run_similarity_pipeline(
     *,
-    target_id: str,
+    target_id: Optional[str] = None,
     pool: asyncpg.Pool,
     conn: asyncpg.Connection,
+
+    # External candidate (unsaved, simulated) — mutually exclusive with target_id
+    external_payload:              Optional[Dict[str, Any]] = None,
+    external_embedding_calculator: Optional[Any]            = None,
 
     # Stage 1
     modes:              Optional[List[str]]        = None,
@@ -78,12 +75,39 @@ async def run_similarity_pipeline(
 ) -> Dict[str, Any]:
     t_start = time.time()
 
+    is_external = external_payload is not None
+    if is_external:
+        target_id = EXTERNAL_SEG_ID
+        if prefilter_features:
+            raise ValueError("prefilter_features is not supported for external candidates")
+    elif target_id is None:
+        raise ValueError("Either target_id or external_payload must be provided")
+
     if prefilter_features is None:
         prefilter_features = []
 
     # ── Stage 1 ──────────────────────────────────────────────────────────
     t1 = time.time()
-    searcher = MultiModalSearcher(pool)
+
+    if is_external:
+        embedding_row = build_external_embeddings(external_payload, external_embedding_calculator)
+        if embedding_row is None:
+            return {
+                'error': 'Could not compute embeddings for external candidate (too few points?)',
+                'traj_similarity': {}, 'segment_similarity': [],
+            }
+
+        external_embeddings = {
+            'joint':       embedding_row['joint_embedding'],
+            'position':    embedding_row['position_embedding'],
+            'orientation': embedding_row['orientation_embedding'],
+            'velocity':    embedding_row['velocity_embedding'],
+            'metadata':    embedding_row['metadata_embedding'],
+        }
+        searcher = MultiModalSearcherExternal(pool, external_embeddings, EXTERNAL_SEG_ID)
+    else:
+        searcher = MultiModalSearcher(pool)
+
     result = await searcher.search_similar(
         target_id=target_id,
         modes=modes,
@@ -113,14 +137,15 @@ async def run_similarity_pipeline(
             result = await predict_performance(
                 result=result, seg_batch={}, conn=conn,
                 feature='mean_distance', coverage=coverage,
-                conformal_active=False,  # no intervals without DTW distances
+                conformal_active=False,
+                dtw_mode=dtw_mode, metric=metric,
             )
         result['timing']['total_ms'] = round((time.time() - t_start) * 1000, 1)
         return result
 
     # ── Stage 2: DTW reranking ───────────────────────────────────────────
     t2 = time.time()
-    loader       = TrajectoryLoader(conn)
+    loader       = TrajectoryLoader(conn)   # immer der echte Loader — lädt DB-Kandidaten
     data_load_ms = 0.0
     candidates_traj: Dict[str, Any] = {}
     seg_batch:       Dict[str, Any] = {}
@@ -148,7 +173,7 @@ async def run_similarity_pipeline(
                 for r in traj_results:
                     sid = r.get('seg_id')
                     if sid in dtw_lookup:
-                        r['dtw_distance']    = dtw_lookup[sid]['dtw_distance']
+                        r['dtw_distance']     = dtw_lookup[sid]['dtw_distance']
                         r['similarity_score'] = dtw_lookup[sid]['similarity_score']
                         r['rank_stage2']      = dtw_lookup[sid]['rank']
                     enriched.append(r)
@@ -156,7 +181,7 @@ async def run_similarity_pipeline(
                 result['traj_similarity']['results'] = enriched
 
     segment_groups = result.get('segment_similarity', [])
-    all_seg_traj_ids: set = {target_id}
+    all_seg_traj_ids: set = set() if is_external else {target_id}
     for group in segment_groups:
         for r in group.get('similar_segments', {}).get('results', []):
             cid = r.get('seg_id')
@@ -167,6 +192,16 @@ async def run_similarity_pipeline(
         t_load    = time.time()
         seg_batch = await loader.load_trajectories_batch(list(all_seg_traj_ids), dtw_mode)
         data_load_ms += (time.time() - t_load) * 1000
+
+    # Query-Segment des externen Kandidaten separat laden und in seg_batch
+    # einspeisen — unter demselben Key, den _seg_id_to_traj_id() für das
+    # Query-Segment liefern würde (bei uns: EXTERNAL_SEG_ID selbst, da
+    # seg_id == traj_id für einen einzelnen externen Kandidaten).
+    if is_external:
+        ext_loader = TrajectoryLoaderExternal(external_payload)
+        ext_data   = await ext_loader.load_trajectory_data(target_id, dtw_mode)
+        if ext_data is not None:
+            seg_batch[target_id] = ext_data
 
     for group in segment_groups:
         query_seg_id = group.get('target_segment')
@@ -204,7 +239,7 @@ async def run_similarity_pipeline(
         for r in seg_results:
             sid = r.get('seg_id')
             if sid in dtw_seg_lup:
-                r['dtw_distance']    = dtw_seg_lup[sid]['dtw_distance']
+                r['dtw_distance']     = dtw_seg_lup[sid]['dtw_distance']
                 r['similarity_score'] = dtw_seg_lup[sid]['similarity_score']
                 r['rank_stage2']      = dtw_seg_lup[sid]['rank']
             enriched.append(r)
@@ -212,8 +247,6 @@ async def run_similarity_pipeline(
         group['similar_segments']['results'] = enriched
 
     stage2_ms = (time.time() - t2) * 1000
-
-    # Stage 2 completed successfully — set flags NOW
     result['stage2_active']   = True
     result['stage2_dtw_mode'] = dtw_mode
 
