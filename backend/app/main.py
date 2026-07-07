@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api.endpoints import traj_route_handler, dashboard_route_handler, evaluation_route_handler, metadata_route_handler, upload_route_handler, similarity_route_handler, similarity_candidate_route_handler
+from .api.endpoints import traj_route_handler, dashboard_route_handler, evaluation_route_handler, metadata_route_handler, upload_route_handler, similarity_route_handler
 from .database import init_db
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
@@ -44,7 +44,6 @@ app.include_router(upload_route_handler.router, prefix="/api/upload", tags=["upl
 app.include_router(evaluation_route_handler.router, prefix="/api/evaluation", tags=["evaluation"])
 app.include_router(similarity_route_handler.router, prefix="/api/similarity", tags=["similarity"])
 app.include_router(metadata_route_handler.router, prefix="/api/metadata", tags=["metadata"])
-app.include_router(similarity_candidate_route_handler.router, prefix="/api/similarity", tags=["similarity"])
 
 # Initialize the database
 init_db(app)

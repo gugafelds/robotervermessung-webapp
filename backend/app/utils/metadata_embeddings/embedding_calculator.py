@@ -1,7 +1,7 @@
 # backend/scripts/calculators/embedding_calculator.py
 
 import numpy as np
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 import logging
 
 logger = logging.getLogger(__name__)
@@ -145,15 +145,15 @@ class EmbeddingCalculator:
         return self._l2_normalize(flat)
 
     def compute_metadata_embedding(self, metadata: Dict) -> Optional[np.ndarray]:
-        vel_max = self.vel_max
+        vel_max   = self.vel_max
         accel_max = self.accel_max
-        reach_xy = self.reach_xy
+        reach_xy  = self.reach_xy
         reach_z_max = self.reach_z_max
         reach_z_min = self.reach_z_min
         max_payload = self.max_payload
-
+ 
         movement_str = metadata.get('movement_type', '').lower().strip()
-
+ 
         if movement_str in ('linear', 'l'):
             linear_ratio   = 1.0
             circular_ratio = 0.0
@@ -170,10 +170,10 @@ class EmbeddingCalculator:
             else:
                 linear_ratio   = 0.0
                 circular_ratio = 0.0
-
+ 
         # Payload
         weight_norm = np.clip(metadata.get('weight', 0.0) / max_payload, 0, 1)
-
+ 
         # Position — normalisiert durch physikalische Reichweite
         pos_x = metadata.get('position_x', 0.0)
         pos_y = metadata.get('position_y', 0.0)
@@ -181,20 +181,21 @@ class EmbeddingCalculator:
         pos_x_norm = np.clip(pos_x / reach_xy, -1, 1)
         pos_y_norm = np.clip(pos_y / reach_xy, -1, 1)
         pos_z_norm = np.clip((pos_z - reach_z_min) / (reach_z_max - reach_z_min), 0, 1)
-
-        # Velocity Stats
-        max_vel_norm    = np.clip((metadata.get('max_vel_act', 0.0) + vel_max) / (2 * vel_max), 0, 1)
-        mean_vel_norm   = np.clip((metadata.get('mean_vel_act', 0.0) + vel_max) / (2 * vel_max), 0, 1)
-        median_vel_norm = np.clip((metadata.get('median_vel_act', 0.0) + vel_max) / (2 * vel_max), 0, 1)
-        std_vel_norm    = np.clip(metadata.get('std_vel_act', 0.0) / vel_max, 0, 1)
-
-        # Acceleration Stats
-        min_accel_norm    = np.clip((metadata.get('min_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
-        max_accel_norm    = np.clip((metadata.get('max_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
-        mean_accel_norm   = np.clip((metadata.get('mean_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
-        median_accel_norm = np.clip((metadata.get('median_accel_act', 0.0) + accel_max) / (2 * accel_max), 0, 1)
-        std_accel_norm    = np.clip(metadata.get('std_accel_act', 0.0) / accel_max, 0, 1)
-
+ 
+        # Velocity Stats — cmd-basiert, immer >= 0
+        max_vel_norm    = np.clip(metadata.get('max_vel',    0.0) / vel_max, 0, 1)
+        mean_vel_norm   = np.clip(metadata.get('mean_vel',   0.0) / vel_max, 0, 1)
+        median_vel_norm = np.clip(metadata.get('median_vel', 0.0) / vel_max, 0, 1)
+        std_vel_norm    = np.clip(metadata.get('std_vel',    0.0) / vel_max, 0, 1)
+ 
+        # Acceleration Stats — cmd-basiert, kann negativ sein (Bremsen)
+        # abs() weil wir Magnitude wollen, nicht Richtung
+        min_accel_norm    = np.clip(abs(metadata.get('min_accel',    0.0)) / accel_max, 0, 1)
+        max_accel_norm    = np.clip(abs(metadata.get('max_accel',    0.0)) / accel_max, 0, 1)
+        mean_accel_norm   = np.clip(abs(metadata.get('mean_accel',   0.0)) / accel_max, 0, 1)
+        median_accel_norm = np.clip(abs(metadata.get('median_accel', 0.0)) / accel_max, 0, 1)
+        std_accel_norm    = np.clip(metadata.get('std_accel',        0.0) / accel_max, 0, 1)
+ 
         # 15D Embedding
         features = np.array([
             linear_ratio,
@@ -211,10 +212,11 @@ class EmbeddingCalculator:
             max_accel_norm,
             mean_accel_norm,
             median_accel_norm,
-            std_accel_norm
+            std_accel_norm,
         ], dtype=np.float32)
-
+ 
         return self._l2_normalize(features)
+
 
     # Helper methods
     @staticmethod
@@ -247,3 +249,119 @@ class EmbeddingCalculator:
         """
         norm = np.linalg.norm(vec)
         return vec / norm if norm > 0 else vec
+    
+
+# ── Candidate (unsaved) embeddings ───────────────────────────────────────
+ 
+CANDIDATE_SEG_ID = 'externalcandidate'
+ 
+ 
+def _build_candidate_metadata(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Computes metadata features for an unsaved, simulated candidate segment.
+ 
+    Mirrors MetadataCalculatorService._calculate_all_metadata_in_memory()
+    for a single segment. If that method's arithmetic ever changes, this
+    needs updating too — kept separate because that method is written for
+    multi-segment DB trajectories, not single-payload candidates.
+    """
+    traj       = payload['trajectory']
+    positions  = np.array(traj['positions'],  dtype=np.float64)
+    timestamps = np.array(traj['timestamps'], dtype=np.float64)
+ 
+    deltas      = np.diff(positions, axis=0)
+    dt          = np.diff(timestamps)
+    dt[dt == 0] = 1e-6
+ 
+    seg_lengths = np.linalg.norm(deltas, axis=1)
+    length      = float(np.sum(seg_lengths))
+    duration    = float(timestamps[-1] - timestamps[0])
+ 
+    twist = seg_lengths / dt
+    accel = np.diff(twist) / dt[1:] if len(twist) > 1 else np.array([0.0])
+    centroid = positions.mean(axis=0)
+ 
+    return {
+        'seg_id':        CANDIDATE_SEG_ID,
+        'traj_id':       CANDIDATE_SEG_ID,
+        'movement_type': payload['movement_type'],
+        'duration':      round(duration, 3),
+        'weight':        round(float(payload['weight']), 3),
+        'length':        round(length, 3),
+        'min_vel':       round(float(np.min(twist)),    3) if len(twist) else 0.0,
+        'max_vel':       round(float(np.max(twist)),    3) if len(twist) else 0.0,
+        'mean_vel':      round(float(np.mean(twist)),   3) if len(twist) else 0.0,
+        'median_vel':    round(float(np.median(twist)), 3) if len(twist) else 0.0,
+        'std_vel':       round(float(np.std(twist)),    3) if len(twist) else 0.0,
+        'min_accel':     round(float(np.min(accel)),    3) if len(accel) else 0.0,
+        'max_accel':     round(float(np.max(accel)),    3) if len(accel) else 0.0,
+        'mean_accel':    round(float(np.mean(accel)),   3) if len(accel) else 0.0,
+        'median_accel':  round(float(np.median(accel)), 3) if len(accel) else 0.0,
+        'std_accel':     round(float(np.std(accel)),    3) if len(accel) else 0.0,
+        'position_x':    round(float(centroid[0]), 3),
+        'position_y':    round(float(centroid[1]), 3),
+        'position_z':    round(float(centroid[2]), 3),
+    }
+ 
+ 
+def build_candidate_embeddings(
+    payload:              Dict[str, Any],
+    embedding_calculator: 'EmbeddingCalculator',
+) -> Optional[Dict[str, Any]]:
+    """
+    Builds all embeddings for an unsaved, simulated candidate segment.
+ 
+    Uses the same EmbeddingCalculator methods as the real ingestion
+    pipeline — no duplicated math, just a different data source
+    (in-memory payload instead of DB rows).
+ 
+    Returns a single embedding row (dict) in the same shape as
+    MetadataCalculatorService's embedding_rows entries, or None if
+    too few points exist (< 10, matching EmbeddingCalculator's minimum).
+ 
+    Previously lived in embedding_calculator_ext.py as build_external_embeddings.
+    """
+    traj = payload['trajectory']
+ 
+    pos_data = [
+        {'x_cmd': p[0], 'y_cmd': p[1], 'z_cmd': p[2]}
+        for p in traj['positions']
+    ]
+    joint_data = [
+        {f'joint_{i+1}': j[i] for i in range(6)}
+        for j in traj.get('joints', [])
+    ]
+    ori_data = [
+        {'qw_cmd': q[0], 'qx_cmd': q[1], 'qy_cmd': q[2], 'qz_cmd': q[3]}
+        for q in traj.get('quats', [])
+    ]
+    vel_data = [
+        {'x_cmd': p[0], 'y_cmd': p[1], 'z_cmd': p[2], 'timestamp': t}
+        for p, t in zip(traj['positions'], traj['timestamps'])
+    ]
+ 
+    joint_emb = embedding_calculator.compute_joint_embedding(joint_data)      if joint_data  else None
+    pos_emb   = embedding_calculator.compute_position_embedding(pos_data)     if pos_data    else None
+    ori_emb   = embedding_calculator.compute_orientation_embedding(ori_data)  if ori_data    else None
+    vel_emb   = embedding_calculator.compute_velocity_embeddings(vel_data)    if vel_data    else None
+ 
+    metadata_row = _build_candidate_metadata(payload)
+    logger.debug(f"[build_candidate_embeddings] metadata_row: {metadata_row}")
+ 
+    meta_emb = embedding_calculator.compute_metadata_embedding(metadata_row)
+ 
+    if all(e is None for e in [joint_emb, pos_emb, ori_emb, vel_emb, meta_emb]):
+        logger.warning("build_candidate_embeddings: all embeddings None (< 10 points?)")
+        return None
+ 
+    return {
+        'seg_id':               CANDIDATE_SEG_ID,
+        'traj_id':              CANDIDATE_SEG_ID,
+        'joint_embedding':       joint_emb,
+        'position_embedding':    pos_emb,
+        'orientation_embedding': ori_emb,
+        'velocity_embedding':    vel_emb,
+        'metadata_embedding':    meta_emb,
+        'metadata_row':          metadata_row,
+    }
+

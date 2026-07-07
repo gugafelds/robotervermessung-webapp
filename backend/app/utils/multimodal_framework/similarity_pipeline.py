@@ -17,11 +17,9 @@ from typing import Any, Dict, List, Literal, Optional
 
 import asyncpg
 
-from .multi_modal_searcher import MultiModalSearcher
-from .multi_modal_ext import MultiModalSearcherExternal
-from ..metadata_embeddings.trajectory_loader import TrajectoryLoader
-from ..metadata_embeddings.trajectory_loader_ext import TrajectoryLoaderExternal
-from ..metadata_embeddings.embedding_calculator_ext import build_external_embeddings, EXTERNAL_SEG_ID
+from .multi_modal_searcher import MultiModalSearcher, MultiModalSearcherCandidate
+from ..metadata_embeddings.trajectory_loader import TrajectoryLoader, TrajectoryLoaderCandidate
+from ..metadata_embeddings.embedding_calculator import build_candidate_embeddings, CANDIDATE_SEG_ID
 from ..feature_prediction.predictor import predict_performance
 from .dtw_reranker import rerank
 
@@ -77,7 +75,7 @@ async def run_similarity_pipeline(
 
     is_external = external_payload is not None
     if is_external:
-        target_id = EXTERNAL_SEG_ID
+        target_id = CANDIDATE_SEG_ID
         if prefilter_features:
             raise ValueError("prefilter_features is not supported for external candidates")
     elif target_id is None:
@@ -90,7 +88,7 @@ async def run_similarity_pipeline(
     t1 = time.time()
 
     if is_external:
-        embedding_row = build_external_embeddings(external_payload, external_embedding_calculator)
+        embedding_row = build_candidate_embeddings(external_payload, external_embedding_calculator)
         if embedding_row is None:
             return {
                 'error': 'Could not compute embeddings for external candidate (too few points?)',
@@ -104,7 +102,7 @@ async def run_similarity_pipeline(
             'velocity':    embedding_row['velocity_embedding'],
             'metadata':    embedding_row['metadata_embedding'],
         }
-        searcher = MultiModalSearcherExternal(pool, external_embeddings, EXTERNAL_SEG_ID)
+        searcher = MultiModalSearcherCandidate(pool, external_embeddings, CANDIDATE_SEG_ID)
     else:
         searcher = MultiModalSearcher(pool)
 
@@ -198,7 +196,7 @@ async def run_similarity_pipeline(
     # Query-Segment liefern würde (bei uns: EXTERNAL_SEG_ID selbst, da
     # seg_id == traj_id für einen einzelnen externen Kandidaten).
     if is_external:
-        ext_loader = TrajectoryLoaderExternal(external_payload)
+        ext_loader = TrajectoryLoaderCandidate(external_payload)
         ext_data   = await ext_loader.load_trajectory_data(target_id, dtw_mode)
         if ext_data is not None:
             seg_batch[target_id] = ext_data

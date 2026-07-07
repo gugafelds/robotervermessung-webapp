@@ -1,10 +1,10 @@
-# backend/app/utils/multi_modal_searcher.py
+# backend/app/utils/multimodal_framework/multi_modal_searcher.py
 
 import asyncio
 import asyncpg
 from typing import Dict, List, Optional, Union
 import logging
-from .shape_searcher import ShapeSearcher
+from .shape_searcher import ShapeSearcher, ShapeSearcherCandidate
 from .rrf_ranker import RRFRanker
 from .filter_searcher import FilterSearcher
 
@@ -187,7 +187,6 @@ class MultiModalSearcher:
                     'results': []
                 }
 
-            # Pre-Filter (Feature + Tag/ID)
             candidate_ids = None
             need_prefilter = (
                 prefilter_features
@@ -212,7 +211,6 @@ class MultiModalSearcher:
                         return {'error': 'No candidates after pre-filter', 'results': []}
                     candidate_ids = traj_candidates
 
-            # Embedding-Suche
             async def _one_mode(mode: str):
                 async with self._acquire() as conn:
                     shape, _ = self._make_helpers(conn)
@@ -275,7 +273,6 @@ class MultiModalSearcher:
                     'results': []
                 }
 
-            # Pre-Filter (Feature + Tag/ID)
             candidate_ids = None
             need_prefilter = (
                 prefilter_features
@@ -300,7 +297,6 @@ class MultiModalSearcher:
                         return {'error': 'No candidates after pre-filter', 'results': []}
                     candidate_ids = segment_candidates
 
-            # Embedding-Suche
             async def _one_mode(mode: str):
                 async with self._acquire() as conn:
                     shape, _ = self._make_helpers(conn)
@@ -333,7 +329,7 @@ class MultiModalSearcher:
             return {'error': str(e), 'results': []}
 
     # =========================================================================
-    # PRIVATE — HELPERS (unverändert)
+    # PRIVATE — HELPERS
     # =========================================================================
 
     async def _enrich_results(
@@ -424,30 +420,92 @@ class MultiModalSearcher:
 
         try:
             async with self._acquire() as conn:
-                result = await conn.fetchrow(
+                row = await conn.fetchrow(
                     f"""
                     SELECT
-                        bm.seg_id, bm.traj_id, bm.duration, bm.weight,
-                        bm.length, bm.movement_type,
-                        bm.mean_vel, bm.max_vel, bm.std_vel,
+                        bm.seg_id, bm.traj_id, bm.duration, bm.weight, bm.length,
+                        bm.movement_type, bm.mean_vel, bm.max_vel, bm.std_vel,
                         bm.min_accel, bm.mean_accel, bm.max_accel, bm.std_accel,
                         bm.position_x, bm.position_y, bm.position_z,
-                        mi.{metric}_min_distance,
-                        mi.{metric}_average_distance,
-                        mi.{metric}_max_distance
+                        mi.{metric}_min_distance     AS min_distance,
+                        mi.{metric}_average_distance AS mean_distance,
+                        mi.{metric}_max_distance     AS max_distance
                     FROM motion.traj_metadata bm
                     LEFT JOIN {metric_table} mi ON bm.seg_id = mi.seg_id
                     WHERE bm.seg_id = $1
                     """,
-                    seg_id
+                    seg_id,
                 )
-                if result is None:
-                    return None
-                row_dict = dict(result)
-                row_dict['min_distance']  = row_dict.pop(f'{metric}_min_distance', None)
-                row_dict['mean_distance'] = row_dict.pop(f'{metric}_average_distance', None)
-                row_dict['max_distance']  = row_dict.pop(f'{metric}_max_distance', None)
-                return row_dict
+            return dict(row) if row else None
         except Exception as e:
             logger.error(f"Error getting features for {seg_id}: {e}")
             return None
+
+
+# ── Candidate (unsaved) variant ───────────────────────────────────────────
+
+class MultiModalSearcherCandidate(MultiModalSearcher):
+    """
+    Variant of MultiModalSearcher for unsaved, simulated candidates.
+    The QUERY-side embedding comes from an injected dict instead of a DB lookup.
+    Only segment-level search runs — candidates have no whole-trajectory aggregate.
+
+    Previously lived in multi_modal_ext.py as MultiModalSearcherExternal.
+    """
+
+    def __init__(
+        self,
+        conn_or_pool:         Union[asyncpg.Pool, asyncpg.Connection],
+        candidate_embeddings: Dict[str, list],
+        candidate_id:         str,
+    ):
+        super().__init__(conn_or_pool)
+        self._candidate_embeddings = candidate_embeddings
+        self._candidate_id         = candidate_id
+
+    def _make_helpers(self, conn: asyncpg.Connection):
+        return (
+            ShapeSearcherCandidate(conn, self._candidate_embeddings, self._candidate_id),
+            FilterSearcher(conn),
+        )
+
+    async def search_similar(
+        self,
+        target_id: str,
+        modes: Optional[List[str]] = None,
+        weights: Optional[Dict[str, float]] = None,
+        prefilter_features: Optional[List[str]] = None,
+        limit: int = 10,
+        metric: str = 'sidtw',
+        buffer_factor: int = 5,
+        include_tags: Optional[List[str]] = None,
+        exclude_tags: Optional[List[str]] = None,
+        exclude_ids: Optional[List[str]] = None,
+    ) -> Dict:
+        modes              = modes or ['joint', 'position', 'orientation', 'velocity', 'metadata']
+        weights            = weights or {m: 1.0 for m in modes}
+        prefilter_features = prefilter_features or []
+
+        seg_result = await self._search_segments(
+            target_seg_id=self._candidate_id,
+            modes=modes, weights=weights, limit=limit,
+            prefilter_features=prefilter_features, metric=metric,
+            buffer_factor=buffer_factor, include_tags=include_tags,
+            exclude_tags=exclude_tags, exclude_ids=exclude_ids,
+        )
+
+        return {
+            'target_id':            target_id,
+            'target_traj_id':       self._candidate_id,
+            'target_traj_features': None,
+            'modes':                modes,
+            'weights':              weights,
+            'metric':               metric,
+            'traj_similarity':      {'results': []},
+            'segment_similarity':   [{
+                'target_segment':          self._candidate_id,
+                'target_segment_features': None,
+                'similar_segments':        seg_result,
+            }],
+            'metadata': {'target_segments_count': 1},
+        }
