@@ -24,7 +24,7 @@ This is enforced in predictor.py, not here.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import asyncpg
