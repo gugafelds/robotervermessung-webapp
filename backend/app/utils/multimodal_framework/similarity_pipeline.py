@@ -275,20 +275,47 @@ async def run_similarity_pipeline(
             ext_data   = await ext_loader.load_trajectory_data(target_id, dtw_mode)
             if ext_data is not None:
                 seg_batch[target_id] = ext_data
+    
+    logger.info("[pipeline DEBUG] seg_batch keys: %s", list(seg_batch.keys()))
+    logger.info("[pipeline DEBUG] segment_groups target_segments: %s",
+                    [g.get('target_segment') for g in segment_groups])
 
     for group in segment_groups:
         query_seg_id = group.get('target_segment')
+
+        logger.info("[pipeline DEBUG] entering group loop: query_seg_id=%s", query_seg_id)
+    
+        seg_results = group.get('similar_segments', {}).get('results', [])
+        logger.info("[pipeline DEBUG] seg_results count=%d", len(seg_results))
+
+        if not seg_results:
+            logger.info("[pipeline DEBUG] skipping — no seg_results")
+            continue
+        
+        query_traj_data = seg_batch.get(_seg_id_to_traj_id(query_seg_id))
+        if query_traj_data is None and is_external:
+            query_traj_data = seg_batch.get(query_seg_id)
+        
+        logger.info("[pipeline DEBUG] query_traj_data found=%s", query_traj_data is not None)
+        
+        query_arr = (query_traj_data.get('segments') or {}).get(query_seg_id) if query_traj_data else None
+        logger.info("[pipeline DEBUG] query_arr=%s", query_arr.shape if query_arr is not None else None)
+
         if not query_seg_id:
             continue
         seg_results = group.get('similar_segments', {}).get('results', [])
         if not seg_results:
             continue
         query_traj_data = seg_batch.get(_seg_id_to_traj_id(query_seg_id))
+        if query_traj_data is None and is_external:
+            query_traj_data = seg_batch.get(query_seg_id)
         if query_traj_data is None:
             continue
         query_arr = (query_traj_data.get('segments') or {}).get(query_seg_id)
         if query_arr is None:
             continue
+
+        
 
         candidates_seg_flat = {}
         for r in seg_results:
@@ -307,6 +334,18 @@ async def run_similarity_pipeline(
 
         dtw_seg     = rerank(query_seq=query_arr, candidates=candidates_seg_flat,
                              limit=limit, mode=dtw_mode)
+        
+        logger.info("[pipeline DEBUG] dtw_seg count=%d, first=%s", 
+                    len(dtw_seg),
+                    dtw_seg[0] if dtw_seg else None)
+        
+        dtw_seg_lup = {r['id']: r for r in dtw_seg}
+        
+        logger.info("[pipeline DEBUG] dtw_seg_lup keys sample=%s", 
+                    list(dtw_seg_lup.keys())[:3])
+        logger.info("[pipeline DEBUG] seg_results ids sample=%s",
+                    [r.get('seg_id') for r in seg_results[:3]])
+
         dtw_seg_lup = {r['id']: r for r in dtw_seg}
         enriched    = []
         for r in seg_results:

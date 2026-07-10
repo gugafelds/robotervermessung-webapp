@@ -493,6 +493,7 @@ class MultiModalSearcherCandidate(MultiModalSearcher):
         weights            = weights or {m: 1.0 for m in modes}
         prefilter_features = prefilter_features or []
 
+        
         if self._segment_embeddings_map:
             # ── Segmentweise suchen — ein Aufruf pro Segment, parallel ───
 

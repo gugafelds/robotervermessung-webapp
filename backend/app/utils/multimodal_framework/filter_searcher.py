@@ -113,25 +113,19 @@ class FilterSearcher:
         exclude_tags: Optional[List[str]] = None,
         exclude_ids: Optional[List[str]] = None,
     ) -> List[str]:
-        """
-        Hauptfunktion: Pre-Filter basierend auf ausgewählten Features + Tag/ID-Filter.
-
-        Args:
-            target_id:       Target Segment/Bahn ID
-            features_to_use: Welche Features filtern?
-            tolerance:       Override für default tolerance (0.10 = ±10%)
-            include_tags:    Nur Bahnen MIT diesen Tags einbeziehen
-            exclude_tags:    Bahnen MIT diesen Tags ausschließen (NULL-Tags bleiben drin)
-            exclude_ids:     Konkrete traj_ids komplett ausschließen
-
-        Returns:
-            List von seg_ids die den Filter passieren
-        """
         try:
-            target_features = await self.get_target_features(target_id)
-            if not target_features:
-                logger.error(f"Cannot get features for target {target_id}")
-                return []
+            # ── Wenn nur Tag/ID-Filter ohne Feature-Filter ────────────────
+            # (z.B. für externe Kandidaten die keine DB-Features haben)
+            features_needed = features_to_use and len(features_to_use) > 0
+            
+            if not features_needed:
+                # Direkt Tag/ID-Filter ohne target_features
+                target_features = None
+            else:
+                target_features = await self.get_target_features(target_id)
+                if not target_features:
+                    logger.error(f"Cannot get features for target {target_id}")
+                    return []
 
             if tolerance is None:
                 tolerance = self.default_tolerance

@@ -47,6 +47,7 @@ class CorrectionRequest(BaseModel):
     limit:           int   = 5
     mode:            Literal["relative", "linear"] = "relative"
     segment_indices: list[int] = []
+    include_tags:    list[str] = []
 
 
 class CorrectionResponse(BaseModel):
@@ -54,37 +55,6 @@ class CorrectionResponse(BaseModel):
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
-
-async def _get_segment_data(conn, seg_id: str, n: int = 10):
-    """
-    Holt die letzten n Punkte aus sidtw_evaluation für ein Segment
-    und berechnet die mittlere Abweichung in x, y, z.
-
-    Direkt übernommen aus dem Korrekturskript (get_segment_data Funktion).
-    """
-    query = """
-        SELECT sidtw_act_x, sidtw_cmd_x,
-               sidtw_act_y, sidtw_cmd_y,
-               sidtw_act_z, sidtw_cmd_z
-        FROM evaluation.sidtw_evaluation
-        WHERE seg_id = $1
-        ORDER BY points_order DESC
-        LIMIT $2
-    """
-    result = await conn.fetch(query, seg_id, n)
-
-    if not result:
-        return None
-
-    x_diff, y_diff, z_diff = 0.0, 0.0, 0.0
-    for row in result:
-        x_diff += float(row["sidtw_act_x"] - row["sidtw_cmd_x"])
-        y_diff += float(row["sidtw_act_y"] - row["sidtw_cmd_y"])
-        z_diff += float(row["sidtw_act_z"] - row["sidtw_cmd_z"])
-
-    n_rows = len(result)
-    return x_diff / n_rows, y_diff / n_rows, z_diff / n_rows
-
 
 async def _fetch_robot_info(conn, robot_model: str) -> Optional[Dict]:
     row = await conn.fetchrow("""
@@ -171,6 +141,7 @@ async def predict_correction(
             dtw_mode="position",
             metric="sidtw",
             prognosis_active=False,
+            include_tags=request.include_tags or None,
         )
 
         if similarity_result.get("error"):
@@ -237,6 +208,22 @@ async def predict_correction(
             "[correction] %d segments processed, %d corrections computed.",
             len(seg_groups), len(corrections),
         )
+
+        # ── DEBUG ─────────────────────────────────────────────────────────
+        seg_groups = similarity_result.get("segment_similarity", [])
+        logger.info("[correction DEBUG] segment_similarity groups: %d", len(seg_groups))
+        for i, group in enumerate(seg_groups):
+            results = group.get("similar_segments", {}).get("results", [])
+            logger.info(
+                "[correction DEBUG] group %d: target_segment=%s, %d results, first dtw=%s",
+                i,
+                group.get("target_segment"),
+                len(results),
+                results[0].get("dtw_distance") if results else "N/A",
+            )
+        logger.info("[correction DEBUG] all_ids count: %d", len(all_ids))
+        logger.info("[correction DEBUG] query_data keys: %d", len(query_data))
+        # ── END DEBUG ──────────────────────────────────────────────────────
 
         return CorrectionResponse(corrections=corrections)
 
