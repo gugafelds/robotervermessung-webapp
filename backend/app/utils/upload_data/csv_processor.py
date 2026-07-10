@@ -922,8 +922,13 @@ class CSVProcessor:
                 # seg_N: move_type; pos=[...]; quat=[...]; support_pos=[...]; support_quat=[...]
                 elif content.startswith('seg_'):
                     try:
-                        # split by ';'
-                        parts = [p.strip() for p in content.split(';')]
+                        if ';' in content:
+                            parts = [p.strip() for p in content.split(';') if p.strip()]
+                        else:
+                            parts = [p.strip() for p in content.split('\t') if p.strip()]
+                        
+                        print(f"[parse SEG] separator={'semicolon' if ';' in content else 'tab'} n_parts={len(parts)}")
+                        print(f"[parse SEG] all parts: {parts}")
                         # parts[0] = 'seg_1: linear'
                         move_type = parts[0].split(':', 1)[1].strip()
 
@@ -961,37 +966,31 @@ class CSVProcessor:
         waypoints: list[dict],
         position_cmd_data: list = None,
     ) -> list:
-
-        """
-        Match waypoints from CSV comments to setpoints via exact position match.
-        Fills move_type and support columns for circular waypoints.
-
-        setpoints_data: list of records [traj_id, seg_id, timestamp, x, y, z, qx, qy, qz, qw]
-        waypoints:      list of dicts with pos, quat, move_type, support_pos, support_quat
-
-        Returns updated setpoints_data with support columns appended.
-        """
         if not waypoints:
             return setpoints_data
 
-        # Build position lookup from waypoints
-        # key: (round(x,4), round(y,4), round(z,4)) → waypoint dict
-        wp_lookup = {}
-        for wp in waypoints:
-            if 'pos' not in wp:
-                continue
-            key = (round(wp['pos'][0], 4), round(wp['pos'][1], 4), round(wp['pos'][2], 4))
-            wp_lookup[key] = wp
+        # ── Fuzzy Position Match mit Toleranz ────────────────────────────
+        def find_wp(x, y, z, tol=5.0):
+            if x is None or y is None or z is None:
+                return None
+            for wp in waypoints:
+                if 'pos' not in wp:
+                    continue
+                pos = wp['pos']
+                if (abs(pos[0] - x) < tol and
+                    abs(pos[1] - y) < tol and
+                    abs(pos[2] - z) < tol):
+                    return wp
+            return None
 
         updated = []
         for record in setpoints_data:
-            # record: [traj_id, seg_id, timestamp, x_reached, y_reached, z_reached,
-            #          qx_reached, qy_reached, qz_reached, qw_reached]
-            x = round(float(record[3]), 4) if record[3] is not None else None
-            y = round(float(record[4]), 4) if record[4] is not None else None
-            z = round(float(record[5]), 4) if record[5] is not None else None
+            seg_id = record[1]
+            x = float(record[3]) if record[3] is not None else None
+            y = float(record[4]) if record[4] is not None else None
+            z = float(record[5]) if record[5] is not None else None
 
-            wp = wp_lookup.get((x, y, z))
+            wp = find_wp(x, y, z)
 
             if wp and wp.get('move_type') == 'circular' and wp.get('support_pos'):
                 sp = wp['support_pos']
@@ -1001,17 +1000,15 @@ class CSVProcessor:
 
                 ts_support = None
                 if position_cmd_data:
-                    seg_id = record[1]
                     seg_cmd = [r for r in position_cmd_data if r[1] == seg_id]
                     if seg_cmd:
-                        best = min(seg_cmd, key=lambda r: 
+                        best = min(seg_cmd, key=lambda r:
                             (r[3]-sp[0])**2 + (r[4]-sp[1])**2 + (r[5]-sp[2])**2
                             if r[3] is not None else float('inf'))
                         ts_support = best[2]
 
                 record = list(record) + [sp[0], sp[1], sp[2], sq[1], sq[2], sq[3], sq[0], vel, stop, ts_support]
             else:
-                # linear or no match — support columns are NULL
                 vel  = wp.get('velocity')  if wp else None
                 stop = wp.get('stop_point') if wp else None
                 record = list(record) + [None, None, None, None, None, None, None, vel, stop, None]
