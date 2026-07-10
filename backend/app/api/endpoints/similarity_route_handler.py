@@ -252,7 +252,6 @@ async def search_candidate(
     Same modes/prognosis/calibration semantics as GET /search/{target_id}.
     prefilter_features is NOT supported here (no stored feature values).
 
-    Previously registered as POST /search-candidate in similarity_candidate_route_handler.py.
     """
     try:
         robot_info = await _fetch_robot_info(conn, request.robot_model)

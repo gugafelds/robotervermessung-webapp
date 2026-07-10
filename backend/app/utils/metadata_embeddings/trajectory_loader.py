@@ -235,42 +235,44 @@ class TrajectoryLoaderCandidate:
     """
     Drop-in replacement for TrajectoryLoader when the QUERY side is an
     unsaved, simulated candidate (no traj_id in the DB).
- 
+
     Returns the same shape as TrajectoryLoader.load_trajectory_data() so
     the rest of the pipeline (rerank(), predict_performance()) is unaffected.
- 
+
     A payload always represents exactly ONE segment — 'trajectory' and
     'segments' are therefore identical, mirroring how a single-segment
     DB trajectory has seg_id == traj_id.
- 
+
     Previously lived in trajectory_loader_ext.py as TrajectoryLoaderExternal.
     """
- 
-    def __init__(self, payload: Dict[str, Any]):
-        self._payload = payload
- 
+
+    def __init__(self, payload: Dict[str, Any], candidate_seg_id: str = None):  
+        self._payload          = payload
+        self._candidate_seg_id = candidate_seg_id
+
     async def load_trajectory_data(self, traj_id: str, mode: str) -> Optional[Dict]:
         """
         traj_id is ignored — kept only to match TrajectoryLoader's call signature.
         """
         from .embedding_calculator import CANDIDATE_SEG_ID
- 
+
+        seg_id     = self._candidate_seg_id or CANDIDATE_SEG_ID  
         trajectory = self._payload.get('trajectory') or {}
- 
+
         if mode == 'position':
             points = trajectory.get('positions')
         elif mode == 'joint':
             points = trajectory.get('joints')
         else:
             raise ValueError(f"Invalid mode: {mode}. Must be 'position' or 'joint'")
- 
+
         if not points:
             logger.warning(f"TrajectoryLoaderCandidate: no '{mode}' data in payload")
             return None
- 
+
         arr = np.array(points, dtype=np.float32)
- 
+
         return {
             'trajectory': arr,
-            'segments':   {CANDIDATE_SEG_ID: arr},
+            'segments':   {seg_id: arr},
         }

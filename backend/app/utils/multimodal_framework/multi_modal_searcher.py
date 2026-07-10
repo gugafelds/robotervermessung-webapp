@@ -442,30 +442,37 @@ class MultiModalSearcher:
             return None
 
 
-# ── Candidate (unsaved) variant ───────────────────────────────────────────
-
 class MultiModalSearcherCandidate(MultiModalSearcher):
     """
     Variant of MultiModalSearcher for unsaved, simulated candidates.
     The QUERY-side embedding comes from an injected dict instead of a DB lookup.
-    Only segment-level search runs — candidates have no whole-trajectory aggregate.
 
-    Previously lived in multi_modal_ext.py as MultiModalSearcherExternal.
+    If segment_embeddings_map is provided, search_similar() runs one search
+    per segment (like the internal searcher) and returns multiple
+    segment_similarity groups — one per segment.
     """
 
     def __init__(
         self,
-        conn_or_pool:         Union[asyncpg.Pool, asyncpg.Connection],
-        candidate_embeddings: Dict[str, list],
-        candidate_id:         str,
+        conn_or_pool:           Union[asyncpg.Pool, asyncpg.Connection],
+        candidate_embeddings:   Dict[str, list],
+        candidate_id:           str,
+        segment_embeddings_map: Optional[Dict[str, Dict[str, list]]] = None,  # NEU
     ):
         super().__init__(conn_or_pool)
-        self._candidate_embeddings = candidate_embeddings
-        self._candidate_id         = candidate_id
+        self._candidate_embeddings   = candidate_embeddings
+        self._candidate_id           = candidate_id
+        self._segment_embeddings_map = segment_embeddings_map or {}  # NEU
 
     def _make_helpers(self, conn: asyncpg.Connection):
         return (
             ShapeSearcherCandidate(conn, self._candidate_embeddings, self._candidate_id),
+            FilterSearcher(conn),
+        )
+
+    def _make_helpers_for_segment(self, conn: asyncpg.Connection, seg_id: str):  # NEU
+        return (
+            ShapeSearcherCandidate(conn, self._segment_embeddings_map[seg_id], seg_id),
             FilterSearcher(conn),
         )
 
@@ -486,13 +493,47 @@ class MultiModalSearcherCandidate(MultiModalSearcher):
         weights            = weights or {m: 1.0 for m in modes}
         prefilter_features = prefilter_features or []
 
-        seg_result = await self._search_segments(
-            target_seg_id=self._candidate_id,
-            modes=modes, weights=weights, limit=limit,
-            prefilter_features=prefilter_features, metric=metric,
-            buffer_factor=buffer_factor, include_tags=include_tags,
-            exclude_tags=exclude_tags, exclude_ids=exclude_ids,
-        )
+        if self._segment_embeddings_map:
+            # ── Segmentweise suchen — ein Aufruf pro Segment, parallel ───
+
+            async def _search_one_segment(seg_id: str) -> Dict:
+                original = self._make_helpers
+                self._make_helpers = lambda conn: self._make_helpers_for_segment(conn, seg_id)
+                try:
+                    seg_result = await self._search_segments(
+                        target_seg_id=seg_id,
+                        modes=modes, weights=weights, limit=limit,
+                        prefilter_features=prefilter_features, metric=metric,
+                        buffer_factor=buffer_factor, include_tags=include_tags,
+                        exclude_tags=exclude_tags, exclude_ids=exclude_ids,
+                    )
+                finally:
+                    self._make_helpers = original
+
+                return {
+                    'target_segment':          seg_id,
+                    'target_segment_features': None,
+                    'similar_segments':        seg_result,
+                }
+
+            segment_results = await asyncio.gather(
+                *[_search_one_segment(seg_id) for seg_id in self._segment_embeddings_map]
+            )
+
+        else:
+            # ── Fallback: ein einziges Segment wie bisher ─────────────────
+            seg_result = await self._search_segments(
+                target_seg_id=self._candidate_id,
+                modes=modes, weights=weights, limit=limit,
+                prefilter_features=prefilter_features, metric=metric,
+                buffer_factor=buffer_factor, include_tags=include_tags,
+                exclude_tags=exclude_tags, exclude_ids=exclude_ids,
+            )
+            segment_results = [{
+                'target_segment':          self._candidate_id,
+                'target_segment_features': None,
+                'similar_segments':        seg_result,
+            }]
 
         return {
             'target_id':            target_id,
@@ -502,10 +543,6 @@ class MultiModalSearcherCandidate(MultiModalSearcher):
             'weights':              weights,
             'metric':               metric,
             'traj_similarity':      {'results': []},
-            'segment_similarity':   [{
-                'target_segment':          self._candidate_id,
-                'target_segment_features': None,
-                'similar_segments':        seg_result,
-            }],
-            'metadata': {'target_segments_count': 1},
+            'segment_similarity':   list(segment_results),
+            'metadata':             {'target_segments_count': len(segment_results)},
         }

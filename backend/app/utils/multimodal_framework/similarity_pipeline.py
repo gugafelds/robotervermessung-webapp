@@ -19,7 +19,7 @@ import asyncpg
 
 from .multi_modal_searcher import MultiModalSearcher, MultiModalSearcherCandidate
 from ..metadata_embeddings.trajectory_loader import TrajectoryLoader, TrajectoryLoaderCandidate
-from ..metadata_embeddings.embedding_calculator import build_candidate_embeddings, CANDIDATE_SEG_ID
+from ..metadata_embeddings.embedding_calculator import build_candidate_embeddings, build_candidate_embeddings_segmented, CANDIDATE_SEG_ID
 from ..feature_prediction.predictor import predict_performance
 from .dtw_reranker import rerank
 
@@ -88,21 +88,65 @@ async def run_similarity_pipeline(
     t1 = time.time()
 
     if is_external:
-        embedding_row = build_candidate_embeddings(external_payload, external_embedding_calculator)
-        if embedding_row is None:
-            return {
-                'error': 'Could not compute embeddings for external candidate (too few points?)',
-                'traj_similarity': {}, 'segment_similarity': [],
+        segment_indices = external_payload.get('segment_indices')  # NEU
+
+        if segment_indices:
+            # ── Multi-Segment Kandidat ────────────────────────────────────
+            rows = build_candidate_embeddings_segmented(
+                external_payload, external_embedding_calculator, segment_indices
+            )
+            if rows is None:
+                return {
+                    'error': 'Could not compute segment embeddings for external candidate.',
+                    'traj_similarity': {}, 'segment_similarity': [],
+                }
+
+            full_row = rows[0]
+            seg_rows = rows[1:]
+
+            full_embeddings = {
+                'joint':       full_row['joint_embedding'],
+                'position':    full_row['position_embedding'],
+                'orientation': full_row['orientation_embedding'],
+                'velocity':    full_row['velocity_embedding'],
+                'metadata':    full_row['metadata_embedding'],
             }
 
-        external_embeddings = {
-            'joint':       embedding_row['joint_embedding'],
-            'position':    embedding_row['position_embedding'],
-            'orientation': embedding_row['orientation_embedding'],
-            'velocity':    embedding_row['velocity_embedding'],
-            'metadata':    embedding_row['metadata_embedding'],
-        }
-        searcher = MultiModalSearcherCandidate(pool, external_embeddings, CANDIDATE_SEG_ID)
+            segment_embeddings_map = {
+                row['seg_id']: {
+                    'joint':       row['joint_embedding'],
+                    'position':    row['position_embedding'],
+                    'orientation': row['orientation_embedding'],
+                    'velocity':    row['velocity_embedding'],
+                    'metadata':    row['metadata_embedding'],
+                }
+                for row in seg_rows
+            }
+
+            searcher = MultiModalSearcherCandidate(
+                pool,
+                full_embeddings,
+                CANDIDATE_SEG_ID,
+                segment_embeddings_map=segment_embeddings_map,
+            )
+
+        else:
+            embedding_row = build_candidate_embeddings(external_payload, external_embedding_calculator)
+            if embedding_row is None:
+                return {
+                    'error': 'Could not compute embeddings for external candidate (too few points?)',
+                    'traj_similarity': {}, 'segment_similarity': [],
+                }
+
+            external_embeddings = {
+                'joint':       embedding_row['joint_embedding'],
+                'position':    embedding_row['position_embedding'],
+                'orientation': embedding_row['orientation_embedding'],
+                'velocity':    embedding_row['velocity_embedding'],
+                'metadata':    embedding_row['metadata_embedding'],
+            }
+            searcher = MultiModalSearcherCandidate(pool, external_embeddings, CANDIDATE_SEG_ID)
+
     else:
         searcher = MultiModalSearcher(pool)
 
@@ -196,10 +240,41 @@ async def run_similarity_pipeline(
     # Query-Segment liefern würde (bei uns: EXTERNAL_SEG_ID selbst, da
     # seg_id == traj_id für einen einzelnen externen Kandidaten).
     if is_external:
-        ext_loader = TrajectoryLoaderCandidate(external_payload)
-        ext_data   = await ext_loader.load_trajectory_data(target_id, dtw_mode)
-        if ext_data is not None:
-            seg_batch[target_id] = ext_data
+        segment_indices = external_payload.get('segment_indices')
+
+        if segment_indices:
+            boundaries = [0] + segment_indices
+            traj = external_payload['trajectory']
+
+            for i, group in enumerate(segment_groups):
+                seg_id = group.get('target_segment')
+                if seg_id is None:
+                    continue
+
+                start = boundaries[i]
+                end   = boundaries[i + 1] + 1
+
+                seg_payload = {
+                    "trajectory": {
+                        "timestamps": traj['timestamps'][start:end],
+                        "positions":  traj['positions'][start:end],
+                        "quats":      traj.get('quats', [])[start:end],
+                        "joints":     traj.get('joints', [])[start:end],
+                    },
+                    "movement_type": external_payload['movement_type'],
+                    "weight":        external_payload['weight'],
+                }
+
+                ext_loader = TrajectoryLoaderCandidate(seg_payload, candidate_seg_id=seg_id)
+                ext_data   = await ext_loader.load_trajectory_data(seg_id, dtw_mode)
+                if ext_data is not None:
+                    seg_batch[seg_id] = ext_data
+
+        else:
+            ext_loader = TrajectoryLoaderCandidate(external_payload)
+            ext_data   = await ext_loader.load_trajectory_data(target_id, dtw_mode)
+            if ext_data is not None:
+                seg_batch[target_id] = ext_data
 
     for group in segment_groups:
         query_seg_id = group.get('target_segment')

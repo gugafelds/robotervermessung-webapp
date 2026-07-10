@@ -252,14 +252,13 @@ class EmbeddingCalculator:
     
 
 # ── Candidate (unsaved) embeddings ───────────────────────────────────────
- 
+
 CANDIDATE_SEG_ID = 'externalcandidate'
- 
- 
-def _build_candidate_metadata(payload: Dict[str, Any]) -> Dict[str, Any]:
+
+def _build_candidate_metadata(payload: Dict[str, Any], seg_id: str = CANDIDATE_SEG_ID) -> Dict[str, Any]:
     """
     Computes metadata features for an unsaved, simulated candidate segment.
- 
+
     Mirrors MetadataCalculatorService._calculate_all_metadata_in_memory()
     for a single segment. If that method's arithmetic ever changes, this
     needs updating too — kept separate because that method is written for
@@ -268,21 +267,21 @@ def _build_candidate_metadata(payload: Dict[str, Any]) -> Dict[str, Any]:
     traj       = payload['trajectory']
     positions  = np.array(traj['positions'],  dtype=np.float64)
     timestamps = np.array(traj['timestamps'], dtype=np.float64)
- 
+
     deltas      = np.diff(positions, axis=0)
     dt          = np.diff(timestamps)
     dt[dt == 0] = 1e-6
- 
+
     seg_lengths = np.linalg.norm(deltas, axis=1)
     length      = float(np.sum(seg_lengths))
     duration    = float(timestamps[-1] - timestamps[0])
- 
+
     twist = seg_lengths / dt
     accel = np.diff(twist) / dt[1:] if len(twist) > 1 else np.array([0.0])
     centroid = positions.mean(axis=0)
- 
+
     return {
-        'seg_id':        CANDIDATE_SEG_ID,
+        'seg_id':        seg_id,
         'traj_id':       CANDIDATE_SEG_ID,
         'movement_type': payload['movement_type'],
         'duration':      round(duration, 3),
@@ -302,27 +301,26 @@ def _build_candidate_metadata(payload: Dict[str, Any]) -> Dict[str, Any]:
         'position_y':    round(float(centroid[1]), 3),
         'position_z':    round(float(centroid[2]), 3),
     }
- 
- 
+
+
 def build_candidate_embeddings(
     payload:              Dict[str, Any],
     embedding_calculator: 'EmbeddingCalculator',
+    seg_id:               str = CANDIDATE_SEG_ID,  # NEU
 ) -> Optional[Dict[str, Any]]:
     """
     Builds all embeddings for an unsaved, simulated candidate segment.
- 
+
     Uses the same EmbeddingCalculator methods as the real ingestion
     pipeline — no duplicated math, just a different data source
     (in-memory payload instead of DB rows).
- 
+
     Returns a single embedding row (dict) in the same shape as
     MetadataCalculatorService's embedding_rows entries, or None if
     too few points exist (< 10, matching EmbeddingCalculator's minimum).
- 
-    Previously lived in embedding_calculator_ext.py as build_external_embeddings.
     """
     traj = payload['trajectory']
- 
+
     pos_data = [
         {'x_cmd': p[0], 'y_cmd': p[1], 'z_cmd': p[2]}
         for p in traj['positions']
@@ -339,23 +337,23 @@ def build_candidate_embeddings(
         {'x_cmd': p[0], 'y_cmd': p[1], 'z_cmd': p[2], 'timestamp': t}
         for p, t in zip(traj['positions'], traj['timestamps'])
     ]
- 
+
     joint_emb = embedding_calculator.compute_joint_embedding(joint_data)      if joint_data  else None
     pos_emb   = embedding_calculator.compute_position_embedding(pos_data)     if pos_data    else None
     ori_emb   = embedding_calculator.compute_orientation_embedding(ori_data)  if ori_data    else None
     vel_emb   = embedding_calculator.compute_velocity_embeddings(vel_data)    if vel_data    else None
- 
-    metadata_row = _build_candidate_metadata(payload)
-    logger.debug(f"[build_candidate_embeddings] metadata_row: {metadata_row}")
- 
+
+    metadata_row = _build_candidate_metadata(payload, seg_id=seg_id)
+    logger.debug(f"[build_candidate_embeddings] seg_id={seg_id} metadata_row: {metadata_row}")
+
     meta_emb = embedding_calculator.compute_metadata_embedding(metadata_row)
- 
+
     if all(e is None for e in [joint_emb, pos_emb, ori_emb, vel_emb, meta_emb]):
-        logger.warning("build_candidate_embeddings: all embeddings None (< 10 points?)")
+        logger.warning("build_candidate_embeddings: all embeddings None (< 10 points?) — seg_id=%s", seg_id)
         return None
- 
+
     return {
-        'seg_id':               CANDIDATE_SEG_ID,
+        'seg_id':               seg_id,
         'traj_id':              CANDIDATE_SEG_ID,
         'joint_embedding':       joint_emb,
         'position_embedding':    pos_emb,
@@ -365,3 +363,67 @@ def build_candidate_embeddings(
         'metadata_row':          metadata_row,
     }
 
+
+def build_candidate_embeddings_segmented(
+    payload:              Dict[str, Any],
+    embedding_calculator: 'EmbeddingCalculator',
+    segment_indices:      list[int],
+) -> Optional[list[Dict[str, Any]]]:
+    """
+    Builds one embedding row per segment, plus one for the full trajectory.
+
+    segment_indices = [end_idx_seg0, end_idx_seg1, ...] aus
+    analytical_simulator.segment_indices (ohne Home-Segment, also [1:]).
+
+    Gibt zurück:
+      rows[0]    = Gesamttrajektorie  (seg_id == traj_id == CANDIDATE_SEG_ID)
+      rows[1..n] = ein Row pro Segment (seg_id = CANDIDATE_SEG_ID_0, _1, ...)
+    """
+    traj       = payload['trajectory']
+    positions  = traj['positions']
+    timestamps = traj['timestamps']
+    quats      = traj.get('quats', [])
+    joints     = traj.get('joints', [])
+
+    # ── Gesamttrajektorie ─────────────────────────────────────────────────
+    full_row = build_candidate_embeddings(payload, embedding_calculator, seg_id=CANDIDATE_SEG_ID)
+    if full_row is None:
+        logger.warning("build_candidate_embeddings_segmented: full trajectory embedding failed.")
+        return None
+
+    rows = [full_row]
+
+    # ── Pro Segment ───────────────────────────────────────────────────────
+    boundaries = [0] + segment_indices
+
+    for i in range(len(segment_indices)):
+        start  = boundaries[i]
+        end    = boundaries[i + 1] + 1
+        seg_id = f"{CANDIDATE_SEG_ID}_{i}"
+
+        seg_payload = {
+            "trajectory": {
+                "timestamps": timestamps[start:end],
+                "positions":  positions[start:end],
+                "quats":      quats[start:end],
+                "joints":     joints[start:end],
+            },
+            "movement_type": payload['movement_type'],
+            "weight":        payload['weight'],
+        }
+
+        row = build_candidate_embeddings(seg_payload, embedding_calculator, seg_id=seg_id)
+        if row is None:
+            logger.warning(
+                "build_candidate_embeddings_segmented: segment %d failed (too few points?) — skipping.", i
+            )
+            continue
+
+        rows.append(row)
+
+    if len(rows) == 1:
+        # Nur Gesamttrajektorie, keine Segmente — sinnlos
+        logger.warning("build_candidate_embeddings_segmented: no segment rows built.")
+        return None
+
+    return rows
