@@ -498,19 +498,25 @@ class MultiModalSearcherCandidate(MultiModalSearcher):
             # ── Segmentweise suchen — ein Aufruf pro Segment, parallel ───
 
             async def _search_one_segment(seg_id: str) -> Dict:
-                original = self._make_helpers
-                self._make_helpers = lambda conn: self._make_helpers_for_segment(conn, seg_id)
-                try:
-                    seg_result = await self._search_segments(
-                        target_seg_id=seg_id,
-                        modes=modes, weights=weights, limit=limit,
-                        prefilter_features=prefilter_features, metric=metric,
-                        buffer_factor=buffer_factor, include_tags=include_tags,
-                        exclude_tags=exclude_tags, exclude_ids=exclude_ids,
-                    )
-                finally:
-                    self._make_helpers = original
-
+                seg_embeddings = self._segment_embeddings_map[seg_id]
+                
+                # Pool oder Connection — genau wie __init__ es speichert
+                conn_or_pool = self._pool if self._pool is not None else self._conn
+                
+                seg_searcher = MultiModalSearcherCandidate(
+                    conn_or_pool,
+                    seg_embeddings,
+                    seg_id,
+                )
+                
+                seg_result = await seg_searcher._search_segments(
+                    target_seg_id=seg_id,
+                    modes=modes, weights=weights, limit=limit,
+                    prefilter_features=prefilter_features, metric=metric,
+                    buffer_factor=buffer_factor, include_tags=include_tags,
+                    exclude_tags=exclude_tags, exclude_ids=exclude_ids,
+                )
+                
                 return {
                     'target_segment':          seg_id,
                     'target_segment_features': None,
@@ -520,7 +526,7 @@ class MultiModalSearcherCandidate(MultiModalSearcher):
             segment_results = await asyncio.gather(
                 *[_search_one_segment(seg_id) for seg_id in self._segment_embeddings_map]
             )
-
+            
         else:
             # ── Fallback: ein einziges Segment wie bisher ─────────────────
             seg_result = await self._search_segments(

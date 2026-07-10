@@ -114,23 +114,19 @@ class FilterSearcher:
         exclude_ids: Optional[List[str]] = None,
     ) -> List[str]:
         try:
-            # ── Wenn nur Tag/ID-Filter ohne Feature-Filter ────────────────
-            # (z.B. für externe Kandidaten die keine DB-Features haben)
-            features_needed = features_to_use and len(features_to_use) > 0
-            
-            if not features_needed:
-                # Direkt Tag/ID-Filter ohne target_features
-                target_features = None
-            else:
+            if tolerance is None:
+                tolerance = self.default_tolerance
+
+            # ── target_features nur wenn Feature-Filter nötig ─────────────
+            features_needed = bool(features_to_use and len(features_to_use) > 0)
+            target_features = None
+
+            if features_needed:
                 target_features = await self.get_target_features(target_id)
                 if not target_features:
                     logger.error(f"Cannot get features for target {target_id}")
                     return []
 
-            if tolerance is None:
-                tolerance = self.default_tolerance
-
-            # Brauchen wir einen JOIN auf traj_info?
             need_join = bool(include_tags or exclude_tags or exclude_ids)
 
             # ── WHERE Clause aufbauen ─────────────────────────────────────
@@ -138,7 +134,6 @@ class FilterSearcher:
             params = []
             param_idx = 1
 
-            # Tag / Exclude Filter (benötigen JOIN)
             if include_tags:
                 where_clauses.append(f"ti.tag = ANY(${param_idx})")
                 params.append(include_tags)
@@ -146,7 +141,6 @@ class FilterSearcher:
                 logger.info(f"include_tags filter: {include_tags}")
 
             if exclude_tags:
-                # NULL-Tags bleiben drin — nur explizit gesetzte Tags ausschließen
                 where_clauses.append(
                     f"(ti.tag IS NULL OR ti.tag != ALL(${param_idx}))"
                 )
@@ -155,7 +149,6 @@ class FilterSearcher:
                 logger.info(f"exclude_tags filter: {exclude_tags}")
 
             if exclude_ids:
-                # Ganzen traj_id-Eintrag ausschließen (trifft auch alle Segmente)
                 where_clauses.append(
                     f"{'tm' if need_join else 'traj_metadata'}.traj_id != ALL(${param_idx})"
                 )
@@ -163,16 +156,15 @@ class FilterSearcher:
                 param_idx += 1
                 logger.info(f"exclude_ids filter: {len(exclude_ids)} IDs")
 
-            # Feature-Filter (nur wenn features_to_use gesetzt)
-            if features_to_use and len(features_to_use) > 0:
-
-                if 'duration' in features_to_use and target_features['duration']:
+            # ── Feature-Filter nur wenn target_features vorhanden ─────────
+            if features_needed and target_features:
+                if 'duration' in features_to_use and target_features.get('duration'):
                     dur = target_features['duration']
                     where_clauses.append(f"{'tm.' if need_join else ''}duration BETWEEN ${param_idx} AND ${param_idx + 1}")
                     params.extend([dur * (1 - tolerance), dur * (1 + tolerance)])
                     param_idx += 2
 
-                if 'length' in features_to_use and target_features['length']:
+                if 'length' in features_to_use and target_features.get('length'):
                     length = target_features['length']
                     where_clauses.append(f"{'tm.' if need_join else ''}length BETWEEN ${param_idx} AND ${param_idx + 1}")
                     params.extend([length * (1 - tolerance), length * (1 + tolerance)])
@@ -247,29 +239,31 @@ class FilterSearcher:
             results = await self.connection.fetch(query, *params)
 
             # ── Movement Type Filtering ───────────────────────────────────
-            target_movement_type = target_features.get('movement_type')
+            if use_movement_type and target_features:  # NEU: target_features check
+                target_movement_type = target_features.get('movement_type')
+                if target_movement_type:
+                    exact_matches = []
+                    similarity_matches = []
+                    for row in results:
+                        cmt = row['movement_type']
+                        if not cmt:
+                            continue
+                        if cmt == target_movement_type:
+                            exact_matches.append(row['seg_id'])
+                        else:
+                            sim = self.calculate_movement_type_similarity(
+                                target_movement_type, cmt
+                            )
+                            if sim >= self.movement_type_threshold:
+                                similarity_matches.append(row['seg_id'])
 
-            if use_movement_type and target_movement_type:
-                exact_matches = []
-                similarity_matches = []
-                for row in results:
-                    cmt = row['movement_type']
-                    if not cmt:
-                        continue
-                    if cmt == target_movement_type:
-                        exact_matches.append(row['seg_id'])
-                    else:
-                        sim = self.calculate_movement_type_similarity(
-                            target_movement_type, cmt
-                        )
-                        if sim >= self.movement_type_threshold:
-                            similarity_matches.append(row['seg_id'])
-
-                candidate_ids = exact_matches + similarity_matches
-                logger.info(
-                    f"Movement type filter '{target_movement_type}': "
-                    f"{len(exact_matches)} exact, {len(similarity_matches)} similar"
-                )
+                    candidate_ids = exact_matches + similarity_matches
+                    logger.info(
+                        f"Movement type filter '{target_movement_type}': "
+                        f"{len(exact_matches)} exact, {len(similarity_matches)} similar"
+                    )
+                else:
+                    candidate_ids = [row['seg_id'] for row in results]
             else:
                 candidate_ids = [row['seg_id'] for row in results]
 

@@ -225,6 +225,12 @@ async def predict_correction(
         logger.info("[correction DEBUG] query_data keys: %d", len(query_data))
         # ── END DEBUG ──────────────────────────────────────────────────────
 
+        logger.info("[correction DEBUG] segment_similarity groups: %d", len(seg_groups))
+        for i, g in enumerate(seg_groups):
+            logger.info("[correction DEBUG] group %d target=%s results=%d", 
+                        i, g.get('target_segment'), 
+                        len(g.get('similar_segments', {}).get('results', [])))
+
         return CorrectionResponse(corrections=corrections)
 
     except HTTPException:

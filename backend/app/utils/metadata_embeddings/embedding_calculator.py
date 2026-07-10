@@ -425,5 +425,22 @@ def build_candidate_embeddings_segmented(
         # Nur Gesamttrajektorie, keine Segmente — sinnlos
         logger.warning("build_candidate_embeddings_segmented: no segment rows built.")
         return None
+    
+    boundaries = [0] + segment_indices
+    logger.info("[segmented] segment_indices=%s boundaries=%s", segment_indices, boundaries)
+
+    for i in range(len(segment_indices)):
+        start = boundaries[i]
+        end   = boundaries[i + 1] + 1
+        logger.info("[segmented] seg %d: start=%d end=%d n_points=%d", i, start, end, end - start)
+        
+        row = build_candidate_embeddings(seg_payload, embedding_calculator, seg_id=seg_id)
+        if row is None:
+            logger.warning("[segmented] segment %d FAILED — skipping.", i)
+            continue
+        logger.info("[segmented] segment %d OK", i)
+        rows.append(row)
+
+    logger.info("[segmented] total rows built: %d (1 full + %d segments)", len(rows), len(rows)-1)
 
     return rows
