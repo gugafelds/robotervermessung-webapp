@@ -19,7 +19,7 @@ export interface EmbeddingSimilarityParams {
   dtw_mode?: 'position' | 'joint';
   metric?: 'sidtw' | 'qdtw';
   prognosis_active?: boolean;
-  calibration_tag?: string | string[];
+  // calibration_tag is derived from include_tags in similarity.service.ts
   coverage?: number;
   include_tags?: string[];
 }
@@ -83,7 +83,7 @@ export interface TrajSimilarityResponse {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Conformal interval — returned by backend in prognosis block
+// Conformal interval
 // ═══════════════════════════════════════════════════════════════════════════
 
 export interface CalibrationMismatch {
@@ -94,6 +94,15 @@ export interface CalibrationMismatch {
   used_modes?: string;
   requested_tag?: string;
   used_tag?: string;
+}
+
+export interface MatchQuality {
+  expected_error_mm: number;
+  tier: 'excellent' | 'good' | 'moderate' | 'poor';
+  bucket: number;
+  n_buckets: number;
+  n_samples: number;
+  calibration_tag_used: string;
 }
 
 export interface ConformalInterval {
@@ -108,17 +117,8 @@ export interface ConformalInterval {
   match_quality?: MatchQuality | null;
 }
 
-export interface MatchQuality {
-  expected_error_mm: number;
-  tier: 'excellent' | 'good' | 'moderate' | 'poor';
-  bucket: number;
-  n_buckets: number;
-  n_samples: number;
-  calibration_tag_used: string;
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
-// Prognosis — returned by backend
+// Prognosis
 // ═══════════════════════════════════════════════════════════════════════════
 
 export interface SegmentPrognosis {
@@ -126,9 +126,7 @@ export interface SegmentPrognosis {
   p_hat: number | null;
   sigma: number | null;
   n_neighbors: number | null;
-  d_min: number | null;
   d_min_per_path_length: number | null;
-  d_mean: number | null;
   query_path_length: number | null;
 }
 
@@ -136,9 +134,7 @@ export interface TrajectoryPrognosis {
   p_hat: number;
   sigma: number;
   n_segments?: number; // decomposed only
-  n_neighbors?: number; // direct only
-  d_min?: number | null; // direct only
-  d_mean?: number | null; // direct only
+  n_neighbors?: number; // direct / stage1 only
   d_min_per_path_length?: number | null;
 }
 
@@ -148,7 +144,8 @@ export interface Prognosis {
   decomposed: TrajectoryPrognosis | null;
   direct: TrajectoryPrognosis | null;
   decomposed_conformal_interval: ConformalInterval | null;
-  direct_conformal_interval: ConformalInterval | null;
+  direct_conformal_interval: ConformalInterval | null; // Stage 2 only
+  stage1_conformal_interval: ConformalInterval | null; // Stage 1 only
   segments: SegmentPrognosis[];
 }
 
@@ -206,15 +203,20 @@ export interface TargetFeatures {
 
 export interface SegmentGroup {
   target_segment: string;
-  target_segment_features?: TargetFeatures;
-  results: SimilarityResult[];
+  target_segment_features?: {
+    length?: number;
+    duration?: number;
+    movement_type?: string;
+  };
+  similar_segments: TrajSimilarityResponse;
+  conformal_interval?: ConformalInterval | null;
 }
 
 export interface SearchTiming {
-  stage1_ms: number;
-  data_loading_ms?: number;
+  stage1_ms?: number;
   stage2_ms?: number;
-  total_ms: number;
+  total_ms?: number;
+  data_loading_ms?: number;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -246,42 +248,4 @@ export interface HierarchicalSimilarityResponse {
   stage2_dtw_mode?: 'position' | 'joint';
   timing?: SearchTiming;
   prognosis?: Prognosis | null;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Misc
-// ═══════════════════════════════════════════════════════════════════════════
-
-export interface TaskStatus {
-  task_id: string;
-  status: string;
-  progress_percent: number;
-  error?: string;
-}
-
-export interface MetadataStats {
-  total_trajs: number;
-  trajs_with_metadata: number;
-  missing_metadata: number;
-  coverage_percent: number;
-}
-
-export interface AvailableDate {
-  date: string;
-}
-
-export interface MetadataCalculationRequest {
-  mode: 'all_missing' | 'single' | 'timerange';
-  traj_id?: string;
-  start_time?: string;
-  end_time?: string;
-  duplicate_handling?: string;
-  batch_size?: number;
-}
-
-export interface MetadataCalculationResponse {
-  task_id: string;
-  status: string;
-  message: string;
-  estimated_duration_minutes?: number;
 }

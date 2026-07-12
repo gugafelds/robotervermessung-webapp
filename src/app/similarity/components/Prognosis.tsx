@@ -96,23 +96,30 @@ const IntervalDisplay: React.FC<IntervalDisplayProps> = ({ interval }) => (
         <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-sm text-blue-800">
           {(interval.coverage * 100).toFixed(0)}%
         </span>
+        {interval.strategy === 'stage1_rrf' && (
+          <span className="ml-1.5 rounded-md bg-purple-100 px-1.5 py-0.5 text-xs text-purple-700">
+            Stage 1
+          </span>
+        )}
       </p>
       {interval.n_segments != null && (
         <p className="text-sm text-gray-800">{interval.n_segments} segments</p>
       )}
     </div>
+
     <p
       className={`mt-1 font-mono text-base font-semibold ${getIntervalColor(interval.low, interval.high)}`}
     >
       [{fmt(interval.low)}, {fmt(interval.high)}] mm
     </p>
+
     {interval.match_quality != null && (
       <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-2">
         <p className="text-sm text-gray-600">
           Match quality{' '}
           <span
             className={`rounded-full px-2 py-0.5 text-xs font-medium ${tierColor[interval.match_quality.tier]}`}
-            title={`Tag: ${interval.match_quality.calibration_tag_used}, n=${interval.match_quality.n_samples}`}
+            title={`Tag: ${interval.match_quality.calibration_tag_used} · bucket ${interval.match_quality.bucket}/${interval.match_quality.n_buckets} · n=${interval.match_quality.n_samples}`}
           >
             {interval.match_quality.tier}
           </span>
@@ -129,7 +136,7 @@ interface PrognosisCardProps {
   label: string;
   prediction: TrajectoryPrognosis | null;
   gt: number | null;
-  interval: ConformalInterval | null;
+  interval: ConformalInterval | null | undefined;
 }
 
 const PrognosisCard: React.FC<PrognosisCardProps> = ({
@@ -182,6 +189,16 @@ const PrognosisView: React.FC<PrognosisViewProps> = ({
   if (prognosis == null) return null;
 
   const gt = targetTrajFeatures?.mean_distance ?? null;
+  const isStage1 = prognosis.stage === 'stage1_rrf';
+
+  // Stage 1: direct gets stage1_conformal_interval, decomposed gets nothing
+  // Stage 2: direct gets direct_conformal_interval, decomposed gets decomposed_conformal_interval
+  const directInterval = isStage1
+    ? (prognosis.stage1_conformal_interval ?? null)
+    : (prognosis.direct_conformal_interval ?? null);
+  const decomposedInterval = isStage1
+    ? null
+    : (prognosis.decomposed_conformal_interval ?? null);
 
   return (
     <div className="flex flex-col overflow-y-auto rounded-lg border border-gray-400 bg-white shadow-md">
@@ -196,14 +213,15 @@ const PrognosisView: React.FC<PrognosisViewProps> = ({
               <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium uppercase text-gray-700">
                 {metric}
               </span>
-              {stage2Active && (
+              {stage2Active ? (
                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
-                  DTW {dtwMode}
+                  Stage 2 · DTW {dtwMode}
+                </span>
+              ) : (
+                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700">
+                  Stage 1 · RRF
                 </span>
               )}
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
-                {prognosis.stage === 'stage2_dtw' ? 'Stage 2' : 'Stage 1'}
-              </span>
             </p>
           </div>
 
@@ -224,15 +242,22 @@ const PrognosisView: React.FC<PrognosisViewProps> = ({
           label="Direct (trajectories)"
           prediction={prognosis.direct}
           gt={gt}
-          interval={prognosis.direct_conformal_interval}
+          interval={directInterval}
         />
         <PrognosisCard
           label="Decomposed (segments)"
           prediction={prognosis.decomposed}
           gt={gt}
-          interval={prognosis.decomposed_conformal_interval}
+          interval={decomposedInterval}
         />
       </div>
+
+      {/* Stage 1 note: decomposed has no conformal interval */}
+      {isStage1 && prognosis.decomposed != null && (
+        <p className="border-t px-6 py-2 text-xs text-gray-400">
+          Conformal interval for decomposed prediction requires Stage 2 (DTW).
+        </p>
+      )}
     </div>
   );
 };

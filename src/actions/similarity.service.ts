@@ -81,11 +81,8 @@ export class SimilarityService {
           params.prognosis_active.toString(),
         );
       }
-      if (params.calibration_tag) {
-        const tag = Array.isArray(params.calibration_tag)
-          ? params.calibration_tag.join(',')
-          : params.calibration_tag;
-        queryParams.append('calibration_tag', tag);
+      if (params.include_tags && params.include_tags.length > 0) {
+        queryParams.append('calibration_tag', params.include_tags.join(','));
       }
       if (params.include_tags && params.include_tags.length > 0) {
         queryParams.append('include_tags', params.include_tags.join(','));
@@ -132,10 +129,14 @@ export class SimilarityService {
           (seg) => ({
             target_segment: seg.target_segment,
             target_segment_features: seg.target_segment_features ?? undefined,
-            results: this.transformEmbeddingResults(
-              seg.similar_segments?.results ?? [],
-              'segment',
-            ),
+            similar_segments: {
+              target: seg.target_segment,
+              results: seg.similar_segments?.results ?? [],
+              metadata: seg.similar_segments?.metadata ?? {
+                modes: [],
+                weights: {},
+              },
+            },
           }),
         );
         callbacks.onSegmentsFound?.(segmentGroups);

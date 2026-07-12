@@ -9,14 +9,7 @@ Stage 2 (DTW): inverse distance weighting with RAW DTW distances,
 
 Stage 1 (RRF): rank-decay weighting (eq. isr).
                w_i ∝ 1 / r_i²
-
-Changes vs. previous version
-------------------------------
-- traj_batch and target_id parameters removed from predict_performance().
-- calibration_tag parameter added.
-- conformal_active parameter added (False during calibration build).
-- _compute_direct_conformal_interval uses CalibrationMismatch for mismatch info.
-- _normalize_dtw() removed (raw DTW, paper-conform).
+               d_min_per_path_length = 1 / best_rrf_score  (match-quality proxy)
 """
 
 from __future__ import annotations
@@ -28,7 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import asyncpg
 import numpy as np
 
-from .conformal_predictor import _compute_direct_conformal_interval, compute_conformal_intervals
+from .conformal_predictor import compute_conformal_intervals, compute_stage1_conformal_interval
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +61,7 @@ def _predict_segment(
     feature:           str   = 'mean_distance',
     sigma_floor:       float = 0.005,
 ) -> Optional[Dict[str, Any]]:
+    """Stage 2 segment prediction using inverse DTW distance weighting."""
     valid = []
     for r in seg_results:
         raw_dtw  = r.get('dtw_distance')
@@ -88,7 +82,6 @@ def _predict_segment(
     valid.sort(key=lambda x: x['dtw_distance'])
     dtw_dists   = [v['dtw_distance'] for v in valid]
     perf_values = [v['perf_value']   for v in valid]
-    ids         = [v['seg_id']       for v in valid]
 
     weights = [1.0 / (d + EPSILON) for d in dtw_dists]
     w_sum   = sum(weights)
@@ -101,7 +94,7 @@ def _predict_segment(
 
     d_min_raw             = dtw_dists[0]
     d_min_per_path_length = (
-        d_min_raw / max(query_path_length, EPSILON)
+        round(d_min_raw / max(query_path_length, EPSILON), 6)
         if query_path_length > EPSILON else None
     )
 
@@ -109,19 +102,68 @@ def _predict_segment(
         'p_hat':                 round(p_hat, 4),
         'sigma':                 round(sigma, 6),
         'n_neighbors':           n,
-        'neighbor_ids':          ids,
-        'd_min':                 round(d_min_raw, 6),
-        'd_min_per_path_length': round(d_min_per_path_length, 6) if d_min_per_path_length is not None else None,
-        'd_mean':                round(sum(dtw_dists) / len(dtw_dists), 6),
+        'd_min_per_path_length': d_min_per_path_length,
+    }
+
+
+def _predict_stage1_rrf(
+    results:     List[Dict[str, Any]],
+    feature:     str   = 'mean_distance',
+    sigma_floor: float = 0.005,
+) -> Optional[Dict[str, Any]]:
+    """
+    Stage 1 prediction using RRF score weighting (w_i ∝ rrf_score).
+
+    d_min_per_path_length = 1 / best_rrf_score — used as match-quality proxy:
+    high RRF score → small "distance" → good match.
+    """
+    valid = []
+    for r in results:
+        features  = r.get('features') or {}
+        perf_val  = features.get(feature)
+        sid       = r.get('seg_id') or r.get('traj_id')
+        rrf_score = r.get('rrf_score')
+        if perf_val is None or sid is None or rrf_score is None:
+            continue
+        weight = float(rrf_score)
+        if weight <= EPSILON:
+            continue
+        valid.append({'seg_id': str(sid), 'weight': weight, 'perf_value': float(perf_val)})
+
+    if len(valid) < 2:
+        return None
+
+    weights     = [v['weight']     for v in valid]
+    perf_values = [v['perf_value'] for v in valid]
+
+    w_sum = sum(weights)
+    if w_sum <= EPSILON:
+        return None
+
+    p_hat    = sum(w * p for w, p in zip(weights, perf_values)) / w_sum
+    n        = len(perf_values)
+    mean_p   = sum(perf_values) / n
+    perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / n)
+    sigma    = max(perf_std, sigma_floor)
+
+    best_rrf              = max(weights)
+    d_min_per_path_length = round(1.0 / best_rrf, 6) if best_rrf > EPSILON else None
+
+    return {
+        'p_hat':                 round(p_hat, 4),
+        'sigma':                 round(sigma, 6),
+        'n_neighbors':           n,
+        'd_min_per_path_length': d_min_per_path_length,
     }
 
 
 def _predict_direct(
-    traj_results: List[Dict[str, Any]],
+    traj_results:      List[Dict[str, Any]],
     query_path_length: float = 0.0,
-    feature:      str   = 'mean_distance',
-    sigma_floor:  float = 0.005,
+    feature:           str   = 'mean_distance',
+    sigma_floor:       float = 0.005,
 ) -> Optional[Dict[str, Any]]:
+    """Stage 2 trajectory-level prediction using inverse DTW distance weighting."""
     valid = []
     for r in traj_results:
         raw_dtw  = r.get('dtw_distance')
@@ -142,7 +184,6 @@ def _predict_direct(
     valid.sort(key=lambda x: x['dtw_distance'])
     dtw_dists   = [v['dtw_distance'] for v in valid]
     perf_values = [v['perf_value']   for v in valid]
-    ids         = [v['traj_id']      for v in valid]
 
     weights = [1.0 / (d + EPSILON) for d in dtw_dists]
     w_sum   = sum(weights)
@@ -155,7 +196,7 @@ def _predict_direct(
 
     d_min_raw             = dtw_dists[0]
     d_min_per_path_length = (
-        d_min_raw / max(query_path_length, EPSILON)
+        round(d_min_raw / max(query_path_length, EPSILON), 6)
         if query_path_length > EPSILON else None
     )
 
@@ -163,55 +204,7 @@ def _predict_direct(
         'p_hat':                 round(p_hat, 4),
         'sigma':                 round(sigma, 6),
         'n_neighbors':           n,
-        'neighbor_ids':          ids,
-        'd_min':                 round(d_min_raw, 6),
-        'd_min_per_path_length': round(d_min_per_path_length, 6) if d_min_per_path_length is not None else None,
-        'd_mean':                round(sum(dtw_dists) / len(dtw_dists), 6),
-    }
-
-
-def _predict_stage1_rrf(
-    results:     List[Dict[str, Any]],
-    feature:     str   = 'mean_distance',
-    sigma_floor: float = 0.005,
-) -> Optional[Dict[str, Any]]:
-    valid = []
-    for r in results:
-        features  = r.get('features') or {}
-        perf_val  = features.get(feature)
-        sid       = r.get('seg_id') or r.get('traj_id')
-        rrf_score = r.get('rrf_score')
-        if perf_val is None or sid is None or rrf_score is None:
-            continue
-        weight = float(rrf_score)
-        if weight <= EPSILON:
-            continue
-        valid.append({'seg_id': str(sid), 'weight': weight, 'perf_value': float(perf_val)})
-
-    if len(valid) < 2:
-        return None
-
-    weights     = [v['weight']     for v in valid]
-    perf_values = [v['perf_value'] for v in valid]
-    ids         = [v['seg_id']     for v in valid]
-
-    w_sum = sum(weights)
-    if w_sum <= EPSILON:
-        return None
-
-    p_hat    = sum(w * p for w, p in zip(weights, perf_values)) / w_sum
-    n        = len(perf_values)
-    mean_p   = sum(perf_values) / n
-    perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / n)
-    sigma    = max(perf_std, sigma_floor)
-
-    return {
-        'p_hat':        round(p_hat, 4),
-        'sigma':        round(sigma, 6),
-        'n_neighbors':  n,
-        'neighbor_ids': ids,
-        'd_min':        None,
-        'd_mean':       None,
+        'd_min_per_path_length': d_min_per_path_length,
     }
 
 
@@ -265,7 +258,7 @@ async def predict_performance(
     k:                int                       = 10,
     search_modes:     Optional[Tuple[str, ...]] = None,
     dtw_mode:         str                       = 'position',
-    metric:           str                       = 'sidtw'
+    metric:           str                       = 'sidtw',
 ) -> Dict[str, Any]:
     sigma_floor     = 0.005
     stage2_active   = bool(result.get('stage2_active'))
@@ -311,18 +304,33 @@ async def predict_performance(
         sigma_floor=sigma_floor,
     )
 
-    direct_prediction: Optional[Dict[str, Any]] = None
-    traj_results = result.get('traj_similarity', {}).get('results', [])
+    traj_results            = result.get('traj_similarity', {}).get('results', [])
     total_query_path_length = sum(seg_path_lengths)
 
     if stage2_active:
         direct_prediction = _predict_direct(
-            traj_results=traj_results, query_path_length=total_query_path_length, feature=feature, sigma_floor=sigma_floor,
+            traj_results=traj_results, query_path_length=total_query_path_length,
+            feature=feature, sigma_floor=sigma_floor,
         )
     else:
         direct_prediction = _predict_stage1_rrf(
             results=traj_results, feature=feature, sigma_floor=sigma_floor,
         )
+
+    # Build segments list — only expose what the frontend needs
+    segments = []
+    for sid, pred in zip(seg_query_ids, seg_predictions):
+        if pred:
+            segments.append({
+                'seg_id':                sid,
+                'p_hat':                 pred.get('p_hat'),
+                'sigma':                 pred.get('sigma'),
+                'n_neighbors':           pred.get('n_neighbors'),
+                'd_min_per_path_length': pred.get('d_min_per_path_length'),
+                'query_path_length':     pred.get('query_path_length'),
+            })
+        else:
+            segments.append({'seg_id': sid, 'p_hat': None})
 
     result['prognosis'] = {
         'feature':                       feature,
@@ -331,29 +339,27 @@ async def predict_performance(
         'direct':                        direct_prediction,
         'decomposed_conformal_interval': None,
         'direct_conformal_interval':     None,
-        'segments': [
-            {'seg_id': sid, **pred} if pred else {'seg_id': sid, 'p_hat': None}
-            for sid, pred in zip(seg_query_ids, seg_predictions)
-        ],
+        'stage1_conformal_interval':     None,
+        'segments':                      segments,
     }
 
-    if stage2_active and conformal_active:
-        result = await compute_conformal_intervals(
-            result=result, conn=conn, strategy='decomposed',
-            coverage=coverage, calibration_tag=calibration_tag,
-            path_length_map=path_length_map,
-            k=k, search_modes=search_modes, dtw_mode=dtw_mode, metric=metric
-        )
-
-        if direct_prediction is not None:
-            direct_interval = await _compute_direct_conformal_interval(
-                prediction=direct_prediction, conn=conn,
+    if conformal_active:
+        if stage2_active:
+            result = await compute_conformal_intervals(
+                result=result, conn=conn, strategy='decomposed',
                 coverage=coverage, calibration_tag=calibration_tag,
-                k=k, search_modes=search_modes, dtw_mode=dtw_mode, metric=metric
+                path_length_map=path_length_map,
+                k=k, search_modes=search_modes, dtw_mode=dtw_mode, metric=metric,
             )
-            result['prognosis']['direct_conformal_interval'] = direct_interval
+        else:
+            stage1_interval = await compute_stage1_conformal_interval(
+                result=result, conn=conn,
+                coverage=coverage, calibration_tag=calibration_tag,
+                k=k, search_modes=search_modes, metric=metric,
+            )
+            result['prognosis']['stage1_conformal_interval'] = stage1_interval
 
-    for group in segment_groups:
-        group.pop('prediction', None)
+        for group in segment_groups:
+            group.pop('prediction', None)
 
     return result
