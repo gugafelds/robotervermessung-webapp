@@ -203,11 +203,7 @@ export interface TargetFeatures {
 
 export interface SegmentGroup {
   target_segment: string;
-  target_segment_features?: {
-    length?: number;
-    duration?: number;
-    movement_type?: string;
-  };
+  target_segment_features?: TargetFeatures;
   similar_segments: TrajSimilarityResponse;
   conformal_interval?: ConformalInterval | null;
 }

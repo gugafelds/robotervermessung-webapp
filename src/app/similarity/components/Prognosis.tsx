@@ -191,14 +191,11 @@ const PrognosisView: React.FC<PrognosisViewProps> = ({
   const gt = targetTrajFeatures?.mean_distance ?? null;
   const isStage1 = prognosis.stage === 'stage1_rrf';
 
-  // Stage 1: direct gets stage1_conformal_interval, decomposed gets nothing
-  // Stage 2: direct gets direct_conformal_interval, decomposed gets decomposed_conformal_interval
   const directInterval = isStage1
     ? (prognosis.stage1_conformal_interval ?? null)
     : (prognosis.direct_conformal_interval ?? null);
-  const decomposedInterval = isStage1
-    ? null
-    : (prognosis.decomposed_conformal_interval ?? null);
+
+  const decomposedInterval = prognosis.decomposed_conformal_interval ?? null;
 
   return (
     <div className="flex flex-col overflow-y-auto rounded-lg border border-gray-400 bg-white shadow-md">

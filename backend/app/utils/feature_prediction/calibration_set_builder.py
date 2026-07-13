@@ -936,10 +936,12 @@ async def run_calibration(
 
     async with pool.acquire() as conn:
         if stage1_mode:
-            # Stage 1 only run: trajectory level only
+            # Stage 1 only run: segment + trajectory
+            await compute_and_store_quantiles(conn, cfg_stage1, coverages, 'segment',    1)
             await compute_and_store_quantiles(conn, cfg_stage1, coverages, 'trajectory', 1)
         else:
             # Stage 1 rows were built as a by-product — compute stage1 quantiles too
+            await compute_and_store_quantiles(conn, cfg_stage1, coverages, 'segment',    1)
             await compute_and_store_quantiles(conn, cfg_stage1, coverages, 'trajectory', 1)
             # Stage 2 decomposed: segment + trajectory
             await compute_and_store_quantiles(conn, cfg_decomp, coverages, 'segment',    2)

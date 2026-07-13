@@ -291,7 +291,7 @@ async def predict_performance(
             )
 
         if prediction is not None:
-            prediction['query_path_length'] = query_path_len if stage2_active else None
+            prediction['query_path_length'] = query_path_len if query_path_len > EPSILON else None
 
         group['prediction'] = prediction
         seg_predictions.append(prediction)
@@ -352,12 +352,13 @@ async def predict_performance(
                 k=k, search_modes=search_modes, dtw_mode=dtw_mode, metric=metric,
             )
         else:
-            stage1_interval = await compute_stage1_conformal_interval(
+            # Stage 1: writes stage1_conformal_interval and decomposed_conformal_interval
+            # directly into result['prognosis']
+            await compute_stage1_conformal_interval(
                 result=result, conn=conn,
                 coverage=coverage, calibration_tag=calibration_tag,
                 k=k, search_modes=search_modes, metric=metric,
             )
-            result['prognosis']['stage1_conformal_interval'] = stage1_interval
 
         for group in segment_groups:
             group.pop('prediction', None)

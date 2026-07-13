@@ -266,7 +266,7 @@ async def get_calibration_quantile_for_tags(
     Tags with n_calibration < MIN_N_CALIBRATION are skipped.
     Falls back to tag='all' if no tag passes the threshold.
     """
-    MIN_N_CALIBRATION = 500
+    MIN_N_CALIBRATION = 150
 
     if not tags or (len(tags) == 1 and tags[0] == 'all'):
         return await get_calibration_quantile(conn, cfg, coverage, level)
@@ -363,6 +363,7 @@ def _aggregate_trajectory_interval(
     seg_intervals: List[Optional[Dict]], seg_path_lengths: List[float],
     q: float, sigma_floor: float, coverage: float,
     mismatch: Optional[CalibrationMismatch],
+    strategy: str = 'decomposed',
 ) -> Optional[Dict[str, Any]]:
     valid = [
         (iv, pl) for iv, pl in zip(seg_intervals, seg_path_lengths)
@@ -373,7 +374,7 @@ def _aggregate_trajectory_interval(
     total  = sum(pl for _, pl in valid)
     p_hat  = sum(iv['p_hat'] * pl for iv, pl in valid) / total
     sigma  = max(sum(iv['sigma'] * pl for iv, pl in valid) / total, sigma_floor)
-    return _build_interval(p_hat, sigma, q, coverage, mismatch, 'decomposed', n_segments=len(valid))
+    return _build_interval(p_hat, sigma, q, coverage, mismatch, strategy, n_segments=len(valid))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -564,10 +565,13 @@ async def compute_stage1_conformal_interval(
     k:               Optional[int]             = None,
     search_modes:    Optional[Tuple[str, ...]] = None,
     metric:          str                       = 'sidtw',
-) -> Optional[Dict[str, Any]]:
+) -> None:
     """
-    Compute Stage 1 conformal interval for the direct (RRF) prediction.
-    Uses retrieval_strategy='stage1_rrf', dtw_mode='none', config_stage=1.
+    Compute Stage 1 conformal intervals — direct and decomposed.
+
+    Writes directly into result['prognosis']:
+      stage1_conformal_interval        — direct trajectory (RRF weighted)
+      decomposed_conformal_interval    — segment-aggregated (length-weighted)
     """
     tags = [calibration_tag] if isinstance(calibration_tag, str) else calibration_tag
     cfg  = get_active_config(
@@ -575,35 +579,107 @@ async def compute_stage1_conformal_interval(
         k=k, search_modes=search_modes,
         dtw_mode='none', metric=metric, config_stage=1,
     )
-
-    q, mismatch = await get_calibration_quantile_for_tags(conn, cfg, tags, coverage, 'trajectory')
-    if q is None:
-        return None
-
+    sigma_floor = cfg.sigma_floor
     prognosis   = result.get('prognosis') or {}
-    direct_pred = prognosis.get('direct') or {}
-    p_hat = direct_pred.get('p_hat')
-    sigma = direct_pred.get('sigma')
-    if p_hat is None or sigma is None:
-        return None
 
-    sigma    = max(float(sigma), cfg.sigma_floor, EPSILON)
-    interval = _build_interval(float(p_hat), sigma, q, coverage, mismatch, 'stage1_rrf')
+    # ── Direct interval ──────────────────────────────────────────────────
+    q_traj, mm_traj = await get_calibration_quantile_for_tags(conn, cfg, tags, coverage, 'trajectory')
 
-    # d_min_per_path_length for stage1 = 1 / best_rrf_score (set by predictor.py)
-    mq = await get_match_quality(
-        conn,
-        direct_pred.get('d_min_per_path_length'),
-        level='trajectory',
-        retrieval_strategy='stage1_rrf',
-        calibration_tag=cfg.calibration_tag,
-        metric=cfg.metric,
-        dtw_mode='none',
-        k=cfg.k,
-        search_modes=cfg.search_modes,
-        config_stage=1,
+    direct_interval = None
+    if q_traj is not None:
+        direct_pred = prognosis.get('direct') or {}
+        p_hat = direct_pred.get('p_hat')
+        sigma = direct_pred.get('sigma')
+        if p_hat is not None and sigma is not None:
+            sigma         = max(float(sigma), sigma_floor, EPSILON)
+            direct_interval = _build_interval(float(p_hat), sigma, q_traj, coverage, mm_traj, 'stage1_rrf')
+            mq = await get_match_quality(
+                conn,
+                direct_pred.get('d_min_per_path_length'),
+                level='trajectory',
+                retrieval_strategy='stage1_rrf',
+                calibration_tag=cfg.calibration_tag,
+                metric=cfg.metric,
+                dtw_mode='none',
+                k=cfg.k,
+                search_modes=cfg.search_modes,
+                config_stage=1,
+            )
+            if mq is not None:
+                direct_interval['match_quality'] = mq.__dict__
+
+    if 'prognosis' in result:
+        result['prognosis']['stage1_conformal_interval'] = direct_interval
+
+    # ── Decomposed interval — segment-level quantile, length-weighted ────
+    q_seg, mm_seg = await get_calibration_quantile_for_tags(conn, cfg, tags, coverage, 'segment')
+    if q_seg is None:
+        return
+
+    segment_groups   = result.get('segment_similarity', [])
+    seg_intervals:   List[Optional[Dict]] = []
+    seg_path_lengths: List[float]         = []
+
+    for group in segment_groups:
+        prediction = group.get('prediction') or {}
+        p_hat = prediction.get('p_hat')
+        sigma = prediction.get('sigma')
+        if p_hat is None or sigma is None:
+            seg_intervals.append(None)
+            seg_path_lengths.append(0.0)
+            continue
+
+        sigma    = max(float(sigma), sigma_floor, EPSILON)
+        interval = _build_interval(float(p_hat), sigma, q_seg, coverage, mm_seg, 'stage1_rrf')
+
+        mq = await get_match_quality(
+            conn,
+            prediction.get('d_min_per_path_length'),
+            level='segment',
+            retrieval_strategy='stage1_rrf',
+            calibration_tag=cfg.calibration_tag,
+            metric=cfg.metric,
+            dtw_mode='none',
+            k=cfg.k,
+            search_modes=cfg.search_modes,
+            config_stage=1,
+        )
+        if mq is not None:
+            interval['match_quality'] = mq.__dict__
+
+        group['conformal_interval'] = interval
+        seg_intervals.append(interval)
+
+        pl = float(prediction.get('query_path_length') or 0.0)
+        seg_path_lengths.append(pl)
+
+    # Aggregate to trajectory level using length-weighted average
+    traj_interval = _aggregate_trajectory_interval(
+        seg_intervals=seg_intervals,
+        seg_path_lengths=seg_path_lengths,
+        q=q_seg,
+        sigma_floor=sigma_floor,
+        coverage=coverage,
+        mismatch=mm_seg,
+        strategy='stage1_rrf',
     )
-    if mq is not None:
-        interval['match_quality'] = mq.__dict__
 
-    return interval
+    if traj_interval is not None:
+        decomposed_pred = prognosis.get('decomposed') or {}
+        mq = await get_match_quality(
+            conn,
+            decomposed_pred.get('d_min_per_path_length'),
+            level='trajectory',
+            retrieval_strategy='stage1_rrf',
+            calibration_tag=cfg.calibration_tag,
+            metric=cfg.metric,
+            dtw_mode='none',
+            k=cfg.k,
+            search_modes=cfg.search_modes,
+            config_stage=1,
+        )
+        if mq is not None:
+            traj_interval['match_quality'] = mq.__dict__
+
+    if 'prognosis' in result:
+        result['prognosis']['decomposed_conformal_interval'] = traj_interval

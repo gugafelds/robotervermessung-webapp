@@ -240,7 +240,7 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
       );
       if (!group) return [];
       const ids: string[] = [group.target_segment];
-      group.results.forEach((r) => {
+      group.similar_segments.results.forEach((r) => {
         if (r.seg_id) ids.push(r.seg_id);
       });
       return ids.slice(0, 50);
@@ -301,7 +301,18 @@ export const SimilarityPlot: React.FC<VergleichPlotProps> = ({
               ? bahnResults.find((r) => r.traj_id === id)
               : segmentGroups
                   .find((g) => g.target_segment === originalSegId)
-                  ?.results.find((r) => r.seg_id === id);
+                  ?.similar_segments.results.map(
+                    (r) =>
+                      ({
+                        seg_id: r.seg_id,
+                        traj_id: r.traj_id,
+                        similarity_score: r.rrf_score ?? 0,
+                        dtw_distance: r.dtw_distance,
+                        rank_stage1: r.rank_stage1,
+                        rank_stage2: r.rank_stage2,
+                      }) as SimilarityResult,
+                  )
+                  .find((r) => r.seg_id === id);
 
             const scoreLabel = isOriginal
               ? 'Original'

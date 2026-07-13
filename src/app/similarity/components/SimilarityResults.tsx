@@ -216,7 +216,36 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
         allRows.push(
           ...renderRows([featuresToResult(group.target_segment_features)]),
         );
-      if (group.results.length > 0) allRows.push(...renderRows(group.results));
+      if (group.similar_segments.results.length > 0)
+        allRows.push(
+          ...renderRows(
+            group.similar_segments.results.map((r) => ({
+              traj_id: r.traj_id,
+              seg_id: r.seg_id,
+              similarity_score: r.rrf_score ?? 0,
+              rank_stage1: r.rank_stage1,
+              rank_stage2: r.rank_stage2,
+              dtw_distance: r.dtw_distance,
+              duration: r.features?.duration ?? 0,
+              weight: r.features?.weight ?? 0,
+              length: r.features?.length ?? 0,
+              movement_type: r.features?.movement_type ?? '',
+              mean_vel: r.features?.mean_vel ?? 0,
+              max_vel: r.features?.max_vel ?? 0,
+              std_vel: r.features?.std_vel ?? 0,
+              mean_accel: r.features?.mean_accel ?? 0,
+              max_accel: r.features?.max_accel ?? 0,
+              min_accel: r.features?.min_accel ?? 0,
+              std_accel: r.features?.std_accel ?? 0,
+              min_distance: r.features?.min_distance,
+              mean_distance: r.features?.mean_distance,
+              max_distance: r.features?.max_distance,
+              position_x: r.features?.position_x ?? 0,
+              position_y: r.features?.position_y ?? 0,
+              position_z: r.features?.position_z ?? 0,
+            })),
+          ),
+        );
     });
   } else if (segmentResults.length > 0) {
     allRows.push(...renderRows(segmentResults));
@@ -253,7 +282,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
               <span>
                 Stage 1:{' '}
                 <span className="font-mono font-medium text-gray-700">
-                  {timing.stage1_ms.toFixed(0)} ms
+                  {timing.stage1_ms?.toFixed(0)} ms
                 </span>
               </span>
               {timing.data_loading_ms !== undefined && (
@@ -273,7 +302,7 @@ const SimilarityResults: React.FC<SimilarityResultsProps> = ({
                 </span>
               )}
               <span className="font-medium text-gray-700">
-                Total: {timing.total_ms.toFixed(0)} ms
+                Total: {timing.total_ms?.toFixed(0)} ms
               </span>
             </div>
           )}
