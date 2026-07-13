@@ -56,11 +56,11 @@ def _tier_for_bucket(bucket_error: float, best_error: float) -> str:
     if best_error <= 0:
         return _TIER_EXCELLENT
     ratio = bucket_error / best_error
-    if ratio <= 1.5:
+    if ratio <= 1.2:
         return _TIER_EXCELLENT
-    if ratio <= 3.0:
+    if ratio <= 2.0:
         return _TIER_GOOD
-    if ratio <= 6.0:
+    if ratio <= 4.0:
         return _TIER_MODERATE
     return _TIER_POOR
 

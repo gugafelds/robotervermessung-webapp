@@ -108,9 +108,8 @@ class EmbeddingCalculator:
         # Savitzky-Golay Filter für Position
         from scipy.signal import savgol_filter
 
-        window_length = min(33, n_points // 2 * 2 + 1)
-        if window_length < 5:
-            window_length = 5
+        window_length = min(33, n_points if n_points % 2 == 1 else n_points - 1)
+        window_length = max(window_length, 3)
 
         positions_smooth = np.zeros_like(positions)
         for dim in range(3):
@@ -127,9 +126,9 @@ class EmbeddingCalculator:
         velocity = delta_pos / delta_time[:, np.newaxis]
 
         # Velocity nochmal glätten
-        vel_window = min(33, len(velocity) // 2 * 2 + 1)
-        if vel_window < 5:
-            vel_window = 5
+        n = len(velocity)
+        vel_window = min(33, n if n % 2 == 1 else n - 1)
+        vel_window = max(vel_window, 3)
 
         velocity_smooth = np.zeros_like(velocity)
         for dim in range(3):
