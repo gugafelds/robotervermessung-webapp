@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.endpoints import correction_route_handler
 
-from .api.endpoints import traj_route_handler, dashboard_route_handler, evaluation_route_handler, metadata_route_handler, upload_route_handler, similarity_route_handler
+from .api.endpoints import traj_route_handler, dashboard_route_handler, evaluation_route_handler, metadata_route_handler, upload_route_handler, similarity_route_handler, correction_route_handler
 from .database import init_db
 from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
