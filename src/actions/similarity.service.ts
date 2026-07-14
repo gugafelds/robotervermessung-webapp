@@ -81,12 +81,13 @@ export class SimilarityService {
           params.prognosis_active.toString(),
         );
       }
-      if (params.include_tags && params.include_tags.length > 0) {
-        queryParams.append('calibration_tag', params.include_tags.join(','));
-      }
-      if (params.include_tags && params.include_tags.length > 0) {
-        queryParams.append('include_tags', params.include_tags.join(','));
-      }
+
+      const tagsValue =
+        params.include_tags && params.include_tags.length > 0
+          ? params.include_tags.join(',')
+          : 'all';
+      queryParams.append('include_tags', tagsValue);
+      queryParams.append('calibration_tag', tagsValue);
       if (params.coverage !== undefined) {
         queryParams.append('coverage', params.coverage.toString());
       }

@@ -970,7 +970,7 @@ class CSVProcessor:
             return setpoints_data
 
         # ── Fuzzy Position Match mit Toleranz ────────────────────────────
-        def find_wp(x, y, z, tol=5.0):
+        def find_wp(x, y, z, tol=0.1):
             if x is None or y is None or z is None:
                 return None
             for wp in waypoints:

@@ -30,6 +30,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# ── Manuelle Kalibrierungsparameter ──────────────────────────────────────
+CORRECTION_THRESHOLD = 10   # DTW-Faktor: Segmente mit dtw > threshold * dtw_first werden ignoriert
+CORRECTION_X_FAC     = 1.0  # 0.5 Skalierung der X-Korrektur
+CORRECTION_Y_FAC     = 1.0  # 0.9 Skalierung der Y-Korrektur
+CORRECTION_Z_FAC     = 1.0  # 1.0 Skalierung der Z-Korrektur
+
 # ── Request / Response Models ─────────────────────────────────────────────
 
 class CorrectionTrajectory(BaseModel):
@@ -165,12 +171,17 @@ async def predict_correction(
             similar_segments = group.get("similar_segments", {}).get("results", [])
 
             x_diffs, y_diffs, z_diffs, dtw_distances = [], [], [], []
+            dtw_first = None
 
             for s in similar_segments:
                 seg_id = s.get("seg_id")
                 dtw    = s.get("dtw_distance")
                 if seg_id is None or dtw is None:
                     continue
+                if dtw_first is None:
+                    dtw_first = float(dtw)
+                if float(dtw) > CORRECTION_THRESHOLD * dtw_first:
+                    break
                 res = query_data.get(str(seg_id))
                 if res is None:
                     continue
@@ -202,7 +213,11 @@ async def predict_correction(
                     y_corr += w * y_diffs[i]
                     z_corr += w * z_diffs[i]
 
-            corrections.append([x_corr, y_corr, z_corr])
+            corrections.append([
+                CORRECTION_X_FAC * x_corr,
+                CORRECTION_Y_FAC * y_corr,
+                CORRECTION_Z_FAC * z_corr,
+            ])
 
         logger.info(
             "[correction] %d segments processed, %d corrections computed.",
