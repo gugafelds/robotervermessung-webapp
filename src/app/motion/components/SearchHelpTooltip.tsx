@@ -88,6 +88,11 @@ const SearchHelpTooltip = () => {
                     - velocity
                   </li>
                   <li>
+                    •{' '}
+                    <code className="rounded bg-gray-100 px-1">t=tagname</code>{' '}
+                    - filter by tag
+                  </li>
+                  <li>
                     • <code className="rounded bg-gray-100 px-1">d=2024</code> -
                     year, or{' '}
                     <code className="rounded bg-gray-100 px-1">

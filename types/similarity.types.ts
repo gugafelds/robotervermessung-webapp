@@ -1,6 +1,41 @@
 // types/similarity.types.ts
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Metadata
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface MetadataStats {
+  total_trajs: number;
+  trajs_with_metadata: number;
+  missing_metadata: number;
+  coverage_percent: number;
+}
+
+export interface AvailableDate {
+  date: string;
+  count: number;
+}
+
+export interface MetadataCalculationRequest {
+  mode: string;
+  duplicate_handling?: string;
+  batch_size?: number;
+  traj_id?: string;
+  start_time?: string;
+  end_time?: string;
+}
+
+export interface MetadataCalculationResponse {
+  task_id?: string;
+  status?: string;
+}
+
+export interface TaskStatus {
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  error?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Search params
 // ═══════════════════════════════════════════════════════════════════════════
 

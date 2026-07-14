@@ -102,6 +102,7 @@ export interface SearchTrajParams extends PaginationParams {
   settedVelocity?: number;
   recordingDate?: string;
   sidtwDistance?: number;
+  tag?: string;
 }
 
 export const searchTrajInfo = async (
@@ -134,6 +135,7 @@ export const searchTrajInfo = async (
       );
     if (searchParams.recordingDate)
       queryParams.append('recording_date', searchParams.recordingDate);
+    if (searchParams.tag) queryParams.append('tag', searchParams.tag);
     if (searchParams.page)
       queryParams.append('page', searchParams.page.toString());
     if (searchParams.pageSize)

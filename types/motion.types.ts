@@ -31,6 +31,7 @@ export interface TrajInfo {
   settedVelocity: number;
   stopPoint: number;
   waitTime: number;
+  tag: string | null;
 }
 
 export interface TrajInfoRaw {
@@ -66,6 +67,7 @@ export interface TrajInfoRaw {
   transformation_matrix: string;
   stop_point: number;
   wait_time: number;
+  tag: string | null;
 }
 
 export interface TrajPoseAct {

@@ -112,6 +112,7 @@ class FilterSearcher:
         include_tags: Optional[List[str]] = None,
         exclude_tags: Optional[List[str]] = None,
         exclude_ids: Optional[List[str]] = None,
+        include_ids: Optional[List[str]] = None,
     ) -> List[str]:
         try:
             if tolerance is None:
@@ -128,6 +129,31 @@ class FilterSearcher:
                     return []
 
             need_join = bool(include_tags or exclude_tags or exclude_ids)
+
+            # include_ids shortcut: ignore all other filters, just restrict to that set
+            if include_ids:
+                seg_col = "tm.seg_id" if need_join else "seg_id"
+                traj_col = "tm.traj_id" if need_join else "traj_id"
+                if need_join:
+                    rows = await self.connection.fetch(
+                        f"""
+                        SELECT tm.seg_id FROM motion.traj_metadata tm
+                        JOIN motion.traj_info ti ON tm.traj_id = ti.traj_id
+                        WHERE tm.traj_id = ANY($1) AND tm.seg_id != $2
+                        """,
+                        include_ids, target_id
+                    )
+                else:
+                    rows = await self.connection.fetch(
+                        f"""
+                        SELECT seg_id FROM motion.traj_metadata
+                        WHERE traj_id = ANY($1) AND seg_id != $2
+                        """,
+                        include_ids, target_id
+                    )
+                candidate_ids = [r['seg_id'] for r in rows]
+                logger.info(f"include_ids filter: {len(include_ids)} IDs → {len(candidate_ids)} candidates")
+                return candidate_ids
 
             # ── WHERE Clause aufbauen ─────────────────────────────────────
             where_clauses = []

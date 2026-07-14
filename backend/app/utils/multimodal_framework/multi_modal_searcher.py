@@ -59,6 +59,7 @@ class MultiModalSearcher:
             include_tags: Optional[List[str]] = None,
             exclude_tags: Optional[List[str]] = None,
             exclude_ids: Optional[List[str]] = None,
+            include_ids: Optional[List[str]] = None,
     ) -> Dict:
         try:
             if modes is None:
@@ -104,6 +105,7 @@ class MultiModalSearcher:
                     include_tags=include_tags,
                     exclude_tags=exclude_tags,
                     exclude_ids=exclude_ids,
+                    include_ids=include_ids,
                 ),
                 self._get_traj_segments(target_traj_id),
             )
@@ -130,6 +132,7 @@ class MultiModalSearcher:
                         include_tags=include_tags,
                         exclude_tags=exclude_tags,
                         exclude_ids=exclude_ids,
+                        include_ids=include_ids,
                     ),
                 )
                 return {
@@ -172,6 +175,7 @@ class MultiModalSearcher:
             include_tags: Optional[List[str]] = None,
             exclude_tags: Optional[List[str]] = None,
             exclude_ids: Optional[List[str]] = None,
+            include_ids: Optional[List[str]] = None,
     ) -> Dict:
         try:
             async with self._acquire() as conn:
@@ -193,6 +197,7 @@ class MultiModalSearcher:
                 or include_tags
                 or exclude_tags
                 or exclude_ids
+                or include_ids
             )
 
             if need_prefilter:
@@ -204,6 +209,7 @@ class MultiModalSearcher:
                         include_tags=include_tags,
                         exclude_tags=exclude_tags,
                         exclude_ids=exclude_ids,
+                        include_ids=include_ids,
                     )
                     traj_candidates = await prefilter._filter_only_trajs(candidate_ids)
                     logger.info(f"[Pre-Filter Bahn] {len(traj_candidates)} candidates")
@@ -258,6 +264,7 @@ class MultiModalSearcher:
             include_tags: Optional[List[str]] = None,
             exclude_tags: Optional[List[str]] = None,
             exclude_ids: Optional[List[str]] = None,
+            include_ids: Optional[List[str]] = None,
     ) -> Dict:
         try:
             async with self._acquire() as conn:
@@ -279,6 +286,7 @@ class MultiModalSearcher:
                 or include_tags
                 or exclude_tags
                 or exclude_ids
+                or include_ids
             )
 
             if need_prefilter:
@@ -290,6 +298,7 @@ class MultiModalSearcher:
                         include_tags=include_tags,
                         exclude_tags=exclude_tags,
                         exclude_ids=exclude_ids,
+                        include_ids=include_ids,
                     )
                     segment_candidates = await prefilter._filter_only_segments(candidate_ids)
                     logger.info(f"[Pre-Filter Segment] {len(segment_candidates)} candidates")
@@ -488,6 +497,7 @@ class MultiModalSearcherCandidate(MultiModalSearcher):
         include_tags: Optional[List[str]] = None,
         exclude_tags: Optional[List[str]] = None,
         exclude_ids: Optional[List[str]] = None,
+        include_ids: Optional[List[str]] = None,
     ) -> Dict:
         modes              = modes or ['joint', 'position', 'orientation', 'velocity', 'metadata']
         weights            = weights or {m: 1.0 for m in modes}
@@ -515,8 +525,9 @@ class MultiModalSearcherCandidate(MultiModalSearcher):
                     prefilter_features=prefilter_features, metric=metric,
                     buffer_factor=buffer_factor, include_tags=include_tags,
                     exclude_tags=exclude_tags, exclude_ids=exclude_ids,
+                    include_ids=include_ids,
                 )
-                
+
                 return {
                     'target_segment':          seg_id,
                     'target_segment_features': None,
@@ -535,6 +546,7 @@ class MultiModalSearcherCandidate(MultiModalSearcher):
                 prefilter_features=prefilter_features, metric=metric,
                 buffer_factor=buffer_factor, include_tags=include_tags,
                 exclude_tags=exclude_tags, exclude_ids=exclude_ids,
+                include_ids=include_ids,
             )
             segment_results = [{
                 'target_segment':          self._candidate_id,

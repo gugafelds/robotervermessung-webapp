@@ -60,6 +60,7 @@ async def run_similarity_pipeline(
     include_tags:       Optional[List[str]]        = None,
     exclude_tags:       Optional[List[str]]        = None,
     exclude_ids:        Optional[List[str]]        = None,
+    include_ids:        Optional[List[str]]        = None,
 
     # Stage 2
     stage2_active: bool                         = False,
@@ -161,6 +162,7 @@ async def run_similarity_pipeline(
         include_tags=include_tags,
         exclude_tags=exclude_tags,
         exclude_ids=exclude_ids,
+        include_ids=include_ids,
     )
     stage1_ms = (time.time() - t1) * 1000
 

@@ -108,6 +108,7 @@ async def search_trajectory(
         include_tags: Optional[str] = Query(None),
         exclude_tags: Optional[str] = Query(None),
         exclude_ids:  Optional[str] = Query(None),
+        include_ids:  Optional[str] = Query(None),
         calibration_tag: Optional[str] = Query(
             'all',
             description=(
@@ -171,6 +172,10 @@ async def search_trajectory(
             [i.strip() for i in exclude_ids.split(',') if i.strip()]
             if exclude_ids else None
         )
+        include_ids_list = (
+            [i.strip() for i in include_ids.split(',') if i.strip()]
+            if include_ids else None
+        )
         calibration_tags = (
             [t.strip() for t in calibration_tag.split(',') if t.strip()]
             if calibration_tag else ['all']
@@ -190,6 +195,7 @@ async def search_trajectory(
             include_tags=include_tags_list,
             exclude_tags=exclude_tags_list,
             exclude_ids=exclude_ids_list,
+            include_ids=include_ids_list,
             stage2_active=stage2_active,
             dtw_mode=dtw_mode,
             prognosis_active=prognosis_active,
@@ -236,6 +242,7 @@ class SearchCandidateRequest(BaseModel):
     include_tags:    Optional[List[str]]          = None
     exclude_tags:    Optional[List[str]]          = None
     exclude_ids:     Optional[List[str]]          = None
+    include_ids:     Optional[List[str]]          = None
 
 
 @router.post("/search/candidate")
@@ -293,6 +300,7 @@ async def search_candidate(
             include_tags=request.include_tags,
             exclude_tags=request.exclude_tags,
             exclude_ids=request.exclude_ids,
+            include_ids=request.include_ids,
             stage2_active=request.stage2_active,
             dtw_mode=request.dtw_mode,
             prognosis_active=request.prognosis_active,

@@ -66,6 +66,7 @@ export const transformTrajInfoResult = (
       transfMatrix: bahn.transformation_matrix,
       stopPoint: bahn.stop_point,
       waitTime: bahn.wait_time,
+      tag: bahn.tag ?? null,
     }),
   );
 };
@@ -105,6 +106,7 @@ export const transformTrajInfobyIDResult = (
   stopPoint: bahnRaw.stop_point,
   waitTime: bahnRaw.wait_time,
   transfMatrix: bahnRaw.transformation_matrix,
+  tag: bahnRaw.tag ?? null,
 });
 
 export const transformTrajPoseActResult = (

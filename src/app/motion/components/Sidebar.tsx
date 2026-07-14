@@ -165,6 +165,7 @@ export const Sidebar = () => {
         const velMatch = part.match(/^(v|velocity)=(\d*\.?\d+)$/i);
         const dateMatch = part.match(/^d=(.+)$/i);
         const sidtwMatch = part.match(/^(s|sidtw)=(\d*\.?\d+)$/i);
+        const tagMatch = part.match(/^t=(.+)$/i);
 
         if (eventMatch) {
           const [, , count] = eventMatch;
@@ -181,6 +182,9 @@ export const Sidebar = () => {
         } else if (sidtwMatch) {
           const [, , distance] = sidtwMatch;
           params.sidtwDistance = parseFloat(distance);
+        } else if (tagMatch) {
+          const [, tag] = tagMatch;
+          params.tag = tag;
         } else if (!params.query) {
           params.query = part;
         }
@@ -284,6 +288,11 @@ export const Sidebar = () => {
                           ? formatDate(traj.recordingDate)
                           : 'n. a.'}
                       </Typography>
+                      {traj.tag && (
+                        <span className="mt-0.5 inline-block rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700">
+                          {traj.tag}
+                        </span>
+                      )}
                     </div>
                   </Link>
                 </div>
