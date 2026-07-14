@@ -19,14 +19,14 @@ const getErrorColor = (predicted: number | null, gt: number | null): string => {
   if (predicted == null || gt == null) return 'text-gray-400';
   const err = Math.abs(predicted - gt);
   if (err < 0.05) return 'text-green-600';
-  if (err < 0.15) return 'text-yellow-600';
+  if (err < 0.08) return 'text-yellow-600';
   return 'text-red-600';
 };
 
 const getIntervalColor = (low: number, high: number): string => {
   const width = high - low;
-  if (width < 0.1) return 'text-green-600';
-  if (width < 0.3) return 'text-yellow-600';
+  if (width < 0.3) return 'text-green-600';
+  if (width < 0.5) return 'text-yellow-600';
   return 'text-red-600';
 };
 

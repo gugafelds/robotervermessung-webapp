@@ -161,9 +161,9 @@ async def search_trajectory(
                 )
 
         include_tags_list = (
-            [t.strip() for t in include_tags.split(',') if t.strip()]
+            [t for t in (t.strip() for t in include_tags.split(',')) if t and t != 'all']
             if include_tags else None
-        )
+        ) or None
         exclude_tags_list = (
             [t.strip() for t in exclude_tags.split(',') if t.strip()]
             if exclude_tags else None

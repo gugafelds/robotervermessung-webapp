@@ -85,12 +85,9 @@ export class SimilarityService {
       const tagsValue =
         params.include_tags && params.include_tags.length > 0
           ? params.include_tags.join(',')
-          : 'all';
-      queryParams.append('include_tags', tagsValue);
-      queryParams.append('calibration_tag', tagsValue);
-      if (params.coverage !== undefined) {
-        queryParams.append('coverage', params.coverage.toString());
-      }
+          : undefined;
+      if (tagsValue) queryParams.append('include_tags', tagsValue);
+      queryParams.append('calibration_tag', tagsValue ?? 'all');
 
       const response = await fetch(
         `${this.BASE_URL}/api/similarity/search/${targetId}?${queryParams.toString()}`,
