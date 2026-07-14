@@ -64,6 +64,7 @@ async def search_traj_info(
         page_size: int = Query(20, ge=1, le=100, description="Einträge pro Seite"),
         recording_date: str = Query(None, description="Datumsfilter"),
         sidtw_distance: float = Query(None, description="SIDTW Distance (±10% Toleranz)"),
+        tag: str = Query(None, description="Tag-Filter"),
         conn=Depends(get_db)
 ):
     try:
@@ -151,6 +152,11 @@ async def search_traj_info(
                 except Exception as e:
                     logger.warning(f"Invalid datetime format: {recording_date}")
         
+        if tag is not None:
+            base_query += f" AND b.tag = ${param_index}"
+            params.append(tag)
+            param_index += 1
+
         if sidtw_distance is not None:
             tolerance = sidtw_distance * 0.1  # 10% Toleranz
             base_query += f" AND i.sidtw_average_distance IS NOT NULL AND i.sidtw_average_distance BETWEEN ${param_index} AND ${param_index + 1}"
