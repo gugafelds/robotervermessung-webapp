@@ -20,17 +20,14 @@ export interface Distribution {
 export interface PerformerData {
   traj_id: number;
   seg_id: number;
-  sidtw_average_distance: number;
+  metric_value: number;
   weight: number;
   waypoints: number;
   stop_point: number;
   max_velocity: number;
   max_acceleration: number;
-  trajectory: Array<{
-    x: number;
-    y: number;
-    z: number;
-  }>;
+  tag?: string;
+  trajectory?: Array<{ x: number; y: number; z: number }>;
 }
 
 export interface DashboardData {
@@ -38,8 +35,6 @@ export interface DashboardData {
   trajsCount: number;
   medianSIDTW?: number;
   meanSIDTW?: number;
-  bestPerformers?: PerformerData[];
-  worstPerformers?: PerformerData[];
   stats: {
     velocityDistribution: Distribution;
     weightDistribution: Distribution;
@@ -47,10 +42,13 @@ export interface DashboardData {
     performanceSIDTWDistribution: Distribution;
     stopPointDistribution: Distribution;
   };
-  workareaPoints?: Array<{
-    x: number;
-    y: number;
-    z: number;
-    sidtw: number;
-  }>;
 }
+
+export type MetricType = 'sidtw' | 'ed' | 'qdtw' | 'gd';
+
+export const METRICS: Record<MetricType, { label: string; unit: string }> = {
+  sidtw: { label: 'SIDTW', unit: 'mm' },
+  ed:    { label: 'ED',    unit: 'mm' },
+  qdtw:  { label: 'QDTW', unit: 'rad' },
+  gd:    { label: 'GD',   unit: 'rad' },
+};

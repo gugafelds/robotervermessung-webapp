@@ -111,26 +111,26 @@ async def _fetch_buckets(
 
 
 async def get_match_quality(
-    conn:                  asyncpg.Connection,
-    d_min_per_path_length: Optional[float],
-    level:                 str,
-    retrieval_strategy:    str             = 'decomposed',
-    calibration_tag:       str             = 'all',
-    metric:                str             = 'sidtw',
-    dtw_mode:              str             = 'position',
-    k:                     int             = 10,
-    search_modes:          Tuple[str, ...] = ('joint', 'metadata', 'orientation', 'position', 'velocity'),
-    config_stage:          int             = 2,
+    conn:         asyncpg.Connection,
+    d_min:        Optional[float],
+    level:        str,
+    retrieval_strategy: str             = 'decomposed',
+    calibration_tag:    str             = 'all',
+    metric:             str             = 'sidtw',
+    dtw_mode:           str             = 'position',
+    k:                  int             = 10,
+    search_modes:       Tuple[str, ...] = ('joint', 'metadata', 'orientation', 'position', 'velocity'),
+    config_stage:       int             = 2,
 ) -> Optional[MatchQuality]:
     """
-    Look up the empirical match-quality tier for a given d_min_per_path_length.
+    Look up the empirical match-quality tier for a given d_min.
 
     Falls back to calibration_tag='all' if no buckets exist for the requested tag.
-    Returns None if no buckets found or d_min_per_path_length is None.
+    Returns None if no buckets found or d_min is None.
 
     config_stage: 1 = Stage 1 RRF, 2 = Stage 2 DTW.
     """
-    if d_min_per_path_length is None:
+    if d_min is None:
         return None
 
     search_modes_str = _make_search_modes_str(search_modes)
@@ -159,11 +159,11 @@ async def get_match_quality(
 
     match = None
     for b in buckets:
-        if b['d_min_lower'] <= d_min_per_path_length <= b['d_min_upper']:
+        if b['d_min_lower'] <= d_min <= b['d_min_upper']:
             match = b
             break
     if match is None:
-        match = buckets[0] if d_min_per_path_length < buckets[0]['d_min_lower'] else buckets[-1]
+        match = buckets[0] if d_min < buckets[0]['d_min_lower'] else buckets[-1]
 
     best_error = min(b['median_error'] for b in buckets)
     tier       = _tier_for_bucket(match['median_error'], best_error)

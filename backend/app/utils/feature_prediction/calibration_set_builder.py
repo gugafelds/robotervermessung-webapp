@@ -8,9 +8,11 @@ DB lookup key for confidence_quantiles
 metric + dtw_mode + retrieval_strategy + level + k + search_modes + calibration_tag + config_stage
 
 config_stage = 1  →  Stage 1 RRF (no DTW), dtw_mode = 'none'
-                      d_min_per_path_length = 1 / rrf_score_of_best_candidate
+                      d_min_per_path_length = 1 / rrf_best,  d_normalized = 1 / rrf_mean,  d_max = 1 / rrf_worst
 config_stage = 2  →  Stage 2 DTW (default)
-                      d_min_per_path_length = dtw_d_min / query_path_length
+                      d_min_per_path_length = dtw_min / path_length
+                      d_normalized          = dtw_mean / path_length
+                      d_max_per_path_length = dtw_max / path_length
 
 calibration_tag allows separate calibration per DB subset (e.g. 'all', 'bandit_v1').
 Online lookup falls back from specific tag to 'all' if no row found.
@@ -135,7 +137,9 @@ async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
             sigma                  FLOAT       NOT NULL,
             nonconformity_score    FLOAT       NOT NULL,
 
-            d_min_per_path_length  FLOAT,
+            d_min          FLOAT,
+            d_max          FLOAT,
+            d_normalized   FLOAT,
             query_path_length      FLOAT,
             neighbor_ids           TEXT[]      NOT NULL DEFAULT '{}',
 
@@ -162,7 +166,9 @@ async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
             sigma                  FLOAT       NOT NULL,
             nonconformity_score    FLOAT       NOT NULL,
 
-            d_min_per_path_length  FLOAT,
+            d_min          FLOAT,
+            d_max          FLOAT,
+            d_normalized   FLOAT,
             neighbor_ids           TEXT[]      NOT NULL DEFAULT '{}',
 
             config_hash            TEXT        NOT NULL,
@@ -343,38 +349,40 @@ async def insert_segment_batch(conn: asyncpg.Connection, batch: List[Dict[str, A
         INSERT INTO prognosis.confidence_calibration_seg (
             seg_id, traj_id, split_role, retrieval_strategy, calibration_tag, config_stage,
             p_actual, p_predicted, prediction_error, sigma, nonconformity_score,
-            d_min_per_path_length, query_path_length, neighbor_ids,
+            d_min, d_max, d_normalized, query_path_length, neighbor_ids,
             config_hash, config_k, config_dtw_mode, config_metric, search_modes
         ) VALUES (
             $1,$2,$3,$4,$5,$6,
             $7,$8,$9,$10,$11,
-            $12,$13,$14,
-            $15,$16,$17,$18,$19
+            $12,$13,$14,$15,$16,
+            $17,$18,$19,$20,$21
         )
         ON CONFLICT (seg_id, config_hash, calibration_tag, config_stage) DO UPDATE SET
-            split_role            = EXCLUDED.split_role,
-            retrieval_strategy    = EXCLUDED.retrieval_strategy,
-            p_actual              = EXCLUDED.p_actual,
-            p_predicted           = EXCLUDED.p_predicted,
-            prediction_error      = EXCLUDED.prediction_error,
-            sigma                 = EXCLUDED.sigma,
-            nonconformity_score   = EXCLUDED.nonconformity_score,
-            d_min_per_path_length = EXCLUDED.d_min_per_path_length,
-            query_path_length     = EXCLUDED.query_path_length,
-            neighbor_ids          = EXCLUDED.neighbor_ids,
-            config_k              = EXCLUDED.config_k,
-            config_dtw_mode       = EXCLUDED.config_dtw_mode,
-            config_metric         = EXCLUDED.config_metric,
-            search_modes          = EXCLUDED.search_modes,
-            computed_at           = NOW()
+            split_role          = EXCLUDED.split_role,
+            retrieval_strategy  = EXCLUDED.retrieval_strategy,
+            p_actual            = EXCLUDED.p_actual,
+            p_predicted         = EXCLUDED.p_predicted,
+            prediction_error    = EXCLUDED.prediction_error,
+            sigma               = EXCLUDED.sigma,
+            nonconformity_score = EXCLUDED.nonconformity_score,
+            d_min               = EXCLUDED.d_min,
+            d_max               = EXCLUDED.d_max,
+            d_normalized        = EXCLUDED.d_normalized,
+            query_path_length   = EXCLUDED.query_path_length,
+            neighbor_ids        = EXCLUDED.neighbor_ids,
+            config_k            = EXCLUDED.config_k,
+            config_dtw_mode     = EXCLUDED.config_dtw_mode,
+            config_metric       = EXCLUDED.config_metric,
+            search_modes        = EXCLUDED.search_modes,
+            computed_at         = NOW()
     """, [
         (
             r['seg_id'], r['traj_id'], r['split_role'], r['retrieval_strategy'],
             r['calibration_tag'], r['config_stage'],
             r['p_actual'], r['p_predicted'], r['prediction_error'],
             r['sigma'], r['nonconformity_score'],
-            r.get('d_min_per_path_length'), r.get('query_path_length'),
-            r['neighbor_ids'],
+            r.get('d_min'), r.get('d_max'), r.get('d_normalized'),
+            r.get('query_path_length'), r['neighbor_ids'],
             r['config_hash'], r['config_k'],
             r['config_dtw_mode'], r['config_metric'], r['search_modes'],
         )
@@ -389,36 +397,39 @@ async def insert_trajectory_batch(conn: asyncpg.Connection, batch: List[Dict[str
         INSERT INTO prognosis.confidence_calibration_traj (
             traj_id, split_role, retrieval_strategy, calibration_tag, config_stage,
             p_actual, p_predicted, prediction_error, sigma, nonconformity_score,
-            d_min_per_path_length, neighbor_ids,
+            d_min, d_max, d_normalized, neighbor_ids,
             config_hash, config_k, config_dtw_mode, config_metric, search_modes
         ) VALUES (
             $1,$2,$3,$4,$5,
             $6,$7,$8,$9,$10,
-            $11,$12,
-            $13,$14,$15,$16,$17
+            $11,$12,$13,$14,
+            $15,$16,$17,$18,$19
         )
         ON CONFLICT (traj_id, config_hash, calibration_tag, config_stage) DO UPDATE SET
-            split_role            = EXCLUDED.split_role,
-            retrieval_strategy    = EXCLUDED.retrieval_strategy,
-            p_actual              = EXCLUDED.p_actual,
-            p_predicted           = EXCLUDED.p_predicted,
-            prediction_error      = EXCLUDED.prediction_error,
-            sigma                 = EXCLUDED.sigma,
-            nonconformity_score   = EXCLUDED.nonconformity_score,
-            d_min_per_path_length = EXCLUDED.d_min_per_path_length,
-            neighbor_ids          = EXCLUDED.neighbor_ids,
-            config_k              = EXCLUDED.config_k,
-            config_dtw_mode       = EXCLUDED.config_dtw_mode,
-            config_metric         = EXCLUDED.config_metric,
-            search_modes          = EXCLUDED.search_modes,
-            computed_at           = NOW()
+            split_role          = EXCLUDED.split_role,
+            retrieval_strategy  = EXCLUDED.retrieval_strategy,
+            p_actual            = EXCLUDED.p_actual,
+            p_predicted         = EXCLUDED.p_predicted,
+            prediction_error    = EXCLUDED.prediction_error,
+            sigma               = EXCLUDED.sigma,
+            nonconformity_score = EXCLUDED.nonconformity_score,
+            d_min               = EXCLUDED.d_min,
+            d_max               = EXCLUDED.d_max,
+            d_normalized        = EXCLUDED.d_normalized,
+            neighbor_ids        = EXCLUDED.neighbor_ids,
+            config_k            = EXCLUDED.config_k,
+            config_dtw_mode     = EXCLUDED.config_dtw_mode,
+            config_metric       = EXCLUDED.config_metric,
+            search_modes        = EXCLUDED.search_modes,
+            computed_at         = NOW()
     """, [
         (
             r['traj_id'], r['split_role'], r['retrieval_strategy'],
             r['calibration_tag'], r['config_stage'],
             r['p_actual'], r['p_predicted'], r['prediction_error'],
             r['sigma'], r['nonconformity_score'],
-            r.get('d_min_per_path_length'), r['neighbor_ids'],
+            r.get('d_min'), r.get('d_max'), r.get('d_normalized'),
+            r['neighbor_ids'],
             r['config_hash'], r['config_k'],
             r['config_dtw_mode'], r['config_metric'], r['search_modes'],
         )
@@ -575,14 +586,16 @@ def build_segment_rows_stage2(
             'calibration_tag':      cfg.calibration_tag,
             'config_stage':         2,
             **values,
-            'd_min_per_path_length': seg_pred.get('d_min_per_path_length'),
-            'query_path_length':    seg_pred.get('query_path_length'),
-            'neighbor_ids':         list(seg_pred.get('neighbor_ids') or []),
-            'config_hash':          cfg.hash(),
-            'config_k':             cfg.k,
-            'config_dtw_mode':      cfg.dtw_mode,
-            'config_metric':        cfg.metric,
-            'search_modes':         cfg.search_modes_str(),
+            'd_min':             seg_pred.get('d_min'),
+            'd_max':             seg_pred.get('d_max'),
+            'd_normalized':      seg_pred.get('d_normalized'),
+            'query_path_length': seg_pred.get('query_path_length'),
+            'neighbor_ids':      list(seg_pred.get('neighbor_ids') or []),
+            'config_hash':       cfg.hash(),
+            'config_k':          cfg.k,
+            'config_dtw_mode':   cfg.dtw_mode,
+            'config_metric':     cfg.metric,
+            'search_modes':      cfg.search_modes_str(),
         })
     return rows
 
@@ -617,9 +630,11 @@ def build_trajectory_row_stage2(
         'calibration_tag':      cfg.calibration_tag,
         'config_stage':         2,
         **values,
-        'd_min_per_path_length': prediction.get('d_min_per_path_length'),
-        'neighbor_ids':         neighbor_ids,
-        'config_hash':          cfg.with_strategy(retrieval_strategy).hash(),
+        'd_min':        prediction.get('d_min'),
+        'd_max':        prediction.get('d_max'),
+        'd_normalized': prediction.get('d_normalized'),
+        'neighbor_ids': neighbor_ids,
+        'config_hash':  cfg.with_strategy(retrieval_strategy).hash(),
         'config_k':             cfg.k,
         'config_dtw_mode':      cfg.dtw_mode,
         'config_metric':        cfg.metric,
@@ -695,10 +710,12 @@ def build_segment_rows_stage1(
             'calibration_tag':      cfg.calibration_tag,
             'config_stage':         1,
             **values,
-            'd_min_per_path_length': d_min,
-            'query_path_length':    seg_pred.get('query_path_length'),
-            'neighbor_ids':         neighbor_ids,
-            'config_hash':          cfg.with_stage(1).with_strategy('stage1_rrf').hash(),
+            'd_min':             seg_pred.get('d_min') or d_min,
+            'd_max':             seg_pred.get('d_max'),
+            'd_normalized':      seg_pred.get('d_normalized'),
+            'query_path_length': seg_pred.get('query_path_length'),
+            'neighbor_ids':      neighbor_ids,
+            'config_hash':       cfg.with_stage(1).with_strategy('stage1_rrf').hash(),
             'config_k':             cfg.k,
             'config_dtw_mode':      'none',
             'config_metric':        cfg.metric,
@@ -740,9 +757,11 @@ def build_trajectory_row_stage1(
         'calibration_tag':      cfg.calibration_tag,
         'config_stage':         1,
         **values,
-        'd_min_per_path_length': d_min,
-        'neighbor_ids':         neighbor_ids,
-        'config_hash':          cfg.with_stage(1).with_strategy('stage1_rrf').hash(),
+        'd_min':        direct_pred.get('d_min') or d_min,
+        'd_max':        direct_pred.get('d_max'),
+        'd_normalized': direct_pred.get('d_normalized'),
+        'neighbor_ids': neighbor_ids,
+        'config_hash':  cfg.with_stage(1).with_strategy('stage1_rrf').hash(),
         'config_k':             cfg.k,
         'config_dtw_mode':      'none',
         'config_metric':        cfg.metric,

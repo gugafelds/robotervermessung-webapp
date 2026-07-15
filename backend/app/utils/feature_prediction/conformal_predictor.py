@@ -439,7 +439,7 @@ async def compute_conformal_intervals(
             prediction = group.get('prediction') or {}
             mq = await get_match_quality(
                 conn,
-                prediction.get('d_min_per_path_length'),
+                prediction.get('d_min'),
                 level='segment',
                 retrieval_strategy=strategy,
                 calibration_tag=cfg.calibration_tag,
@@ -477,7 +477,7 @@ async def compute_conformal_intervals(
         decomposed_pred = (result.get('prognosis') or {}).get('decomposed') or {}
         mq = await get_match_quality(
             conn,
-            decomposed_pred.get('d_min_per_path_length'),
+            decomposed_pred.get('d_min'),
             level='trajectory',
             retrieval_strategy=strategy,
             calibration_tag=cfg.calibration_tag,
@@ -537,7 +537,7 @@ async def _compute_direct_conformal_interval(
 
     mq = await get_match_quality(
         conn,
-        direct_pred.get('d_min_per_path_length'),
+        direct_pred.get('d_min'),
         level='trajectory',
         retrieval_strategy='direct',
         calibration_tag=direct_cfg.calibration_tag,
@@ -595,7 +595,7 @@ async def compute_stage1_conformal_interval(
             direct_interval = _build_interval(float(p_hat), sigma, q_traj, coverage, mm_traj, 'stage1_rrf')
             mq = await get_match_quality(
                 conn,
-                direct_pred.get('d_min_per_path_length'),
+                direct_pred.get('d_min'),
                 level='trajectory',
                 retrieval_strategy='stage1_rrf',
                 calibration_tag=cfg.calibration_tag,
@@ -634,7 +634,7 @@ async def compute_stage1_conformal_interval(
 
         mq = await get_match_quality(
             conn,
-            prediction.get('d_min_per_path_length'),
+            prediction.get('d_min'),
             level='segment',
             retrieval_strategy='stage1_rrf',
             calibration_tag=cfg.calibration_tag,
@@ -668,7 +668,7 @@ async def compute_stage1_conformal_interval(
         decomposed_pred = prognosis.get('decomposed') or {}
         mq = await get_match_quality(
             conn,
-            decomposed_pred.get('d_min_per_path_length'),
+            decomposed_pred.get('d_min'),
             level='trajectory',
             retrieval_strategy='stage1_rrf',
             calibration_tag=cfg.calibration_tag,

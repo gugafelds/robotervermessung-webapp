@@ -92,17 +92,18 @@ def _predict_segment(
     perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / n)
     sigma    = max(perf_std, sigma_floor)
 
-    d_min_raw             = dtw_dists[0]
-    d_min_per_path_length = (
-        round(d_min_raw / max(query_path_length, EPSILON), 6)
-        if query_path_length > EPSILON else None
-    )
+    pl = max(query_path_length, EPSILON)
+    d_min        = round(dtw_dists[0],  6)
+    d_max        = round(dtw_dists[-1], 6)
+    d_normalized = round(sum(dtw_dists) / len(dtw_dists) / pl, 6) if query_path_length > EPSILON else None
 
     return {
-        'p_hat':                 round(p_hat, 4),
-        'sigma':                 round(sigma, 6),
-        'n_neighbors':           n,
-        'd_min_per_path_length': d_min_per_path_length,
+        'p_hat':        round(p_hat, 4),
+        'sigma':        round(sigma, 6),
+        'n_neighbors':  n,
+        'd_min':        d_min,
+        'd_max':        d_max,
+        'd_normalized': d_normalized,
     }
 
 
@@ -146,14 +147,21 @@ def _predict_stage1_rrf(
     perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / n)
     sigma    = max(perf_std, sigma_floor)
 
-    best_rrf              = max(weights)
-    d_min_per_path_length = round(1.0 / best_rrf, 6) if best_rrf > EPSILON else None
+    best_rrf  = max(weights)
+    mean_rrf  = sum(weights) / len(weights)
+    worst_rrf = min(weights)
+    # RRF proxies: 1/score² — squaring rewards better-ranked neighbours more (per paper)
+    d_min        = round(1.0 / best_rrf  ** 2, 6) if best_rrf  > EPSILON else None
+    d_max        = round(1.0 / worst_rrf ** 2, 6) if worst_rrf > EPSILON else None
+    d_normalized = round(1.0 / mean_rrf  ** 2, 6) if mean_rrf  > EPSILON else None
 
     return {
-        'p_hat':                 round(p_hat, 4),
-        'sigma':                 round(sigma, 6),
-        'n_neighbors':           n,
-        'd_min_per_path_length': d_min_per_path_length,
+        'p_hat':        round(p_hat, 4),
+        'sigma':        round(sigma, 6),
+        'n_neighbors':  n,
+        'd_min':        d_min,
+        'd_max':        d_max,
+        'd_normalized': d_normalized,
     }
 
 
@@ -194,17 +202,18 @@ def _predict_direct(
     perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / n)
     sigma    = max(perf_std, sigma_floor)
 
-    d_min_raw             = dtw_dists[0]
-    d_min_per_path_length = (
-        round(d_min_raw / max(query_path_length, EPSILON), 6)
-        if query_path_length > EPSILON else None
-    )
+    pl = max(query_path_length, EPSILON)
+    d_min        = round(dtw_dists[0],  6)
+    d_max        = round(dtw_dists[-1], 6)
+    d_normalized = round(sum(dtw_dists) / len(dtw_dists) / pl, 6) if query_path_length > EPSILON else None
 
     return {
-        'p_hat':                 round(p_hat, 4),
-        'sigma':                 round(sigma, 6),
-        'n_neighbors':           n,
-        'd_min_per_path_length': d_min_per_path_length,
+        'p_hat':        round(p_hat, 4),
+        'sigma':        round(sigma, 6),
+        'n_neighbors':  n,
+        'd_min':        d_min,
+        'd_max':        d_max,
+        'd_normalized': d_normalized,
     }
 
 
@@ -228,18 +237,17 @@ def _aggregate_trajectory_decomposed(
     p_hat = sum(pred['p_hat'] * pl for pred, pl in valid) / total
     sigma = max(sum(pred['sigma'] * pl for pred, pl in valid) / total, sigma_floor)
 
-    d_min_vals = [
-        pred['d_min_per_path_length']
-        for pred, _ in valid
-        if pred.get('d_min_per_path_length') is not None
-    ]
-    d_min_agg = round(sum(d_min_vals) / len(d_min_vals), 6) if d_min_vals else None
+    def _wagg(key: str) -> Optional[float]:
+        vals = [pred[key] for pred, _ in valid if pred.get(key) is not None]
+        return round(sum(vals) / len(vals), 6) if vals else None
 
     return {
-        'p_hat':                 round(p_hat, 4),
-        'sigma':                 round(sigma, 6),
-        'n_segments':            len(valid),
-        'd_min_per_path_length': d_min_agg,
+        'p_hat':        round(p_hat, 4),
+        'sigma':        round(sigma, 6),
+        'n_segments':   len(valid),
+        'd_min':        _wagg('d_min'),
+        'd_max':        _wagg('d_max'),
+        'd_normalized': _wagg('d_normalized'),
     }
 
 
@@ -326,8 +334,10 @@ async def predict_performance(
                 'p_hat':                 pred.get('p_hat'),
                 'sigma':                 pred.get('sigma'),
                 'n_neighbors':           pred.get('n_neighbors'),
-                'd_min_per_path_length': pred.get('d_min_per_path_length'),
-                'query_path_length':     pred.get('query_path_length'),
+                'd_min':             pred.get('d_min'),
+                'd_max':             pred.get('d_max'),
+                'd_normalized':      pred.get('d_normalized'),
+                'query_path_length': pred.get('query_path_length'),
             })
         else:
             segments.append({'seg_id': sid, 'p_hat': None})

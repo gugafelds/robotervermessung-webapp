@@ -161,7 +161,9 @@ export interface SegmentPrognosis {
   p_hat: number | null;
   sigma: number | null;
   n_neighbors: number | null;
-  d_min_per_path_length: number | null;
+  d_min: number | null;
+  d_max: number | null;
+  d_normalized: number | null;
   query_path_length: number | null;
 }
 
@@ -170,7 +172,9 @@ export interface TrajectoryPrognosis {
   sigma: number;
   n_segments?: number; // decomposed only
   n_neighbors?: number; // direct / stage1 only
-  d_min_per_path_length?: number | null;
+  d_min?: number | null;
+  d_max?: number | null;
+  d_normalized?: number | null;
 }
 
 export interface Prognosis {

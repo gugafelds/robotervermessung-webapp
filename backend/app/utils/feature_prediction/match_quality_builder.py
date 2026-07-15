@@ -2,7 +2,7 @@
 match_quality_builder.py
 =========================
 Builds prognosis.confidence_match_quality (empirical match-quality
-buckets: d_min_per_path_length -> typical prediction_error), from the
+buckets: d_min -> typical prediction_error), from the
 existing confidence_calibration_seg/traj tables.
 
 Complements calibration_set_builder.py's conformal quantiles with a
@@ -185,15 +185,15 @@ async def build_buckets_for_level(
                 calibration_tag,
                 config_stage,
                 retrieval_strategy,
-                d_min_per_path_length,
+                d_min,
                 prediction_error,
                 NTILE($1) OVER (
                     PARTITION BY config_metric, config_dtw_mode, retrieval_strategy,
                                  config_k, search_modes, calibration_tag, config_stage
-                    ORDER BY d_min_per_path_length
+                    ORDER BY d_min
                 ) AS bucket
             FROM {source_table}
-            WHERE d_min_per_path_length IS NOT NULL
+            WHERE d_min IS NOT NULL
               {tag_clause}
         )
         SELECT
@@ -201,8 +201,8 @@ async def build_buckets_for_level(
             metric, dtw_mode, config_k, search_modes, calibration_tag,
             config_stage, retrieval_strategy,
             bucket,
-            MIN(d_min_per_path_length) AS d_min_lower,
-            MAX(d_min_per_path_length) AS d_min_upper,
+            MIN(d_min) AS d_min_lower,
+            MAX(d_min) AS d_min_upper,
             AVG(prediction_error)      AS mean_error,
             PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY prediction_error) AS median_error,
             STDDEV(prediction_error)   AS std_error,
