@@ -272,10 +272,11 @@ async def predict_performance(
     stage2_active   = bool(result.get('stage2_active'))
     path_length_map = _build_path_length_lookup(seg_batch or {})
 
-    segment_groups:   list                 = result.get('segment_similarity', [])
-    seg_predictions:  List[Optional[Dict]] = []
-    seg_path_lengths: List[float]          = []
-    seg_query_ids:    List[str]            = []
+    segment_groups:    list                 = result.get('segment_similarity', [])
+    seg_predictions:   List[Optional[Dict]] = []
+    seg_path_lengths:  List[float]          = []
+    seg_query_ids:     List[str]            = []
+    seg_neighbor_ids:  List[List[str]]      = []
 
     for group in segment_groups:
         query_seg_id = group.get('target_segment', '')
@@ -301,10 +302,12 @@ async def predict_performance(
         if prediction is not None:
             prediction['query_path_length'] = query_path_len if query_path_len > EPSILON else None
 
+        nids = [str(r['seg_id']) for r in seg_results if r.get('seg_id')]
         group['prediction'] = prediction
         seg_predictions.append(prediction)
         seg_path_lengths.append(query_path_len)
         seg_query_ids.append(query_seg_id)
+        seg_neighbor_ids.append(nids)
 
     decomposed_prediction = _aggregate_trajectory_decomposed(
         seg_predictions=seg_predictions,
@@ -327,17 +330,18 @@ async def predict_performance(
 
     # Build segments list — only expose what the frontend needs
     segments = []
-    for sid, pred in zip(seg_query_ids, seg_predictions):
+    for sid, pred, nids in zip(seg_query_ids, seg_predictions, seg_neighbor_ids):
         if pred:
             segments.append({
-                'seg_id':                sid,
-                'p_hat':                 pred.get('p_hat'),
-                'sigma':                 pred.get('sigma'),
-                'n_neighbors':           pred.get('n_neighbors'),
+                'seg_id':            sid,
+                'p_hat':             pred.get('p_hat'),
+                'sigma':             pred.get('sigma'),
+                'n_neighbors':       pred.get('n_neighbors'),
                 'd_min':             pred.get('d_min'),
                 'd_max':             pred.get('d_max'),
                 'd_normalized':      pred.get('d_normalized'),
                 'query_path_length': pred.get('query_path_length'),
+                'neighbor_ids':      nids,
             })
         else:
             segments.append({'seg_id': sid, 'p_hat': None})

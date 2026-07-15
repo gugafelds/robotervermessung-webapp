@@ -68,13 +68,13 @@ export const getTagInfo = async (tags?: string[]) => {
   }
 };
 
-// Returns all points with tag field — loaded once, filtered client-side
-export const getWorkareaData = async () => {
+// On-demand: fetch setpoints + workspace bounds for selected tags
+export const getWorkareaByTag = async (tags: string[]) => {
   try {
-    return await apiFetch(`${API_BASE_URL}/dashboard/workarea`);
+    return await apiFetch(buildUrl('/dashboard/workarea/by-tag', { tag: tags }));
   } catch (error) {
-    console.error('Error fetching workarea data:', error);
-    return { points: [] };
+    console.error('Error fetching workarea by tag:', error);
+    return { points: [], bounds: null };
   }
 };
 
@@ -88,12 +88,12 @@ export const getMetricTimeline = async (metric: MetricType = 'sidtw') => {
   }
 };
 
-// Returns 5000 samples with tag field — loaded once per metric, filtered client-side
-export const getMetricInfluence = async (metric: MetricType = 'sidtw') => {
+// Returns pre-binned box-plot data per parameter from backend
+export const getInfluenceBinned = async (metric: MetricType = 'sidtw', tags?: string[]) => {
   try {
-    return await apiFetch(buildUrl('/dashboard/influence', { metric }));
+    return await apiFetch(buildUrl('/dashboard/influence/binned', { metric, tag: tags }));
   } catch (error) {
-    console.error('Error fetching influence data:', error);
-    return { data: [] };
+    console.error('Error fetching binned influence data:', error);
+    return {};
   }
 };

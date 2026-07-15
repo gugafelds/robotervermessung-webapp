@@ -260,6 +260,140 @@ async def get_tag_info(tag: list[str] = Query(None), conn=Depends(get_db)):
     } for r in rows]}
 
 
+@router.get("/workarea/by-tag")
+async def get_workarea_by_tag(tag: list[str] = Query(None), conn=Depends(get_db)):
+    """Returns setpoints + sidtw for given tags, plus workspace bounds from tag_info."""
+    if not tag:
+        return {"points": [], "bounds": None}
+
+    rows = await conn.fetch("""
+        SELECT be.x_reached, be.y_reached, be.z_reached,
+               s.sidtw_average_distance, bi.tag
+        FROM motion.traj_setpoints be
+        JOIN evaluation.sidtw_info s ON be.traj_id = s.traj_id
+        JOIN motion.traj_info bi ON be.traj_id = bi.traj_id
+        WHERE bi.tag = ANY($1::text[])
+          AND s.traj_id <> s.seg_id
+          AND s.sidtw_average_distance IS NOT NULL
+          AND be.x_reached IS NOT NULL
+    """, tag)
+
+    tag_rows = await conn.fetch(
+        "SELECT * FROM motion.tag_info WHERE tag = ANY($1::text[]) ORDER BY tag", tag
+    )
+    bounds = None
+    if tag_rows:
+        xs = [r["ws_x_min"] for r in tag_rows if r["ws_x_min"] is not None]
+        xe = [r["ws_x_max"] for r in tag_rows if r["ws_x_max"] is not None]
+        ys = [r["ws_y_min"] for r in tag_rows if r["ws_y_min"] is not None]
+        ye = [r["ws_y_max"] for r in tag_rows if r["ws_y_max"] is not None]
+        zs = [r["ws_z_min"] for r in tag_rows if r["ws_z_min"] is not None]
+        ze = [r["ws_z_max"] for r in tag_rows if r["ws_z_max"] is not None]
+        if xs and xe and ys and ye and zs and ze:
+            bounds = {
+                "x_min": min(xs), "x_max": max(xe),
+                "y_min": min(ys), "y_max": max(ye),
+                "z_min": min(zs), "z_max": max(ze),
+            }
+
+    return {
+        "points": [{"x": r["x_reached"], "y": r["y_reached"], "z": r["z_reached"],
+                    "sidtw": r["sidtw_average_distance"], "tag": r["tag"]} for r in rows],
+        "bounds": bounds,
+    }
+
+
+@router.get("/influence/binned")
+@cache(expire=3600)
+async def get_influence_binned(
+    metric: str = Query("sidtw"),
+    tag: list[str] = Query(None),
+    conn=Depends(get_db),
+):
+    """Returns box-plot bins per parameter, pre-computed in DB."""
+    if metric not in METRIC_MAP:
+        raise HTTPException(status_code=400, detail=f"Unknown metric: {metric}")
+    table, col = METRIC_MAP[metric]
+    tc, tp = _tf(tag or None, alias="bi", p=1)
+    # shift param index if tag filter adds $1
+    p_offset = len(tp)
+
+    rows = await conn.fetch(f"""
+        WITH base AS (
+            SELECT info.{col}   AS mv,
+                   bm.max_vel   AS velocity,
+                   bm.max_accel AS acceleration,
+                   bi.weight    AS weight,
+                   bx.stop_point AS stop_point
+            FROM {table} info
+            INNER JOIN motion.traj_metadata bm ON info.seg_id = bm.seg_id
+            INNER JOIN motion.traj_info bi      ON info.traj_id = bi.traj_id
+            INNER JOIN motion.traj_setpoints bx ON info.seg_id = bx.seg_id
+            WHERE info.{col} IS NOT NULL AND bm.max_vel IS NOT NULL
+              AND bm.max_accel IS NOT NULL AND bx.stop_point IS NOT NULL
+              AND bi.tag IS NOT NULL {tc}
+        ),
+        vel_bins AS (
+            SELECT 'velocity' AS param,
+                   width_bucket(velocity, (SELECT MIN(velocity) FROM base),
+                                          (SELECT MAX(velocity) FROM base) + 0.001, 6) AS bucket,
+                   CONCAT(ROUND(MIN(velocity)::numeric), '–', ROUND(MAX(velocity)::numeric), ' mm/s') AS label,
+                   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY mv) AS median,
+                   PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY mv) AS q1,
+                   PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY mv) AS q3,
+                   MIN(mv) AS wlo, MAX(mv) AS whi, COUNT(*) AS cnt
+            FROM base GROUP BY bucket
+        ),
+        accel_bins AS (
+            SELECT 'acceleration' AS param,
+                   width_bucket(acceleration, (SELECT MIN(acceleration) FROM base),
+                                              (SELECT MAX(acceleration) FROM base) + 0.001, 6) AS bucket,
+                   CONCAT(ROUND(MIN(acceleration)::numeric), '–', ROUND(MAX(acceleration)::numeric), ' mm/s²') AS label,
+                   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY mv) AS median,
+                   PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY mv) AS q1,
+                   PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY mv) AS q3,
+                   MIN(mv) AS wlo, MAX(mv) AS whi, COUNT(*) AS cnt
+            FROM base GROUP BY bucket
+        ),
+        weight_bins AS (
+            SELECT 'weight' AS param, weight::int AS bucket,
+                   CONCAT(weight::int, ' kg') AS label,
+                   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY mv) AS median,
+                   PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY mv) AS q1,
+                   PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY mv) AS q3,
+                   MIN(mv) AS wlo, MAX(mv) AS whi, COUNT(*) AS cnt
+            FROM base GROUP BY weight::int
+        ),
+        stop_bins AS (
+            SELECT 'stop_point' AS param, (stop_point * 100)::int AS bucket,
+                   CONCAT((stop_point * 100)::int, '%') AS label,
+                   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY mv) AS median,
+                   PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY mv) AS q1,
+                   PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY mv) AS q3,
+                   MIN(mv) AS wlo, MAX(mv) AS whi, COUNT(*) AS cnt
+            FROM base GROUP BY (stop_point * 100)::int
+        )
+        SELECT * FROM vel_bins
+        UNION ALL SELECT * FROM accel_bins
+        UNION ALL SELECT * FROM weight_bins
+        UNION ALL SELECT * FROM stop_bins
+        ORDER BY param, bucket
+    """, *tp)
+
+    result: dict = {}
+    for r in rows:
+        result.setdefault(r["param"], []).append({
+            "label":  r["label"],
+            "median": float(r["median"]),
+            "q1":     float(r["q1"]),
+            "q3":     float(r["q3"]),
+            "wlo":    float(r["wlo"]),
+            "whi":    float(r["whi"]),
+            "count":  int(r["cnt"]),
+        })
+    return result
+
+
 @router.get("/workarea")
 @cache(expire=3600)
 async def get_dashboard_workarea(conn=Depends(get_db)):

@@ -54,10 +54,26 @@ class CorrectionRequest(BaseModel):
     mode:            Literal["relative", "linear"] = "relative"
     segment_indices: list[int] = []
     include_tags:    list[str] = []
+    exclude_tags:    list[str] = []
+
+
+class NeighborDebug(BaseModel):
+    seg_id:       str
+    dtw_distance: float
+    weight:       float
+    dx: float; dy: float; dz: float
+    positions:    List[List[float]]  # [[x, y, z], ...]
+
+
+class SegmentDebug(BaseModel):
+    target_segment: str
+    correction:     List[float]      # [dx, dy, dz] final
+    neighbors:      List[NeighborDebug]
 
 
 class CorrectionResponse(BaseModel):
-    corrections: List[List[float]]  # [[dx, dy, dz], ...] — one per segment
+    corrections: List[List[float]]   # [[dx, dy, dz], ...] — one per segment
+    debug:       Optional[List[SegmentDebug]] = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
@@ -110,11 +126,34 @@ async def _get_all_segment_data(conn, seg_ids: list[str], last_points: int = 10)
     return data
 
 
+async def _fetch_neighbor_positions(conn, seg_ids: list[str]) -> dict[str, list]:
+    """Returns {seg_id: [[x, y, z], ...]} sampled to max 200 points per segment."""
+    rows = await conn.fetch("""
+        SELECT seg_id, x_cmd, y_cmd, z_cmd
+        FROM (
+            SELECT seg_id, x_cmd, y_cmd, z_cmd,
+                   ROW_NUMBER() OVER (PARTITION BY seg_id ORDER BY timestamp ASC) AS rn,
+                   COUNT(*) OVER (PARTITION BY seg_id) AS total
+            FROM motion.traj_position_cmd
+            WHERE seg_id = ANY($1::text[])
+        ) t
+        WHERE rn = 1 OR rn % GREATEST(1, total / 200) = 0
+        ORDER BY seg_id, rn
+    """, seg_ids)
+    result: dict[str, list] = {}
+    for r in rows:
+        result.setdefault(str(r['seg_id']), []).append(
+            [float(r['x_cmd']), float(r['y_cmd']), float(r['z_cmd'])]
+        )
+    return result
+
+
 # ── Endpoint ──────────────────────────────────────────────────────────────
 
 @router.post("/predict", response_model=CorrectionResponse)
 async def predict_correction(
     request: CorrectionRequest,
+    debug: bool = False,
     pool=Depends(get_db_pool),
     conn=Depends(get_db),
 ):
@@ -148,6 +187,7 @@ async def predict_correction(
             metric="sidtw",
             prognosis_active=False,
             include_tags=request.include_tags or None,
+            exclude_tags=request.exclude_tags or None,
         )
 
         if similarity_result.get("error"):
@@ -224,29 +264,45 @@ async def predict_correction(
             len(seg_groups), len(corrections),
         )
 
-        # ── DEBUG ─────────────────────────────────────────────────────────
-        seg_groups = similarity_result.get("segment_similarity", [])
-        logger.info("[correction DEBUG] segment_similarity groups: %d", len(seg_groups))
-        for i, group in enumerate(seg_groups):
-            results = group.get("similar_segments", {}).get("results", [])
-            logger.info(
-                "[correction DEBUG] group %d: target_segment=%s, %d results, first dtw=%s",
-                i,
-                group.get("target_segment"),
-                len(results),
-                results[0].get("dtw_distance") if results else "N/A",
-            )
-        logger.info("[correction DEBUG] all_ids count: %d", len(all_ids))
-        logger.info("[correction DEBUG] query_data keys: %d", len(query_data))
-        # ── END DEBUG ──────────────────────────────────────────────────────
+        debug_data = None
+        if debug:
+            neighbor_positions = await _fetch_neighbor_positions(conn, all_ids)
+            debug_data = []
+            for group, corr in zip(seg_groups, corrections):
+                similar = group.get("similar_segments", {}).get("results", [])
+                dtw_first = None
+                neighbors_out = []
+                eps = 1e-9
+                inverse_dtw = []
+                valid = []
+                for s in similar:
+                    dtw = s.get("dtw_distance")
+                    if dtw is None:
+                        continue
+                    if dtw_first is None:
+                        dtw_first = float(dtw)
+                    if float(dtw) > CORRECTION_THRESHOLD * dtw_first:
+                        break
+                    valid.append((s, float(dtw)))
+                    inverse_dtw.append(1.0 / (float(dtw) + eps))
+                total_inv = sum(inverse_dtw) or 1.0
+                for (s, dtw), inv in zip(valid, inverse_dtw):
+                    sid = s.get("seg_id")
+                    dev = query_data.get(str(sid), [0, 0, 0])
+                    neighbors_out.append(NeighborDebug(
+                        seg_id=str(sid) if sid else "",
+                        dtw_distance=dtw,
+                        weight=round(inv / total_inv, 6),
+                        dx=dev[0], dy=dev[1], dz=dev[2],
+                        positions=neighbor_positions.get(str(sid), []),
+                    ))
+                debug_data.append(SegmentDebug(
+                    target_segment=group.get("target_segment", ""),
+                    correction=corr,
+                    neighbors=neighbors_out,
+                ))
 
-        logger.info("[correction DEBUG] segment_similarity groups: %d", len(seg_groups))
-        for i, g in enumerate(seg_groups):
-            logger.info("[correction DEBUG] group %d target=%s results=%d", 
-                        i, g.get('target_segment'), 
-                        len(g.get('similar_segments', {}).get('results', [])))
-
-        return CorrectionResponse(corrections=corrections)
+        return CorrectionResponse(corrections=corrections, debug=debug_data)
 
     except HTTPException:
         raise

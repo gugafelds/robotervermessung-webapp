@@ -1,15 +1,13 @@
 'use client';
 
-import { Loader } from 'lucide-react';
+import { ChevronDown, Loader } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import {
   getAvailableTags,
   getDashboardData,
-  getMetricInfluence,
   getMetricTimeline,
   getPerformers,
-  getWorkareaData,
 } from '@/src/actions/dashboard.service';
 import { AccuracyCard } from '@/src/app/dashboard/components/AccuracyCard';
 import { AccuracyTimeline } from '@/src/app/dashboard/components/AccuracyTimeline';
@@ -22,8 +20,6 @@ import { WorkareaPlot } from '@/src/app/dashboard/components/WorkareaPlot';
 import { Typography } from '@/src/components/Typography';
 import { METRICS, type DashboardData, type MetricType, type PerformerData } from '@/types/dashboard.types';
 
-interface WorkareaPoint { x: number; y: number; z: number; sidtw: number; tag: string }
-interface InfluencePoint { metric_value: number; velocity: number; acceleration: number; weight: number; stop_point: number; tag: string }
 interface TimelinePoint { date: string; tag: string | null; avg_val: number; min_val: number; max_val: number; count: number }
 
 export default function DashboardClient() {
@@ -31,38 +27,28 @@ export default function DashboardClient() {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [metric, setMetric] = useState<MetricType>('sidtw');
   const [basicData, setBasicData] = useState<DashboardData | null>(null);
-  const [sidtwPerformers, setSidtwPerformers] = useState<{ bestPerformers: PerformerData[]; worstPerformers: PerformerData[] }>({ bestPerformers: [], worstPerformers: [] });
-  const [workareaPoints, setWorkareaPoints] = useState<WorkareaPoint[]>([]);
-  const [influenceData, setInfluenceData] = useState<InfluencePoint[]>([]);
-  const [timelineData, setTimelineData] = useState<TimelinePoint[]>([]);
   const [performersAll, setPerformersAll] = useState<{ bestPerformers: PerformerData[]; worstPerformers: PerformerData[] }>({ bestPerformers: [], worstPerformers: [] });
+  const [timelineData, setTimelineData] = useState<TimelinePoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const initialized = useRef(false);
 
-  // Load heavy data once on mount
   useEffect(() => {
     Promise.all([
       getAvailableTags(),
       getDashboardData(),
-      getPerformers('sidtw', true),   // with trajectories for WorkareaPlot
-      getPerformers('sidtw', false),  // 100 best/worst for PerformersTable
-      getWorkareaData(),
-      getMetricInfluence(),
+      getPerformers('sidtw', false),
       getMetricTimeline(),
-    ]).then(([tags, data, trajPerformers, tablePerformers, workarea, influence, timeline]) => {
+    ]).then(([tags, data, tablePerformers, timeline]) => {
       setAvailableTags((tags as { tags: string[] }).tags);
       setBasicData(data as DashboardData);
-      setSidtwPerformers(trajPerformers as typeof sidtwPerformers);
       setPerformersAll(tablePerformers as typeof performersAll);
-      setWorkareaPoints((workarea as { points: WorkareaPoint[] }).points ?? []);
-      setInfluenceData((influence as { data: InfluencePoint[] }).data ?? []);
       setTimelineData((timeline as { timeline: TimelinePoint[] }).timeline ?? []);
       initialized.current = true;
     }).finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // On tag change: only re-fetch KPI/distribution data silently (keep old values visible)
   useEffect(() => {
     if (!initialized.current) return;
     const tagFilter = selectedTags.length > 0 ? selectedTags : undefined;
@@ -73,6 +59,7 @@ export default function DashboardClient() {
     setSelectedTags((prev) =>
       prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
     );
+    setDropdownOpen(false);
   };
 
   if (loading) {
@@ -87,98 +74,132 @@ export default function DashboardClient() {
     return <div className="p-6">Error: No data found</div>;
   }
 
+  const tagLabel = selectedTags.length === 0
+    ? 'All tags'
+    : selectedTags.length === 1
+      ? selectedTags[0]
+      : `${selectedTags.length} tags selected`;
+
   return (
-    <div className="w-full space-y-4 p-4">
-      {/* Global filters */}
-      <div className="space-y-2 rounded-2xl border border-gray-200 bg-white p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="w-16 text-sm font-semibold text-gray-700">Tags:</span>
-          <button
-            type="button"
-            onClick={() => setSelectedTags([])}
-            className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-              selectedTags.length === 0
-                ? 'bg-blue-950 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            All
-          </button>
-          {availableTags.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => toggleTag(t)}
-              className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                selectedTags.includes(t)
-                  ? 'bg-blue-950 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="w-16 text-sm font-semibold text-gray-700">Metrics:</span>
-          {(Object.keys(METRICS) as MetricType[]).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMetric(m)}
-              className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                metric === m
-                  ? 'bg-blue-950 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {METRICS[m].label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2">
+    <div className="flex min-h-screen bg-gray-50">
+      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
+      <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col gap-6 overflow-y-auto border-r border-gray-200 bg-white p-4">
         <div>
-          <Typography as="h2">Motion Data</Typography>
-          <div className="my-2 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <DataCard componentName="Trajectories overall" value={basicData.trajsCount} />
-            <DataCard componentName="Segments overall" value={basicData.segmentsCount} />
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-gray-400">Tag</p>
+
+          {/* Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setDropdownOpen((o) => !o)}
+              className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              <span className="truncate">{tagLabel}</span>
+              <ChevronDown className={`ml-1 size-4 shrink-0 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute left-0 z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => { setSelectedTags([]); setDropdownOpen(false); }}
+                  className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-gray-50 ${selectedTags.length === 0 ? 'font-semibold text-blue-950' : 'text-gray-700'}`}
+                >
+                  All tags
+                </button>
+                {availableTags.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => toggleTag(t)}
+                    className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-gray-50 ${selectedTags.includes(t) ? 'font-semibold text-blue-950' : 'text-gray-700'}`}
+                  >
+                    {selectedTags.includes(t) ? '✓ ' : ''}{t}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Active tag chips */}
+          {selectedTags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {selectedTags.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setSelectedTags((prev) => prev.filter((x) => x !== t))}
+                  className="rounded-full bg-blue-950 px-2 py-0.5 text-xs text-white hover:bg-blue-700"
+                  title="Remove"
+                >
+                  {t} ×
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-gray-400">Metric</p>
+          <div className="flex flex-col gap-1">
+            {(Object.keys(METRICS) as MetricType[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMetric(m)}
+                className={`rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
+                  metric === m
+                    ? 'bg-blue-950 text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {METRICS[m].label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </aside>
+
+      {/* ── Main content ────────────────────────────────────────────────── */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions */}
+      <main
+        className="flex-1 overflow-y-auto p-6"
+        onClick={() => { if (dropdownOpen) setDropdownOpen(false); }}
+      >
+        <div className="mx-auto flex max-w-4xl flex-col gap-6">
+
+          {/* KPI row */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <DataCard componentName="Trajectories" value={basicData.trajsCount} />
+            <DataCard componentName="Segments" value={basicData.segmentsCount} />
             <AccuracyCard medianSIDTW={basicData.medianSIDTW} meanSIDTW={basicData.meanSIDTW} />
           </div>
 
-          {/* Tag info cards — only visible when tags are selected */}
           <TagInfoCard selectedTags={selectedTags} />
 
           <DistributionCharts stats={basicData.stats} />
+
+          <PerformersTable
+            initialPerformers={performersAll}
+            selectedTags={selectedTags}
+            metric={metric}
+          />
+
+          <ParameterCorrelation
+            selectedTags={selectedTags}
+            metric={metric}
+          />
+
+          <AccuracyTimeline
+            allTimeline={timelineData}
+            selectedTags={selectedTags}
+            metric={metric}
+          />
+
+          <WorkareaPlot selectedTags={selectedTags} />
+
         </div>
-
-        <PerformersTable
-          initialPerformers={performersAll}
-          selectedTags={selectedTags}
-          metric={metric}
-        />
-
-        <ParameterCorrelation
-          allData={influenceData}
-          selectedTags={selectedTags}
-          metric={metric}
-        />
-
-        <WorkareaPlot
-          allPoints={workareaPoints}
-          selectedTags={selectedTags}
-          bestPerformers={sidtwPerformers.bestPerformers}
-          worstPerformers={sidtwPerformers.worstPerformers}
-        />
-
-        <AccuracyTimeline
-          allTimeline={timelineData}
-          selectedTags={selectedTags}
-          metric={metric}
-        />
-      </div>
+      </main>
     </div>
   );
 }
