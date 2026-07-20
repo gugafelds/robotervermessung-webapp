@@ -23,7 +23,10 @@ import { METRICS, type DashboardData, type MetricType, type PerformerData } from
 interface TimelinePoint { date: string; tag: string | null; avg_val: number; min_val: number; max_val: number; count: number }
 
 export default function DashboardClient() {
+  // selectedTags = applied (drives data fetching)
+  // pendingTags  = what's shown in the dropdown (not yet applied)
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [pendingTags,  setPendingTags]  = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [metric, setMetric] = useState<MetricType>('sidtw');
   const [basicData, setBasicData] = useState<DashboardData | null>(null);
@@ -49,18 +52,32 @@ export default function DashboardClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Re-fetch KPI/distribution data when applied tags change
   useEffect(() => {
     if (!initialized.current) return;
     const tagFilter = selectedTags.length > 0 ? selectedTags : undefined;
     getDashboardData(tagFilter).then((data) => setBasicData(data as DashboardData));
   }, [selectedTags]);
 
-  const toggleTag = (t: string) => {
-    setSelectedTags((prev) =>
+  const togglePending = (t: string) => {
+    setPendingTags((prev) =>
       prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
     );
+  };
+
+  const applyTags = () => {
+    setSelectedTags([...pendingTags]);
     setDropdownOpen(false);
   };
+
+  const removeAll = () => {
+    setPendingTags([]);
+    setSelectedTags([]);
+    setDropdownOpen(false);
+  };
+
+  const hasPendingChanges =
+    JSON.stringify([...pendingTags].sort()) !== JSON.stringify([...selectedTags].sort());
 
   if (loading) {
     return (
@@ -78,7 +95,7 @@ export default function DashboardClient() {
     ? 'All tags'
     : selectedTags.length === 1
       ? selectedTags[0]
-      : `${selectedTags.length} tags selected`;
+      : `${selectedTags.length} tags`;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -87,7 +104,6 @@ export default function DashboardClient() {
         <div>
           <p className="mb-2 text-xs font-bold uppercase tracking-widest text-gray-400">Tag</p>
 
-          {/* Dropdown */}
           <div className="relative">
             <button
               type="button"
@@ -99,41 +115,60 @@ export default function DashboardClient() {
             </button>
 
             {dropdownOpen && (
-              <div className="absolute left-0 z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => { setSelectedTags([]); setDropdownOpen(false); }}
-                  className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-gray-50 ${selectedTags.length === 0 ? 'font-semibold text-blue-950' : 'text-gray-700'}`}
-                >
-                  All tags
-                </button>
-                {availableTags.map((t) => (
+              <div className="absolute left-0 z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                {/* Tag list */}
+                <div className="max-h-64 overflow-y-auto py-1">
                   <button
-                    key={t}
                     type="button"
-                    onClick={() => toggleTag(t)}
-                    className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-gray-50 ${selectedTags.includes(t) ? 'font-semibold text-blue-950' : 'text-gray-700'}`}
+                    onClick={() => setPendingTags([])}
+                    className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-gray-50 ${pendingTags.length === 0 ? 'font-semibold text-blue-950' : 'text-gray-700'}`}
                   >
-                    {selectedTags.includes(t) ? '✓ ' : ''}{t}
+                    All tags
                   </button>
-                ))}
+                  {availableTags.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => togglePending(t)}
+                      className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-gray-50 ${pendingTags.includes(t) ? 'font-semibold text-blue-950' : 'text-gray-700'}`}
+                    >
+                      {pendingTags.includes(t) ? '✓ ' : ''}{t}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-1 border-t border-gray-100 p-2">
+                  <button
+                    type="button"
+                    onClick={removeAll}
+                    className="flex-1 rounded-md border border-gray-200 px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                  >
+                    Remove all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyTags}
+                    disabled={!hasPendingChanges}
+                    className="flex-1 rounded-md bg-blue-950 px-2 py-1.5 text-xs font-medium text-white hover:bg-blue-800 disabled:opacity-40"
+                  >
+                    Apply
+                  </button>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Active tag chips */}
+          {/* Applied tag chips */}
           {selectedTags.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {selectedTags.map((t) => (
-                <button
+                <span
                   key={t}
-                  type="button"
-                  onClick={() => setSelectedTags((prev) => prev.filter((x) => x !== t))}
-                  className="rounded-full bg-blue-950 px-2 py-0.5 text-xs text-white hover:bg-blue-700"
-                  title="Remove"
+                  className="rounded-full bg-blue-950 px-2 py-0.5 text-xs text-white"
                 >
-                  {t} ×
-                </button>
+                  {t}
+                </span>
               ))}
             </div>
           )}
@@ -148,9 +183,7 @@ export default function DashboardClient() {
                 type="button"
                 onClick={() => setMetric(m)}
                 className={`rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
-                  metric === m
-                    ? 'bg-blue-950 text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
+                  metric === m ? 'bg-blue-950 text-white' : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {METRICS[m].label}
@@ -168,7 +201,6 @@ export default function DashboardClient() {
       >
         <div className="mx-auto flex max-w-4xl flex-col gap-6">
 
-          {/* KPI row */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <DataCard componentName="Trajectories" value={basicData.trajsCount} />
             <DataCard componentName="Segments" value={basicData.segmentsCount} />

@@ -1,3 +1,6 @@
+import os
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from ...database import get_db
 import logging
@@ -226,7 +229,7 @@ async def get_dashboard_influence(metric: str = Query("sidtw"), conn=Depends(get
             WHERE info.{col} IS NOT NULL AND bm.max_vel IS NOT NULL
               AND bm.max_accel IS NOT NULL AND bx.stop_point IS NOT NULL
               AND bi.tag IS NOT NULL
-            ORDER BY RANDOM() LIMIT 5000
+            ORDER BY RANDOM() LIMIT 2000
         ) SELECT * FROM sampled""")
 
     return {"data": [{
@@ -260,41 +263,56 @@ async def get_tag_info(tag: list[str] = Query(None), conn=Depends(get_db)):
     } for r in rows]}
 
 
-@router.get("/workarea/by-tag")
-async def get_workarea_by_tag(tag: list[str] = Query(None), conn=Depends(get_db)):
-    """Returns setpoints + sidtw for given tags, plus workspace bounds from tag_info."""
-    if not tag:
-        return {"points": [], "bounds": None}
+@router.get("/workarea/data")
+async def get_workarea_data(tag: list[str] = Query(None), conn=Depends(get_db)):
+    """
+    With tags  → all setpoints for those tags + workspace bounds from tag_info.
+    Without    → 5000 random setpoints from whole DB, no bounds box.
+    """
+    if tag:
+        rows = await conn.fetch("""
+            SELECT be.x_reached, be.y_reached, be.z_reached,
+                   s.sidtw_average_distance, bi.tag
+            FROM motion.traj_setpoints be
+            JOIN evaluation.sidtw_info s ON be.traj_id = s.traj_id
+            JOIN motion.traj_info bi ON be.traj_id = bi.traj_id
+            WHERE bi.tag = ANY($1::text[])
+              AND s.traj_id <> s.seg_id
+              AND s.sidtw_average_distance IS NOT NULL
+              AND be.x_reached IS NOT NULL
+        """, tag)
 
-    rows = await conn.fetch("""
-        SELECT be.x_reached, be.y_reached, be.z_reached,
-               s.sidtw_average_distance, bi.tag
-        FROM motion.traj_setpoints be
-        JOIN evaluation.sidtw_info s ON be.traj_id = s.traj_id
-        JOIN motion.traj_info bi ON be.traj_id = bi.traj_id
-        WHERE bi.tag = ANY($1::text[])
-          AND s.traj_id <> s.seg_id
-          AND s.sidtw_average_distance IS NOT NULL
-          AND be.x_reached IS NOT NULL
-    """, tag)
-
-    tag_rows = await conn.fetch(
-        "SELECT * FROM motion.tag_info WHERE tag = ANY($1::text[]) ORDER BY tag", tag
-    )
-    bounds = None
-    if tag_rows:
-        xs = [r["ws_x_min"] for r in tag_rows if r["ws_x_min"] is not None]
-        xe = [r["ws_x_max"] for r in tag_rows if r["ws_x_max"] is not None]
-        ys = [r["ws_y_min"] for r in tag_rows if r["ws_y_min"] is not None]
-        ye = [r["ws_y_max"] for r in tag_rows if r["ws_y_max"] is not None]
-        zs = [r["ws_z_min"] for r in tag_rows if r["ws_z_min"] is not None]
-        ze = [r["ws_z_max"] for r in tag_rows if r["ws_z_max"] is not None]
-        if xs and xe and ys and ye and zs and ze:
-            bounds = {
-                "x_min": min(xs), "x_max": max(xe),
-                "y_min": min(ys), "y_max": max(ye),
-                "z_min": min(zs), "z_max": max(ze),
-            }
+        tag_rows = await conn.fetch(
+            "SELECT * FROM motion.tag_info WHERE tag = ANY($1::text[]) ORDER BY tag", tag
+        )
+        bounds = None
+        if tag_rows:
+            xs = [r["ws_x_min"] for r in tag_rows if r["ws_x_min"] is not None]
+            xe = [r["ws_x_max"] for r in tag_rows if r["ws_x_max"] is not None]
+            ys = [r["ws_y_min"] for r in tag_rows if r["ws_y_min"] is not None]
+            ye = [r["ws_y_max"] for r in tag_rows if r["ws_y_max"] is not None]
+            zs = [r["ws_z_min"] for r in tag_rows if r["ws_z_min"] is not None]
+            ze = [r["ws_z_max"] for r in tag_rows if r["ws_z_max"] is not None]
+            if xs and xe and ys and ye and zs and ze:
+                bounds = {
+                    "x_min": min(xs), "x_max": max(xe),
+                    "y_min": min(ys), "y_max": max(ye),
+                    "z_min": min(zs), "z_max": max(ze),
+                }
+    else:
+        rows = await conn.fetch("""
+            SELECT be.x_reached, be.y_reached, be.z_reached,
+                   s.sidtw_average_distance, bi.tag
+            FROM motion.traj_setpoints be
+            JOIN evaluation.sidtw_info s ON be.traj_id = s.traj_id
+            JOIN motion.traj_info bi ON be.traj_id = bi.traj_id
+            WHERE s.traj_id <> s.seg_id
+              AND s.sidtw_average_distance IS NOT NULL
+              AND be.x_reached IS NOT NULL
+              AND bi.tag IS NOT NULL
+            ORDER BY RANDOM()
+        """)
+        bounds = None
 
     return {
         "points": [{"x": r["x_reached"], "y": r["y_reached"], "z": r["z_reached"],
@@ -315,8 +333,7 @@ async def get_influence_binned(
         raise HTTPException(status_code=400, detail=f"Unknown metric: {metric}")
     table, col = METRIC_MAP[metric]
     tc, tp = _tf(tag or None, alias="bi", p=1)
-    # shift param index if tag filter adds $1
-    p_offset = len(tp)
+    sample = "ORDER BY RANDOM() LIMIT 5000" if not tag else ""
 
     rows = await conn.fetch(f"""
         WITH base AS (
@@ -332,6 +349,7 @@ async def get_influence_binned(
             WHERE info.{col} IS NOT NULL AND bm.max_vel IS NOT NULL
               AND bm.max_accel IS NOT NULL AND bx.stop_point IS NOT NULL
               AND bi.tag IS NOT NULL {tc}
+            {sample}
         ),
         vel_bins AS (
             SELECT 'velocity' AS param,
@@ -356,22 +374,22 @@ async def get_influence_binned(
             FROM base GROUP BY bucket
         ),
         weight_bins AS (
-            SELECT 'weight' AS param, weight::int AS bucket,
-                   CONCAT(weight::int, ' kg') AS label,
+            SELECT 'weight' AS param, weight AS bucket,
+                   CONCAT(weight, ' kg') AS label,
                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY mv) AS median,
                    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY mv) AS q1,
                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY mv) AS q3,
                    MIN(mv) AS wlo, MAX(mv) AS whi, COUNT(*) AS cnt
-            FROM base GROUP BY weight::int
+            FROM base GROUP BY weight ORDER BY weight
         ),
         stop_bins AS (
-            SELECT 'stop_point' AS param, (stop_point * 100)::int AS bucket,
-                   CONCAT((stop_point * 100)::int, '%') AS label,
+            SELECT 'stop_point' AS param, stop_point AS bucket,
+                   CONCAT(stop_point::int, '%') AS label,
                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY mv) AS median,
                    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY mv) AS q1,
                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY mv) AS q3,
                    MIN(mv) AS wlo, MAX(mv) AS whi, COUNT(*) AS cnt
-            FROM base GROUP BY (stop_point * 100)::int
+            FROM base GROUP BY stop_point ORDER BY stop_point
         )
         SELECT * FROM vel_bins
         UNION ALL SELECT * FROM accel_bins
@@ -394,26 +412,46 @@ async def get_influence_binned(
     return result
 
 
-@router.get("/workarea")
-@cache(expire=3600)
-async def get_dashboard_workarea(conn=Depends(get_db)):
-    """Returns sampled workarea points with tag field. Client filters by tag."""
-    rows = await conn.fetch("""
-        WITH numbered AS (
-            SELECT be.x_reached, be.y_reached, be.z_reached,
-                   s.sidtw_average_distance, bi.tag,
-                   ROW_NUMBER() OVER (PARTITION BY be.traj_id ORDER BY be.timestamp) as rn
-            FROM motion.traj_setpoints be
-            JOIN evaluation.sidtw_info s ON be.traj_id = s.traj_id
-            JOIN motion.traj_info bi ON be.traj_id = bi.traj_id
-            WHERE s.traj_id <> s.seg_id AND s.sidtw_average_distance IS NOT NULL
-              AND be.x_reached IS NOT NULL AND be.y_reached IS NOT NULL
-              AND be.z_reached IS NOT NULL AND bi.tag IS NOT NULL
-        )
-        SELECT x_reached, y_reached, z_reached, sidtw_average_distance, tag
-        FROM numbered WHERE rn % 10 = 0 LIMIT 30000""")
+_MODELS_DIR = os.path.join(os.path.dirname(__file__), "../../utils/robot_models")
 
-    return {"points": [{
-        "x": r["x_reached"], "y": r["y_reached"], "z": r["z_reached"],
-        "sidtw": r["sidtw_average_distance"], "tag": r["tag"],
-    } for r in rows]}
+def _parse_ascii_stl(path: str):
+    """Parse ASCII STL → (x, y, z, i, j, k) lists for Plotly mesh3d."""
+    with open(path) as f:
+        content = f.read()
+    verts = re.findall(r'vertex\s+([\-\d.eE+]+)\s+([\-\d.eE+]+)\s+([\-\d.eE+]+)', content)
+    xs, ys, zs, ii, jj, kk = [], [], [], [], [], []
+    for idx in range(0, len(verts) - 2, 3):
+        base = len(xs)
+        for v in verts[idx:idx + 3]:
+            xs.append(float(v[0])); ys.append(float(v[1])); zs.append(float(v[2]))
+        ii.append(base); jj.append(base + 1); kk.append(base + 2)
+    return xs, ys, zs, ii, jj, kk
+
+
+@router.get("/workarea/robot-mesh")
+@cache(expire=86400)
+async def get_robot_mesh(tag: list[str] = Query(None), conn=Depends(get_db)):
+    """Returns Plotly mesh3d data for the robot workspace STL of the given tag(s)."""
+    if tag:
+        row = await conn.fetchrow(
+            "SELECT DISTINCT robot FROM motion.tag_info WHERE tag = ANY($1::text[]) AND robot IS NOT NULL LIMIT 1", tag
+        )
+    else:
+        row = await conn.fetchrow(
+            "SELECT DISTINCT robot FROM motion.tag_info WHERE robot IS NOT NULL LIMIT 1"
+        )
+    if not row or not row["robot"]:
+        return {"mesh": None}
+
+    robot = row["robot"]
+    stl_path = os.path.normpath(os.path.join(_MODELS_DIR, f"{robot}_workspace.stl"))
+    # Safety: must stay within models dir
+    if not stl_path.startswith(os.path.normpath(_MODELS_DIR)):
+        raise HTTPException(status_code=400, detail="Invalid robot model")
+    if not os.path.isfile(stl_path):
+        return {"mesh": None, "robot": robot}
+
+    xs, ys, zs, ii, jj, kk = _parse_ascii_stl(stl_path)
+    return {"mesh": {"x": xs, "y": ys, "z": zs, "i": ii, "j": jj, "k": kk}, "robot": robot}
+
+
