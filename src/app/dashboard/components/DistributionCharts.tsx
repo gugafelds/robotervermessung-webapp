@@ -10,7 +10,12 @@ import type { DashboardData } from '@/types/dashboard.types';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
-type TabType = 'weight' | 'velocity' | 'waypoint' | 'performance_sidtw' | 'stopPoint';
+type TabType =
+  | 'weight'
+  | 'velocity'
+  | 'waypoint'
+  | 'performance_sidtw'
+  | 'stopPoint';
 
 const tabs: { id: TabType; label: string }[] = [
   { id: 'weight', label: 'Payload' },
@@ -27,7 +32,10 @@ interface Props {
 export function DistributionCharts({ stats }: Props) {
   const [activeTab, setActiveTab] = useState<TabType>('weight');
 
-  const distMap: Record<TabType, DashboardData['stats'][keyof DashboardData['stats']]> = {
+  const distMap: Record<
+    TabType,
+    DashboardData['stats'][keyof DashboardData['stats']]
+  > = {
     weight: stats.weightDistribution,
     velocity: stats.velocityDistribution,
     waypoint: stats.waypointDistribution,
@@ -67,16 +75,39 @@ export function DistributionCharts({ stats }: Props) {
         ))}
       </div>
       <Plot
-        data={[{ x: xLabels, y: sorted.map((d) => d.count), type: 'bar', marker: { color: '#003560' } }]}
+        data={[
+          {
+            x: xLabels,
+            y: sorted.map((d) => d.count),
+            type: 'bar',
+            marker: { color: '#003560' },
+          },
+        ]}
         layout={{
           autosize: true,
           height: 450,
           margin: { t: 20, r: 20, l: 80, b: 80 },
-          xaxis: { title: { text: `${active.meta.label} [${active.meta.unit}]` }, type: 'category' },
+          xaxis: {
+            title: { text: `${active.meta.label} [${active.meta.unit}]` },
+            type: 'category',
+          },
           yaxis: { title: { text: 'Amount' } },
         }}
         style={{ width: '100%' }}
-        config={{ responsive: true, displaylogo: false, modeBarButtonsToRemove: ['toImage', 'orbitRotation', 'lasso2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'pan2d', 'select2d'] }}
+        config={{
+          responsive: true,
+          displaylogo: false,
+          modeBarButtonsToRemove: [
+            'toImage',
+            'orbitRotation',
+            'lasso2d',
+            'zoomIn2d',
+            'zoomOut2d',
+            'autoScale2d',
+            'pan2d',
+            'select2d',
+          ],
+        }}
       />
     </div>
   );

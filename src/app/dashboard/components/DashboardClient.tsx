@@ -1,3 +1,6 @@
+/* eslint-disable jsx-a11y/no-noninteractive-element-interactions */
+/* eslint-disable no-nested-ternary */
+
 'use client';
 
 import { ChevronDown, Loader } from 'lucide-react';
@@ -17,20 +20,34 @@ import { ParameterCorrelation } from '@/src/app/dashboard/components/ParameterCo
 import { PerformersTable } from '@/src/app/dashboard/components/PerformersTable';
 import { TagInfoCard } from '@/src/app/dashboard/components/TagInfoCard';
 import { WorkareaPlot } from '@/src/app/dashboard/components/WorkareaPlot';
-import { Typography } from '@/src/components/Typography';
-import { METRICS, type DashboardData, type MetricType, type PerformerData } from '@/types/dashboard.types';
+import {
+  type DashboardData,
+  METRICS,
+  type MetricType,
+  type PerformerData,
+} from '@/types/dashboard.types';
 
-interface TimelinePoint { date: string; tag: string | null; avg_val: number; min_val: number; max_val: number; count: number }
+interface TimelinePoint {
+  date: string;
+  tag: string | null;
+  avg_val: number;
+  min_val: number;
+  max_val: number;
+  count: number;
+}
 
 export default function DashboardClient() {
   // selectedTags = applied (drives data fetching)
   // pendingTags  = what's shown in the dropdown (not yet applied)
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [pendingTags,  setPendingTags]  = useState<string[]>([]);
+  const [pendingTags, setPendingTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [metric, setMetric] = useState<MetricType>('sidtw');
   const [basicData, setBasicData] = useState<DashboardData | null>(null);
-  const [performersAll, setPerformersAll] = useState<{ bestPerformers: PerformerData[]; worstPerformers: PerformerData[] }>({ bestPerformers: [], worstPerformers: [] });
+  const [performersAll, setPerformersAll] = useState<{
+    bestPerformers: PerformerData[];
+    worstPerformers: PerformerData[];
+  }>({ bestPerformers: [], worstPerformers: [] });
   const [timelineData, setTimelineData] = useState<TimelinePoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -42,26 +59,32 @@ export default function DashboardClient() {
       getDashboardData(),
       getPerformers('sidtw', false),
       getMetricTimeline(),
-    ]).then(([tags, data, tablePerformers, timeline]) => {
-      setAvailableTags((tags as { tags: string[] }).tags);
-      setBasicData(data as DashboardData);
-      setPerformersAll(tablePerformers as typeof performersAll);
-      setTimelineData((timeline as { timeline: TimelinePoint[] }).timeline ?? []);
-      initialized.current = true;
-    }).finally(() => setLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    ])
+      .then(([tags, data, tablePerformers, timeline]) => {
+        setAvailableTags((tags as { tags: string[] }).tags);
+        setBasicData(data as DashboardData);
+        setPerformersAll(tablePerformers as typeof performersAll);
+        setTimelineData(
+          (timeline as { timeline: TimelinePoint[] }).timeline ?? [],
+        );
+        initialized.current = true;
+      })
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Re-fetch KPI/distribution data when applied tags change
   useEffect(() => {
     if (!initialized.current) return;
     const tagFilter = selectedTags.length > 0 ? selectedTags : undefined;
-    getDashboardData(tagFilter).then((data) => setBasicData(data as DashboardData));
+    getDashboardData(tagFilter).then((data) =>
+      setBasicData(data as DashboardData),
+    );
   }, [selectedTags]);
 
   const togglePending = (t: string) => {
     setPendingTags((prev) =>
-      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
+      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
     );
   };
 
@@ -77,7 +100,8 @@ export default function DashboardClient() {
   };
 
   const hasPendingChanges =
-    JSON.stringify([...pendingTags].sort()) !== JSON.stringify([...selectedTags].sort());
+    JSON.stringify([...pendingTags].sort()) !==
+    JSON.stringify([...selectedTags].sort());
 
   if (loading) {
     return (
@@ -91,31 +115,34 @@ export default function DashboardClient() {
     return <div className="p-6">Error: No data found</div>;
   }
 
-  const tagLabel = selectedTags.length === 0
-    ? 'All tags'
-    : selectedTags.length === 1
-      ? selectedTags[0]
-      : `${selectedTags.length} tags`;
+  const tagLabel =
+    selectedTags.length === 0
+      ? 'All tags'
+      : selectedTags.length === 1
+        ? selectedTags[0]
+        : `${selectedTags.length} tags`;
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen border-r border-gray-500 bg-gray-50">
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-      <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col gap-6 overflow-y-auto border-r border-gray-200 bg-white p-4">
+      <aside className="sticky top-0 flex h-screen w-72 flex-col gap-6 overflow-y-auto border-r border-gray-500 bg-white p-4">
         <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-gray-400">Tag</p>
+          <p className="mb-2 text-xs font-bold uppercase text-gray-800">Tag</p>
 
           <div className="relative">
             <button
               type="button"
               onClick={() => setDropdownOpen((o) => !o)}
-              className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-100"
+              className="flex w-full items-center justify-between rounded-lg border border-gray-500 bg-gray-50 px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-100"
             >
               <span className="truncate">{tagLabel}</span>
-              <ChevronDown className={`ml-1 size-4 shrink-0 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown
+                className={`ml-1 size-4 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
+              />
             </button>
 
             {dropdownOpen && (
-              <div className="absolute left-0 z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+              <div className="absolute left-0 z-50 mt-1 w-full overflow-y-auto rounded-lg border border-gray-500 bg-white shadow-lg">
                 {/* Tag list */}
                 <div className="max-h-64 overflow-y-auto py-1">
                   <button
@@ -132,7 +159,8 @@ export default function DashboardClient() {
                       onClick={() => togglePending(t)}
                       className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-gray-50 ${pendingTags.includes(t) ? 'font-semibold text-blue-950' : 'text-gray-700'}`}
                     >
-                      {pendingTags.includes(t) ? '✓ ' : ''}{t}
+                      {pendingTags.includes(t) ? '✓ ' : ''}
+                      {t}
                     </button>
                   ))}
                 </div>
@@ -165,7 +193,7 @@ export default function DashboardClient() {
               {selectedTags.map((t) => (
                 <span
                   key={t}
-                  className="rounded-full bg-blue-950 px-2 py-0.5 text-xs text-white"
+                  className="rounded-full bg-blue-950 px-2 py-1 text-xs text-white"
                 >
                   {t}
                 </span>
@@ -175,7 +203,9 @@ export default function DashboardClient() {
         </div>
 
         <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-gray-400">Metric</p>
+          <p className="mb-2 text-xs font-bold uppercase text-gray-800">
+            Metric
+          </p>
           <div className="flex flex-col gap-1">
             {(Object.keys(METRICS) as MetricType[]).map((m) => (
               <button
@@ -183,7 +213,9 @@ export default function DashboardClient() {
                 type="button"
                 onClick={() => setMetric(m)}
                 className={`rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
-                  metric === m ? 'bg-blue-950 text-white' : 'text-gray-600 hover:bg-gray-100'
+                  metric === m
+                    ? 'bg-blue-950 text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {METRICS[m].label}
@@ -196,15 +228,25 @@ export default function DashboardClient() {
       {/* ── Main content ────────────────────────────────────────────────── */}
       {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions */}
       <main
-        className="flex-1 overflow-y-auto p-6"
-        onClick={() => { if (dropdownOpen) setDropdownOpen(false); }}
+        className="flex-1 overflow-y-auto p-10"
+        onClick={() => {
+          if (dropdownOpen) setDropdownOpen(false);
+        }}
       >
-        <div className="mx-auto flex max-w-4xl flex-col gap-6">
-
+        <div className="mx-auto flex max-w-4xl flex-col gap-8">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <DataCard componentName="Trajectories" value={basicData.trajsCount} />
-            <DataCard componentName="Segments" value={basicData.segmentsCount} />
-            <AccuracyCard medianSIDTW={basicData.medianSIDTW} meanSIDTW={basicData.meanSIDTW} />
+            <DataCard
+              componentName="Trajectories"
+              value={basicData.trajsCount}
+            />
+            <DataCard
+              componentName="Segments"
+              value={basicData.segmentsCount}
+            />
+            <AccuracyCard
+              medianSIDTW={basicData.medianSIDTW}
+              meanSIDTW={basicData.meanSIDTW}
+            />
           </div>
 
           <TagInfoCard selectedTags={selectedTags} />
@@ -217,10 +259,7 @@ export default function DashboardClient() {
             metric={metric}
           />
 
-          <ParameterCorrelation
-            selectedTags={selectedTags}
-            metric={metric}
-          />
+          <ParameterCorrelation selectedTags={selectedTags} metric={metric} />
 
           <AccuracyTimeline
             allTimeline={timelineData}
@@ -229,7 +268,6 @@ export default function DashboardClient() {
           />
 
           <WorkareaPlot selectedTags={selectedTags} />
-
         </div>
       </main>
     </div>

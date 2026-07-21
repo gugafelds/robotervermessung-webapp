@@ -50,7 +50,7 @@ export function ParameterCorrelation({ selectedTags, metric }: Props) {
 
   if (loading) {
     return (
-      <div className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4">
+      <div className="flex flex-col rounded-2xl border border-gray-500 bg-white p-4">
         <Typography as="h2" className="mb-3">
           Factors influencing accuracy
         </Typography>
@@ -66,7 +66,7 @@ export function ParameterCorrelation({ selectedTags, metric }: Props) {
 
   if (subplots.length === 0) {
     return (
-      <div className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4">
+      <div className="flex flex-col rounded-2xl border border-gray-500 bg-white p-4">
         <Typography as="h2" className="mb-3">
           Factors influencing accuracy
         </Typography>
@@ -78,7 +78,7 @@ export function ParameterCorrelation({ selectedTags, metric }: Props) {
   }
 
   return (
-    <div className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4">
+    <div className="flex flex-col rounded-2xl border border-gray-500 bg-white p-4">
       <Typography as="h2" className="mb-3">
         Factors influencing accuracy
       </Typography>

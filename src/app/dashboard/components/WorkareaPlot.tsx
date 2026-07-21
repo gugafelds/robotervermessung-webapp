@@ -210,7 +210,7 @@ export function WorkareaPlot({ selectedTags }: Props) {
   if (bounds) traces.push(makeWorkspaceBox(bounds));
 
   return (
-    <div className="flex flex-col rounded-2xl border border-gray-200 bg-white p-4">
+    <div className="flex flex-col rounded-2xl border border-gray-500 bg-white p-4">
       <Typography as="h2" className="mb-3">
         Work area
       </Typography>
@@ -226,7 +226,7 @@ export function WorkareaPlot({ selectedTags }: Props) {
         </button>
         {selectedTags.length === 0 && !loaded && (
           <span className="text-sm text-gray-400">
-            All tags — 5 000 random samples + robot mesh
+            All tags — every 9th setpoint per trajectory + robot mesh
           </span>
         )}
         {tagsChanged && !loading && (

@@ -301,16 +301,21 @@ async def get_workarea_data(tag: list[str] = Query(None), conn=Depends(get_db)):
                 }
     else:
         rows = await conn.fetch("""
-            SELECT be.x_reached, be.y_reached, be.z_reached,
-                   s.sidtw_average_distance, bi.tag
-            FROM motion.traj_setpoints be
-            JOIN evaluation.sidtw_info s ON be.traj_id = s.traj_id
-            JOIN motion.traj_info bi ON be.traj_id = bi.traj_id
-            WHERE s.traj_id <> s.seg_id
-              AND s.sidtw_average_distance IS NOT NULL
-              AND be.x_reached IS NOT NULL
-              AND bi.tag IS NOT NULL
-            ORDER BY RANDOM()
+            WITH numbered AS (
+                SELECT be.x_reached, be.y_reached, be.z_reached,
+                       s.sidtw_average_distance, bi.tag,
+                       ROW_NUMBER() OVER (PARTITION BY be.traj_id ORDER BY be.timestamp) AS rn
+                FROM motion.traj_setpoints be
+                JOIN evaluation.sidtw_info s ON be.traj_id = s.traj_id
+                JOIN motion.traj_info bi ON be.traj_id = bi.traj_id
+                WHERE s.traj_id <> s.seg_id
+                  AND s.sidtw_average_distance IS NOT NULL
+                  AND be.x_reached IS NOT NULL
+                  AND be.y_reached IS NOT NULL
+                  AND be.z_reached IS NOT NULL
+            )
+            SELECT x_reached, y_reached, z_reached, sidtw_average_distance, tag
+            FROM numbered WHERE rn % 9 = 0
         """)
         bounds = None
 
@@ -319,7 +324,6 @@ async def get_workarea_data(tag: list[str] = Query(None), conn=Depends(get_db)):
                     "sidtw": r["sidtw_average_distance"], "tag": r["tag"]} for r in rows],
         "bounds": bounds,
     }
-
 
 @router.get("/influence/binned")
 @cache(expire=3600)
@@ -340,15 +344,15 @@ async def get_influence_binned(
             SELECT info.{col}   AS mv,
                    bm.max_vel   AS velocity,
                    bm.max_accel AS acceleration,
-                   bi.weight    AS weight,
+                   bm.weight    AS weight,
                    bx.stop_point AS stop_point
             FROM {table} info
             INNER JOIN motion.traj_metadata bm ON info.seg_id = bm.seg_id
             INNER JOIN motion.traj_info bi      ON info.traj_id = bi.traj_id
             INNER JOIN motion.traj_setpoints bx ON info.seg_id = bx.seg_id
             WHERE info.{col} IS NOT NULL AND bm.max_vel IS NOT NULL
-              AND bm.max_accel IS NOT NULL AND bx.stop_point IS NOT NULL
-              AND bi.tag IS NOT NULL {tc}
+              AND bm.max_accel IS NOT NULL AND bm.weight IS NOT NULL
+              AND bx.stop_point IS NOT NULL {tc}
             {sample}
         ),
         vel_bins AS (
