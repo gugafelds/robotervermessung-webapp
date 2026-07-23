@@ -112,9 +112,9 @@ async def _get_all_segment_data(conn, seg_ids: list[str], last_points: int = 10)
     data = {}
     for row in result:
         sid   = str(row["seg_id"])
-        x_diff = float(row["sidtw_act_x"] - row["sidtw_cmd_x"]) / last_points
-        y_diff = float(row["sidtw_act_y"] - row["sidtw_cmd_y"]) / last_points
-        z_diff = float(row["sidtw_act_z"] - row["sidtw_cmd_z"]) / last_points
+        x_diff = float(row["sidtw_cmd_x"] - row["sidtw_act_x"]) / last_points
+        y_diff = float(row["sidtw_cmd_y"] - row["sidtw_act_y"]) / last_points
+        z_diff = float(row["sidtw_cmd_z"] - row["sidtw_act_z"]) / last_points
 
         if sid in data:
             data[sid][0] += x_diff
