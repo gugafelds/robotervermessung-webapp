@@ -17,6 +17,7 @@ integriert.
 import asyncio
 from typing import List, Literal, Optional, Dict
 
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -32,9 +33,16 @@ router = APIRouter()
 
 # ── Manuelle Kalibrierungsparameter ──────────────────────────────────────
 CORRECTION_THRESHOLD = 10   # DTW-Faktor: Segmente mit dtw > threshold * dtw_first werden ignoriert
-CORRECTION_X_FAC     = 1.0  # 0.5 Skalierung der X-Korrektur
-CORRECTION_Y_FAC     = 1.0  # 0.9 Skalierung der Y-Korrektur
-CORRECTION_Z_FAC     = 1.0  # 1.0 Skalierung der Z-Korrektur
+CORRECTION_X_FAC     = 1.0  # Skalierung der X-Korrektur
+CORRECTION_Y_FAC     = 1.0  # Skalierung der Y-Korrektur
+CORRECTION_Z_FAC     = 1.0  # Skalierung der Z-Korrektur
+
+# Drift-Offset: globaler additiver Drift zwischen historischen Daten und aktueller Messung.
+# Berechnet aus Duplikat-Paaren (ba-mueller vs. ba-mueller-correction-10/11/12, 2026-06-03 → 2026-07-24).
+# Auf [0, 0, 0] setzen wenn kein Drift bekannt oder frische Daten verwendet werden.
+DRIFT_OFFSET_X =  0.0
+DRIFT_OFFSET_Y =  0.0
+DRIFT_OFFSET_Z =  0.0
 
 # ── Request / Response Models ─────────────────────────────────────────────
 
@@ -46,15 +54,18 @@ class CorrectionTrajectory(BaseModel):
 
 
 class CorrectionRequest(BaseModel):
-    trajectory:      CorrectionTrajectory
-    movement_type:   str
-    weight:          float = Field(..., description="Payload in kg")
-    robot_model:     str   = Field(..., description="e.g. abb_irb4400")
-    limit:           int   = 5
-    mode:            Literal["relative", "linear"] = "relative"
-    segment_indices: list[int] = []
-    include_tags:    list[str] = []
-    exclude_tags:    list[str] = []
+    trajectory:        CorrectionTrajectory
+    movement_type:     str
+    weight:            float = Field(..., description="Payload in kg")
+    robot_model:       str   = Field(..., description="e.g. abb_irb4400")
+    limit:             int   = 5
+    mode:              Literal["relative", "linear"] = "relative"
+    segment_indices:   list[int] = []
+    include_tags:      list[str] = []
+    exclude_tags:      list[str] = []
+    calibration_date:       str        = ""
+    filter_by_calibration:  bool       = True
+    drift_offset:           list[float] = [0.0, 0.0, 0.0]
 
 
 class NeighborDebug(BaseModel):
@@ -86,16 +97,50 @@ async def _fetch_robot_info(conn, robot_model: str) -> Optional[Dict]:
     """, robot_model)
     return dict(row) if row else None
 
+async def _filter_seg_ids_by_calibration(
+    conn, seg_ids: list[str], min_calibration_date: str
+) -> list[str]:
+    """
+    Drops seg_ids whose trajectory was recorded with a calibration older than
+    min_calibration_date. Trajectories with NULL or unknown transformation_matrix
+    are kept (conservative fallback).
+    """
+    if not min_calibration_date or not seg_ids:
+        return seg_ids
+    rows = await conn.fetch("""
+        SELECT s.seg_id
+        FROM (SELECT unnest($1::text[]) AS seg_id) s
+        JOIN motion.traj_info t
+          ON t.traj_id = LEFT(s.seg_id, LENGTH(s.seg_id) - POSITION('_' IN REVERSE(s.seg_id)))
+        WHERE t.transformation_matrix IS NULL
+           OR t.transformation_matrix >= $2
+    """, seg_ids, min_calibration_date)
+    allowed = {str(r["seg_id"]) for r in rows}
+    # seg_ids not found in traj_info are kept (unknown = not filtered)
+    found_ids = set()
+    for r in await conn.fetch("""
+        SELECT s.seg_id
+        FROM (SELECT unnest($1::text[]) AS seg_id) s
+        JOIN motion.traj_info t
+          ON t.traj_id = LEFT(s.seg_id, LENGTH(s.seg_id) - POSITION('_' IN REVERSE(s.seg_id)))
+    """, seg_ids):
+        found_ids.add(str(r["seg_id"]))
+    unknown_ids = set(str(s) for s in seg_ids) - found_ids
+    kept = [s for s in seg_ids if str(s) in allowed or str(s) in unknown_ids]
+    n_dropped = len(seg_ids) - len(kept)
+    if n_dropped:
+        logger.info("[correction] calibration filter dropped %d/%d segments (< %s)",
+                    n_dropped, len(seg_ids), min_calibration_date)
+    return kept
+
+
 async def _get_all_segment_data(conn, seg_ids: list[str], last_points: int = 10) -> dict:
-    """
-    Holt alle Segment-Daten in einem einzigen Query.
-    Direkt übernommen aus dem Korrekturskript (get_segment_data Funktion).
-    """
+    """Returns {seg_id: [dx, dy, dz]} — avg(cmd - act) over last N endpoint points."""
     query = """
-        SELECT seg_id, sidtw_deviation, sidtw_cmd_x, sidtw_cmd_y, sidtw_cmd_z,
+        SELECT seg_id, sidtw_cmd_x, sidtw_cmd_y, sidtw_cmd_z,
                sidtw_act_x, sidtw_act_y, sidtw_act_z
         FROM (
-            SELECT seg_id, sidtw_deviation, sidtw_cmd_x, sidtw_cmd_y, sidtw_cmd_z,
+            SELECT seg_id, sidtw_cmd_x, sidtw_cmd_y, sidtw_cmd_z,
                    sidtw_act_x, sidtw_act_y, sidtw_act_z,
                    ROW_NUMBER() OVER (
                        PARTITION BY seg_id
@@ -109,9 +154,9 @@ async def _get_all_segment_data(conn, seg_ids: list[str], last_points: int = 10)
     """
     result = await conn.fetch(query, seg_ids, last_points)
 
-    data = {}
+    data: dict[str, list] = {}
     for row in result:
-        sid   = str(row["seg_id"])
+        sid    = str(row["seg_id"])
         x_diff = float(row["sidtw_cmd_x"] - row["sidtw_act_x"]) / last_points
         y_diff = float(row["sidtw_cmd_y"] - row["sidtw_act_y"]) / last_points
         z_diff = float(row["sidtw_cmd_z"] - row["sidtw_act_z"]) / last_points
@@ -201,7 +246,11 @@ async def predict_correction(
                 if s.get("seg_id"):
                     all_ids.append(s["seg_id"])
 
-        query_data = await _get_all_segment_data(conn, all_ids)
+        # ── Kalibrierungsfilter: alte Daten ausschließen ─────────────────
+        filtered_ids = await _filter_seg_ids_by_calibration(
+            conn, all_ids, request.calibration_date or "" if request.filter_by_calibration else ""
+        )
+        query_data = await _get_all_segment_data(conn, filtered_ids)
 
         # ── Korrektur pro Segment ────────────────────
         corrections = []
@@ -224,7 +273,7 @@ async def predict_correction(
                     break
                 res = query_data.get(str(seg_id))
                 if res is None:
-                    continue
+                    continue  # filtered out (old calibration)
                 x_diffs.append(res[0])
                 y_diffs.append(res[1])
                 z_diffs.append(res[2])
@@ -253,10 +302,14 @@ async def predict_correction(
                     y_corr += w * y_diffs[i]
                     z_corr += w * z_diffs[i]
 
+            req_drift = request.drift_offset
+            dx = req_drift[0] if any(req_drift) else DRIFT_OFFSET_X
+            dy = req_drift[1] if any(req_drift) else DRIFT_OFFSET_Y
+            dz = req_drift[2] if any(req_drift) else DRIFT_OFFSET_Z
             corrections.append([
-                CORRECTION_X_FAC * x_corr,
-                CORRECTION_Y_FAC * y_corr,
-                CORRECTION_Z_FAC * z_corr,
+                CORRECTION_X_FAC * x_corr + dx,
+                CORRECTION_Y_FAC * y_corr + dy,
+                CORRECTION_Z_FAC * z_corr + dz,
             ])
 
         logger.info(
