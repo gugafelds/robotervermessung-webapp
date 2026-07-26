@@ -321,7 +321,8 @@ async def predict_performance(
     )
 
     traj_results            = result.get('traj_similarity', {}).get('results', [])
-    total_query_path_length = sum(seg_path_lengths)
+    traj_features           = result.get('target_traj_features') or {}
+    total_query_path_length = float(traj_features.get('length') or 0) or sum(seg_path_lengths)
 
     if decomposed_prediction is not None:
         decomposed_prediction['query_path_length'] = total_query_path_length or None

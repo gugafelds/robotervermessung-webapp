@@ -311,6 +311,9 @@ async def delete_config_rows(
 async def insert_calibration_batch(conn: asyncpg.Connection, batch: List[Dict[str, Any]]) -> None:
     if not batch:
         return
+    def _r6(v):
+        return round(v, 6) if v is not None else None
+
     await conn.executemany("""
         INSERT INTO prognosis.confidence_calibration (
             level, entity_id, traj_id, split_role, retrieval_strategy, calibration_tag, config_stage,
@@ -346,10 +349,10 @@ async def insert_calibration_batch(conn: asyncpg.Connection, batch: List[Dict[st
         (
             r['level'], r['entity_id'], r['traj_id'], r['split_role'], r['retrieval_strategy'],
             r['calibration_tag'], r['config_stage'],
-            r['p_actual'], r['p_predicted'], r['prediction_error'],
-            r['sigma'], r['nonconformity_score'],
-            r.get('d_min'), r.get('d_max'), r.get('d_normalized'),
-            r.get('query_path_length'), r['neighbor_ids'],
+            _r6(r['p_actual']), _r6(r['p_predicted']), _r6(r['prediction_error']),
+            _r6(r['sigma']), _r6(r['nonconformity_score']),
+            _r6(r.get('d_min')), _r6(r.get('d_max')), _r6(r.get('d_normalized')),
+            _r6(r.get('query_path_length')), r['neighbor_ids'],
             r['config_hash'], r['config_k'],
             r['config_dtw_mode'], r['config_metric'], r['search_modes'],
         )
@@ -566,21 +569,9 @@ def build_trajectory_row_stage2(
 # ═════════════════════════════════════════════════════════════════════════════
 
 def _rrf_d_min(results: List[Dict[str, Any]]) -> Optional[float]:
-    """
-    d_min_per_path_length proxy for Stage 1:  1 / rrf_score_of_best_candidate.
-    High RRF score → small "distance" → good match quality.
-    Returns None if no valid candidates.
-    """
-    best_rrf = None
-    for r in results:
-        score = r.get('rrf_score')
-        if score is not None and float(score) > EPSILON:
-            s = float(score)
-            if best_rrf is None or s > best_rrf:
-                best_rrf = s
-    if best_rrf is None:
-        return None
-    return round(1.0 / best_rrf, 6)
+    """Fallback: max rrf_score among results (= best match proxy for Stage 1)."""
+    scores = [float(r['rrf_score']) for r in results if r.get('rrf_score') and float(r['rrf_score']) > EPSILON]
+    return round(max(scores), 6) if scores else None
 
 
 def build_segment_rows_stage1(
@@ -805,12 +796,13 @@ async def run_calibration(
         await ensure_calibration_tables(conn)
 
         if not resume:
-            await delete_config_rows(conn, cfg.hash(), cfg.calibration_tag, resume_stage)
             if not stage1_mode:
-                # Stage 1 rows use different hashes (dtw_mode='none', separate per strategy)
+                for s2_strat in ('decomposed', 'direct'):
+                    await delete_config_rows(conn, cfg.with_strategy(s2_strat).hash(), cfg.calibration_tag, 2)
                 for s1_strat in ('direct', 'decomposed'):
-                    cfg_s1 = cfg.with_stage(1).with_strategy(s1_strat)
-                    await delete_config_rows(conn, cfg_s1.hash(), cfg.calibration_tag, 1)
+                    await delete_config_rows(conn, cfg.with_stage(1).with_strategy(s1_strat).hash(), cfg.calibration_tag, 1)
+            else:
+                await delete_config_rows(conn, cfg.hash(), cfg.calibration_tag, 1)
 
         all_trajs = await get_all_traj_ids(
             conn, cfg.metric,
