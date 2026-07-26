@@ -96,7 +96,7 @@ const IntervalDisplay: React.FC<IntervalDisplayProps> = ({ interval }) => (
         <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-sm text-blue-800">
           {(interval.coverage * 100).toFixed(0)}%
         </span>
-        {interval.strategy === 'stage1_rrf' && (
+        {isStage1 && (
           <span className="ml-1.5 rounded-md bg-purple-100 px-1.5 py-0.5 text-xs text-purple-700">
             Stage 1
           </span>
@@ -192,10 +192,12 @@ const PrognosisView: React.FC<PrognosisViewProps> = ({
   const isStage1 = prognosis.stage === 'stage1_rrf';
 
   const directInterval = isStage1
-    ? (prognosis.stage1_conformal_interval ?? null)
+    ? (prognosis.s1_direct_conformal_interval ?? null)
     : (prognosis.direct_conformal_interval ?? null);
 
-  const decomposedInterval = prognosis.decomposed_conformal_interval ?? null;
+  const decomposedInterval = isStage1
+    ? (prognosis.s1_decomposed_conformal_interval ?? null)
+    : (prognosis.decomposed_conformal_interval ?? null);
 
   return (
     <div className="flex flex-col overflow-y-auto rounded-lg border border-gray-400 bg-white shadow-md">

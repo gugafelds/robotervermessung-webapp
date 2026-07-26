@@ -126,34 +126,30 @@ def _predict_stage1_rrf(
         rrf_score = r.get('rrf_score')
         if perf_val is None or sid is None or rrf_score is None:
             continue
-        weight = float(rrf_score)
-        if weight <= EPSILON:
+        if float(rrf_score) <= EPSILON:
             continue
-        valid.append({'seg_id': str(sid), 'weight': weight, 'perf_value': float(perf_val)})
+        valid.append({'seg_id': str(sid), 'rrf_score': float(rrf_score), 'perf_value': float(perf_val)})
 
     if len(valid) < 2:
         return None
 
-    weights     = [v['weight']     for v in valid]
+    # Sort by RRF score descending, assign rank r=1,2,3... → w_i = 1/r² (paper eq. 3)
+    valid.sort(key=lambda x: x['rrf_score'], reverse=True)
+    weights     = [1.0 / (rank ** 2) for rank in range(1, len(valid) + 1)]
     perf_values = [v['perf_value'] for v in valid]
 
     w_sum = sum(weights)
-    if w_sum <= EPSILON:
-        return None
-
     p_hat    = sum(w * p for w, p in zip(weights, perf_values)) / w_sum
     n        = len(perf_values)
     mean_p   = sum(perf_values) / n
     perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / (n - 1))
     sigma    = max(perf_std, sigma_floor)
 
-    best_rrf  = max(weights)
-    mean_rrf  = sum(weights) / len(weights)
-    worst_rrf = min(weights)
-    # RRF proxies: 1/score² — squaring rewards better-ranked neighbours more (per paper)
-    d_min        = round(1.0 / best_rrf  ** 2, 6) if best_rrf  > EPSILON else None
-    d_max        = round(1.0 / worst_rrf ** 2, 6) if worst_rrf > EPSILON else None
-    d_normalized = round(1.0 / mean_rrf  ** 2, 6) if mean_rrf  > EPSILON else None
+    # d_min/d_max/d_normalized: rank-based proxies (rank 1 = best match)
+    # 1/rank² mirrors the weight — rank 1 → d=1, rank n → d=1/n²
+    d_min        = round(1.0 / 1 ** 2,       6)          # best rank = 1
+    d_max        = round(1.0 / n ** 2,       6)          # worst rank = n
+    d_normalized = round(1.0 / ((n + 1) / 2) ** 2, 6)   # median rank proxy
 
     return {
         'p_hat':        round(p_hat, 4),
@@ -334,20 +330,37 @@ async def predict_performance(
     traj_results            = result.get('traj_similarity', {}).get('results', [])
     total_query_path_length = sum(seg_path_lengths)
 
+    traj_neighbor_ids = [str(r['seg_id']) for r in traj_results if r.get('seg_id')]
+
+    # Stage 1: RRF-weighted predictions (always computed — needed for calibration even in Stage 2)
+    s1_direct_prediction = _predict_stage1_rrf(
+        results=traj_results, feature=feature, sigma_floor=sigma_floor,
+    )
+    if s1_direct_prediction is not None:
+        s1_direct_prediction['neighbor_ids'] = traj_neighbor_ids
+
+    # Stage 1 decomposed: length-weighted aggregate of segment-level RRF predictions
+    s1_decomposed_prediction = _aggregate_trajectory_decomposed(
+        seg_predictions=[
+            {'p_hat': s.get('p_hat'), 'sigma': s.get('sigma'),
+             'd_min': s.get('d_min'), 'd_max': s.get('d_max'),
+             'd_normalized': s.get('d_normalized')}
+            if s.get('p_hat') is not None else None
+            for s in stage1_seg_preds
+        ],
+        path_lengths=seg_path_lengths,
+        sigma_floor=sigma_floor,
+    )
+
     if stage2_active:
         direct_prediction = _predict_direct(
             traj_results=traj_results, query_path_length=total_query_path_length,
             feature=feature, sigma_floor=sigma_floor,
         )
-        # Always compute RRF traj prediction for stage1 calibration rows (Bug 1 fix)
-        stage1_rrf_prediction = _predict_stage1_rrf(
-            results=traj_results, feature=feature, sigma_floor=sigma_floor,
-        )
+        if direct_prediction is not None:
+            direct_prediction['neighbor_ids'] = traj_neighbor_ids
     else:
-        direct_prediction     = _predict_stage1_rrf(
-            results=traj_results, feature=feature, sigma_floor=sigma_floor,
-        )
-        stage1_rrf_prediction = direct_prediction
+        direct_prediction     = s1_direct_prediction
 
     # Build segments list — only expose what the frontend needs
     segments = []
@@ -368,16 +381,21 @@ async def predict_performance(
             segments.append({'seg_id': sid, 'p_hat': None})
 
     result['prognosis'] = {
-        'feature':                       feature,
-        'stage':                         'stage2_dtw' if stage2_active else 'stage1_rrf',
-        'decomposed':                    decomposed_prediction,
-        'direct':                        direct_prediction,
-        'stage1_rrf':                    stage1_rrf_prediction,   # always RRF (Bug 1 fix)
-        'stage1_segments':               stage1_seg_preds,        # always RRF per seg (Bug 2 fix)
-        'decomposed_conformal_interval': None,
-        'direct_conformal_interval':     None,
-        'stage1_conformal_interval':     None,
-        'segments':                      segments,
+        'feature':                          feature,
+        'stage':                            'stage2_dtw' if stage2_active else 'stage1_rrf',
+        # Stage 2 (DTW) predictions
+        'decomposed':                       decomposed_prediction,
+        'direct':                           direct_prediction,
+        # Stage 1 (RRF) predictions — always computed, used for calibration even in Stage 2 mode
+        's1_direct':                        s1_direct_prediction,
+        's1_decomposed':                    s1_decomposed_prediction,
+        's1_segments':                      stage1_seg_preds,
+        # Conformal intervals (filled in by conformal_predictor.py)
+        'decomposed_conformal_interval':    None,
+        'direct_conformal_interval':        None,
+        's1_direct_conformal_interval':     None,
+        's1_decomposed_conformal_interval': None,
+        'segments':                         segments,
     }
 
     if conformal_active:

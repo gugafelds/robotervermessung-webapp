@@ -26,7 +26,7 @@ import hashlib
 from dataclasses import dataclass, replace
 from typing import Literal, Optional, Tuple
 
-RetrievalStrategy = Literal['decomposed', 'direct', 'stage1_rrf']
+RetrievalStrategy = Literal['decomposed', 'direct']
 
 
 def _search_modes_str(modes: Tuple[str, ...]) -> str:
@@ -74,14 +74,15 @@ class CalibrationConfig:
         return _search_modes_str(self.search_modes)
 
     def with_strategy(self, strategy: RetrievalStrategy) -> 'CalibrationConfig':
-        if strategy == 'stage1_rrf':
-            return replace(self, retrieval_strategy=strategy, dtw_mode='none', config_stage=1)
         return replace(self, retrieval_strategy=strategy)
 
     def with_tag(self, tag: str) -> 'CalibrationConfig':
         return replace(self, calibration_tag=tag)
 
     def with_stage(self, stage: int) -> 'CalibrationConfig':
+        # Stage 1 never uses DTW — enforce dtw_mode='none'
+        if stage == 1:
+            return replace(self, config_stage=1, dtw_mode='none')
         return replace(self, config_stage=stage)
 
 
@@ -99,13 +100,13 @@ DEFAULT_CONFIG = CalibrationConfig(
     split_seed         = 3,
 )
 
-# Default config for Stage 1 (RRF)
+# Default config for Stage 1 (RRF) — direct strategy, dtw_mode='none'
 DEFAULT_CONFIG_STAGE1 = CalibrationConfig(
     k                  = 10,
     dtw_mode           = 'none',
     metric             = 'sidtw',
     search_modes       = ('joint', 'metadata', 'orientation', 'position', 'velocity'),
-    retrieval_strategy = 'stage1_rrf',
+    retrieval_strategy = 'direct',
     calibration_tag    = 'all',
     config_stage       = 1,
     sigma_floor        = 0.005,
@@ -126,22 +127,21 @@ def get_active_config(
     """
     Build a CalibrationConfig from the given parameters, filling in
     defaults from DEFAULT_CONFIG (Stage 2) or DEFAULT_CONFIG_STAGE1.
+    Stage 1 always uses dtw_mode='none' regardless of what is passed.
     """
-    is_stage1 = (
-        retrieval_strategy == 'stage1_rrf'
-        or (config_stage is not None and config_stage == 1)
-    )
+    is_stage1 = config_stage == 1
     base = DEFAULT_CONFIG_STAGE1 if is_stage1 else DEFAULT_CONFIG
 
     cfg = base.with_strategy(retrieval_strategy).with_tag(calibration_tag)
 
     if config_stage is not None:
-        cfg = cfg.with_stage(config_stage)
+        cfg = cfg.with_stage(config_stage)  # enforces dtw_mode='none' for stage 1
     if k is not None:
         cfg = replace(cfg, k=k)
     if search_modes is not None and len(search_modes) > 0:
         cfg = replace(cfg, search_modes=tuple(sorted(search_modes)))
-    if dtw_mode is not None:
+    # dtw_mode override only for stage 2 — stage 1 is always 'none'
+    if dtw_mode is not None and not is_stage1:
         cfg = replace(cfg, dtw_mode=dtw_mode)
     if metric is not None:
         cfg = replace(cfg, metric=metric)

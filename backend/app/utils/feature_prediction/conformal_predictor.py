@@ -536,47 +536,51 @@ async def compute_stage1_conformal_interval(
     metric:          str                       = 'sidtw',
 ) -> None:
     """
-    Compute Stage 1 conformal intervals — direct and decomposed.
-
-    Writes directly into result['prognosis']:
-      stage1_conformal_interval        — direct trajectory (RRF weighted)
-      decomposed_conformal_interval    — segment-aggregated (length-weighted)
+    Compute Stage 1 conformal intervals matching the paper's two strategies:
+      - direct     (p̂_g):  trajectory-level RRF prediction  → s1_direct_conformal_interval
+      - decomposed (p̂_gs): segment-aggregated RRF prediction → s1_decomposed_conformal_interval
+                            + per-segment intervals          → group['conformal_interval']
     """
-    tags = [calibration_tag] if isinstance(calibration_tag, str) else calibration_tag
-    cfg  = get_active_config(
-        'stage1_rrf', tags[0],
-        k=k, search_modes=search_modes,
-        dtw_mode='none', metric=metric, config_stage=1,
-    )
-    sigma_floor = cfg.sigma_floor
+    tags        = [calibration_tag] if isinstance(calibration_tag, str) else calibration_tag
+    sigma_floor = 0.005
     prognosis   = result.get('prognosis') or {}
 
-    # ── Direct interval ──────────────────────────────────────────────────
-    q_traj, mm_traj = await get_calibration_quantile_for_tags(conn, cfg, tags, coverage, 'trajectory')
-
+    # ── s1_direct interval (trajectory-level) ────────────────────────────
+    cfg_direct = get_active_config('direct', tags[0], k=k, search_modes=search_modes,
+                                   metric=metric, config_stage=1)
+    q_direct, mm_direct = await get_calibration_quantile_for_tags(
+        conn, cfg_direct, tags, coverage, 'trajectory'
+    )
     direct_interval = None
-    if q_traj is not None:
-        direct_pred = prognosis.get('direct') or {}
-        p_hat = direct_pred.get('p_hat')
-        sigma = direct_pred.get('sigma')
+    if q_direct is not None:
+        s1_dir = prognosis.get('s1_direct') or {}
+        p_hat  = s1_dir.get('p_hat')
+        sigma  = s1_dir.get('sigma')
         if p_hat is not None and sigma is not None:
-            sigma         = max(float(sigma), sigma_floor, EPSILON)
-            direct_interval = _build_interval(float(p_hat), sigma, q_traj, coverage, mm_traj, 'stage1_rrf')
-            mq = await get_match_quality(conn, direct_pred.get('d_min'), 'trajectory', cfg)
+            sigma = max(float(sigma), sigma_floor, EPSILON)
+            direct_interval = _build_interval(float(p_hat), sigma, q_direct, coverage,
+                                              mm_direct, 'direct')
+            mq = await get_match_quality(conn, s1_dir.get('d_min'), 'trajectory', cfg_direct)
             if mq is not None:
                 direct_interval['match_quality'] = mq.__dict__
 
     if 'prognosis' in result:
-        result['prognosis']['stage1_conformal_interval'] = direct_interval
+        result['prognosis']['s1_direct_conformal_interval'] = direct_interval
 
-    # ── Decomposed interval — segment-level quantile, length-weighted ────
-    q_seg, mm_seg = await get_calibration_quantile_for_tags(conn, cfg, tags, coverage, 'segment')
+    # ── s1_decomposed: segment-level quantile + length-weighted traj ─────
+    cfg_decomp = get_active_config('decomposed', tags[0], k=k, search_modes=search_modes,
+                                   metric=metric, config_stage=1)
+    q_seg, mm_seg = await get_calibration_quantile_for_tags(
+        conn, cfg_decomp, tags, coverage, 'segment'
+    )
     if q_seg is None:
+        if 'prognosis' in result:
+            result['prognosis']['s1_decomposed_conformal_interval'] = None
         return
 
-    segment_groups   = result.get('segment_similarity', [])
-    seg_intervals:   List[Optional[Dict]] = []
-    seg_path_lengths: List[float]         = []
+    segment_groups    = result.get('segment_similarity', [])
+    seg_intervals:    List[Optional[Dict]] = []
+    seg_path_lengths: List[float]          = []
 
     for group in segment_groups:
         prediction = group.get('prediction') or {}
@@ -588,34 +592,33 @@ async def compute_stage1_conformal_interval(
             continue
 
         sigma    = max(float(sigma), sigma_floor, EPSILON)
-        interval = _build_interval(float(p_hat), sigma, q_seg, coverage, mm_seg, 'stage1_rrf')
-
-        mq = await get_match_quality(conn, prediction.get('d_min'), 'segment', cfg)
+        interval = _build_interval(float(p_hat), sigma, q_seg, coverage, mm_seg, 'decomposed')
+        mq       = await get_match_quality(conn, prediction.get('d_min'), 'segment', cfg_decomp)
         if mq is not None:
             interval['match_quality'] = mq.__dict__
 
         group['conformal_interval'] = interval
         seg_intervals.append(interval)
+        seg_path_lengths.append(float(prediction.get('query_path_length') or 0.0))
 
-        pl = float(prediction.get('query_path_length') or 0.0)
-        seg_path_lengths.append(pl)
-
-    # Aggregate to trajectory level using length-weighted average
+    q_traj_decomp, mm_traj_decomp = await get_calibration_quantile_for_tags(
+        conn, cfg_decomp, tags, coverage, 'trajectory'
+    )
     traj_interval = _aggregate_trajectory_interval(
         seg_intervals=seg_intervals,
         seg_path_lengths=seg_path_lengths,
-        q=q_seg,
+        q=q_traj_decomp if q_traj_decomp is not None else q_seg,
         sigma_floor=sigma_floor,
         coverage=coverage,
-        mismatch=mm_seg,
-        strategy='stage1_rrf',
-    )
+        mismatch=mm_traj_decomp if q_traj_decomp is not None else mm_seg,
+        strategy='decomposed',
+    ) if seg_intervals else None
 
     if traj_interval is not None:
-        decomposed_pred = prognosis.get('decomposed') or {}
-        mq = await get_match_quality(conn, decomposed_pred.get('d_min'), 'trajectory', cfg)
+        s1_decomp = prognosis.get('s1_decomposed') or {}
+        mq = await get_match_quality(conn, s1_decomp.get('d_min'), 'trajectory', cfg_decomp)
         if mq is not None:
             traj_interval['match_quality'] = mq.__dict__
 
     if 'prognosis' in result:
-        result['prognosis']['decomposed_conformal_interval'] = traj_interval
+        result['prognosis']['s1_decomposed_conformal_interval'] = traj_interval

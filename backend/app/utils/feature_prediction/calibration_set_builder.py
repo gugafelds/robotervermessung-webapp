@@ -67,7 +67,7 @@ ALLOWED_DTW_MODES    = {'position', 'joint', 'none'}   # 'none' for Stage 1
 
 SplitRole         = Literal['calibration', 'test']
 Level             = Literal['segment', 'trajectory']
-RetrievalStrategy = Literal['decomposed', 'direct', 'stage1_rrf']
+RetrievalStrategy = Literal['decomposed', 'direct']
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -589,10 +589,11 @@ def build_segment_rows_stage1(
     result: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
     """
-    Build segment calibration rows for Stage 1.
-    d_min_per_path_length = 1 / best_rrf_score of that segment's candidates.
+    Build segment calibration rows for Stage 1 (strategy='decomposed').
+    These are the per-segment RRF predictions used for:
+      - conformal quantile calibration at segment level
+      - aggregation into s1_decomposed trajectory prediction
     """
-    # Build seg_id → similar_segments results lookup
     seg_results_map: Dict[str, List[Dict]] = {}
     for group in result.get('segment_similarity', []) or []:
         sid = group.get('target_segment')
@@ -601,8 +602,9 @@ def build_segment_rows_stage1(
                 group.get('similar_segments', {}).get('results', []) or []
             )
 
+    cfg_s1_decomposed = cfg.with_stage(1).with_strategy('decomposed')
     rows: List[Dict[str, Any]] = []
-    for seg_pred in prognosis.get('stage1_segments', []) or []:  # Bug 2 fix: was prognosis.get('segments', [])
+    for seg_pred in prognosis.get('s1_segments', []) or []:
         seg_id   = seg_pred.get('seg_id')
         p_actual = segment_actuals.get(seg_id) if seg_id else None
         if not seg_id or p_actual is None:
@@ -613,8 +615,8 @@ def build_segment_rows_stage1(
         if values is None:
             continue
 
-        seg_results = seg_results_map.get(seg_id, [])
-        d_min       = _rrf_d_min(seg_results)
+        seg_results  = seg_results_map.get(seg_id, [])
+        d_min        = _rrf_d_min(seg_results)
         neighbor_ids = [
             str(r.get('seg_id') or r.get('traj_id'))
             for r in seg_results
@@ -622,74 +624,81 @@ def build_segment_rows_stage1(
         ]
 
         rows.append({
-            'level':                'segment',
-            'entity_id':            seg_id,
-            'traj_id':              traj_id,
-            'split_role':           split_role,
-            'retrieval_strategy':   'stage1_rrf',
-            'calibration_tag':      cfg.calibration_tag,
-            'config_stage':         1,
+            'level':             'segment',
+            'entity_id':         seg_id,
+            'traj_id':           traj_id,
+            'split_role':        split_role,
+            'retrieval_strategy': 'decomposed',
+            'calibration_tag':   cfg.calibration_tag,
+            'config_stage':      1,
             **values,
             'd_min':             seg_pred.get('d_min') or d_min,
             'd_max':             seg_pred.get('d_max'),
             'd_normalized':      seg_pred.get('d_normalized'),
             'query_path_length': seg_pred.get('query_path_length'),
             'neighbor_ids':      neighbor_ids,
-            'config_hash':       cfg.with_stage(1).with_strategy('stage1_rrf').hash(),
-            'config_k':             cfg.k,
-            'config_dtw_mode':      'none',
-            'config_metric':        cfg.metric,
-            'search_modes':         cfg.search_modes_str(),
+            'config_hash':       cfg_s1_decomposed.hash(),
+            'config_k':          cfg.k,
+            'config_dtw_mode':   'none',
+            'config_metric':     cfg.metric,
+            'search_modes':      cfg.search_modes_str(),
         })
     return rows
 
 
-def build_trajectory_row_stage1(
+def build_trajectory_rows_stage1(
     *, traj_id: str, split_role: SplitRole, p_actual: float,
     prognosis: Dict[str, Any], cfg: CalibrationConfig,
     result: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+) -> List[Dict[str, Any]]:
     """
-    Build trajectory calibration row for Stage 1 (direct prediction).
-    d_min_per_path_length = 1 / best_rrf_score of trajectory-level candidates.
+    Build trajectory calibration rows for Stage 1:
+      - strategy='direct'     — trajectory-level RRF prediction (p̂_g from paper eq. 3)
+      - strategy='decomposed' — segment-aggregated RRF prediction (p̂_gs from paper eq. 3)
     """
-    direct_pred = prognosis.get('stage1_rrf')  # Bug 1 fix: was prognosis.get('direct')
-    if direct_pred is None:
-        return None
-    values = prediction_to_row_values(
-        p_actual=p_actual, prediction=direct_pred, sigma_floor=cfg.sigma_floor,
-    )
-    if values is None:
-        return None
-
     traj_results = result.get('traj_similarity', {}).get('results', []) or []
-    d_min        = _rrf_d_min(traj_results)
-    neighbor_ids = [
+    d_min_traj   = _rrf_d_min(traj_results)
+    traj_nids    = [
         str(r.get('seg_id') or r.get('traj_id'))
         for r in traj_results
         if r.get('seg_id') or r.get('traj_id')
     ]
 
-    return {
-        'level':                'trajectory',
-        'entity_id':            traj_id,
-        'traj_id':              traj_id,
-        'split_role':           split_role,
-        'retrieval_strategy':   'stage1_rrf',
-        'calibration_tag':      cfg.calibration_tag,
-        'config_stage':         1,
-        **values,
-        'd_min':             direct_pred.get('d_min') or d_min,
-        'd_max':             direct_pred.get('d_max'),
-        'd_normalized':      direct_pred.get('d_normalized'),
-        'query_path_length': None,
-        'neighbor_ids':      neighbor_ids,
-        'config_hash':       cfg.with_stage(1).with_strategy('stage1_rrf').hash(),
-        'config_k':          cfg.k,
-        'config_dtw_mode':   'none',
-        'config_metric':     cfg.metric,
-        'search_modes':      cfg.search_modes_str(),
-    }
+    rows: List[Dict[str, Any]] = []
+    cfg_s1 = cfg.with_stage(1)
+
+    for strategy, pred_key in [('direct', 's1_direct'), ('decomposed', 's1_decomposed')]:
+        pred = prognosis.get(pred_key)
+        if pred is None:
+            continue
+        values = prediction_to_row_values(
+            p_actual=p_actual, prediction=pred, sigma_floor=cfg.sigma_floor,
+        )
+        if values is None:
+            continue
+        cfg_s1_strat = cfg_s1.with_strategy(strategy)
+        neighbor_ids = list(pred.get('neighbor_ids') or traj_nids)
+        rows.append({
+            'level':              'trajectory',
+            'entity_id':          traj_id,
+            'traj_id':            traj_id,
+            'split_role':         split_role,
+            'retrieval_strategy': strategy,
+            'calibration_tag':    cfg.calibration_tag,
+            'config_stage':       1,
+            **values,
+            'd_min':             pred.get('d_min') or d_min_traj,
+            'd_max':             pred.get('d_max'),
+            'd_normalized':      pred.get('d_normalized'),
+            'query_path_length': None,
+            'neighbor_ids':      neighbor_ids,
+            'config_hash':       cfg_s1_strat.hash(),
+            'config_k':          cfg.k,
+            'config_dtw_mode':   'none',
+            'config_metric':     cfg.metric,
+            'search_modes':      cfg.search_modes_str(),
+        })
+    return rows
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -734,22 +743,21 @@ async def process_trajectory_bundle(
         if not prognosis:
             return None
 
-        # ── Stage 1 rows — always built (RRF results are always available) ──
-        s1_seg_rows = build_segment_rows_stage1(
+        # ── Stage 1 rows — always built (RRF results always available) ──
+        s1_seg_rows  = build_segment_rows_stage1(
             traj_id=traj_id, split_role=split_role,
             prognosis=prognosis, segment_actuals=segment_actuals,
             cfg=cfg, result=result,
         )
-        s1_traj_row = build_trajectory_row_stage1(
+        s1_traj_rows = build_trajectory_rows_stage1(
             traj_id=traj_id, split_role=split_role, p_actual=p_actual_traj,
             prognosis=prognosis, cfg=cfg, result=result,
         )
 
         if stage1_mode:
-            # Only Stage 1 was requested — pipeline ran without DTW
             return {
                 'segment_rows': s1_seg_rows,
-                'traj_rows':    [s1_traj_row] if s1_traj_row is not None else [],
+                'traj_rows':    s1_traj_rows,
             }
 
         # ── Stage 2 rows — decomposed + direct ───────────────────────────
@@ -768,10 +776,9 @@ async def process_trajectory_bundle(
             cfg=cfg,
         )
 
-        # Both Stage 1 and Stage 2 rows — free since RRF always runs first
         return {
             'segment_rows': s1_seg_rows + decomposed_rows,
-            'traj_rows':    [r for r in [s1_traj_row, decomposed_traj, direct_traj] if r is not None],
+            'traj_rows':    s1_traj_rows + [r for r in [decomposed_traj, direct_traj] if r is not None],
         }
 
     except Exception as e:
@@ -800,9 +807,10 @@ async def run_calibration(
         if not resume:
             await delete_config_rows(conn, cfg.hash(), cfg.calibration_tag, resume_stage)
             if not stage1_mode:
-                # Bug 3 fix: stage1 rows use a different hash (dtw_mode='none', strategy='stage1_rrf')
-                cfg_s1 = cfg.with_stage(1).with_strategy('stage1_rrf')
-                await delete_config_rows(conn, cfg_s1.hash(), cfg.calibration_tag, 1)
+                # Stage 1 rows use different hashes (dtw_mode='none', separate per strategy)
+                for s1_strat in ('direct', 'decomposed'):
+                    cfg_s1 = cfg.with_stage(1).with_strategy(s1_strat)
+                    await delete_config_rows(conn, cfg_s1.hash(), cfg.calibration_tag, 1)
 
         all_trajs = await get_all_traj_ids(
             conn, cfg.metric,
@@ -866,26 +874,23 @@ async def run_calibration(
 
     logger.info(f"Done. ok={n_ok:,} fail={n_fail:,}")
 
-    # Compute and store quantiles
-    # Each retrieval_strategy has its own config_hash — must pass the right cfg.
-    cfg_stage1   = cfg.with_stage(1).with_strategy('stage1_rrf')
-    cfg_direct   = cfg.with_strategy('direct')
-    cfg_decomp   = cfg  # already decomposed, stage2
+    # Compute and store quantiles — each (strategy, stage) has its own config_hash
+    cfg_s1_direct   = cfg.with_stage(1).with_strategy('direct')
+    cfg_s1_decomp   = cfg.with_stage(1).with_strategy('decomposed')
+    cfg_s2_decomp   = cfg.with_strategy('decomposed')   # stage2, cfg already has stage=2
+    cfg_s2_direct   = cfg.with_strategy('direct')
 
     async with pool.acquire() as conn:
-        if stage1_mode:
-            # Stage 1 only run: segment + trajectory
-            await compute_and_store_quantiles(conn, cfg_stage1, coverages, 'segment',    1)
-            await compute_and_store_quantiles(conn, cfg_stage1, coverages, 'trajectory', 1)
-        else:
-            # Stage 1 rows were built as a by-product — compute stage1 quantiles too
-            await compute_and_store_quantiles(conn, cfg_stage1, coverages, 'segment',    1)
-            await compute_and_store_quantiles(conn, cfg_stage1, coverages, 'trajectory', 1)
-            # Stage 2 decomposed: segment + trajectory
-            await compute_and_store_quantiles(conn, cfg_decomp, coverages, 'segment',    2)
-            await compute_and_store_quantiles(conn, cfg_decomp, coverages, 'trajectory', 2)
-            # Stage 2 direct: trajectory only
-            await compute_and_store_quantiles(conn, cfg_direct, coverages, 'trajectory', 2)
+        # Stage 1: direct (traj) + decomposed (seg + traj)
+        await compute_and_store_quantiles(conn, cfg_s1_direct,  coverages, 'trajectory', 1)
+        await compute_and_store_quantiles(conn, cfg_s1_decomp,  coverages, 'segment',    1)
+        await compute_and_store_quantiles(conn, cfg_s1_decomp,  coverages, 'trajectory', 1)
+
+        if not stage1_mode:
+            # Stage 2: decomposed (seg + traj) + direct (traj)
+            await compute_and_store_quantiles(conn, cfg_s2_decomp, coverages, 'segment',    2)
+            await compute_and_store_quantiles(conn, cfg_s2_decomp, coverages, 'trajectory', 2)
+            await compute_and_store_quantiles(conn, cfg_s2_direct,  coverages, 'trajectory', 2)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -925,7 +930,7 @@ async def main() -> None:
         dtw_mode=dtw_mode_val,
         metric=validate_metric(args.metric),
         search_modes=tuple(sorted(args.search_modes)),
-        retrieval_strategy='stage1_rrf' if stage1_mode else 'decomposed',
+        retrieval_strategy='direct' if stage1_mode else 'decomposed',
         calibration_tag=args.tag,
         config_stage=1 if stage1_mode else 2,
         sigma_floor=float(args.sigma_floor),

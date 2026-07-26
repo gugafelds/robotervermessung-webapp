@@ -180,11 +180,16 @@ export interface TrajectoryPrognosis {
 export interface Prognosis {
   feature: string;
   stage: 'stage2_dtw' | 'stage1_rrf';
+  // Stage 2 (DTW) predictions
   decomposed: TrajectoryPrognosis | null;
   direct: TrajectoryPrognosis | null;
   decomposed_conformal_interval: ConformalInterval | null;
-  direct_conformal_interval: ConformalInterval | null; // Stage 2 only
-  stage1_conformal_interval: ConformalInterval | null; // Stage 1 only
+  direct_conformal_interval: ConformalInterval | null;
+  // Stage 1 (RRF) predictions — always present
+  s1_direct: TrajectoryPrognosis | null;
+  s1_decomposed: TrajectoryPrognosis | null;
+  s1_direct_conformal_interval: ConformalInterval | null;
+  s1_decomposed_conformal_interval: ConformalInterval | null;
   segments: SegmentPrognosis[];
 }
 
