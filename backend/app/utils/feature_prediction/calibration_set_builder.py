@@ -123,8 +123,9 @@ async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
     await conn.execute("""
         CREATE SCHEMA IF NOT EXISTS prognosis;
 
-        CREATE TABLE IF NOT EXISTS prognosis.confidence_calibration_seg (
-            seg_id                 TEXT        NOT NULL,
+        CREATE TABLE IF NOT EXISTS prognosis.confidence_calibration (
+            level                  TEXT        NOT NULL CHECK (level IN ('segment', 'trajectory')),
+            entity_id              TEXT        NOT NULL,
             traj_id                TEXT        NOT NULL,
             split_role             TEXT        NOT NULL CHECK (split_role IN ('calibration', 'test')),
             retrieval_strategy     TEXT        NOT NULL DEFAULT 'decomposed',
@@ -137,9 +138,9 @@ async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
             sigma                  FLOAT       NOT NULL,
             nonconformity_score    FLOAT       NOT NULL,
 
-            d_min          FLOAT,
-            d_max          FLOAT,
-            d_normalized   FLOAT,
+            d_min                  FLOAT,
+            d_max                  FLOAT,
+            d_normalized           FLOAT,
             query_path_length      FLOAT,
             neighbor_ids           TEXT[]      NOT NULL DEFAULT '{}',
 
@@ -150,36 +151,12 @@ async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
             search_modes           TEXT        NOT NULL,
             computed_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-            PRIMARY KEY (seg_id, config_hash, calibration_tag, config_stage)
+            PRIMARY KEY (level, entity_id, config_hash, calibration_tag, config_stage)
         );
 
-        CREATE TABLE IF NOT EXISTS prognosis.confidence_calibration_traj (
-            traj_id                TEXT        NOT NULL,
-            split_role             TEXT        NOT NULL CHECK (split_role IN ('calibration', 'test')),
-            retrieval_strategy     TEXT        NOT NULL DEFAULT 'decomposed',
-            calibration_tag        TEXT        NOT NULL DEFAULT 'all',
-            config_stage           INT         NOT NULL DEFAULT 2 CHECK (config_stage IN (1, 2)),
-
-            p_actual               FLOAT       NOT NULL,
-            p_predicted            FLOAT       NOT NULL,
-            prediction_error       FLOAT       NOT NULL,
-            sigma                  FLOAT       NOT NULL,
-            nonconformity_score    FLOAT       NOT NULL,
-
-            d_min          FLOAT,
-            d_max          FLOAT,
-            d_normalized   FLOAT,
-            neighbor_ids           TEXT[]      NOT NULL DEFAULT '{}',
-
-            config_hash            TEXT        NOT NULL,
-            config_k               INT         NOT NULL,
-            config_dtw_mode        TEXT        NOT NULL,
-            config_metric          TEXT        NOT NULL,
-            search_modes           TEXT        NOT NULL,
-            computed_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-
-            PRIMARY KEY (traj_id, config_hash, calibration_tag, config_stage)
-        );
+        CREATE INDEX IF NOT EXISTS idx_cc_lookup
+            ON prognosis.confidence_calibration
+            (config_hash, calibration_tag, split_role, config_stage, level);
 
         CREATE TABLE IF NOT EXISTS prognosis.confidence_quantiles (
             id                     SERIAL      PRIMARY KEY,
@@ -208,14 +185,6 @@ async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
             UNIQUE (metric, dtw_mode, retrieval_strategy, level,
                     config_k, search_modes, calibration_tag, coverage, config_stage)
         );
-
-        CREATE INDEX IF NOT EXISTS idx_ccs_lookup
-            ON prognosis.confidence_calibration_seg
-            (config_hash, calibration_tag, split_role, config_stage);
-
-        CREATE INDEX IF NOT EXISTS idx_cct_lookup
-            ON prognosis.confidence_calibration_traj
-            (config_hash, calibration_tag, split_role, config_stage);
 
         CREATE INDEX IF NOT EXISTS idx_cq_lookup
             ON prognosis.confidence_quantiles
@@ -314,10 +283,11 @@ async def get_already_computed_trajectories(
     conn: asyncpg.Connection, config_hash: str, calibration_tag: str, config_stage: int,
 ) -> set:
     rows = await conn.fetch("""
-        SELECT traj_id FROM prognosis.confidence_calibration_traj
+        SELECT entity_id FROM prognosis.confidence_calibration
         WHERE config_hash = $1 AND calibration_tag = $2 AND config_stage = $3
+          AND level = 'trajectory'
     """, config_hash, calibration_tag, config_stage)
-    return {r['traj_id'] for r in rows}
+    return {r['entity_id'] for r in rows}
 
 
 async def delete_config_rows(
@@ -328,11 +298,7 @@ async def delete_config_rows(
         config_hash, calibration_tag, config_stage,
     )
     await conn.execute(
-        "DELETE FROM prognosis.confidence_calibration_traj WHERE config_hash=$1 AND calibration_tag=$2 AND config_stage=$3",
-        config_hash, calibration_tag, config_stage,
-    )
-    await conn.execute(
-        "DELETE FROM prognosis.confidence_calibration_seg WHERE config_hash=$1 AND calibration_tag=$2 AND config_stage=$3",
+        "DELETE FROM prognosis.confidence_calibration WHERE config_hash=$1 AND calibration_tag=$2 AND config_stage=$3",
         config_hash, calibration_tag, config_stage,
     )
     logger.info(f"Deleted rows for config_hash={config_hash} tag={calibration_tag} stage={config_stage}")
@@ -342,24 +308,25 @@ async def delete_config_rows(
 # DB inserts
 # ═════════════════════════════════════════════════════════════════════════════
 
-async def insert_segment_batch(conn: asyncpg.Connection, batch: List[Dict[str, Any]]) -> None:
+async def insert_calibration_batch(conn: asyncpg.Connection, batch: List[Dict[str, Any]]) -> None:
     if not batch:
         return
     await conn.executemany("""
-        INSERT INTO prognosis.confidence_calibration_seg (
-            seg_id, traj_id, split_role, retrieval_strategy, calibration_tag, config_stage,
+        INSERT INTO prognosis.confidence_calibration (
+            level, entity_id, traj_id, split_role, retrieval_strategy, calibration_tag, config_stage,
             p_actual, p_predicted, prediction_error, sigma, nonconformity_score,
             d_min, d_max, d_normalized, query_path_length, neighbor_ids,
             config_hash, config_k, config_dtw_mode, config_metric, search_modes
         ) VALUES (
-            $1,$2,$3,$4,$5,$6,
-            $7,$8,$9,$10,$11,
-            $12,$13,$14,$15,$16,
-            $17,$18,$19,$20,$21
+            $1,$2,$3,$4,$5,$6,$7,
+            $8,$9,$10,$11,$12,
+            $13,$14,$15,$16,$17,
+            $18,$19,$20,$21,$22
         )
-        ON CONFLICT (seg_id, config_hash, calibration_tag, config_stage) DO UPDATE SET
+        ON CONFLICT (level, entity_id, config_hash, calibration_tag, config_stage) DO UPDATE SET
             split_role          = EXCLUDED.split_role,
             retrieval_strategy  = EXCLUDED.retrieval_strategy,
+            traj_id             = EXCLUDED.traj_id,
             p_actual            = EXCLUDED.p_actual,
             p_predicted         = EXCLUDED.p_predicted,
             prediction_error    = EXCLUDED.prediction_error,
@@ -377,59 +344,12 @@ async def insert_segment_batch(conn: asyncpg.Connection, batch: List[Dict[str, A
             computed_at         = NOW()
     """, [
         (
-            r['seg_id'], r['traj_id'], r['split_role'], r['retrieval_strategy'],
+            r['level'], r['entity_id'], r['traj_id'], r['split_role'], r['retrieval_strategy'],
             r['calibration_tag'], r['config_stage'],
             r['p_actual'], r['p_predicted'], r['prediction_error'],
             r['sigma'], r['nonconformity_score'],
             r.get('d_min'), r.get('d_max'), r.get('d_normalized'),
             r.get('query_path_length'), r['neighbor_ids'],
-            r['config_hash'], r['config_k'],
-            r['config_dtw_mode'], r['config_metric'], r['search_modes'],
-        )
-        for r in batch
-    ])
-
-
-async def insert_trajectory_batch(conn: asyncpg.Connection, batch: List[Dict[str, Any]]) -> None:
-    if not batch:
-        return
-    await conn.executemany("""
-        INSERT INTO prognosis.confidence_calibration_traj (
-            traj_id, split_role, retrieval_strategy, calibration_tag, config_stage,
-            p_actual, p_predicted, prediction_error, sigma, nonconformity_score,
-            d_min, d_max, d_normalized, neighbor_ids,
-            config_hash, config_k, config_dtw_mode, config_metric, search_modes
-        ) VALUES (
-            $1,$2,$3,$4,$5,
-            $6,$7,$8,$9,$10,
-            $11,$12,$13,$14,
-            $15,$16,$17,$18,$19
-        )
-        ON CONFLICT (traj_id, config_hash, calibration_tag, config_stage) DO UPDATE SET
-            split_role          = EXCLUDED.split_role,
-            retrieval_strategy  = EXCLUDED.retrieval_strategy,
-            p_actual            = EXCLUDED.p_actual,
-            p_predicted         = EXCLUDED.p_predicted,
-            prediction_error    = EXCLUDED.prediction_error,
-            sigma               = EXCLUDED.sigma,
-            nonconformity_score = EXCLUDED.nonconformity_score,
-            d_min               = EXCLUDED.d_min,
-            d_max               = EXCLUDED.d_max,
-            d_normalized        = EXCLUDED.d_normalized,
-            neighbor_ids        = EXCLUDED.neighbor_ids,
-            config_k            = EXCLUDED.config_k,
-            config_dtw_mode     = EXCLUDED.config_dtw_mode,
-            config_metric       = EXCLUDED.config_metric,
-            search_modes        = EXCLUDED.search_modes,
-            computed_at         = NOW()
-    """, [
-        (
-            r['traj_id'], r['split_role'], r['retrieval_strategy'],
-            r['calibration_tag'], r['config_stage'],
-            r['p_actual'], r['p_predicted'], r['prediction_error'],
-            r['sigma'], r['nonconformity_score'],
-            r.get('d_min'), r.get('d_max'), r.get('d_normalized'),
-            r['neighbor_ids'],
             r['config_hash'], r['config_k'],
             r['config_dtw_mode'], r['config_metric'], r['search_modes'],
         )
@@ -454,18 +374,13 @@ async def fetch_level_rows(
     conn: asyncpg.Connection, level: Level,
     config_hash: str, calibration_tag: str, split_role: SplitRole, config_stage: int,
 ) -> List[asyncpg.Record]:
-    table = (
-        'prognosis.confidence_calibration_seg'
-        if level == 'segment'
-        else 'prognosis.confidence_calibration_traj'
-    )
-    return await conn.fetch(f"""
+    return await conn.fetch("""
         SELECT p_actual, p_predicted, prediction_error, sigma, nonconformity_score
-        FROM {table}
-        WHERE config_hash = $1 AND calibration_tag = $2
-          AND split_role = $3 AND config_stage = $4
+        FROM prognosis.confidence_calibration
+        WHERE level = $1 AND config_hash = $2 AND calibration_tag = $3
+          AND split_role = $4 AND config_stage = $5
         ORDER BY nonconformity_score
-    """, config_hash, calibration_tag, split_role, config_stage)
+    """, level, config_hash, calibration_tag, split_role, config_stage)
 
 
 def coverage_stats(rows: Sequence[asyncpg.Record], q: float) -> Dict[str, Any]:
@@ -579,7 +494,8 @@ def build_segment_rows_stage2(
         if values is None:
             continue
         rows.append({
-            'seg_id':               seg_id,
+            'level':                'segment',
+            'entity_id':            seg_id,
             'traj_id':              traj_id,
             'split_role':           split_role,
             'retrieval_strategy':   'decomposed',
@@ -624,21 +540,24 @@ def build_trajectory_row_stage2(
         neighbor_ids = list(seen.keys())
 
     return {
+        'level':                'trajectory',
+        'entity_id':            traj_id,
         'traj_id':              traj_id,
         'split_role':           split_role,
         'retrieval_strategy':   retrieval_strategy,
         'calibration_tag':      cfg.calibration_tag,
         'config_stage':         2,
         **values,
-        'd_min':        prediction.get('d_min'),
-        'd_max':        prediction.get('d_max'),
-        'd_normalized': prediction.get('d_normalized'),
-        'neighbor_ids': neighbor_ids,
-        'config_hash':  cfg.with_strategy(retrieval_strategy).hash(),
-        'config_k':             cfg.k,
-        'config_dtw_mode':      cfg.dtw_mode,
-        'config_metric':        cfg.metric,
-        'search_modes':         cfg.search_modes_str(),
+        'd_min':               prediction.get('d_min'),
+        'd_max':               prediction.get('d_max'),
+        'd_normalized':        prediction.get('d_normalized'),
+        'query_path_length':   None,
+        'neighbor_ids':        neighbor_ids,
+        'config_hash':         cfg.with_strategy(retrieval_strategy).hash(),
+        'config_k':            cfg.k,
+        'config_dtw_mode':     cfg.dtw_mode,
+        'config_metric':       cfg.metric,
+        'search_modes':        cfg.search_modes_str(),
     }
 
 
@@ -683,7 +602,7 @@ def build_segment_rows_stage1(
             )
 
     rows: List[Dict[str, Any]] = []
-    for seg_pred in prognosis.get('segments', []) or []:
+    for seg_pred in prognosis.get('stage1_segments', []) or []:  # Bug 2 fix: was prognosis.get('segments', [])
         seg_id   = seg_pred.get('seg_id')
         p_actual = segment_actuals.get(seg_id) if seg_id else None
         if not seg_id or p_actual is None:
@@ -703,7 +622,8 @@ def build_segment_rows_stage1(
         ]
 
         rows.append({
-            'seg_id':               seg_id,
+            'level':                'segment',
+            'entity_id':            seg_id,
             'traj_id':              traj_id,
             'split_role':           split_role,
             'retrieval_strategy':   'stage1_rrf',
@@ -733,7 +653,7 @@ def build_trajectory_row_stage1(
     Build trajectory calibration row for Stage 1 (direct prediction).
     d_min_per_path_length = 1 / best_rrf_score of trajectory-level candidates.
     """
-    direct_pred = prognosis.get('direct')
+    direct_pred = prognosis.get('stage1_rrf')  # Bug 1 fix: was prognosis.get('direct')
     if direct_pred is None:
         return None
     values = prediction_to_row_values(
@@ -751,21 +671,24 @@ def build_trajectory_row_stage1(
     ]
 
     return {
+        'level':                'trajectory',
+        'entity_id':            traj_id,
         'traj_id':              traj_id,
         'split_role':           split_role,
         'retrieval_strategy':   'stage1_rrf',
         'calibration_tag':      cfg.calibration_tag,
         'config_stage':         1,
         **values,
-        'd_min':        direct_pred.get('d_min') or d_min,
-        'd_max':        direct_pred.get('d_max'),
-        'd_normalized': direct_pred.get('d_normalized'),
-        'neighbor_ids': neighbor_ids,
-        'config_hash':  cfg.with_stage(1).with_strategy('stage1_rrf').hash(),
-        'config_k':             cfg.k,
-        'config_dtw_mode':      'none',
-        'config_metric':        cfg.metric,
-        'search_modes':         cfg.search_modes_str(),
+        'd_min':             direct_pred.get('d_min') or d_min,
+        'd_max':             direct_pred.get('d_max'),
+        'd_normalized':      direct_pred.get('d_normalized'),
+        'query_path_length': None,
+        'neighbor_ids':      neighbor_ids,
+        'config_hash':       cfg.with_stage(1).with_strategy('stage1_rrf').hash(),
+        'config_k':          cfg.k,
+        'config_dtw_mode':   'none',
+        'config_metric':     cfg.metric,
+        'search_modes':      cfg.search_modes_str(),
     }
 
 
@@ -877,8 +800,9 @@ async def run_calibration(
         if not resume:
             await delete_config_rows(conn, cfg.hash(), cfg.calibration_tag, resume_stage)
             if not stage1_mode:
-                # Also delete stage1 rows from a previous stage2 run
-                await delete_config_rows(conn, cfg.hash(), cfg.calibration_tag, 1)
+                # Bug 3 fix: stage1 rows use a different hash (dtw_mode='none', strategy='stage1_rrf')
+                cfg_s1 = cfg.with_stage(1).with_strategy('stage1_rrf')
+                await delete_config_rows(conn, cfg_s1.hash(), cfg.calibration_tag, 1)
 
         all_trajs = await get_all_traj_ids(
             conn, cfg.metric,
@@ -906,8 +830,6 @@ async def run_calibration(
         f"to process: {len(todo):,} (cal={n_cal:,} test={n_test:,})"
     )
 
-    seg_buffer:  List[Dict[str, Any]] = []
-    traj_buffer: List[Dict[str, Any]] = []
     n_ok = n_fail = 0
 
     stage_label = 'stage1_rrf' if stage1_mode else 'stage2_dtw'
@@ -926,21 +848,18 @@ async def run_calibration(
             ]
             results = await asyncio.gather(*tasks, return_exceptions=False)
 
+            buffer: List[Dict[str, Any]] = []
             for res in results:
                 if res is None:
                     n_fail += 1
                     continue
-                seg_buffer.extend(res.get('segment_rows') or [])
-                traj_buffer.extend(res.get('traj_rows') or [])
+                buffer.extend(res.get('segment_rows') or [])
+                buffer.extend(res.get('traj_rows') or [])
                 n_ok += 1
 
             async with pool.acquire() as conn:
-                if seg_buffer:
-                    await insert_segment_batch(conn, seg_buffer)
-                    seg_buffer.clear()
-                if traj_buffer:
-                    await insert_trajectory_batch(conn, traj_buffer)
-                    traj_buffer.clear()
+                if buffer:
+                    await insert_calibration_batch(conn, buffer)
 
             pbar.update(len(batch))
             pbar.set_postfix(ok=n_ok, fail=n_fail)

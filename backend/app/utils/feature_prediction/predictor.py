@@ -89,7 +89,7 @@ def _predict_segment(
 
     n        = len(perf_values)
     mean_p   = sum(perf_values) / n
-    perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / n)
+    perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / (n - 1))
     sigma    = max(perf_std, sigma_floor)
 
     pl = max(query_path_length, EPSILON)
@@ -144,7 +144,7 @@ def _predict_stage1_rrf(
     p_hat    = sum(w * p for w, p in zip(weights, perf_values)) / w_sum
     n        = len(perf_values)
     mean_p   = sum(perf_values) / n
-    perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / n)
+    perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / (n - 1))
     sigma    = max(perf_std, sigma_floor)
 
     best_rrf  = max(weights)
@@ -199,7 +199,7 @@ def _predict_direct(
 
     n        = len(perf_values)
     mean_p   = sum(perf_values) / n
-    perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / n)
+    perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / (n - 1))
     sigma    = max(perf_std, sigma_floor)
 
     pl = max(query_path_length, EPSILON)
@@ -277,6 +277,7 @@ async def predict_performance(
     seg_path_lengths:  List[float]          = []
     seg_query_ids:     List[str]            = []
     seg_neighbor_ids:  List[List[str]]      = []
+    stage1_seg_preds:  List[Dict]           = []
 
     for group in segment_groups:
         query_seg_id = group.get('target_segment', '')
@@ -302,6 +303,21 @@ async def predict_performance(
         if prediction is not None:
             prediction['query_path_length'] = query_path_len if query_path_len > EPSILON else None
 
+        # Always compute RRF prediction for stage1 calibration rows (Bug 1+2 fix)
+        s1_pred = (
+            prediction if not stage2_active
+            else _predict_stage1_rrf(results=seg_results, feature=feature, sigma_floor=sigma_floor)
+        )
+        stage1_seg_preds.append({
+            'seg_id':            query_seg_id,
+            'p_hat':             s1_pred.get('p_hat')        if s1_pred else None,
+            'sigma':             s1_pred.get('sigma')        if s1_pred else None,
+            'd_min':             s1_pred.get('d_min')        if s1_pred else None,
+            'd_max':             s1_pred.get('d_max')        if s1_pred else None,
+            'd_normalized':      s1_pred.get('d_normalized') if s1_pred else None,
+            'query_path_length': query_path_len if query_path_len > EPSILON else None,
+        })
+
         nids = [str(r['seg_id']) for r in seg_results if r.get('seg_id')]
         group['prediction'] = prediction
         seg_predictions.append(prediction)
@@ -323,10 +339,15 @@ async def predict_performance(
             traj_results=traj_results, query_path_length=total_query_path_length,
             feature=feature, sigma_floor=sigma_floor,
         )
-    else:
-        direct_prediction = _predict_stage1_rrf(
+        # Always compute RRF traj prediction for stage1 calibration rows (Bug 1 fix)
+        stage1_rrf_prediction = _predict_stage1_rrf(
             results=traj_results, feature=feature, sigma_floor=sigma_floor,
         )
+    else:
+        direct_prediction     = _predict_stage1_rrf(
+            results=traj_results, feature=feature, sigma_floor=sigma_floor,
+        )
+        stage1_rrf_prediction = direct_prediction
 
     # Build segments list — only expose what the frontend needs
     segments = []
@@ -351,6 +372,8 @@ async def predict_performance(
         'stage':                         'stage2_dtw' if stage2_active else 'stage1_rrf',
         'decomposed':                    decomposed_prediction,
         'direct':                        direct_prediction,
+        'stage1_rrf':                    stage1_rrf_prediction,   # always RRF (Bug 1 fix)
+        'stage1_segments':               stage1_seg_preds,        # always RRF per seg (Bug 2 fix)
         'decomposed_conformal_interval': None,
         'direct_conformal_interval':     None,
         'stage1_conformal_interval':     None,

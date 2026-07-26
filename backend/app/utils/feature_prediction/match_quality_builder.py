@@ -3,7 +3,7 @@ match_quality_builder.py
 =========================
 Builds prognosis.confidence_match_quality (empirical match-quality
 buckets: d_min -> typical prediction_error), from the
-existing confidence_calibration_seg/traj tables.
+existing confidence_calibration table.
 
 Complements calibration_set_builder.py's conformal quantiles with a
 descriptive (non-guaranteed) match-quality signal — see quality_match.py
@@ -28,7 +28,7 @@ n_samples per bucket, which is especially important for small tags.
 
 Usage
 -----
-  # Build for every tag found in confidence_calibration_seg/traj:
+  # Build for every tag found in confidence_calibration:
   python match_quality_builder.py
 
   # Build for a specific tag only:
@@ -125,18 +125,9 @@ async def get_all_tags_from_motion(conn: asyncpg.Connection) -> List[str]:
 
 
 async def get_distinct_tags_from_calibration(conn: asyncpg.Connection) -> List[str]:
-    """
-    Return every calibration_tag that actually has data in the calibration
-    tables (split_role='calibration').  Used when neither --tag nor
-    --all-tags is given so we process whatever is present.
-    """
     rows = await conn.fetch(f"""
         SELECT DISTINCT calibration_tag
-        FROM (
-            SELECT calibration_tag FROM {SCHEMA}.confidence_calibration_seg
-            UNION
-            SELECT calibration_tag FROM {SCHEMA}.confidence_calibration_traj
-        ) t
+        FROM {SCHEMA}.confidence_calibration
         ORDER BY calibration_tag
     """)
     return [r['calibration_tag'] for r in rows]
@@ -155,62 +146,99 @@ async def build_buckets_for_level(
     """
     Build (or refresh) match-quality buckets for one level and one tag.
 
+    Uses fixed percentile breakpoints (not NTILE) so bucket boundaries are
+    stable: adding more rows shifts stats but never re-numbers which bucket
+    a d_min value falls into.  Boundaries are the n_buckets+1 quantile
+    edges [0%, 100/n%, 200/n%, …, 100%] of the d_min distribution,
+    computed per config group.  Rows at the extreme are clamped into the
+    first/last bucket by the lookup in quality_match.py.
+
     All rows are used regardless of split_role — more data means more
     stable bucket boundaries and higher n_samples per bucket.
-
-    tag_filter=None means "all tags present in the table at once" — the
-    PARTITION BY already includes calibration_tag so each tag gets its own
-    independent set of buckets.  Passing a specific tag restricts the rows
-    and is faster when you only need to refresh one tag.
     """
-    source_table = (
-        f"{SCHEMA}.confidence_calibration_seg"
-        if level == 'segment'
-        else f"{SCHEMA}.confidence_calibration_traj"
-    )
-
     tag_clause = "AND calibration_tag = $2" if tag_filter else ""
-    params: List = [n_buckets]
+    params: List = [level]
     if tag_filter:
         params.append(tag_filter)
 
-    rows = await conn.fetch(f"""
-        WITH ranked AS (
-            SELECT
-                config_hash,
-                config_metric   AS metric,
-                config_dtw_mode AS dtw_mode,
-                config_k,
-                search_modes,
-                calibration_tag,
-                config_stage,
-                retrieval_strategy,
-                d_min,
-                prediction_error,
-                NTILE($1) OVER (
-                    PARTITION BY config_metric, config_dtw_mode, retrieval_strategy,
-                                 config_k, search_modes, calibration_tag, config_stage
-                    ORDER BY d_min
-                ) AS bucket
-            FROM {source_table}
-            WHERE d_min IS NOT NULL
-              {tag_clause}
-        )
+    # Fetch all rows needed for bucket computation
+    raw = await conn.fetch(f"""
         SELECT
-            (array_agg(config_hash))[1] AS config_hash,
-            metric, dtw_mode, config_k, search_modes, calibration_tag,
-            config_stage, retrieval_strategy,
-            bucket,
-            MIN(d_min) AS d_min_lower,
-            MAX(d_min) AS d_min_upper,
-            AVG(prediction_error)      AS mean_error,
-            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY prediction_error) AS median_error,
-            STDDEV(prediction_error)   AS std_error,
-            COUNT(*)                   AS n_samples
-        FROM ranked
-        GROUP BY metric, dtw_mode, config_k, search_modes, calibration_tag,
-                 config_stage, retrieval_strategy, bucket
+            config_hash,
+            config_metric   AS metric,
+            config_dtw_mode AS dtw_mode,
+            config_k,
+            search_modes,
+            calibration_tag,
+            config_stage,
+            retrieval_strategy,
+            d_min,
+            prediction_error
+        FROM {SCHEMA}.confidence_calibration
+        WHERE level = $1
+          AND d_min IS NOT NULL
+          {tag_clause}
+        ORDER BY config_metric, config_dtw_mode, retrieval_strategy,
+                 config_k, search_modes, calibration_tag, config_stage,
+                 d_min
     """, *params)
+
+    if not raw:
+        logger.warning(
+            f"No rows found for level='{level}'"
+            + (f", tag='{tag_filter}'" if tag_filter else "")
+            + " — skipping."
+        )
+        return 0
+
+    # Group rows by config key
+    import itertools
+    group_key = lambda r: (r['metric'], r['dtw_mode'], r['retrieval_strategy'],
+                           r['config_k'], r['search_modes'], r['calibration_tag'], r['config_stage'])
+    rows: List[dict] = []
+    for key, group_iter in itertools.groupby(raw, key=group_key):
+        group  = list(group_iter)
+        metric, dtw_mode, strategy, config_k, search_modes, cal_tag, config_stage = key
+        config_hash = group[0]['config_hash']
+        d_mins  = [float(r['d_min']) for r in group]
+        errors  = [float(r['prediction_error']) for r in group]
+        n_total = len(d_mins)
+
+        # Compute fixed percentile edges (n_buckets + 1 edges → n_buckets intervals)
+        edges = [d_mins[min(n_total - 1, int(i * n_total / n_buckets))]
+                 for i in range(n_buckets + 1)]
+
+        # Assign each row to a bucket (1-indexed) based on where d_min falls
+        def _bucket_for(d: float) -> int:
+            for b in range(n_buckets - 1, 0, -1):
+                if d >= edges[b]:
+                    return b + 1
+            return 1
+
+        # Collect per-bucket stats
+        buckets: dict = {}
+        for d, err in zip(d_mins, errors):
+            b = _bucket_for(d)
+            buckets.setdefault(b, {'d_mins': [], 'errors': []})
+            buckets[b]['d_mins'].append(d)
+            buckets[b]['errors'].append(err)
+
+        for b, bdata in buckets.items():
+            bd = sorted(bdata['d_mins'])
+            be = sorted(bdata['errors'])
+            n  = len(be)
+            mean_err   = sum(be) / n
+            median_err = be[n // 2] if n % 2 else (be[n // 2 - 1] + be[n // 2]) / 2
+            std_err    = (sum((e - mean_err) ** 2 for e in be) / (n - 1)) ** 0.5 if n > 1 else None
+            rows.append({
+                'metric': metric, 'dtw_mode': dtw_mode, 'retrieval_strategy': strategy,
+                'config_k': config_k, 'search_modes': search_modes,
+                'calibration_tag': cal_tag, 'config_stage': config_stage,
+                'bucket': b, 'config_hash': config_hash,
+                'd_min_lower': bd[0], 'd_min_upper': bd[-1],
+                'mean_error': mean_err, 'median_error': median_err,
+                'std_error': std_err, 'n_samples': n,
+            })
 
     if not rows:
         logger.warning(

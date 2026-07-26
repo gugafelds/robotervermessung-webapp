@@ -20,6 +20,7 @@ Each fallback attaches a CalibrationMismatch so the frontend can warn.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -33,8 +34,9 @@ logger = logging.getLogger(__name__)
 EPSILON     = 1e-6
 DEFAULT_COV = 0.90
 
-# Simple in-process cache: key → (quantile, mismatch_or_None)
-_quantile_cache: Dict[str, Tuple[Optional[float], Optional['CalibrationMismatch']]] = {}
+# In-process cache: key → (quantile, mismatch_or_None, expiry_monotonic)
+_quantile_cache: Dict[str, Tuple[Optional[float], Optional['CalibrationMismatch'], float]] = {}
+QUANTILE_CACHE_TTL = 300  # seconds — mirrors quality_match.py TTL
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -186,15 +188,20 @@ async def get_calibration_quantile(
     tag              = cfg.calibration_tag
     stage            = cfg.config_stage
 
-    ck = _cache_key(metric, dtw_mode, strategy, level, k, search_modes_str, tag, coverage, stage)
-    if ck in _quantile_cache:
-        return _quantile_cache[ck]
+    ck  = _cache_key(metric, dtw_mode, strategy, level, k, search_modes_str, tag, coverage, stage)
+    now = time.monotonic()
+    cached = _quantile_cache.get(ck)
+    if cached is not None and now < cached[2]:
+        return cached[0], cached[1]
+
+    def _store(q: Optional[float], mm: Optional[CalibrationMismatch]) -> Tuple[Optional[float], Optional[CalibrationMismatch]]:
+        _quantile_cache[ck] = (q, mm, now + QUANTILE_CACHE_TTL)
+        return q, mm
 
     # Step 1: Exact match
     q = await _fetch_exact(conn, metric, dtw_mode, strategy, level, k, search_modes_str, tag, coverage, stage)
     if q is not None:
-        _quantile_cache[ck] = (q, None)
-        return q, None
+        return _store(q, None)
 
     # Step 2: Nearest k, same modes + tag
     result = await _fetch_nearest_k(conn, metric, dtw_mode, strategy, level, k, search_modes_str, tag, coverage, stage)
@@ -205,8 +212,7 @@ async def get_calibration_quantile(
             requested_k=k, used_k=used_k,
         )
         logger.info(f"Fuzzy quantile: k {k}→{used_k} ({metric}/{dtw_mode}/{strategy}/{level}/stage{stage})")
-        _quantile_cache[ck] = (q, mismatch)
-        return q, mismatch
+        return _store(q, mismatch)
 
     # Step 3: Nearest k, any modes, same tag
     result2 = await _fetch_any_modes(conn, metric, dtw_mode, strategy, level, k, tag, coverage, stage)
@@ -218,8 +224,7 @@ async def get_calibration_quantile(
             requested_modes=search_modes_str, used_modes=used_modes,
         )
         logger.info(f"Fuzzy quantile: modes+k mismatch, using [{used_modes}] k={used_k}")
-        _quantile_cache[ck] = (q, mismatch)
-        return q, mismatch
+        return _store(q, mismatch)
 
     # Step 4: Fallback to tag='all', same stage
     if tag != 'all':
@@ -229,8 +234,7 @@ async def get_calibration_quantile(
                 warning=f"calibration_tag '{tag}' not found, using tag='all'.",
                 requested_tag=tag, used_tag='all',
             )
-            _quantile_cache[ck] = (q, mismatch)
-            return q, mismatch
+            return _store(q, mismatch)
 
         result3 = await _fetch_any_modes(conn, metric, dtw_mode, strategy, level, k, 'all', coverage, stage)
         if result3 is not None:
@@ -241,8 +245,7 @@ async def get_calibration_quantile(
                 requested_modes=search_modes_str, used_modes=used_modes,
                 requested_tag=tag, used_tag='all',
             )
-            _quantile_cache[ck] = (q, mismatch)
-            return q, mismatch
+            return _store(q, mismatch)
 
     logger.warning(
         f"No conformal quantile found — metric={metric} dtw_mode={dtw_mode} "
@@ -250,8 +253,7 @@ async def get_calibration_quantile(
         f"tag={tag} coverage={coverage} stage={stage}. "
         f"Run calibration_set_builder.py first."
     )
-    _quantile_cache[ck] = (None, None)
-    return None, None
+    return _store(None, None)
 
 
 async def get_calibration_quantile_for_tags(
@@ -437,18 +439,7 @@ async def compute_conformal_intervals(
         )
         if interval is not None:
             prediction = group.get('prediction') or {}
-            mq = await get_match_quality(
-                conn,
-                prediction.get('d_min'),
-                level='segment',
-                retrieval_strategy=strategy,
-                calibration_tag=cfg.calibration_tag,
-                metric=cfg.metric,
-                dtw_mode=cfg.dtw_mode,
-                k=cfg.k,
-                search_modes=cfg.search_modes,
-                config_stage=2,
-            )
+            mq = await get_match_quality(conn, prediction.get('d_min'), 'segment', cfg)
             if mq is not None:
                 interval['match_quality'] = mq.__dict__
         group['conformal_interval'] = interval
@@ -475,18 +466,7 @@ async def compute_conformal_intervals(
 
     if traj_interval is not None:
         decomposed_pred = (result.get('prognosis') or {}).get('decomposed') or {}
-        mq = await get_match_quality(
-            conn,
-            decomposed_pred.get('d_min'),
-            level='trajectory',
-            retrieval_strategy=strategy,
-            calibration_tag=cfg.calibration_tag,
-            metric=cfg.metric,
-            dtw_mode=cfg.dtw_mode,
-            k=cfg.k,
-            search_modes=cfg.search_modes,
-            config_stage=2,
-        )
+        mq = await get_match_quality(conn, decomposed_pred.get('d_min'), 'trajectory', cfg)
         if mq is not None:
             traj_interval['match_quality'] = mq.__dict__
 
@@ -535,18 +515,7 @@ async def _compute_direct_conformal_interval(
     sigma  = max(float(sigma), sigma_floor, EPSILON)
     interval = _build_interval(float(p_hat), sigma, q, coverage, mismatch, 'direct')
 
-    mq = await get_match_quality(
-        conn,
-        direct_pred.get('d_min'),
-        level='trajectory',
-        retrieval_strategy='direct',
-        calibration_tag=direct_cfg.calibration_tag,
-        metric=direct_cfg.metric,
-        dtw_mode=direct_cfg.dtw_mode,
-        k=direct_cfg.k,
-        search_modes=direct_cfg.search_modes,
-        config_stage=2,
-    )
+    mq = await get_match_quality(conn, direct_pred.get('d_min'), 'trajectory', direct_cfg)
     if mq is not None:
         interval['match_quality'] = mq.__dict__
 
@@ -593,18 +562,7 @@ async def compute_stage1_conformal_interval(
         if p_hat is not None and sigma is not None:
             sigma         = max(float(sigma), sigma_floor, EPSILON)
             direct_interval = _build_interval(float(p_hat), sigma, q_traj, coverage, mm_traj, 'stage1_rrf')
-            mq = await get_match_quality(
-                conn,
-                direct_pred.get('d_min'),
-                level='trajectory',
-                retrieval_strategy='stage1_rrf',
-                calibration_tag=cfg.calibration_tag,
-                metric=cfg.metric,
-                dtw_mode='none',
-                k=cfg.k,
-                search_modes=cfg.search_modes,
-                config_stage=1,
-            )
+            mq = await get_match_quality(conn, direct_pred.get('d_min'), 'trajectory', cfg)
             if mq is not None:
                 direct_interval['match_quality'] = mq.__dict__
 
@@ -632,18 +590,7 @@ async def compute_stage1_conformal_interval(
         sigma    = max(float(sigma), sigma_floor, EPSILON)
         interval = _build_interval(float(p_hat), sigma, q_seg, coverage, mm_seg, 'stage1_rrf')
 
-        mq = await get_match_quality(
-            conn,
-            prediction.get('d_min'),
-            level='segment',
-            retrieval_strategy='stage1_rrf',
-            calibration_tag=cfg.calibration_tag,
-            metric=cfg.metric,
-            dtw_mode='none',
-            k=cfg.k,
-            search_modes=cfg.search_modes,
-            config_stage=1,
-        )
+        mq = await get_match_quality(conn, prediction.get('d_min'), 'segment', cfg)
         if mq is not None:
             interval['match_quality'] = mq.__dict__
 
@@ -666,18 +613,7 @@ async def compute_stage1_conformal_interval(
 
     if traj_interval is not None:
         decomposed_pred = prognosis.get('decomposed') or {}
-        mq = await get_match_quality(
-            conn,
-            decomposed_pred.get('d_min'),
-            level='trajectory',
-            retrieval_strategy='stage1_rrf',
-            calibration_tag=cfg.calibration_tag,
-            metric=cfg.metric,
-            dtw_mode='none',
-            k=cfg.k,
-            search_modes=cfg.search_modes,
-            config_stage=1,
-        )
+        mq = await get_match_quality(conn, decomposed_pred.get('d_min'), 'trajectory', cfg)
         if mq is not None:
             traj_interval['match_quality'] = mq.__dict__
 

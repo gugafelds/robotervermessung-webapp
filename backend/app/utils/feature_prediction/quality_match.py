@@ -31,6 +31,8 @@ from typing import Dict, List, Optional, Tuple
 
 import asyncpg
 
+from .conformal_config import CalibrationConfig
+
 logger = logging.getLogger(__name__)
 
 _bucket_cache: Dict[Tuple, Tuple[List[dict], float]] = {}
@@ -70,18 +72,13 @@ def _make_search_modes_str(search_modes: Tuple[str, ...]) -> str:
 
 
 async def _fetch_buckets(
-    conn:               asyncpg.Connection,
-    metric:             str,
-    dtw_mode:           str,
-    retrieval_strategy: str,
-    level:              str,
-    k:                  int,
-    search_modes_str:   str,
-    calibration_tag:    str,
-    config_stage:       int,
+    conn: asyncpg.Connection,
+    cfg:  CalibrationConfig,
+    level: str,
 ) -> List[dict]:
-    cache_key = (metric, dtw_mode, retrieval_strategy, level, k,
-                 search_modes_str, calibration_tag, config_stage)
+    sm  = cfg.search_modes_str()
+    cache_key = (cfg.metric, cfg.dtw_mode, cfg.retrieval_strategy, level,
+                 cfg.k, sm, cfg.calibration_tag, cfg.config_stage)
 
     cached = _bucket_cache.get(cache_key)
     if cached is not None:
@@ -102,8 +99,8 @@ async def _fetch_buckets(
           AND calibration_tag     = $7
           AND config_stage        = $8
         ORDER BY bucket
-    """, metric, dtw_mode, retrieval_strategy, level, k,
-        search_modes_str, calibration_tag, config_stage)
+    """, cfg.metric, cfg.dtw_mode, cfg.retrieval_strategy, level,
+        cfg.k, sm, cfg.calibration_tag, cfg.config_stage)
 
     rows = [dict(r) for r in rows_raw]
     _bucket_cache[cache_key] = (rows, time.monotonic() + CACHE_TTL_SECONDS)
@@ -111,47 +108,31 @@ async def _fetch_buckets(
 
 
 async def get_match_quality(
-    conn:         asyncpg.Connection,
-    d_min:        Optional[float],
-    level:        str,
-    retrieval_strategy: str             = 'decomposed',
-    calibration_tag:    str             = 'all',
-    metric:             str             = 'sidtw',
-    dtw_mode:           str             = 'position',
-    k:                  int             = 10,
-    search_modes:       Tuple[str, ...] = ('joint', 'metadata', 'orientation', 'position', 'velocity'),
-    config_stage:       int             = 2,
+    conn:  asyncpg.Connection,
+    d_min: Optional[float],
+    level: str,
+    cfg:   CalibrationConfig,
 ) -> Optional[MatchQuality]:
     """
     Look up the empirical match-quality tier for a given d_min.
 
     Falls back to calibration_tag='all' if no buckets exist for the requested tag.
     Returns None if no buckets found or d_min is None.
-
-    config_stage: 1 = Stage 1 RRF, 2 = Stage 2 DTW.
     """
     if d_min is None:
         return None
 
-    search_modes_str = _make_search_modes_str(search_modes)
-    used_tag         = calibration_tag
+    used_tag = cfg.calibration_tag
+    buckets  = await _fetch_buckets(conn, cfg, level)
 
-    buckets = await _fetch_buckets(
-        conn, metric, dtw_mode, retrieval_strategy, level,
-        k, search_modes_str, calibration_tag, config_stage,
-    )
-
-    if not buckets and calibration_tag != 'all':
-        buckets = await _fetch_buckets(
-            conn, metric, dtw_mode, retrieval_strategy, level,
-            k, search_modes_str, 'all', config_stage,
-        )
+    if not buckets and cfg.calibration_tag != 'all':
+        buckets = await _fetch_buckets(conn, cfg.with_tag('all'), level)
         if buckets:
             used_tag = 'all'
             logger.warning(
-                f"[MatchQuality] stage={config_stage} tag='{calibration_tag}' has no buckets — "
-                f"fell back to tag='all' (level={level}, strategy={retrieval_strategy}). "
-                f"Run: python match_quality_builder.py --tag {calibration_tag}"
+                f"[MatchQuality] stage={cfg.config_stage} tag='{cfg.calibration_tag}' has no buckets — "
+                f"fell back to tag='all' (level={level}, strategy={cfg.retrieval_strategy}). "
+                f"Run: python match_quality_builder.py --tag {cfg.calibration_tag}"
             )
 
     if not buckets:
