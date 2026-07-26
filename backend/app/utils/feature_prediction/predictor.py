@@ -112,12 +112,7 @@ def _predict_stage1_rrf(
     feature:     str   = 'mean_distance',
     sigma_floor: float = 0.005,
 ) -> Optional[Dict[str, Any]]:
-    """
-    Stage 1 prediction using RRF score weighting (w_i ∝ rrf_score).
-
-    d_min_per_path_length = 1 / best_rrf_score — used as match-quality proxy:
-    high RRF score → small "distance" → good match.
-    """
+    """Stage 1 prediction: w_i = rrf_score (paper eq. 3). d_min = max rrf_score (best match)."""
     valid = []
     for r in results:
         features  = r.get('features') or {}
@@ -133,9 +128,8 @@ def _predict_stage1_rrf(
     if len(valid) < 2:
         return None
 
-    # Sort by RRF score descending, assign rank r=1,2,3... → w_i = 1/r² (paper eq. 3)
-    valid.sort(key=lambda x: x['rrf_score'], reverse=True)
-    weights     = [1.0 / (rank ** 2) for rank in range(1, len(valid) + 1)]
+    # w_i = rrf_score directly (paper eq. 3)
+    weights     = [v['rrf_score'] for v in valid]
     perf_values = [v['perf_value'] for v in valid]
 
     w_sum = sum(weights)
@@ -145,11 +139,10 @@ def _predict_stage1_rrf(
     perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / (n - 1))
     sigma    = max(perf_std, sigma_floor)
 
-    # d_min/d_max/d_normalized: rank-based proxies (rank 1 = best match)
-    # 1/rank² mirrors the weight — rank 1 → d=1, rank n → d=1/n²
-    d_min        = round(1.0 / 1 ** 2,       6)          # best rank = 1
-    d_max        = round(1.0 / n ** 2,       6)          # worst rank = n
-    d_normalized = round(1.0 / ((n + 1) / 2) ** 2, 6)   # median rank proxy
+    rrf_scores   = [v['rrf_score'] for v in valid]
+    d_min        = round(max(rrf_scores), 6)   # best match = highest rrf_score
+    d_max        = round(min(rrf_scores), 6)   # worst match = lowest rrf_score
+    d_normalized = round(sum(rrf_scores) / n,  6)   # mean rrf_score
 
     return {
         'p_hat':        round(p_hat, 4),
@@ -330,6 +323,9 @@ async def predict_performance(
     traj_results            = result.get('traj_similarity', {}).get('results', [])
     total_query_path_length = sum(seg_path_lengths)
 
+    if decomposed_prediction is not None:
+        decomposed_prediction['query_path_length'] = total_query_path_length or None
+
     traj_neighbor_ids = [str(r['seg_id']) for r in traj_results if r.get('seg_id')]
 
     # Stage 1: RRF-weighted predictions (always computed — needed for calibration even in Stage 2)
@@ -337,7 +333,8 @@ async def predict_performance(
         results=traj_results, feature=feature, sigma_floor=sigma_floor,
     )
     if s1_direct_prediction is not None:
-        s1_direct_prediction['neighbor_ids'] = traj_neighbor_ids
+        s1_direct_prediction['neighbor_ids']      = traj_neighbor_ids
+        s1_direct_prediction['query_path_length'] = total_query_path_length or None
 
     # Stage 1 decomposed: length-weighted aggregate of segment-level RRF predictions
     s1_decomposed_prediction = _aggregate_trajectory_decomposed(
@@ -352,15 +349,19 @@ async def predict_performance(
         sigma_floor=sigma_floor,
     )
 
+    if s1_decomposed_prediction is not None:
+        s1_decomposed_prediction['query_path_length'] = total_query_path_length or None
+
     if stage2_active:
         direct_prediction = _predict_direct(
             traj_results=traj_results, query_path_length=total_query_path_length,
             feature=feature, sigma_floor=sigma_floor,
         )
         if direct_prediction is not None:
-            direct_prediction['neighbor_ids'] = traj_neighbor_ids
+            direct_prediction['neighbor_ids']      = traj_neighbor_ids
+            direct_prediction['query_path_length'] = total_query_path_length or None
     else:
-        direct_prediction     = s1_direct_prediction
+        direct_prediction = s1_direct_prediction
 
     # Build segments list — only expose what the frontend needs
     segments = []
