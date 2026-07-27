@@ -3,62 +3,61 @@
 correction_route_handler.py
 ============================
 POST /api/correction/predict
-
+ 
 Nimmt eine SimulatedTrajectory entgegen, führt eine multimodale
 Ähnlichkeitssuche durch und berechnet eine gewichtete Korrektur
 [dx, dy, dz] pro Segment.
-
+ 
 Basiert auf dem Korrekturansatz von [Name Studentin] — die Logik der
 gewichteten Mittelung (1/dtw) und der Abweichungsberechnung aus
 sidtw_evaluation wurde direkt übernommen und in die Backend-Pipeline
 integriert.
 """
-
-import asyncio
+ 
 from typing import List, Literal, Optional, Dict
-
-import numpy as np
+ 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-
+ 
 from ...database import get_db, get_db_pool
 from ...utils.multimodal_framework.similarity_pipeline import run_similarity_pipeline
 from ...utils.metadata_embeddings.embedding_calculator import EmbeddingCalculator
-
+ 
 import logging
-
+ 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
+ 
+ 
 # ── Manuelle Kalibrierungsparameter ──────────────────────────────────────
 CORRECTION_THRESHOLD = 10   # DTW-Faktor: Segmente mit dtw > threshold * dtw_first werden ignoriert
 CORRECTION_X_FAC     = 1.0  # Skalierung der X-Korrektur
 CORRECTION_Y_FAC     = 1.0  # Skalierung der Y-Korrektur
 CORRECTION_Z_FAC     = 1.0  # Skalierung der Z-Korrektur
-
+ 
 # Drift-Offset: globaler additiver Drift zwischen historischen Daten und aktueller Messung.
 # Berechnet aus Duplikat-Paaren (ba-mueller vs. ba-mueller-correction-10/11/12, 2026-06-03 → 2026-07-24).
 # Auf [0, 0, 0] setzen wenn kein Drift bekannt oder frische Daten verwendet werden.
 DRIFT_OFFSET_X =  0.0
 DRIFT_OFFSET_Y =  0.0
 DRIFT_OFFSET_Z =  0.0
-
+ 
 # ── Request / Response Models ─────────────────────────────────────────────
-
+ 
 class CorrectionTrajectory(BaseModel):
     timestamps: List[float]
     positions:  List[List[float]]
     quats:      List[List[float]]
     joints:     List[List[float]]
-
-
+ 
+ 
 class CorrectionRequest(BaseModel):
     trajectory:        CorrectionTrajectory
     movement_type:     str
     weight:            float = Field(..., description="Payload in kg")
     robot_model:       str   = Field(..., description="e.g. abb_irb4400")
     limit:             int   = 5
+    stage2_active:     bool  = True
     mode:              Literal["relative", "linear"] = "relative"
     segment_indices:   list[int] = []
     include_tags:      list[str] = []
@@ -66,29 +65,30 @@ class CorrectionRequest(BaseModel):
     calibration_date:       str        = ""
     filter_by_calibration:  bool       = True
     drift_offset:           list[float] = [0.0, 0.0, 0.0]
-
-
+ 
+ 
 class NeighborDebug(BaseModel):
     seg_id:       str
-    dtw_distance: float
+    dtw_distance: Optional[float] = None
+    rrf_score:    Optional[float] = None
     weight:       float
     dx: float; dy: float; dz: float
     positions:    List[List[float]]  # [[x, y, z], ...]
-
-
+ 
+ 
 class SegmentDebug(BaseModel):
     target_segment: str
     correction:     List[float]      # [dx, dy, dz] final
     neighbors:      List[NeighborDebug]
-
-
+ 
+ 
 class CorrectionResponse(BaseModel):
     corrections: List[List[float]]   # [[dx, dy, dz], ...] — one per segment
     debug:       Optional[List[SegmentDebug]] = None
-
-
+ 
+ 
 # ── Helpers ───────────────────────────────────────────────────────────────
-
+ 
 async def _fetch_robot_info(conn, robot_model: str) -> Optional[Dict]:
     row = await conn.fetchrow("""
         SELECT vel_max, accel_max, max_payload, reach_xy, reach_z_max, reach_z_min
@@ -96,7 +96,7 @@ async def _fetch_robot_info(conn, robot_model: str) -> Optional[Dict]:
         WHERE robot_model = $1
     """, robot_model)
     return dict(row) if row else None
-
+ 
 async def _filter_seg_ids_by_calibration(
     conn, seg_ids: list[str], min_calibration_date: str
 ) -> list[str]:
@@ -132,8 +132,8 @@ async def _filter_seg_ids_by_calibration(
         logger.info("[correction] calibration filter dropped %d/%d segments (< %s)",
                     n_dropped, len(seg_ids), min_calibration_date)
     return kept
-
-
+ 
+ 
 async def _get_all_segment_data(conn, seg_ids: list[str], last_points: int = 10) -> dict:
     """Returns {seg_id: [dx, dy, dz]} — avg(cmd - act) over last N endpoint points."""
     query = """
@@ -153,24 +153,24 @@ async def _get_all_segment_data(conn, seg_ids: list[str], last_points: int = 10)
         ORDER BY seg_id, rn;
     """
     result = await conn.fetch(query, seg_ids, last_points)
-
+ 
     data: dict[str, list] = {}
     for row in result:
         sid    = str(row["seg_id"])
         x_diff = float(row["sidtw_cmd_x"] - row["sidtw_act_x"]) / last_points
         y_diff = float(row["sidtw_cmd_y"] - row["sidtw_act_y"]) / last_points
         z_diff = float(row["sidtw_cmd_z"] - row["sidtw_act_z"]) / last_points
-
+ 
         if sid in data:
             data[sid][0] += x_diff
             data[sid][1] += y_diff
             data[sid][2] += z_diff
         else:
             data[sid] = [x_diff, y_diff, z_diff]
-
+ 
     return data
-
-
+ 
+ 
 async def _fetch_neighbor_positions(conn, seg_ids: list[str]) -> dict[str, list]:
     """Returns {seg_id: [[x, y, z], ...]} sampled to max 200 points per segment."""
     rows = await conn.fetch("""
@@ -191,10 +191,10 @@ async def _fetch_neighbor_positions(conn, seg_ids: list[str]) -> dict[str, list]
             [float(r['x_cmd']), float(r['y_cmd']), float(r['z_cmd'])]
         )
     return result
-
-
+ 
+ 
 # ── Endpoint ──────────────────────────────────────────────────────────────
-
+ 
 @router.post("/predict", response_model=CorrectionResponse)
 async def predict_correction(
     request: CorrectionRequest,
@@ -206,9 +206,9 @@ async def predict_correction(
         robot_info = await _fetch_robot_info(conn, request.robot_model)
         if robot_info is None:
             logger.warning(f"robot_model '{request.robot_model}' not found — using fallback.")
-
+ 
         embedding_calculator = EmbeddingCalculator(n_samples=10, robot_info=robot_info)
-
+ 
         # ── Ein einziger Pipeline-Aufruf — intern segmentweise ────────────
         similarity_result = await run_similarity_pipeline(
             external_payload={
@@ -227,17 +227,17 @@ async def predict_correction(
             conn=conn,
             modes=["position", "joint", "orientation", "velocity", "metadata"],
             limit=request.limit,
-            stage2_active=True,
+            stage2_active=request.stage2_active,
             dtw_mode="position",
             metric="sidtw",
             prognosis_active=False,
             include_tags=request.include_tags or None,
             exclude_tags=request.exclude_tags or None,
         )
-
+ 
         if similarity_result.get("error"):
             raise HTTPException(status_code=422, detail=similarity_result["error"])
-
+ 
         # ── Alle IDs auf einmal sammeln ───────────────────────────────────
         seg_groups = similarity_result.get("segment_similarity", [])
         all_ids = []
@@ -245,46 +245,51 @@ async def predict_correction(
             for s in group.get("similar_segments", {}).get("results", []):
                 if s.get("seg_id"):
                     all_ids.append(s["seg_id"])
-
+ 
         # ── Kalibrierungsfilter: alte Daten ausschließen ─────────────────
         filtered_ids = await _filter_seg_ids_by_calibration(
             conn, all_ids, request.calibration_date or "" if request.filter_by_calibration else ""
         )
         query_data = await _get_all_segment_data(conn, filtered_ids)
-
+ 
         # ── Korrektur pro Segment ────────────────────
         corrections = []
         eps = 1e-9
-
+ 
         for group in seg_groups:
             similar_segments = group.get("similar_segments", {}).get("results", [])
-
-            x_diffs, y_diffs, z_diffs, dtw_distances = [], [], [], []
+ 
+            x_diffs, y_diffs, z_diffs, raw_scores = [], [], [], []
             dtw_first = None
-
+ 
             for s in similar_segments:
                 seg_id = s.get("seg_id")
-                dtw    = s.get("dtw_distance")
-                if seg_id is None or dtw is None:
+                if request.stage2_active:
+                    score_val = s.get("dtw_distance")
+                else:
+                    score_val = s.get("rrf_score")
+                if seg_id is None or score_val is None:
                     continue
-                if dtw_first is None:
-                    dtw_first = float(dtw)
-                if float(dtw) > CORRECTION_THRESHOLD * dtw_first:
-                    break
+                if request.stage2_active:
+                    # DTW: threshold filter (kleinere = besser)
+                    if dtw_first is None:
+                        dtw_first = float(score_val)
+                    if float(score_val) > CORRECTION_THRESHOLD * dtw_first:
+                        break
                 res = query_data.get(str(seg_id))
                 if res is None:
                     continue  # filtered out (old calibration)
                 x_diffs.append(res[0])
                 y_diffs.append(res[1])
                 z_diffs.append(res[2])
-                dtw_distances.append(float(dtw))
-
+                raw_scores.append(float(score_val))
+ 
             if not x_diffs:
                 corrections.append([0.0, 0.0, 0.0])
                 continue
-
+ 
             x_corr, y_corr, z_corr = 0.0, 0.0, 0.0
-
+ 
             if request.mode == "linear":
                 k          = len(x_diffs)
                 weight_sum = (k * (k + 1)) / 2
@@ -293,15 +298,25 @@ async def predict_correction(
                     x_corr += w * x_diffs[i]
                     y_corr += w * y_diffs[i]
                     z_corr += w * z_diffs[i]
-            else:
-                inverse_dtw   = [1.0 / (d + eps) for d in dtw_distances]
+            elif request.stage2_active:
+                # 1/dtw Gewichtung (kleiner dtw = besser)
+                inverse_dtw   = [1.0 / (d + eps) for d in raw_scores]
                 total_inverse = sum(inverse_dtw)
                 weights_dtw   = [v / total_inverse for v in inverse_dtw]
                 for i, w in enumerate(weights_dtw):
                     x_corr += w * x_diffs[i]
                     y_corr += w * y_diffs[i]
                     z_corr += w * z_diffs[i]
-
+            else:
+                # rrf_score² Gewichtung (größer rrf = besser)
+                rrf_sq    = [r ** 2 for r in raw_scores]
+                total_rrf = sum(rrf_sq) or eps
+                weights   = [v / total_rrf for v in rrf_sq]
+                for i, w in enumerate(weights):
+                    x_corr += w * x_diffs[i]
+                    y_corr += w * y_diffs[i]
+                    z_corr += w * z_diffs[i]
+ 
             req_drift = request.drift_offset
             dx = req_drift[0] if any(req_drift) else DRIFT_OFFSET_X
             dy = req_drift[1] if any(req_drift) else DRIFT_OFFSET_Y
@@ -311,12 +326,12 @@ async def predict_correction(
                 CORRECTION_Y_FAC * y_corr + dy,
                 CORRECTION_Z_FAC * z_corr + dz,
             ])
-
+ 
         logger.info(
             "[correction] %d segments processed, %d corrections computed.",
             len(seg_groups), len(corrections),
         )
-
+ 
         debug_data = None
         if debug:
             neighbor_positions = await _fetch_neighbor_positions(conn, all_ids)
@@ -326,26 +341,34 @@ async def predict_correction(
                 dtw_first = None
                 neighbors_out = []
                 eps = 1e-9
-                inverse_dtw = []
+                raw_scores_debug = []
                 valid = []
                 for s in similar:
-                    dtw = s.get("dtw_distance")
-                    if dtw is None:
+                    if request.stage2_active:
+                        score_val = s.get("dtw_distance")
+                    else:
+                        score_val = s.get("rrf_score")
+                    if score_val is None:
                         continue
-                    if dtw_first is None:
-                        dtw_first = float(dtw)
-                    if float(dtw) > CORRECTION_THRESHOLD * dtw_first:
-                        break
-                    valid.append((s, float(dtw)))
-                    inverse_dtw.append(1.0 / (float(dtw) + eps))
-                total_inv = sum(inverse_dtw) or 1.0
-                for (s, dtw), inv in zip(valid, inverse_dtw):
+                    if request.stage2_active:
+                        if dtw_first is None:
+                            dtw_first = float(score_val)
+                        if float(score_val) > CORRECTION_THRESHOLD * dtw_first:
+                            break
+                    valid.append((s, float(score_val)))
+                    if request.stage2_active:
+                        raw_scores_debug.append(1.0 / (float(score_val) + eps))
+                    else:
+                        raw_scores_debug.append(float(score_val) ** 2)
+                total_score = sum(raw_scores_debug) or 1.0
+                for (s, score_val), raw in zip(valid, raw_scores_debug):
                     sid = s.get("seg_id")
                     dev = query_data.get(str(sid), [0, 0, 0])
                     neighbors_out.append(NeighborDebug(
                         seg_id=str(sid) if sid else "",
-                        dtw_distance=dtw,
-                        weight=round(inv / total_inv, 6),
+                        dtw_distance=score_val if request.stage2_active else None,
+                        rrf_score=score_val if not request.stage2_active else None,
+                        weight=round(raw / total_score, 6),
                         dx=dev[0], dy=dev[1], dz=dev[2],
                         positions=neighbor_positions.get(str(sid), []),
                     ))
@@ -354,9 +377,9 @@ async def predict_correction(
                     correction=corr,
                     neighbors=neighbors_out,
                 ))
-
+ 
         return CorrectionResponse(corrections=corrections, debug=debug_data)
-
+ 
     except HTTPException:
         raise
     except Exception as e:
