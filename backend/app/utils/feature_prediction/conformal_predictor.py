@@ -27,7 +27,17 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import asyncpg
 
 from .conformal_config import CalibrationConfig, get_active_config
-from .quality_match import get_match_quality
+from .quality_match import get_match_quality as _get_match_quality
+
+
+async def _safe_match_quality(conn, d_min, level, cfg):
+    try:
+        return await _get_match_quality(conn, d_min, level, cfg)
+    except Exception:
+        return None
+
+
+get_match_quality = _safe_match_quality
 
 logger = logging.getLogger(__name__)
 
@@ -270,7 +280,7 @@ async def get_calibration_quantile_for_tags(
     """
     MIN_N_CALIBRATION = 150
 
-    if not tags or (len(tags) == 1 and tags[0] == 'all'):
+    if not tags or len(tags) == 1:
         return await get_calibration_quantile(conn, cfg, coverage, level)
 
     metric           = cfg.metric

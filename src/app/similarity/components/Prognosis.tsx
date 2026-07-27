@@ -86,9 +86,10 @@ const PredictionRow: React.FC<PredictionRowProps> = ({
 
 interface IntervalDisplayProps {
   interval: ConformalInterval;
+  isStage1?: boolean;
 }
 
-const IntervalDisplay: React.FC<IntervalDisplayProps> = ({ interval }) => (
+const IntervalDisplay: React.FC<IntervalDisplayProps> = ({ interval, isStage1 = false }) => (
   <div className="mt-2 rounded-md bg-gray-50 px-3 py-2">
     <div className="flex items-center justify-between">
       <p className="py-1 text-base text-primary">
@@ -137,6 +138,7 @@ interface PrognosisCardProps {
   prediction: TrajectoryPrognosis | null;
   gt: number | null;
   interval: ConformalInterval | null | undefined;
+  isStage1?: boolean;
 }
 
 const PrognosisCard: React.FC<PrognosisCardProps> = ({
@@ -144,6 +146,7 @@ const PrognosisCard: React.FC<PrognosisCardProps> = ({
   prediction,
   gt,
   interval,
+  isStage1 = false,
 }) => (
   <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-4">
     <p className="text-lg font-medium uppercase tracking-wider text-primary">
@@ -159,7 +162,7 @@ const PrognosisCard: React.FC<PrognosisCardProps> = ({
           sigma={prediction.sigma}
           mismatchWarning={interval?.calibration_mismatch?.warning ?? null}
         />
-        {interval != null && <IntervalDisplay interval={interval} />}
+        {interval != null && <IntervalDisplay interval={interval} isStage1={isStage1} />}
       </>
     ) : (
       <p className="text-lg text-gray-800">—</p>
@@ -239,15 +242,17 @@ const PrognosisView: React.FC<PrognosisViewProps> = ({
       <div className="grid grid-cols-2 gap-4 border-t p-4">
         <PrognosisCard
           label="Direct (trajectories)"
-          prediction={prognosis.direct}
+          prediction={isStage1 ? prognosis.s1_direct : prognosis.direct}
           gt={gt}
           interval={directInterval}
+          isStage1={isStage1}
         />
         <PrognosisCard
           label="Decomposed (segments)"
-          prediction={prognosis.decomposed}
+          prediction={isStage1 ? prognosis.s1_decomposed : prognosis.decomposed}
           gt={gt}
           interval={decomposedInterval}
+          isStage1={isStage1}
         />
       </div>
 
