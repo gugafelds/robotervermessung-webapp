@@ -161,7 +161,7 @@ class FilterSearcher:
             param_idx = 1
 
             if include_tags:
-                where_clauses.append(f"ti.tag = ANY(${param_idx})")
+                where_clauses.append(f"string_to_array(ti.tag, ';') && ${param_idx}::text[]")
                 params.append(include_tags)
                 param_idx += 1
                 logger.info(f"include_tags filter: {include_tags}")

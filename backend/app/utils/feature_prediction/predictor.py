@@ -276,6 +276,14 @@ async def predict_performance(
         query_path_len = float(seg_features.get('length') or 0.0)
         if query_path_len <= EPSILON:
             query_path_len = path_length_map.get(query_seg_id, 0.0)
+        if query_path_len <= EPSILON:
+            # Candidate trajectories have no stored features — estimate from neighbors
+            neighbor_lengths = [
+                float((r.get('features') or {}).get('length') or 0.0)
+                for r in seg_results
+            ]
+            valid_nl = [l for l in neighbor_lengths if l > EPSILON]
+            query_path_len = sum(valid_nl) / len(valid_nl) if valid_nl else 1.0
         if query_path_len > EPSILON:
             path_length_map[query_seg_id] = query_path_len
 

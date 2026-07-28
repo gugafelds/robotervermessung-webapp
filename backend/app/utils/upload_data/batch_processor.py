@@ -8,6 +8,7 @@ from .csv_processor import CSVProcessor
 from .db_operations import DatabaseOperations
 from .db_config import DB_PARAMS
 from ..metadata_embeddings.metadata_calculator import MetadataCalculatorService
+from .evaluation_processor import evaluate_and_upload
 
 
 class BatchProcessor:
@@ -360,5 +361,16 @@ class BatchProcessor:
 
                 except Exception as e:
                     logger.error(f'Metadata error for {traj_id}: {e}')
+
+        # ── Evaluation berechnen und hochladen ────────────────────
+        if new_traj_ids:
+            logger.info(f'Starte Trajectory Evaluation für {len(new_traj_ids)} neue Bahnen...')
+            for traj_id in new_traj_ids:
+                traj_data = next(
+                    (d for d in all_processed_data if d['traj_info_data'][0] == traj_id),
+                    None
+                )
+                if traj_data:
+                    await evaluate_and_upload(conn, traj_id, traj_data)
 
         return file_results

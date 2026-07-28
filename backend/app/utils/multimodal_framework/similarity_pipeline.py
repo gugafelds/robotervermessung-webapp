@@ -89,7 +89,8 @@ async def run_similarity_pipeline(
     t1 = time.time()
 
     if is_external:
-        segment_indices = external_payload.get('segment_indices')  # NEU
+        segment_indices    = external_payload.get('segment_indices')  # NEU
+        segment_metadata_map: dict = {}
 
         if segment_indices:
             # ── Multi-Segment Kandidat ────────────────────────────────────
@@ -123,6 +124,8 @@ async def run_similarity_pipeline(
                 }
                 for row in seg_rows
             }
+
+            segment_metadata_map = {row['seg_id']: row['metadata_row'] for row in seg_rows}
 
             searcher = MultiModalSearcherCandidate(
                 pool,
@@ -165,6 +168,14 @@ async def run_similarity_pipeline(
         include_ids=include_ids,
     )
     stage1_ms = (time.time() - t1) * 1000
+
+    # Populate target_segment_features from pre-computed metadata for candidate segments
+    if is_external and segment_indices:
+        for group in result.get('segment_similarity', []):
+            if group.get('target_segment_features') is None:
+                seg_id = group.get('target_segment')
+                if seg_id and seg_id in segment_metadata_map:
+                    group['target_segment_features'] = segment_metadata_map[seg_id]
 
     if result.get('error'):
         result['timing']       = {'stage1_ms': round(stage1_ms, 1), 'total_ms': round((time.time() - t_start) * 1000, 1)}
