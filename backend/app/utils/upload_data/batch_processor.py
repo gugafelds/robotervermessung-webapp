@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 
 import logging
@@ -50,15 +51,13 @@ class BatchProcessor:
         for file_info in files_and_paths:
             try:
                 csv_processor = CSVProcessor(file_info['path'])
-                processed_data_list = csv_processor.process_csv(
-                    robot_model,
-                    path_planning,
-                    source_data_act,
-                    source_data_cmd,
-                    file_info['filename'],
-                    segmentation_method,
-                    num_segments,
-                    reference_position
+                loop = asyncio.get_event_loop()
+                processed_data_list = await loop.run_in_executor(
+                    None,
+                    lambda p=file_info['path'], fn=file_info['filename']: CSVProcessor(p).process_csv(
+                        robot_model, path_planning, source_data_act, source_data_cmd,
+                        fn, segmentation_method, num_segments, reference_position
+                    )
                 )
 
 
