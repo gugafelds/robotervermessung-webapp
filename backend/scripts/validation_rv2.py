@@ -34,11 +34,11 @@ logging.basicConfig(level=logging.WARNING, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 DATABASE_URL   = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost/dbname')
-VALIDATION_TAG = 'rv2-dataset-validation'
-DATASETS       = ['rv2-dataset-1', 'rv2-dataset-2', 'rv2-dataset-3', 'rv2-dataset-4', 'rv2-dataset-5']
+DATASETS       = ['rv2-dataset-1', 'rv2-dataset-2', 'rv2-dataset-3', 'rv2-dataset-4',
+                   'rv2-dataset-5', 'rv2-dataset-6', 'rv2-dataset-7']
 SEARCH_MODES   = ['position', 'joint', 'orientation', 'velocity', 'metadata']
 EPSILON        = 1e-9
-DEFAULT_STEPS  = [50, 100, 150]
+DEFAULT_STEPS  = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]
 
 
 # ── DB ────────────────────────────────────────────────────────────────────────
@@ -67,14 +67,14 @@ async def fetch_actuals_for_ids(conn: asyncpg.Connection, ids: List[str]) -> Lis
     return [(r['traj_id'], float(r['mean_distance'])) for r in rows if r['mean_distance'] is not None]
 
 
-async def fetch_validation_trajs(conn: asyncpg.Connection) -> List[Tuple[str, float]]:
+async def fetch_validation_trajs(conn: asyncpg.Connection, tag: str) -> List[Tuple[str, float]]:
     rows = await conn.fetch("""
         SELECT DISTINCT ON (tt.traj_id) tt.traj_id, mi.sidtw_average_distance AS mean_distance
         FROM motion.traj_info tt
         LEFT JOIN evaluation.sidtw_info mi ON mi.seg_id = tt.traj_id
         WHERE tt.tag = $1
         ORDER BY tt.traj_id
-    """, VALIDATION_TAG)
+    """, tag)
     return [(r['traj_id'], float(r['mean_distance'])) for r in rows if r['mean_distance'] is not None]
 
 
@@ -83,20 +83,16 @@ def _temp_tag(base_tag: str, n: int) -> str:
 
 
 async def set_temp_tag(conn: asyncpg.Connection, base_tag: str, ids: List[str], n: int) -> None:
-    """Tag first n trajectories with a temp tag (keeps base_tag on remaining rows)."""
-    temp = _temp_tag(base_tag, n)
     await conn.execute("""
         UPDATE motion.traj_info SET tag = $1
         WHERE traj_id = ANY($2::text[]) AND tag = $3
-    """, temp, ids, base_tag)
+    """, _temp_tag(base_tag, n), ids, base_tag)
 
 
 async def restore_temp_tag(conn: asyncpg.Connection, base_tag: str, n: int) -> None:
-    """Restore temp tag back to base_tag."""
-    temp = _temp_tag(base_tag, n)
     await conn.execute("""
         UPDATE motion.traj_info SET tag = $1 WHERE tag = $2
-    """, base_tag, temp)
+    """, base_tag, _temp_tag(base_tag, n))
 
 
 async def cleanup_all_temp_tags(conn: asyncpg.Connection, datasets: List[str]) -> None:
@@ -156,7 +152,6 @@ async def run_batch(
     active_tags: List[str],
     stages: List[int],
     limit: int,
-    batch_size: int,
     desc: str,
 ) -> Dict[str, Dict[int, List[Tuple[float, float, float]]]]:
     """Run all validation trajectories against active_tags and return (p_hat, p_actual, sigma)."""
@@ -164,24 +159,14 @@ async def run_batch(
         tag: {s: [] for s in stages} for tag in active_tags
     }
 
-    with tqdm(total=len(val_trajs), desc=desc, leave=False) as pbar:
-        for i in range(0, len(val_trajs), batch_size):
-            batch = val_trajs[i:i + batch_size]
-            tasks = [
-                search_one(pool, traj_id, stage, limit, include_tags=[tag])
-                for traj_id, _ in batch
-                for tag in active_tags
-                for stage in stages
-            ]
-            res = await asyncio.gather(*tasks)
-            idx = 0
-            for traj_id, p_actual in batch:
-                for tag in active_tags:
-                    for stage in stages:
-                        pred = res[idx]; idx += 1
-                        if pred:
-                            results[tag][stage].append((pred[0], p_actual, pred[1]))
-            pbar.update(len(batch))
+    with tqdm(total=len(val_trajs) * len(active_tags), desc=desc, leave=False) as pbar:
+        for traj_id, p_actual in val_trajs:
+            for tag in active_tags:
+                for stage in stages:
+                    pred = await search_one(pool, traj_id, stage, limit, include_tags=[tag])
+                    if pred:
+                        results[tag][stage].append((pred[0], p_actual, pred[1]))
+                pbar.update(1)
 
     return results
 
@@ -196,7 +181,8 @@ def ncs(rows):        return [abs(h - a) / max(s, EPSILON) for h, a, s in rows]
 
 # ── Normal run ────────────────────────────────────────────────────────────────
 
-async def run(limit: int, datasets: List[str], stages: List[int], batch_size: int) -> None:
+async def run(limit: int, datasets: List[str], stages: List[int], batch_size: int,
+              val_tags: List[str]) -> None:
     pool = await asyncpg.create_pool(
         DATABASE_URL, min_size=5, max_size=20,
         server_settings={'search_path': 'motion, public'},
@@ -205,21 +191,32 @@ async def run(limit: int, datasets: List[str], stages: List[int], batch_size: in
     async with pool.acquire() as conn:
         for tag in datasets:
             print(f'  {tag}: {await fetch_tag_count(conn, tag)} trajectories')
-        val_trajs = await fetch_validation_trajs(conn)
+        all_val: Dict[str, List[Tuple[str, float]]] = {}
+        for vtag in val_tags:
+            trajs = await fetch_validation_trajs(conn, vtag)
+            all_val[vtag] = trajs
+            print(f'  {vtag}: {len(trajs)} validation trajectories')
 
-    print(f'  {VALIDATION_TAG}: {len(val_trajs)} validation trajectories\n')
-    if not val_trajs:
+    print()
+    all_val = {k: v for k, v in all_val.items() if v}
+    if not all_val:
         await pool.close(); return
 
-    results = await run_batch(pool, val_trajs, datasets, stages, limit, batch_size, 'Validating')
+    # run each validation set independently, then aggregate
+    all_results: Dict[str, Dict[str, Dict[int, List[Tuple[float, float, float]]]]] = {}
+    for vtag, val_trajs in all_val.items():
+        all_results[vtag] = await run_batch(
+            pool, val_trajs, datasets, stages, limit, f'Validating [{vtag}]'
+        )
     await pool.close()
-    _print_table(results, datasets, stages, val_trajs, f'full datasets, limit={limit}')
+    _print_table_multi(all_results, datasets, stages, all_val, limit)
 
 
 # ── Learning curve ────────────────────────────────────────────────────────────
 
 async def run_learning_curve(
-    limit: int, datasets: List[str], stages: List[int], batch_size: int, steps: List[int]
+    limit: int, datasets: List[str], stages: List[int], batch_size: int, steps: List[int],
+    val_tag: str = 'rv2-dataset-validation',
 ) -> None:
     pool = await asyncpg.create_pool(
         DATABASE_URL, min_size=5, max_size=20,
@@ -231,11 +228,11 @@ async def run_learning_curve(
         for tag in datasets:
             counts[tag] = await fetch_tag_count(conn, tag)
             print(f'  {tag}: {counts[tag]} trajectories')
-        val_trajs = await fetch_validation_trajs(conn)
+        val_trajs = await fetch_validation_trajs(conn, val_tag)
         # Safety: clean up any leftover temp tags from a previous crashed run
         await cleanup_all_temp_tags(conn, datasets)
 
-    print(f'  {VALIDATION_TAG}: {len(val_trajs)} validation trajectories\n')
+    print(f'  {val_tag}: {len(val_trajs)} validation trajectories\n')
     if not val_trajs:
         await pool.close(); return
 
@@ -256,22 +253,33 @@ async def run_learning_curve(
                     ids = await fetch_first_n_ids(conn, tag, n)
                     await set_temp_tag(conn, tag, ids, n)
 
-            temp_tags = [_temp_tag(tag, n) for tag in active]
-            results = await run_batch(
-                pool, val_trajs, temp_tags, stages, limit, batch_size, f'n={n:>4}'
-            )
+            curve[n] = {}
+            for tag in active:
+                temp_tag = _temp_tag(tag, n)
+                tag_results: Dict[int, List[Tuple[float, float, float]]] = {s: [] for s in stages}
+                with tqdm(total=len(val_trajs), desc=f'  n={n:>4} {tag}', leave=False) as pbar:
+                    for i in range(0, len(val_trajs), batch_size):
+                        batch = val_trajs[i:i + batch_size]
+                        tasks = [
+                            search_one(pool, traj_id, stage, limit, include_tags=[temp_tag])
+                            for traj_id, _ in batch
+                            for stage in stages
+                        ]
+                        res = await asyncio.gather(*tasks)
+                        idx = 0
+                        for traj_id, p_actual in batch:
+                            for stage in stages:
+                                pred = res[idx]; idx += 1
+                                if pred:
+                                    tag_results[stage].append((pred[0], p_actual, pred[1]))
+                        pbar.update(len(batch))
+                curve[n][tag] = tag_results
 
             # Restore original tags immediately after each step
             async with pool.acquire() as conn:
                 for tag in active:
                     await restore_temp_tag(conn, tag, n)
 
-            # Re-key results from temp_tag back to base_tag
-            curve[n] = {
-                tag: results[_temp_tag(tag, n)]
-                for tag in active
-                if _temp_tag(tag, n) in results
-            }
             print(f'n={n}: done ({", ".join(f"{tag}: {len(curve[n].get(tag, {}).get(stages[0], []))} results" for tag in active)})')
 
     finally:
@@ -315,11 +323,9 @@ async def run_loo_curve(
             curve[n] = {}
 
             async with pool.acquire() as conn:
-                ids_per_tag: Dict[str, List[str]] = {}
                 actuals_per_tag: Dict[str, List[Tuple[str, float]]] = {}
                 for tag in active:
                     ids = await fetch_first_n_ids(conn, tag, n)
-                    ids_per_tag[tag] = ids
                     actuals_per_tag[tag] = await fetch_actuals_for_ids(conn, ids)
                     await set_temp_tag(conn, tag, ids, n)
 
@@ -364,24 +370,45 @@ async def run_loo_curve(
 
 # ── Output ────────────────────────────────────────────────────────────────────
 
-def _print_table(results, datasets, stages, val_trajs, title: str) -> None:
+def _print_table_multi(
+    all_results: Dict[str, Dict[str, Dict[int, List[Tuple[float, float, float]]]]],
+    datasets: List[str],
+    stages: List[int],
+    all_val: Dict[str, List],
+    limit: int,
+) -> None:
+    vtags = list(all_results.keys())
+    multi = len(vtags) > 1
     print(f'\n{"="*80}')
-    print(f'Validation Results — {title}')
-    print(f'Validation set: {len(val_trajs)} trajectories ({VALIDATION_TAG})')
+    print(f'Validation Results — limit={limit}')
+    for vtag, trajs in all_val.items():
+        print(f'  Validation set: {vtag} ({len(trajs)} trajectories)')
     print(f'{"="*80}')
+
     for stage in stages:
         print(f'\nStage {stage} ({"RRF" if stage == 1 else "DTW"}):')
-        print(f'  {"Dataset":<22} {"n":>5}  {"MAE (mm)":>10}  {"RMSE (mm)":>10}  {"Mean σ":>10}  {"Mean NCS":>10}  {"Median NCS":>10}')
-        print(f'  {"-"*82}')
+        hdr = f'  {"Dataset":<22} {"n":>5}  {"MAE":>12}  {"RMSE":>12}  {"Mean σ":>10}  {"Mean NCS":>10}'
+        print(hdr)
+        print(f'  {"-"*(len(hdr)-2)}')
+        _fmt = lambda vals: f'{statistics.mean(vals):>6.4f}±{statistics.stdev(vals) if len(vals)>1 else 0:.4f}'
         for tag in datasets:
-            rows = results[tag][stage]
-            if not rows:
+            maes, rmses, sigmas, ncss_mean, ns = [], [], [], [], []
+            for vtag in vtags:
+                rows = all_results[vtag].get(tag, {}).get(stage, [])
+                if rows:
+                    maes.append(mae(rows)); rmses.append(rmse(rows))
+                    sigmas.append(mean_sigma(rows))
+                    ncss_mean.append(statistics.mean(ncs(rows)))
+                    ns.append(len(rows))
+            if not maes:
                 print(f'  {tag:<22} {"—":>5}'); continue
-            nc = ncs(rows)
-            print(f'  {tag:<22} {len(rows):>5}  '
-                  f'{mae(rows):>10.4f}  {rmse(rows):>10.4f}  '
-                  f'{mean_sigma(rows):>10.4f}  '
-                  f'{statistics.mean(nc):>10.4f}  {statistics.median(nc):>10.4f}')
+            n_str = f'{int(statistics.mean(ns)):>5}'
+            if multi:
+                print(f'  {tag:<22} {n_str}  {_fmt(maes):>12}  {_fmt(rmses):>12}  '
+                      f'{statistics.mean(sigmas):>10.4f}  {statistics.mean(ncss_mean):>10.4f}')
+            else:
+                print(f'  {tag:<22} {n_str}  {maes[0]:>12.4f}  {rmses[0]:>12.4f}  '
+                      f'{sigmas[0]:>10.4f}  {ncss_mean[0]:>10.4f}')
     print()
 
 
@@ -398,7 +425,8 @@ def _print_learning_curve(curve, datasets, stages, steps, val_trajs, limit, loo=
 
     for stage in stages:
         label = "RRF" if stage == 1 else "DTW"
-        for metric_name, fn in [('MAE (mm)', mae), ('Mean σ (mm)', mean_sigma)]:
+        for metric_name, fn in [('MAE (mm)', mae), ('Mean σ (mm)', mean_sigma),
+                                ('Mean NCS', lambda rows: statistics.mean(ncs(rows)))]:
             print(f'\nStage {stage} ({label}) — {metric_name}:')
             header = f'  {"n":>5}  ' + '  '.join(f'{tag:>{col}}' for tag in datasets)
             print(header)
@@ -416,19 +444,22 @@ def _print_learning_curve(curve, datasets, stages, steps, val_trajs, limit, loo=
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--limit',          type=int,  default=10,                 help='Similarity search k (default: 10)')
-    parser.add_argument('--batch',          type=int,  default=5,                  help='Trajectories per parallel batch (default: 5)')
-    parser.add_argument('--datasets',       type=str,  default=','.join(DATASETS), help='Comma-separated dataset tags')
-    parser.add_argument('--no-stage2',      action='store_true',                   help='Skip Stage 2 (DTW)')
-    parser.add_argument('--learning-curve', action='store_true',                   help='Run learning curve vs external validation set')
-    parser.add_argument('--loo-curve',      action='store_true',                   help='Run LOO learning curve within each dataset')
-    parser.add_argument('--steps',          type=str,  default=','.join(map(str, DEFAULT_STEPS)),
-                                                                                   help='Comma-separated n values for learning/LOO curve')
+    parser.add_argument('--limit',            type=int,  default=10,  help='Similarity search k (default: 10)')
+    parser.add_argument('--batch',            type=int,  default=5,   help='Trajectories per parallel batch (default: 5)')
+    parser.add_argument('--datasets',         nargs='+', default=None, help='Dataset tags (space- or comma-separated)')
+    parser.add_argument('--validation-tags',  nargs='+', default=None, help='Validation set tags (space- or comma-separated, default: rv2-dataset-validation)')
+    parser.add_argument('--no-stage2',        action='store_true',     help='Skip Stage 2 (DTW)')
+    parser.add_argument('--learning-curve',   action='store_true',     help='Run learning curve vs external validation set')
+    parser.add_argument('--loo-curve',        action='store_true',     help='Run LOO learning curve within each dataset')
+    parser.add_argument('--steps',            nargs='+', default=None, help='n values for learning/LOO curve (space- or comma-separated)')
     args = parser.parse_args()
 
+    def _pl(raw, default): return ' '.join(raw).replace(',', ' ').split() if raw else default
+
     stages   = [1] if args.no_stage2 else [1, 2]
-    datasets = [d.strip() for d in args.datasets.split(',')]
-    steps    = [int(s.strip()) for s in args.steps.split(',')]
+    datasets = _pl(args.datasets, DATASETS)
+    steps    = [int(s) for s in _pl(args.steps, DEFAULT_STEPS)]
+    val_tags = _pl(args.validation_tags, ['rv2-dataset-validation'])
 
     if args.loo_curve:
         asyncio.run(run_loo_curve(
@@ -438,9 +469,10 @@ if __name__ == '__main__':
     elif args.learning_curve:
         asyncio.run(run_learning_curve(
             limit=args.limit, datasets=datasets, stages=stages,
-            batch_size=args.batch, steps=steps,
+            batch_size=args.batch, steps=steps, val_tag=val_tags[0],
         ))
     else:
         asyncio.run(run(
-            limit=args.limit, datasets=datasets, stages=stages, batch_size=args.batch,
+            limit=args.limit, datasets=datasets, stages=stages,
+            batch_size=args.batch, val_tags=val_tags,
         ))
