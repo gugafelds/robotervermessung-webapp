@@ -63,7 +63,7 @@ class RRFRanker:
 
         # RRF Score Berechnung
         rrf_scores = defaultdict(float)
-        mode_details = defaultdict(lambda: {})  # Für Debugging/Transparency
+        mode_details = defaultdict(dict)
         all_seg_ids = set()
 
         for mode, results in rankings.items():

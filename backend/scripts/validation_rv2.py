@@ -216,8 +216,11 @@ async def run(limit: int, datasets: List[str], stages: List[int], batch_size: in
 
 async def run_learning_curve(
     limit: int, datasets: List[str], stages: List[int], batch_size: int, steps: List[int],
-    val_tag: str = 'rv2-dataset-validation',
+    val_tags: List[str] = None,
 ) -> None:
+    if val_tags is None:
+        val_tags = ['rv2-dataset-validation']
+
     pool = await asyncpg.create_pool(
         DATABASE_URL, min_size=5, max_size=20,
         server_settings={'search_path': 'motion, public'},
@@ -228,67 +231,71 @@ async def run_learning_curve(
         for tag in datasets:
             counts[tag] = await fetch_tag_count(conn, tag)
             print(f'  {tag}: {counts[tag]} trajectories')
-        val_trajs = await fetch_validation_trajs(conn, val_tag)
-        # Safety: clean up any leftover temp tags from a previous crashed run
+        all_val: Dict[str, List[Tuple[str, float]]] = {}
+        for vtag in val_tags:
+            trajs = await fetch_validation_trajs(conn, vtag)
+            all_val[vtag] = trajs
+            print(f'  {vtag}: {len(trajs)} validation trajectories')
         await cleanup_all_temp_tags(conn, datasets)
 
-    print(f'  {val_tag}: {len(val_trajs)} validation trajectories\n')
-    if not val_trajs:
+    print()
+    all_val = {k: v for k, v in all_val.items() if v}
+    if not all_val:
         await pool.close(); return
 
-    # curve[n][base_tag][stage] = list of (p_hat, p_actual, sigma)
-    curve: Dict[int, Dict[str, Dict[int, List[Tuple[float, float, float]]]]] = {}
+    # all_curves[vtag][n][base_tag][stage] = list of (p_hat, p_actual, sigma)
+    all_curves: Dict[str, Dict[int, Dict[str, Dict[int, List[Tuple[float, float, float]]]]]] = {
+        vtag: {} for vtag in all_val
+    }
 
     try:
         for n in steps:
-            # Only include datasets that have at least n trajectories
             active = [tag for tag in datasets if counts[tag] >= n]
             if not active:
                 print(f'n={n}: no dataset has enough trajectories, skipping.')
                 continue
 
-            # Set temp tags for first n trajectories of each active dataset
             async with pool.acquire() as conn:
                 for tag in active:
                     ids = await fetch_first_n_ids(conn, tag, n)
                     await set_temp_tag(conn, tag, ids, n)
 
-            curve[n] = {}
-            for tag in active:
-                temp_tag = _temp_tag(tag, n)
-                tag_results: Dict[int, List[Tuple[float, float, float]]] = {s: [] for s in stages}
-                with tqdm(total=len(val_trajs), desc=f'  n={n:>4} {tag}', leave=False) as pbar:
-                    for i in range(0, len(val_trajs), batch_size):
-                        batch = val_trajs[i:i + batch_size]
-                        tasks = [
-                            search_one(pool, traj_id, stage, limit, include_tags=[temp_tag])
-                            for traj_id, _ in batch
-                            for stage in stages
-                        ]
-                        res = await asyncio.gather(*tasks)
-                        idx = 0
-                        for traj_id, p_actual in batch:
-                            for stage in stages:
-                                pred = res[idx]; idx += 1
-                                if pred:
-                                    tag_results[stage].append((pred[0], p_actual, pred[1]))
-                        pbar.update(len(batch))
-                curve[n][tag] = tag_results
+            for vtag, val_trajs in all_val.items():
+                all_curves[vtag][n] = {}
+                for tag in active:
+                    temp_tag = _temp_tag(tag, n)
+                    tag_results: Dict[int, List[Tuple[float, float, float]]] = {s: [] for s in stages}
+                    with tqdm(total=len(val_trajs), desc=f'  n={n:>4} {tag} [{vtag}]', leave=False) as pbar:
+                        for i in range(0, len(val_trajs), batch_size):
+                            batch = val_trajs[i:i + batch_size]
+                            tasks = [
+                                search_one(pool, traj_id, stage, limit, include_tags=[temp_tag])
+                                for traj_id, _ in batch
+                                for stage in stages
+                            ]
+                            res = await asyncio.gather(*tasks)
+                            idx = 0
+                            for traj_id, p_actual in batch:
+                                for stage in stages:
+                                    pred = res[idx]; idx += 1
+                                    if pred:
+                                        tag_results[stage].append((pred[0], p_actual, pred[1]))
+                            pbar.update(len(batch))
+                    all_curves[vtag][n][tag] = tag_results
 
-            # Restore original tags immediately after each step
             async with pool.acquire() as conn:
                 for tag in active:
                     await restore_temp_tag(conn, tag, n)
 
-            print(f'n={n}: done ({", ".join(f"{tag}: {len(curve[n].get(tag, {}).get(stages[0], []))} results" for tag in active)})')
+            first_vtag = next(iter(all_val))
+            print(f'n={n}: done ({", ".join(f"{tag}: {len(all_curves[first_vtag][n].get(tag, {}).get(stages[0], []))} results" for tag in active)})')
 
     finally:
-        # Guarantee cleanup even on crash
         async with pool.acquire() as conn:
             await cleanup_all_temp_tags(conn, datasets)
 
     await pool.close()
-    _print_learning_curve(curve, datasets, stages, steps, val_trajs, limit)
+    _print_learning_curve(all_curves, datasets, stages, steps, all_val, limit)
 
 
 # ── LOO learning curve ───────────────────────────────────────────────────────
@@ -365,7 +372,7 @@ async def run_loo_curve(
             await cleanup_all_temp_tags(conn, datasets)
 
     await pool.close()
-    _print_learning_curve(curve, datasets, stages, steps, None, limit, loo=True)
+    _print_learning_curve({None: curve}, datasets, stages, steps, {}, limit, loo=True)
 
 
 # ── Output ────────────────────────────────────────────────────────────────────
@@ -412,21 +419,28 @@ def _print_table_multi(
     print()
 
 
-def _print_learning_curve(curve, datasets, stages, steps, val_trajs, limit, loo=False) -> None:
-    valid_steps = [n for n in steps if n in curve]
-    col = 14
+def _print_learning_curve(all_curves, datasets, stages, steps, all_val, limit, loo=False) -> None:
+    # all_curves: Dict[vtag, curve] where curve[n][tag][stage] = rows
+    # For LOO: all_curves is passed as {None: curve} single-entry dict
+    vtags = list(all_curves.keys())
+    multi = len(vtags) > 1
+    col   = 16 if multi else 14
+    _fmt  = lambda vals: f'{statistics.mean(vals):.4f}±{statistics.stdev(vals) if len(vals)>1 else 0:.4f}'
+
+    valid_steps = [n for n in steps if any(n in all_curves[v] for v in vtags)]
 
     print(f'\n{"="*80}')
     if loo:
         print(f'LOO Learning Curve — limit={limit} (evaluated within each dataset)')
     else:
-        print(f'Learning Curve — limit={limit}, validation set: {len(val_trajs)} trajectories')
+        for vtag, trajs in all_val.items():
+            print(f'Learning Curve — limit={limit}, validation: {vtag} ({len(trajs)} trajs)')
     print(f'{"="*80}')
 
     for stage in stages:
         label = "RRF" if stage == 1 else "DTW"
         for metric_name, fn in [('MAE (mm)', mae), ('Mean σ (mm)', mean_sigma),
-                                ('Mean NCS', lambda rows: statistics.mean(ncs(rows)))]:
+                                 ('Mean NCS', lambda rows: statistics.mean(ncs(rows)))]:
             print(f'\nStage {stage} ({label}) — {metric_name}:')
             header = f'  {"n":>5}  ' + '  '.join(f'{tag:>{col}}' for tag in datasets)
             print(header)
@@ -434,8 +448,15 @@ def _print_learning_curve(curve, datasets, stages, steps, val_trajs, limit, loo=
             for n in valid_steps:
                 row = f'  {n:>5}  '
                 for tag in datasets:
-                    rows = curve[n].get(tag, {}).get(stage, [])
-                    row += f'{fn(rows):>{col}.4f}  ' if rows else f'{"—":>{col}}  '
+                    vals = [fn(all_curves[v][n][tag][stage])
+                            for v in vtags if n in all_curves[v] and tag in all_curves[v][n]
+                            and all_curves[v][n][tag].get(stage)]
+                    if not vals:
+                        row += f'{"—":>{col}}  '
+                    elif multi:
+                        row += f'{_fmt(vals):>{col}}  '
+                    else:
+                        row += f'{vals[0]:>{col}.4f}  '
                 print(row)
     print()
 
@@ -469,7 +490,7 @@ if __name__ == '__main__':
     elif args.learning_curve:
         asyncio.run(run_learning_curve(
             limit=args.limit, datasets=datasets, stages=stages,
-            batch_size=args.batch, steps=steps, val_tag=val_tags[0],
+            batch_size=args.batch, steps=steps, val_tags=val_tags,
         ))
     else:
         asyncio.run(run(

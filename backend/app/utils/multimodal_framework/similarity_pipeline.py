@@ -89,8 +89,7 @@ async def run_similarity_pipeline(
     t1 = time.time()
 
     if is_external:
-        segment_indices    = external_payload.get('segment_indices')  # NEU
-        segment_metadata_map: dict = {}
+        segment_indices = external_payload.get('segment_indices')
 
         if segment_indices:
             # ── Multi-Segment Kandidat ────────────────────────────────────
@@ -106,26 +105,12 @@ async def run_similarity_pipeline(
             full_row = rows[0]
             seg_rows = rows[1:]
 
-            full_embeddings = {
-                'joint':       full_row['joint_embedding'],
-                'position':    full_row['position_embedding'],
-                'orientation': full_row['orientation_embedding'],
-                'velocity':    full_row['velocity_embedding'],
-                'metadata':    full_row['metadata_embedding'],
-            }
+            def _emb(row):
+                return {k: row[f'{k}_embedding'] for k in ('joint', 'position', 'orientation', 'velocity', 'metadata')}
 
-            segment_embeddings_map = {
-                row['seg_id']: {
-                    'joint':       row['joint_embedding'],
-                    'position':    row['position_embedding'],
-                    'orientation': row['orientation_embedding'],
-                    'velocity':    row['velocity_embedding'],
-                    'metadata':    row['metadata_embedding'],
-                }
-                for row in seg_rows
-            }
-
-            segment_metadata_map = {row['seg_id']: row['metadata_row'] for row in seg_rows}
+            full_embeddings        = _emb(full_row)
+            segment_embeddings_map = {row['seg_id']: _emb(row) for row in seg_rows}
+            segment_metadata_map   = {row['seg_id']: row['metadata_row'] for row in seg_rows}
 
             searcher = MultiModalSearcherCandidate(
                 pool,
@@ -142,14 +127,7 @@ async def run_similarity_pipeline(
                     'traj_similarity': {}, 'segment_similarity': [],
                 }
 
-            external_embeddings = {
-                'joint':       embedding_row['joint_embedding'],
-                'position':    embedding_row['position_embedding'],
-                'orientation': embedding_row['orientation_embedding'],
-                'velocity':    embedding_row['velocity_embedding'],
-                'metadata':    embedding_row['metadata_embedding'],
-            }
-            searcher = MultiModalSearcherCandidate(pool, external_embeddings, CANDIDATE_SEG_ID)
+            searcher = MultiModalSearcherCandidate(pool, _emb(embedding_row), CANDIDATE_SEG_ID)
 
     else:
         searcher = MultiModalSearcher(pool)
@@ -309,8 +287,6 @@ async def run_similarity_pipeline(
         if query_arr is None:
             continue
 
-
-
         candidates_seg_flat = {}
         for r in seg_results:
             cand_seg_id = r.get('seg_id')
@@ -348,7 +324,7 @@ async def run_similarity_pipeline(
     if prognosis_active:
         result = await predict_performance(
             result=result,
-            seg_batch=seg_batch or {},
+            seg_batch=seg_batch,
             conn=conn,
             feature='mean_distance',
             coverage=coverage,

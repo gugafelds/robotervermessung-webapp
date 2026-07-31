@@ -119,7 +119,7 @@ class FilterSearcher:
                 tolerance = self.default_tolerance
 
             # ── target_features nur wenn Feature-Filter nötig ─────────────
-            features_needed = bool(features_to_use and len(features_to_use) > 0)
+            features_needed = bool(features_to_use)
             target_features = None
 
             if features_needed:
@@ -132,8 +132,6 @@ class FilterSearcher:
 
             # include_ids shortcut: ignore all other filters, just restrict to that set
             if include_ids:
-                seg_col = "tm.seg_id" if need_join else "seg_id"
-                traj_col = "tm.traj_id" if need_join else "traj_id"
                 if need_join:
                     rows = await self.connection.fetch(
                         f"""

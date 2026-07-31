@@ -479,12 +479,6 @@ class MultiModalSearcherCandidate(MultiModalSearcher):
             FilterSearcher(conn),
         )
 
-    def _make_helpers_for_segment(self, conn: asyncpg.Connection, seg_id: str):  # NEU
-        return (
-            ShapeSearcherCandidate(conn, self._segment_embeddings_map[seg_id], seg_id),
-            FilterSearcher(conn),
-        )
-
     async def search_similar(
         self,
         target_id: str,
