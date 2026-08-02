@@ -394,7 +394,6 @@ def build_candidate_embeddings_segmented(
 
     # ── Pro Segment ───────────────────────────────────────────────────────
     boundaries = [0] + segment_indices
-
     for i in range(len(segment_indices)):
         start  = boundaries[i]
         end    = boundaries[i + 1] + 1

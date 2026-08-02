@@ -120,6 +120,9 @@ async def run_similarity_pipeline(
             )
 
         else:
+            def _emb(row):
+                return {k: row[f'{k}_embedding'] for k in ('joint', 'position', 'orientation', 'velocity', 'metadata')}
+
             embedding_row = build_candidate_embeddings(external_payload, external_embedding_calculator)
             if embedding_row is None:
                 return {

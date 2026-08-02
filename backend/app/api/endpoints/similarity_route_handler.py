@@ -243,6 +243,7 @@ class SearchCandidateRequest(BaseModel):
     exclude_tags:    Optional[List[str]]          = None
     exclude_ids:     Optional[List[str]]          = None
     include_ids:     Optional[List[str]]          = None
+    segment_indices: Optional[List[int]]          = None
 
 
 @router.post("/search/candidate")
@@ -279,6 +280,7 @@ async def search_candidate(
             },
             "movement_type": request.movement_type,
             "weight":        request.weight,
+            **({"segment_indices": request.segment_indices} if request.segment_indices else {}),
         }
 
         weights = request.weights or {

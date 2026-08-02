@@ -38,7 +38,7 @@ DATASETS       = ['rv2-dataset-1', 'rv2-dataset-2', 'rv2-dataset-3', 'rv2-datase
                    'rv2-dataset-5', 'rv2-dataset-6', 'rv2-dataset-7']
 SEARCH_MODES   = ['position', 'joint', 'orientation', 'velocity', 'metadata']
 EPSILON        = 1e-9
-DEFAULT_STEPS  = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]
+DEFAULT_STEPS  = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]
 
 
 # ── DB ────────────────────────────────────────────────────────────────────────
