@@ -11,6 +11,7 @@ Used by:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import Any, Dict, List, Literal, Optional
@@ -206,8 +207,12 @@ async def run_similarity_pipeline(
                 if data is not None and data.get('trajectory') is not None
             }
             if candidates_flat:
-                dtw_traj   = rerank(query_seq=query_traj_data['trajectory'],
-                                    candidates=candidates_flat, limit=limit, mode=dtw_mode)
+                loop = asyncio.get_event_loop()
+                dtw_traj = await loop.run_in_executor(
+                    None,
+                    lambda: rerank(query_seq=query_traj_data['trajectory'],
+                                   candidates=candidates_flat, limit=limit, mode=dtw_mode)
+                )
                 dtw_lookup = {r['id']: r for r in dtw_traj}
                 enriched   = []
                 for r in traj_results:
@@ -305,8 +310,12 @@ async def run_similarity_pipeline(
         if not candidates_seg_flat:
             continue
 
-        dtw_seg     = rerank(query_seq=query_arr, candidates=candidates_seg_flat,
-                             limit=limit, mode=dtw_mode)
+        loop = asyncio.get_event_loop()
+        dtw_seg = await loop.run_in_executor(
+            None,
+            lambda: rerank(query_seq=query_arr, candidates=candidates_seg_flat,
+                           limit=limit, mode=dtw_mode)
+        )
         dtw_seg_lup = {r['id']: r for r in dtw_seg}
         enriched    = []
         for r in seg_results:

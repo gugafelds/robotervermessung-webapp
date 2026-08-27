@@ -15,6 +15,7 @@ QUERY side: an existing traj_id vs. an in-memory payload.
 Previously the candidate endpoint lived in similarity_candidate_route_handler.py.
 """
 
+import asyncio
 import logging
 import math
 from typing import Dict, List, Literal, Optional
@@ -320,3 +321,99 @@ async def search_candidate(
     except Exception as e:
         logger.error(f"Error in candidate similarity search: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class SearchCandidatesBatchRequest(BaseModel):
+    candidates: List[SearchCandidateRequest]
+
+
+# Each candidate's pipeline run internally acquires further connections per
+# segment (parallel modal search), so capping concurrent candidates alone
+# still allows several connections per candidate at once. Keep this low
+# enough to stay well under the DB server's max_connections regardless of
+# how large ucb_k is.
+_BATCH_CONCURRENCY = asyncio.Semaphore(10)
+
+
+async def _search_one_candidate(request: SearchCandidateRequest, pool, robot_info) -> Dict:
+    embedding_calculator = EmbeddingCalculator(n_samples=10, robot_info=robot_info)
+
+    candidate_payload = {
+        "trajectory": {
+            "timestamps": request.trajectory.timestamps,
+            "positions":  request.trajectory.positions,
+            "quats":      request.trajectory.quats,
+            "joints":     request.trajectory.joints,
+        },
+        "movement_type": request.movement_type,
+        "weight":        request.weight,
+        **({"segment_indices": request.segment_indices} if request.segment_indices else {}),
+    }
+
+    weights = request.weights or {
+        'joint': 1.0, 'position': 1.0, 'orientation': 1.0,
+        'velocity': 1.0, 'metadata': 1.0,
+    }
+
+    async with _BATCH_CONCURRENCY, pool.acquire() as conn:
+        try:
+            result = await run_similarity_pipeline(
+                external_payload=candidate_payload,
+                external_embedding_calculator=embedding_calculator,
+                pool=pool,
+                conn=conn,
+                modes=request.modes,
+                weights=weights,
+                limit=request.limit,
+                buffer_factor=5,
+                prefilter_features=[],
+                metric=request.metric,
+                include_tags=request.include_tags,
+                exclude_tags=request.exclude_tags,
+                exclude_ids=request.exclude_ids,
+                include_ids=request.include_ids,
+                stage2_active=request.stage2_active,
+                dtw_mode=request.dtw_mode,
+                prognosis_active=request.prognosis_active,
+                calibration_tag=request.calibration_tag,
+                coverage=request.coverage,
+            )
+        except Exception as e:
+            logger.error(f"Error in batch candidate search: {e}", exc_info=True)
+            return {'error': str(e)}
+
+    return _sanitize_result(result) if not result.get('error') else result
+
+
+@router.post("/search/candidates_batch")
+async def search_candidates_batch(
+    request: SearchCandidatesBatchRequest,
+    pool=Depends(get_db_pool),
+    conn=Depends(get_db),
+):
+    """
+    Evaluates multiple unsaved candidates (e.g. AutoMode's ucb_k candidates
+    per round) in one request, run concurrently against the pool instead of
+    one /candidate HTTP round-trip per candidate.
+
+    robot_info is fetched once per distinct robot_model and reused across
+    all candidates sharing it. Each candidate acquires its own pool
+    connection for the duration of its own pipeline run — a single
+    asyncpg.Connection is not safe for concurrent queries.
+    """
+    if not request.candidates:
+        return {'results': []}
+
+    robot_info_cache: Dict[str, Optional[Dict]] = {}
+    for model in {c.robot_model for c in request.candidates}:
+        robot_info = await _fetch_robot_info(conn, model)
+        if robot_info is None:
+            logger.warning(f"robot_model '{model}' not found in robot_info — using fallback normalization values")
+        robot_info_cache[model] = robot_info
+
+    results = await asyncio.gather(*[
+        _search_one_candidate(c, pool, robot_info_cache[c.robot_model])
+        for c in request.candidates
+    ])
+
+    return {'results': results}

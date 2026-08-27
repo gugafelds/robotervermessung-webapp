@@ -6,6 +6,7 @@ erfolgreich in die DB geschrieben wurden.
 """
 import sys
 import os
+import asyncio
 import logging
 import numpy as np
 
@@ -170,17 +171,21 @@ async def evaluate_and_upload(conn, traj_id: str, traj_data: dict):
     logger.info(f'Starte Evaluation für {traj_id}: soll={soll_pos.shape}, ist={ist_pos.shape}')
 
     try:
-        results = evaluate(
-            soll_pos=soll_pos,
-            ist_pos=ist_pos,
-            soll_ori=soll_ori if use_ori else np.zeros((1, 4)),
-            ist_ori=ist_ori if use_ori else np.zeros((1, 4)),
-            segment_ids_pos=seg_ids_pos,
-            segment_ids_ori=seg_ids_ori,
-            use_ed=True,
-            use_sidtw=True,
-            use_gd=use_ori,
-            use_qdtw=use_ori,
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(
+            None,
+            lambda: evaluate(
+                soll_pos=soll_pos,
+                ist_pos=ist_pos,
+                soll_ori=soll_ori if use_ori else np.zeros((1, 4)),
+                ist_ori=ist_ori if use_ori else np.zeros((1, 4)),
+                segment_ids_pos=seg_ids_pos,
+                segment_ids_ori=seg_ids_ori,
+                use_ed=True,
+                use_sidtw=True,
+                use_gd=use_ori,
+                use_qdtw=use_ori,
+            )
         )
     except Exception as e:
         logger.error(f'Evaluation fehlgeschlagen für {traj_id}: {e}')

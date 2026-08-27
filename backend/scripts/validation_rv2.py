@@ -34,11 +34,11 @@ logging.basicConfig(level=logging.WARNING, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 DATABASE_URL   = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost/dbname')
-DATASETS       = ['rv2-dataset-1', 'rv2-dataset-2', 'rv2-dataset-3', 'rv2-dataset-4',
-                   'rv2-dataset-5', 'rv2-dataset-6', 'rv2-dataset-7']
+DATASETS       = ['rv2-dataset-1', 'rv2-dataset-2', 'rv2-dataset-3',
+                    'rv2-dataset-7', 'rv2-dataset-8', 'rv2-dataset-9']
 SEARCH_MODES   = ['position', 'joint', 'orientation', 'velocity', 'metadata']
 EPSILON        = 1e-9
-DEFAULT_STEPS  = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]
+DEFAULT_STEPS  = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]
 
 
 # ── DB ────────────────────────────────────────────────────────────────────────
@@ -219,7 +219,7 @@ async def run_learning_curve(
     val_tags: List[str] = None,
 ) -> None:
     if val_tags is None:
-        val_tags = ['rv2-dataset-validation']
+        val_tags = ['rv2-dataset-validation-v2']
 
     pool = await asyncpg.create_pool(
         DATABASE_URL, min_size=5, max_size=20,
@@ -480,7 +480,7 @@ if __name__ == '__main__':
     stages   = [1] if args.no_stage2 else [1, 2]
     datasets = _pl(args.datasets, DATASETS)
     steps    = [int(s) for s in _pl(args.steps, DEFAULT_STEPS)]
-    val_tags = _pl(args.validation_tags, ['rv2-dataset-validation'])
+    val_tags = _pl(args.validation_tags, ['rv2-dataset-validation-v2'])
 
     if args.loo_curve:
         asyncio.run(run_loo_curve(

@@ -1,5 +1,6 @@
 # backend/app/utils/metadata_calculator.py
 
+import asyncio
 import asyncpg
 import numpy as np
 from datetime import datetime
@@ -639,8 +640,9 @@ class MetadataCalculatorService:
                 else:
                     traj_data['wp_lookup'] = {}
 
-                metadata_rows = self._calculate_all_metadata_in_memory(
-                    traj_id, traj_data
+                loop = asyncio.get_event_loop()
+                metadata_rows = await loop.run_in_executor(
+                    None, self._calculate_all_metadata_in_memory, traj_id, traj_data
                 )
                 result['metadata'] = metadata_rows
                 result['segments_processed'] = len(metadata_rows) - 1
@@ -652,7 +654,10 @@ class MetadataCalculatorService:
             if compute_embeddings:
                 if not self.skip_embeddings:
                     traj_data['metadata_rows'] = metadata_rows
-                    embedding_rows = self._calculate_all_embeddings_in_memory(traj_id, traj_data)
+                    loop = asyncio.get_event_loop()
+                    embedding_rows = await loop.run_in_executor(
+                        None, self._calculate_all_embeddings_in_memory, traj_id, traj_data
+                    )
                     # ── Debug ──────────────────────────────────────────────
                     logger.info(f'Segments: {len(traj_data["segments"])}')
                     logger.info(f'Joints available: {list(traj_data["joints"].keys())[:3]}')
