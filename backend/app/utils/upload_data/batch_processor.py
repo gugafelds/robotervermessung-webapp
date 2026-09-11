@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 from .csv_processor import CSVProcessor
 from .db_operations import DatabaseOperations
-from .db_config import DB_PARAMS
+from .db_config import DATABASE_URL
 from ..metadata_embeddings.metadata_calculator import MetadataCalculatorService
 from .evaluation_processor import evaluate_and_upload
 
@@ -92,11 +92,11 @@ class BatchProcessor:
             return file_results
 
         # Group data by type for batch insertion
+        close_conn = False
         if all_processed_data:
-            db_ops = DatabaseOperations(DB_PARAMS)
+            db_ops = DatabaseOperations(DATABASE_URL)
 
             # If no connection was passed, create a new one
-            close_conn = False
             if conn is None:
                 conn = await db_ops.connect_to_db()
                 close_conn = True
@@ -308,9 +308,8 @@ class BatchProcessor:
                     if result['success']:
                         result['success'] = False
                         result['error'] = f"Processing error: {str(e)}"
-            finally:
-                if close_conn and conn:
-                    await conn.close()
+            # conn stays open here — metadata/evaluation below still need it.
+            # Closed in the finally at the bottom of this function instead.
 
         end_time = datetime.now()
         processing_time = (end_time - start_time).total_seconds()
@@ -371,5 +370,8 @@ class BatchProcessor:
                 )
                 if traj_data:
                     await evaluate_and_upload(conn, traj_id, traj_data)
+
+        if close_conn and conn:
+            await conn.close()
 
         return file_results

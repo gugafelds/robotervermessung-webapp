@@ -37,7 +37,8 @@ Fehlerraums des Roboters erreichen.
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Runde (while batches_accepted < number_of_batches)                 │
 │                                                                     │
-│  for _ in range(ucb_k):                                             │
+│  ucb_k Kandidaten parallel (RoboDK-Connection-Pool, siehe            │
+│  recorder_parameters.py: PARALLEL_ROBODK_CONNECTIONS):              │
 │  ┌────────────────────────────────────────────────────────────────┐ │
 │  │ 1. Kandidat generieren                                         │ │
 │  │    generate_auto_batch(batch_size, move_type, seen_positions)  │ │
@@ -49,13 +50,13 @@ Fehlerraums des Roboters erreichen.
 │  │    → Zeitreihe (Position, Orientierung, Joints, Geschw.)       │ │
 │  │    → kein RoboDK nötig, sehr schnell                           │ │
 │  │                                                                │ │
-│  │ 3. POST /api/similarity/search/candidate                       │ │
+│  │ 3. POST /api/similarity/search/candidates_batch                │ │
+│  │    (alle ucb_k Kandidaten in einem Request, siehe unten)       │ │
 │  │    → Stage 1: RRF-Suche über Segmente (schnell)                │ │
 │  │    → Stage 2 (optional): DTW-Reranking (genauer, langsamer)    │ │
 │  │    → Rückgabe: segment_similarity + prognosis                  │ │
 │  │                                                                │ │
-│  │ 4. Score berechnen (Akquisitionsfunktion)                      │ │
-│  │    → score = mean( σᵢ · dᵢ )  für alle Segmente i             │ │
+│  │ 4. Score berechnen (Akquisitionsfunktion, siehe unten)         │ │
 │  │                                                                │ │
 │  └────────────────────────────────────────────────────────────────┘ │
 │                                                                     │
@@ -76,29 +77,39 @@ Fehlerraums des Roboters erreichen.
 
 ### Aktuell: Gulimov & Kalinichenko (2022) — pro Segment
 
-$$\text{score} = \frac{1}{N} \sum_{i=1}^{N} \sigma_i \cdot d_{\min,i}$$
+```
+score = Σ(σᵢ · dᵢ · lᵢ) / Σ(lᵢ)      — Summe über alle Segmente i=1..N
+```
 
-| Symbol       | Bedeutung |
-|--------------|-----------|
-| $N$          | Anzahl der Segmente des Kandidaten |
-| $\sigma_i$   | Unsicherheit der k-NN-Prognose für Segment $i$ (aus `prognosis.segments[i].sigma`) |
-| $d_{\min,i}$ | DTW-Abstand zum nächsten Nachbarn von Segment $i$ (aus `segment_similarity[i].similar_segments.results[0].dtw_distance`) |
+| Symbol  | Bedeutung |
+|---------|-----------|
+| `N`     | Anzahl der Segmente des Kandidaten |
+| `σᵢ`    | Unsicherheit der k-NN-Prognose für Segment i (aus `prognosis.segments[i].sigma`) |
+| `lᵢ`    | Länge von Segment i [mm] — längengewichtetes Mittel statt einfachem Mittel |
+| `dᵢ`    | Abstand zum nächsten Nachbarn von Segment i: bei `stage2_active=True` der DTW-Abstand (`dtw_distance`); bei `stage2_active=False` gibt es keine DTW-Distanz — stattdessen `1 / RRF-Score` des besten Treffers (RRF ist eine Ähnlichkeit, hoch = nah; invertiert, damit hoch weiterhin "weit weg" bedeutet) |
+
+**Bekannte Einschränkung:** `σᵢ` und `dᵢ` sind unnormalisiert und liegen auf
+sehr unterschiedlichen Skalen (σ ≈ 0.1-0.3, DTW-Distanz oft im Bereich
+mehrerer Zehntausend) — der Score wird dadurch praktisch nur von `dᵢ`
+getrieben. Eine globale Normalisierung ist in Arbeit.
 
 **Interpretation:**  
 Ein Kandidat erhält einen hohen Score, wenn er **unbekannte** Regionen des
-Fehlerraums abdeckt ($d_{\min,i}$ groß = weit von bekannten Trajektorien
-entfernt) **und** die Prognose dort **unsicher** ist ($\sigma_i$ groß = wenig
-Vertrauen in den vorhergesagten Fehler).
+Fehlerraums abdeckt (`dᵢ` groß = weit von bekannten Trajektorien entfernt)
+**und** die Prognose dort **unsicher** ist (`σᵢ` groß = wenig Vertrauen in
+den vorhergesagten Fehler).
 
 Beide Faktoren müssen gleichzeitig hoch sein — eine Region, die zwar
 unbekannt, aber gut extrapoliert werden kann, wird nicht bevorzugt.
 
 ### Kommentierte Alternative: UCB (Snoek et al. 2012)
 
-$$\text{score} = \hat{p} + \kappa \cdot \sigma$$
+```
+score = p_hat + kappa · σ
+```
 
-Globales $\hat{p}$ (erwarteter Fehler) + globale Unsicherheit $\sigma$.
-Wurde durch die segmentweise Formel ersetzt, da $\hat{p}$ für externe
+Globales `p_hat` (erwarteter Fehler) + globale Unsicherheit `σ`.
+Wurde durch die segmentweise Formel ersetzt, da `p_hat` für externe
 Kandidaten keinen direkten Informationsgewinn über die räumliche
 Lage kodiert.
 
@@ -163,7 +174,7 @@ Nach der Score-Auswahl wird `_validate_batch_robodk()` aufgerufen:
 | Komponente | Pfad | Rolle |
 |---|---|---|
 | `trajectory_builder.py` | `src/trajectory_generation/…` | AutoMode-Logik, Akquisitionsfunktion |
-| `similarity_client.py` | `…/generators/similarity_client.py` | HTTP-Client für `/api/similarity/search/candidate` |
+| `similarity_client.py` | `…/generators/similarity_client.py` | HTTP-Client für `/api/similarity/search/candidates_batch` |
 | `analytical_simulator.py` | `…/generators/` | Schnelle analytische Simulation der Kandidaten |
 | `validation_rv2.py` | `backend/scripts/` | Offline-Validierung: LOO + externe Validierung der Wissensbasis |
 | `calibration_set_builder.py` | `backend/scripts/` | Aufbau der initialen Wissensbasis |

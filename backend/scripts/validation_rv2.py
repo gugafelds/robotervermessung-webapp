@@ -34,11 +34,10 @@ logging.basicConfig(level=logging.WARNING, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 DATABASE_URL   = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost/dbname')
-DATASETS       = ['rv2-dataset-1', 'rv2-dataset-8', 'rv2-dataset-9'
-                       , 'rv2-dataset-10']
+DATASETS       = ['paper-random','paper-kdtree', 'paper-auto']
 SEARCH_MODES   = ['position', 'joint', 'orientation', 'velocity', 'metadata']
 EPSILON        = 1e-9
-DEFAULT_STEPS  = [25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
+DEFAULT_STEPS  = [50, 100, 200, 300, 400, 500]
 
 
 # ── DB ────────────────────────────────────────────────────────────────────────
@@ -219,7 +218,7 @@ async def run_learning_curve(
     val_tags: List[str] = None,
 ) -> None:
     if val_tags is None:
-        val_tags = ['rv2-dataset-3']
+        val_tags = ['paper-lhs']
 
     pool = await asyncpg.create_pool(
         DATABASE_URL, min_size=5, max_size=20,
@@ -480,7 +479,7 @@ if __name__ == '__main__':
     stages   = [1] if args.no_stage2 else [1, 2]
     datasets = _pl(args.datasets, DATASETS)
     steps    = [int(s) for s in _pl(args.steps, DEFAULT_STEPS)]
-    val_tags = _pl(args.validation_tags, ['rv2-dataset-3'])
+    val_tags = _pl(args.validation_tags, ['paper-lhs'])
 
     if args.loo_curve:
         asyncio.run(run_loo_curve(

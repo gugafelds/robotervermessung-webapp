@@ -9,7 +9,7 @@ class DatabaseOperations:
 
     async def connect_to_db(self):
         try:
-            return await asyncpg.connect(**self.db_params)
+            return await asyncpg.connect(self.db_params, server_settings={'search_path': 'motion, public'})
         except Exception as error:
             logger.error(f"Error while connecting to PostgreSQL: {error}")
             raise
