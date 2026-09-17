@@ -34,10 +34,11 @@ logging.basicConfig(level=logging.WARNING, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 DATABASE_URL   = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost/dbname')
-DATASETS       = ['paper-random','paper-kdtree', 'paper-auto']
+#DATASETS       = ['paper-norm', 'paper-random', 'paper-full', 'paper-kdtree', 'paper-auto']
+DATASETS = ['paper-geometry']
 SEARCH_MODES   = ['position', 'joint', 'orientation', 'velocity', 'metadata']
 EPSILON        = 1e-9
-DEFAULT_STEPS  = [50, 100, 200, 300, 400, 500]
+DEFAULT_STEPS  = [25, 50, 75, 100]
 
 
 # ── DB ────────────────────────────────────────────────────────────────────────
