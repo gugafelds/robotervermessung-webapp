@@ -208,7 +208,7 @@ export const Sidebar = () => {
     <div className="flex h-80 w-full flex-col border-r border-gray-500 bg-gray-100 px-4 py-2 lg:h-fullscreen lg:max-w-72">
       <div className="flex-col align-middle">
         <div className="relative items-center justify-between">
-          <div className={classNames('flex items-end gap-4 pl-1')}>
+          <div className="flex items-end gap-4 pl-1">
             <LogoIcon width={30} color="#003560" />
             <span className="mt-2 text-2xl font-semibold text-primary">
               Motion data

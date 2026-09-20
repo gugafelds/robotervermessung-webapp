@@ -115,6 +115,16 @@ async def get_dashboard_data(tag: list[str] = Query(None), conn=Depends(get_db))
             "meta": {"useRanges": False, "unit": "%", "label": "Stop point"}
         }
 
+        mtrows = await conn.fetch(f"""
+            SELECT m.movement_type AS bucket, COUNT(*) FROM motion.traj_metadata m
+            INNER JOIN motion.traj_info bi ON m.traj_id = bi.traj_id
+            WHERE m.traj_id != m.seg_id AND m.movement_type IN ('linear', 'circular') {tc}
+            GROUP BY bucket ORDER BY bucket""", *tp)
+        stats["segmentTypeDistribution"] = {
+            "data": [{"bucket": r["bucket"], "count": r["count"]} for r in mtrows],
+            "meta": {"useRanges": False, "unit": "-", "label": "Type"}
+        }
+
         return {
             "segmentsCount": segments_count,
             "trajsCount": trajs_count,

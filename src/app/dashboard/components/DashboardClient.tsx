@@ -3,7 +3,7 @@
 
 'use client';
 
-import { ChevronDown, Loader } from 'lucide-react';
+import { ChevronDown, Loader, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import {
@@ -50,6 +50,7 @@ export default function DashboardClient() {
   }>({ bestPerformers: [], worstPerformers: [] });
   const [timelineData, setTimelineData] = useState<TimelinePoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const initialized = useRef(false);
 
@@ -73,13 +74,14 @@ export default function DashboardClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-fetch KPI/distribution data when applied tags change
+  // Re-fetch KPI/distribution data when applied tags change (or on manual refresh)
   useEffect(() => {
     if (!initialized.current) return;
     const tagFilter = selectedTags.length > 0 ? selectedTags : undefined;
-    getDashboardData(tagFilter).then((data) =>
-      setBasicData(data as DashboardData),
-    );
+    setRefreshing(true);
+    getDashboardData(tagFilter)
+      .then((data) => setBasicData(data as DashboardData))
+      .finally(() => setRefreshing(false));
   }, [selectedTags]);
 
   const togglePending = (t: string) => {
@@ -127,7 +129,20 @@ export default function DashboardClient() {
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside className="sticky top-0 flex h-screen w-72 flex-col gap-6 overflow-y-auto border-r border-gray-500 bg-white p-4">
         <div>
-          <p className="mb-2 text-xs font-bold uppercase text-gray-800">Tag</p>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-bold uppercase text-gray-800">Tag</p>
+            <button
+              type="button"
+              onClick={() => setSelectedTags((prev) => [...prev])}
+              disabled={refreshing}
+              title="Refresh data for selected tag"
+              className="rounded-md p-1 text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+            >
+              <RefreshCw
+                className={`size-4 ${refreshing ? 'animate-spin' : ''}`}
+              />
+            </button>
+          </div>
 
           <div className="relative">
             <button
@@ -144,7 +159,7 @@ export default function DashboardClient() {
             {dropdownOpen && (
               <div className="absolute left-0 z-50 mt-1 w-full overflow-y-auto rounded-lg border border-gray-500 bg-white shadow-lg">
                 {/* Tag list */}
-                <div className="max-h-64 overflow-y-auto py-1">
+                <div className="max-h-[28rem] overflow-y-auto py-1">
                   <button
                     type="button"
                     onClick={() => setPendingTags([])}

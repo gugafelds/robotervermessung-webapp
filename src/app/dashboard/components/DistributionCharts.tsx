@@ -15,7 +15,8 @@ type TabType =
   | 'velocity'
   | 'waypoint'
   | 'performance_sidtw'
-  | 'stopPoint';
+  | 'stopPoint'
+  | 'segmentType';
 
 const tabs: { id: TabType; label: string }[] = [
   { id: 'weight', label: 'Payload' },
@@ -23,6 +24,7 @@ const tabs: { id: TabType; label: string }[] = [
   { id: 'waypoint', label: 'Setpoint' },
   { id: 'performance_sidtw', label: 'Accuracy' },
   { id: 'stopPoint', label: 'Stop point' },
+  { id: 'segmentType', label: 'Type' },
 ];
 
 interface Props {
@@ -41,10 +43,15 @@ export function DistributionCharts({ stats }: Props) {
     waypoint: stats.waypointDistribution,
     performance_sidtw: stats.performanceSIDTWDistribution,
     stopPoint: stats.stopPointDistribution,
+    segmentType: stats.segmentTypeDistribution,
   };
 
   const active = distMap[activeTab];
-  const sorted = [...active.data].sort((a, b) => a.bucket - b.bucket);
+  const sorted = [...active.data].sort((a, b) =>
+    typeof a.bucket === 'number' && typeof b.bucket === 'number'
+      ? a.bucket - b.bucket
+      : String(a.bucket).localeCompare(String(b.bucket)),
+  );
 
   const getBucketRange = (bucket: number) => {
     const { min = 0, max = 1, numBuckets = 1 } = active.meta;
@@ -53,7 +60,7 @@ export function DistributionCharts({ stats }: Props) {
   };
 
   const xLabels = active.meta.useRanges
-    ? sorted.map((d) => getBucketRange(d.bucket))
+    ? sorted.map((d) => getBucketRange(Number(d.bucket)))
     : sorted.map((d) => d.bucket);
 
   return (

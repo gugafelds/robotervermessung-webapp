@@ -36,12 +36,6 @@ const fetchAPI = async <T>(
   return response.json();
 };
 
-export const TaskService = {
-  async getTaskStatus(taskId: string): Promise<TaskStatus> {
-    return fetchAPI<TaskStatus>(`/task-status/${taskId}`);
-  },
-};
-
 export const MetadataService = {
   async getStats(): Promise<MetadataStats> {
     return fetchAPI<MetadataStats>('/metadata-stats');
@@ -78,7 +72,9 @@ export const MetadataService = {
     return new Promise<void>((resolve, reject) => {
       const pollInterval = setInterval(async () => {
         try {
-          const taskStatus = await TaskService.getTaskStatus(result.task_id!);
+          const taskStatus = await fetchAPI<TaskStatus>(
+            `/task-status/${result.task_id!}`,
+          );
 
           if (taskStatus.status === 'completed') {
             clearInterval(pollInterval);

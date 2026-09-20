@@ -34,12 +34,6 @@ export const formatNumber = (
   return num.toFixed(2);
 };
 
-export const json = (data: unknown) => JSON.parse(JSON.stringify(data));
-
-export const filterBy = (filter: string, properties: string[]) => {
-  return properties.some((property) => property.toLowerCase().includes(filter));
-};
-
 export const quaternionToEuler = (
   x: number,
   y: number,

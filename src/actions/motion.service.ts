@@ -36,34 +36,7 @@ import type {
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000/api';
 
-/* eslint-disable no-await-in-loop */
-async function streamFromAPI(endpoint: string) {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`);
-  if (!response.body) throw new Error('No response body');
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-
-  try {
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(<Uint8Array>value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  return JSON.parse(new TextDecoder().decode(Buffer.concat(chunks)));
-}
-/* eslint-enable no-await-in-loop */
-
-async function fetchFromAPI(endpoint: string, useStream = false) {
-  if (useStream) {
-    return streamFromAPI(endpoint);
-  }
-
+async function fetchFromAPI(endpoint: string) {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     cache: 'no-cache',
   });
@@ -172,7 +145,7 @@ export const getTrajPoseActById = async (
   id: string,
 ): Promise<TrajPoseAct[]> => {
   try {
-    const result = await fetchFromAPI(`/traj/traj_pose_act/${id}`, true);
+    const result = await fetchFromAPI(`/traj/traj_pose_act/${id}`);
     return transformTrajPoseActResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -183,7 +156,7 @@ export const getTrajPoseActById = async (
 
 export const getTrajVelActById = async (id: string): Promise<TrajVelAct[]> => {
   try {
-    const result = await fetchFromAPI(`/traj/traj_vel_act/${id}`, true);
+    const result = await fetchFromAPI(`/traj/traj_vel_act/${id}`);
     return transformTrajVelActResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -196,7 +169,7 @@ export const getTrajAccelActById = async (
   id: string,
 ): Promise<TrajAccelAct[]> => {
   try {
-    const result = await fetchFromAPI(`/traj/traj_accel_act/${id}`, true);
+    const result = await fetchFromAPI(`/traj/traj_accel_act/${id}`);
     return transformTrajAccelActResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -209,7 +182,7 @@ export const getTrajAccelCmdById = async (
   id: string,
 ): Promise<TrajAccelCmd[]> => {
   try {
-    const result = await fetchFromAPI(`/traj/traj_accel_cmd/${id}`, true);
+    const result = await fetchFromAPI(`/traj/traj_accel_cmd/${id}`);
     return transformTrajAccelCmdResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -222,7 +195,7 @@ export const getTrajPositionCmdById = async (
   id: string,
 ): Promise<TrajPositionCmd[]> => {
   try {
-    const result = await fetchFromAPI(`/traj/traj_position_cmd/${id}`, true);
+    const result = await fetchFromAPI(`/traj/traj_position_cmd/${id}`);
     return transformTrajPositionCmdResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -235,7 +208,7 @@ export const getSegmentPositionCmdById = async (
   id: string,
 ): Promise<TrajPositionCmd[]> => {
   try {
-    const result = await fetchFromAPI(`/traj/seg_position_cmd/${id}`, true);
+    const result = await fetchFromAPI(`/traj/seg_position_cmd/${id}`);
     return transformTrajPositionCmdResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -248,7 +221,7 @@ export const getTrajOrientationCmdById = async (
   id: string,
 ): Promise<TrajOrientationCmd[]> => {
   try {
-    const result = await fetchFromAPI(`/traj/traj_orientation_cmd/${id}`, true);
+    const result = await fetchFromAPI(`/traj/traj_orientation_cmd/${id}`);
     return transformTrajOrientationCmdResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -259,7 +232,7 @@ export const getTrajOrientationCmdById = async (
 
 export const getTrajVelCmdById = async (id: string): Promise<TrajVelCmd[]> => {
   try {
-    const result = await fetchFromAPI(`/traj/traj_vel_cmd/${id}`, true);
+    const result = await fetchFromAPI(`/traj/traj_vel_cmd/${id}`);
     return transformTrajVelCmdResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -272,7 +245,7 @@ export const getTrajJointStatesById = async (
   id: string,
 ): Promise<TrajJointStates[]> => {
   try {
-    const result = await fetchFromAPI(`/traj/traj_joint_states/${id}`, true);
+    const result = await fetchFromAPI(`/traj/traj_joint_states/${id}`);
     return transformTrajJointStatesResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -285,7 +258,7 @@ export const getTrajSetpointsById = async (
   id: string,
 ): Promise<TrajSetpoints[]> => {
   try {
-    const result = await fetchFromAPI(`/traj/traj_setpoints/${id}`, true);
+    const result = await fetchFromAPI(`/traj/traj_setpoints/${id}`);
     return transformTrajSetpointsResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -298,7 +271,7 @@ export const getSegmentSetpointsById = async (
   id: string,
 ): Promise<TrajSetpoints[]> => {
   try {
-    const result = await fetchFromAPI(`/traj/traj_setpoints/${id}`, true);
+    const result = await fetchFromAPI(`/traj/traj_setpoints/${id}`);
     return transformTrajSetpointsResult(result);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -311,7 +284,7 @@ export const getTrajMetadataById = async (
   id: string,
 ): Promise<TrajMetadataResult> => {
   try {
-    const result = await fetchFromAPI(`/traj/traj_metadata/${id}`, true);
+    const result = await fetchFromAPI(`/traj/traj_metadata/${id}`);
     const all = transformTrajMetadataResult(result);
     return {
       trajectory: all.find((m) => m.segID === m.trajID)!,

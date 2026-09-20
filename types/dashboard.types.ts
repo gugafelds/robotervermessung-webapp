@@ -1,5 +1,5 @@
 export interface DistributionEntry {
-  bucket: number;
+  bucket: number | string;
   count: number;
 }
 
@@ -41,6 +41,7 @@ export interface DashboardData {
     waypointDistribution: Distribution;
     performanceSIDTWDistribution: Distribution;
     stopPointDistribution: Distribution;
+    segmentTypeDistribution: Distribution;
   };
 }
 
@@ -49,6 +50,6 @@ export type MetricType = 'sidtw' | 'ed' | 'qdtw' | 'gd';
 export const METRICS: Record<MetricType, { label: string; unit: string }> = {
   sidtw: { label: 'SIDTW', unit: 'mm' },
   ed:    { label: 'ED',    unit: 'mm' },
-  qdtw:  { label: 'QDTW', unit: 'rad' },
-  gd:    { label: 'GD',   unit: 'rad' },
+  qdtw:  { label: 'QDTW', unit: '°' },
+  gd:    { label: 'GD',   unit: '°' },
 };

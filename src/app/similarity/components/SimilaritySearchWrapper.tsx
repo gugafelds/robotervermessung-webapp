@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 
-import { SimilarityService } from '@/src/actions/similarity.service';
+import { searchSimilarityEmbedding } from '@/src/actions/similarity.service';
 import type { TrajInfo } from '@/types/motion.types';
 import type {
   Prognosis,
@@ -71,7 +71,7 @@ export default function SimilaritySearchWrapper({
     setPrognosis(null);
 
     try {
-      await SimilarityService.searchSimilarityEmbedding(
+      await searchSimilarityEmbedding(
         id,
         {
           modes,
