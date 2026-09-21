@@ -67,22 +67,13 @@ export async function searchSimilarityEmbedding(
 
     if (params.weights) {
       queryParams.append('joint_weight', params.weights.joint.toString());
-      queryParams.append(
-        'position_weight',
-        params.weights.position.toString(),
-      );
+      queryParams.append('position_weight', params.weights.position.toString());
       queryParams.append(
         'orientation_weight',
         params.weights.orientation.toString(),
       );
-      queryParams.append(
-        'velocity_weight',
-        params.weights.velocity.toString(),
-      );
-      queryParams.append(
-        'metadata_weight',
-        params.weights.metadata.toString(),
-      );
+      queryParams.append('velocity_weight', params.weights.velocity.toString());
+      queryParams.append('metadata_weight', params.weights.metadata.toString());
     }
 
     queryParams.append('limit', params.limit.toString());
@@ -171,8 +162,7 @@ export async function searchSimilarityEmbedding(
     // 3. Prognosis — single source of truth
     callbacks.onPrognosisFound?.(data.prognosis ?? null);
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : String(error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     callbacks.onError?.(errorMessage);
   }
 }

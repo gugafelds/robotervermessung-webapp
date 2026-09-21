@@ -89,7 +89,10 @@ interface IntervalDisplayProps {
   isStage1?: boolean;
 }
 
-const IntervalDisplay: React.FC<IntervalDisplayProps> = ({ interval, isStage1 = false }) => (
+const IntervalDisplay: React.FC<IntervalDisplayProps> = ({
+  interval,
+  isStage1 = false,
+}) => (
   <div className="mt-2 rounded-md bg-gray-50 px-3 py-2">
     <div className="flex items-center justify-between">
       <p className="py-1 text-base text-primary">
@@ -162,7 +165,9 @@ const PrognosisCard: React.FC<PrognosisCardProps> = ({
           sigma={prediction.sigma}
           mismatchWarning={interval?.calibration_mismatch?.warning ?? null}
         />
-        {interval != null && <IntervalDisplay interval={interval} isStage1={isStage1} />}
+        {interval != null && (
+          <IntervalDisplay interval={interval} isStage1={isStage1} />
+        )}
       </>
     ) : (
       <p className="text-lg text-gray-800">—</p>
