@@ -1,9 +1,9 @@
 /* eslint-disable react/button-has-type */
 
-'use client';
+"use client";
 
-import { Loader2 } from 'lucide-react';
-import React, { useCallback, useEffect, useState } from 'react';
+import { Loader2 } from "lucide-react";
+import React, { useCallback, useEffect, useState } from "react";
 
 import {
   getEDPositionById,
@@ -11,12 +11,12 @@ import {
   getGDOrientationById,
   getQDTWOrientationById,
   getSIDTWPositionById,
-} from '@/src/actions/evaluation.service';
-import { getTrajInfoById } from '@/src/actions/motion.service';
-import { PosDeviationPlot2D } from '@/src/app/evaluation/components/PosDeviationPlot2D';
-import { PosDeviationPlot3D } from '@/src/app/evaluation/components/PosDeviationPlot3D';
+} from "@/src/actions/evaluation.service";
+import { PosDeviationPlot2D } from "@/src/app/evaluation/components/PosDeviationPlot2D";
+import { PosDeviationPlot3D } from "@/src/app/evaluation/components/PosDeviationPlot3D";
+import type { TrajInfo } from "@/types/motion.types";
 
-import { OriDeviationPlot2D } from './OriDeviationPlot2D';
+import { OriDeviationPlot2D } from "./OriDeviationPlot2D";
 
 interface MetricState {
   isLoaded: boolean;
@@ -29,6 +29,7 @@ interface DeviationsPlotProps {
   hasOrientationData: boolean;
   trajID: string;
   selectedSegment: string;
+  trajInfo: TrajInfo | null;
 }
 
 export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
@@ -36,6 +37,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   hasOrientationData,
   trajID,
   selectedSegment,
+  trajInfo,
 }) => {
   const [posMetrics, setPosMetrics] = useState<{
     ED: MetricState;
@@ -58,23 +60,12 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   const [currentSIDTWDeviation, setCurrentSIDTWDeviation] = useState<any[]>([]);
   const [currentGDDeviation, setCurrentGDDeviation] = useState<any[]>([]);
   const [currentQDTWDeviation, setCurrentQDTWDeviation] = useState<any[]>([]);
-  const [currentBahnInfo, setCurrentBahnInfo] = useState<any>(null);
   const [currentEvaluationInfo, setCurrentEvaluationInfo] = useState<any>({
     EDInfo: [],
     SIDTWInfo: [],
     QDTWInfo: [],
     GDInfo: [],
   });
-
-  // Bahn-Info laden
-  const loadBahnInfo = useCallback(async () => {
-    try {
-      const bahnInfo = await getTrajInfoById(trajID);
-      setCurrentBahnInfo(bahnInfo);
-    } catch (error) {
-      /* empty */
-    }
-  }, [trajID]);
 
   // Auswertungsinformationen laden
   const loadAuswertungInfo = useCallback(async () => {
@@ -88,14 +79,13 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
 
   useEffect(() => {
     if (trajID) {
-      loadBahnInfo();
       loadAuswertungInfo();
     }
-  }, [trajID, loadBahnInfo, loadAuswertungInfo]);
+  }, [trajID, loadAuswertungInfo]);
 
   // Zentrale Funktion zum Laden der Metrik-Daten
   const loadPosMetricData = useCallback(
-    async (metricType: 'ED' | 'SIDTW') => {
+    async (metricType: "ED" | "SIDTW") => {
       if (!trajID) return;
 
       // Wenn bereits geladen, toggle visibility
@@ -119,11 +109,11 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
       try {
         let data;
         switch (metricType) {
-          case 'ED':
+          case "ED":
             data = await getEDPositionById(trajID);
             setCurrentEDDeviation(data);
             break;
-          case 'SIDTW':
+          case "SIDTW":
             data = await getSIDTWPositionById(trajID);
             setCurrentSIDTWDeviation(data);
             break;
@@ -146,7 +136,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   );
 
   const loadOriMetricData = useCallback(
-    async (metricType: 'GD' | 'QDTW') => {
+    async (metricType: "GD" | "QDTW") => {
       if (!trajID) return;
 
       // Wenn bereits geladen, toggle visibility
@@ -170,11 +160,11 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
       try {
         let data;
         switch (metricType) {
-          case 'GD':
+          case "GD":
             data = await getGDOrientationById(trajID);
             setCurrentGDDeviation(data);
             break;
-          case 'QDTW':
+          case "QDTW":
             data = await getQDTWOrientationById(trajID);
             setCurrentQDTWDeviation(data);
             break;
@@ -206,7 +196,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   // Automatisch EA laden, wenn verfügbar
   useEffect(() => {
     if (hasEDData && !posMetrics.ED.isLoaded && !posMetrics.ED.isLoading) {
-      loadPosMetricData('ED');
+      loadPosMetricData("ED");
     }
   }, [
     hasEDData,
@@ -217,7 +207,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
 
   useEffect(() => {
     if (hasGDData && !oriMetrics.GD.isLoaded && !oriMetrics.GD.isLoading) {
-      loadOriMetricData('GD');
+      loadOriMetricData("GD");
     }
   }, [
     hasGDData,
@@ -232,7 +222,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
       !posMetrics.SIDTW.isLoaded &&
       !posMetrics.SIDTW.isLoading
     ) {
-      loadPosMetricData('SIDTW');
+      loadPosMetricData("SIDTW");
     }
   }, [
     hasSIDTWData,
@@ -247,7 +237,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
       !oriMetrics.QDTW.isLoaded &&
       !oriMetrics.QDTW.isLoading
     ) {
-      loadOriMetricData('QDTW');
+      loadOriMetricData("QDTW");
     }
   }, [
     hasQDTWData,
@@ -275,12 +265,12 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
 
   const getButtonColorClass = (metric: MetricState) => {
     if (!metric.isLoaded) {
-      return 'bg-primary text-white hover:bg-primary/80';
+      return "bg-primary text-white hover:bg-primary/80";
     }
     if (metric.visible) {
-      return 'bg-emerald-600 text-white hover:bg-red-700';
+      return "bg-emerald-600 text-white hover:bg-red-700";
     }
-    return 'bg-gray-500 text-white hover:bg-gray-600';
+    return "bg-gray-500 text-white hover:bg-gray-600";
   };
 
   if (!hasDeviationData) {
@@ -301,25 +291,25 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
         <div>Position:</div>
         {hasEDData && (
           <button
-            onClick={() => loadPosMetricData('ED')}
+            onClick={() => loadPosMetricData("ED")}
             disabled={posMetrics.ED.isLoading}
             className={`inline-flex items-center space-x-2 rounded px-3 py-1 text-sm 
               ${getButtonColorClass(posMetrics.ED)} 
               disabled:bg-gray-300 disabled:text-gray-600`}
           >
-            {getButtonContent(posMetrics.ED, 'ED')}
+            {getButtonContent(posMetrics.ED, "ED")}
           </button>
         )}
 
         {hasSIDTWData && (
           <button
-            onClick={() => loadPosMetricData('SIDTW')}
+            onClick={() => loadPosMetricData("SIDTW")}
             disabled={posMetrics.SIDTW.isLoading}
             className={`inline-flex items-center space-x-2 rounded px-3 py-1 text-sm 
               ${getButtonColorClass(posMetrics.SIDTW)} 
               disabled:bg-gray-300 disabled:text-gray-600`}
           >
-            {getButtonContent(posMetrics.SIDTW, 'SIDTW')}
+            {getButtonContent(posMetrics.SIDTW, "SIDTW")}
           </button>
         )}
 
@@ -335,33 +325,32 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
           </button>
         ) */}
 
-        {hasGDData ||
-          (hasQDTWData && (
-            <div className="ml-2 border-l border-gray-200 pl-6">
-              Orientation:
-            </div>
-          ))}
+        {(hasGDData || hasQDTWData) && (
+          <div className="ml-2 border-l border-gray-200 pl-6">
+            Orientation:
+          </div>
+        )}
         {hasGDData && (
           <button
-            onClick={() => loadOriMetricData('GD')}
+            onClick={() => loadOriMetricData("GD")}
             disabled={oriMetrics.GD.isLoading}
             className={`inline-flex items-center space-x-2 rounded px-3 py-1 text-sm 
               ${getButtonColorClass(oriMetrics.GD)} 
               disabled:bg-gray-300 disabled:text-gray-600`}
           >
-            {getButtonContent(oriMetrics.GD, 'GD')}
+            {getButtonContent(oriMetrics.GD, "GD")}
           </button>
         )}
 
         {hasQDTWData && (
           <button
-            onClick={() => loadOriMetricData('QDTW')}
+            onClick={() => loadOriMetricData("QDTW")}
             disabled={oriMetrics.QDTW.isLoading}
             className={`inline-flex items-center space-x-2 rounded px-3 py-1 text-sm 
               ${getButtonColorClass(oriMetrics.QDTW)} 
               disabled:bg-gray-300 disabled:text-gray-600`}
           >
-            {getButtonContent(oriMetrics.QDTW, 'QDTW')}
+            {getButtonContent(oriMetrics.QDTW, "QDTW")}
           </button>
         )}
       </div>
@@ -376,7 +365,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
             metrics={posMetrics}
             currentEDDeviation={currentEDDeviation}
             currentSIDTWDeviation={currentSIDTWDeviation}
-            currentBahnInfo={currentBahnInfo}
+            currentBahnInfo={trajInfo}
           />
           <PosDeviationPlot3D
             hasDeviationData={hasDeviationData}
@@ -397,7 +386,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
             metrics={oriMetrics}
             currentGDDeviation={currentGDDeviation}
             currentQDTWDeviation={currentQDTWDeviation}
-            currentBahnInfo={currentBahnInfo}
+            currentBahnInfo={trajInfo}
           />
         </div>
       )}

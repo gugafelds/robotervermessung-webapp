@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import dynamic from 'next/dynamic';
-import type { Layout, PlotData } from 'plotly.js';
-import React from 'react';
+import dynamic from "next/dynamic";
+import type { Layout, PlotData } from "plotly.js";
+import React, { useMemo } from "react";
 
 import type {
   TrajPoseAct,
   TrajPositionCmd,
   TrajSetpoints,
-} from '@/types/motion.types';
+} from "@/types/motion.types";
 
-const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
+const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
 interface Position2DPlotProps {
   idealTrajectory: TrajPositionCmd[];
@@ -18,256 +18,254 @@ interface Position2DPlotProps {
   currentTrajPoseAct: TrajPoseAct[];
 }
 
-export const Position2DPlot: React.FC<Position2DPlotProps> = ({
-  idealTrajectory,
-  currentTrajSetpoints,
-  currentTrajPoseAct,
-}) => {
-  const createCombinedPositionPlot = (): {
-    plotData: Partial<PlotData>[];
-    maxTimePos: number;
-  } => {
-    const currentPoseData = currentTrajPoseAct;
+export const Position2DPlot: React.FC<Position2DPlotProps> = React.memo(
+  ({ idealTrajectory, currentTrajSetpoints, currentTrajPoseAct }) => {
+    const { plotData: combinedPositionPlotData, maxTimePos: positionMaxTime } =
+      useMemo((): {
+        plotData: Partial<PlotData>[];
+        maxTimePos: number;
+      } => {
+        const currentPoseData = currentTrajPoseAct;
 
-    // Neue optimierte Berechnung von globalStartTime
-    const getGlobalStartTime = () => {
-      let minTime = Number.MAX_VALUE;
+        // Neue optimierte Berechnung von globalStartTime
+        const getGlobalStartTime = () => {
+          let minTime = Number.MAX_VALUE;
 
-      idealTrajectory.forEach((b) => {
-        minTime = Math.min(minTime, Number(b.timestamp));
-      });
+          idealTrajectory.forEach((b) => {
+            minTime = Math.min(minTime, Number(b.timestamp));
+          });
 
-      currentTrajSetpoints.forEach((b) => {
-        minTime = Math.min(minTime, Number(b.timestamp));
-      });
+          currentTrajSetpoints.forEach((b) => {
+            minTime = Math.min(minTime, Number(b.timestamp));
+          });
 
-      currentPoseData.forEach((b) => {
-        minTime = Math.min(minTime, Number(b.timestamp));
-      });
+          currentPoseData.forEach((b) => {
+            minTime = Math.min(minTime, Number(b.timestamp));
+          });
 
-      return minTime;
+          return minTime;
+        };
+
+        const globalStartTime = getGlobalStartTime();
+
+        const positionSollData = idealTrajectory.map((b) => ({
+          x: (Number(b.timestamp) - globalStartTime) / 1e9,
+          xPos: b.xCmd,
+          yPos: b.yCmd,
+          zPos: b.zCmd,
+        }));
+
+        const positionIstData = currentPoseData.map((b) => {
+          const x = (Number(b.timestamp) - globalStartTime) / 1e9;
+          const istPose = b as TrajPoseAct;
+          return {
+            x,
+            xPos: istPose.xAct,
+            yPos: istPose.yAct,
+            zPos: istPose.zAct,
+          };
+        });
+
+        const createStairStepData = (
+          data: { x: number; pos: number }[],
+        ): { x: number[]; y: number[] } => {
+          const x: number[] = [];
+          const y: number[] = [];
+          data.forEach((point, index) => {
+            if (index > 0) {
+              x.push(point.x);
+              y.push(y[y.length - 1]);
+            }
+            x.push(point.x);
+            y.push(point.pos);
+          });
+          return { x, y };
+        };
+
+        const xAchievedData = createStairStepData(
+          currentTrajSetpoints.map((b) => ({
+            x: (Number(b.timestamp) - globalStartTime) / 1e9,
+            pos: b.xReached,
+          })),
+        );
+
+        const supportX = currentTrajSetpoints.map(
+          (b) => (Number(b.timestampSupport) - globalStartTime) / 1e9,
+        );
+
+        const getMaxTimePos = () => {
+          let maxTime = 0;
+
+          positionSollData.forEach((d) => {
+            maxTime = Math.max(maxTime, d.x);
+          });
+
+          xAchievedData.x.forEach((x) => {
+            maxTime = Math.max(maxTime, x);
+          });
+
+          positionIstData.forEach((d) => {
+            maxTime = Math.max(maxTime, d.x);
+          });
+
+          return maxTime;
+        };
+
+        const maxTimePos = getMaxTimePos();
+
+        const plotData: Partial<PlotData>[] = [
+          // X Position
+          {
+            type: "scatter",
+            mode: "lines",
+            name: "X (C)",
+            x: positionSollData.map((d) => d.x),
+            y: positionSollData.map((d) => d.xPos),
+            line: { color: "red", width: 2 },
+          },
+          {
+            type: "scatter",
+            mode: "lines",
+            name: "X (M)",
+            x: positionIstData.map((d) => d.x),
+            y: positionIstData.map((d) => d.xPos),
+            line: { color: "darkred", width: 2 },
+          },
+          {
+            type: "scatter",
+            mode: "markers",
+            name: "X (S)",
+            x: currentTrajSetpoints.map(
+              (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
+            ),
+            y: currentTrajSetpoints.map((b) => b.xReached),
+            marker: { color: "red", size: 12, symbol: "circle" },
+          },
+          {
+            type: "scatter",
+            mode: "markers",
+            name: "X (SP)",
+            x: supportX,
+            y: currentTrajSetpoints.map((b) => b.xSupport),
+            marker: { color: "red", size: 8, symbol: "square" },
+          },
+          // Y Position
+          {
+            type: "scatter",
+            mode: "lines",
+            name: "Y (C)",
+            x: positionSollData.map((d) => d.x),
+            y: positionSollData.map((d) => d.yPos),
+            line: { color: "green", width: 2 },
+          },
+          {
+            type: "scatter",
+            mode: "lines",
+            name: "Y (M)",
+            x: positionIstData.map((d) => d.x),
+            y: positionIstData.map((d) => d.yPos),
+            line: { color: "darkgreen", width: 2 },
+          },
+          {
+            type: "scatter",
+            mode: "markers",
+            name: "Y (S)",
+            x: currentTrajSetpoints.map(
+              (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
+            ),
+            y: currentTrajSetpoints.map((b) => b.yReached),
+            marker: { color: "green", size: 12, symbol: "circle" },
+          },
+          {
+            type: "scatter",
+            mode: "markers",
+            name: "Y (SP)",
+            x: supportX,
+            y: currentTrajSetpoints.map((b) => b.ySupport),
+            marker: { color: "green", size: 8, symbol: "square" },
+          },
+          // Z Position
+          {
+            type: "scatter",
+            mode: "lines",
+            name: "Z (C)",
+            x: positionSollData.map((d) => d.x),
+            y: positionSollData.map((d) => d.zPos),
+            line: { color: "blue", width: 2 },
+          },
+          {
+            type: "scatter",
+            mode: "lines",
+            name: "Z (M)",
+            x: positionIstData.map((d) => d.x),
+            y: positionIstData.map((d) => d.zPos),
+            line: { color: "darkblue", width: 2 },
+          },
+          {
+            type: "scatter",
+            mode: "markers",
+            name: "Z (S)",
+            x: currentTrajSetpoints.map(
+              (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
+            ),
+            y: currentTrajSetpoints.map((b) => b.zReached),
+            marker: { color: "blue", size: 12, symbol: "circle" },
+          },
+          {
+            type: "scatter",
+            mode: "markers",
+            name: "Z (SP)",
+            x: supportX,
+            y: currentTrajSetpoints.map((b) => b.zSupport),
+            marker: { color: "blue", size: 8, symbol: "square" },
+          },
+        ];
+
+        return { plotData, maxTimePos };
+      }, [idealTrajectory, currentTrajSetpoints, currentTrajPoseAct]);
+
+    const combinedPositionLayout: Partial<Layout> = {
+      title: { text: "Position" },
+      font: {
+        family: "Helvetica",
+      },
+      xaxis: {
+        title: { text: "s" },
+        range: [0, positionMaxTime],
+        tickformat: ".2f",
+      },
+      yaxis: { title: { text: "mm" } },
+      legend: { orientation: "h", y: -0.15 }, // Legende näher zum Plot
+      hovermode: "x unified",
+      margin: { l: 60, r: 20, b: 80, t: 50 }, // Kleinere Margins = mehr Platz für Plot
+      uirevision: "true",
     };
 
-    const globalStartTime = getGlobalStartTime();
-
-    const positionSollData = idealTrajectory.map((b) => ({
-      x: (Number(b.timestamp) - globalStartTime) / 1e9,
-      xPos: b.xCmd,
-      yPos: b.yCmd,
-      zPos: b.zCmd,
-    }));
-
-    const positionIstData = currentPoseData.map((b) => {
-      const x = (Number(b.timestamp) - globalStartTime) / 1e9;
-      const istPose = b as TrajPoseAct;
-      return {
-        x,
-        xPos: istPose.xAct,
-        yPos: istPose.yAct,
-        zPos: istPose.zAct,
-      };
-    });
-
-    const createStairStepData = (
-      data: { x: number; pos: number }[],
-    ): { x: number[]; y: number[] } => {
-      const x: number[] = [];
-      const y: number[] = [];
-      data.forEach((point, index) => {
-        if (index > 0) {
-          x.push(point.x);
-          y.push(y[y.length - 1]);
-        }
-        x.push(point.x);
-        y.push(point.pos);
-      });
-      return { x, y };
-    };
-
-    const xAchievedData = createStairStepData(
-      currentTrajSetpoints.map((b) => ({
-        x: (Number(b.timestamp) - globalStartTime) / 1e9,
-        pos: b.xReached,
-      })),
+    return (
+      <div className="w-full">
+        <Plot
+          data={combinedPositionPlotData}
+          layout={combinedPositionLayout}
+          useResizeHandler
+          config={{
+            displaylogo: false,
+            modeBarButtonsToRemove: [
+              "toImage",
+              "orbitRotation",
+              "lasso2d",
+              "zoomIn2d",
+              "zoomOut2d",
+              "autoScale2d",
+              "pan2d",
+              "select2d",
+            ],
+            responsive: true,
+          }}
+          style={{ width: "100%", height: "500px" }}
+        />
+      </div>
     );
+  },
+);
 
-    const supportX = currentTrajSetpoints.map(
-      (b) => (Number(b.timestampSupport) - globalStartTime) / 1e9,
-    );
-
-    const getMaxTimePos = () => {
-      let maxTime = 0;
-
-      positionSollData.forEach((d) => {
-        maxTime = Math.max(maxTime, d.x);
-      });
-
-      xAchievedData.x.forEach((x) => {
-        maxTime = Math.max(maxTime, x);
-      });
-
-      positionIstData.forEach((d) => {
-        maxTime = Math.max(maxTime, d.x);
-      });
-
-      return maxTime;
-    };
-
-    const maxTimePos = getMaxTimePos();
-
-    const plotData: Partial<PlotData>[] = [
-      // X Position
-      {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'X (C)',
-        x: positionSollData.map((d) => d.x),
-        y: positionSollData.map((d) => d.xPos),
-        line: { color: 'red', width: 2 },
-      },
-      {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'X (M)',
-        x: positionIstData.map((d) => d.x),
-        y: positionIstData.map((d) => d.xPos),
-        line: { color: 'darkred', width: 2 },
-      },
-      {
-        type: 'scatter',
-        mode: 'markers',
-        name: 'X (S)',
-        x: currentTrajSetpoints.map(
-          (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
-        ),
-        y: currentTrajSetpoints.map((b) => b.xReached),
-        marker: { color: 'red', size: 12, symbol: 'circle' },
-      },
-      {
-        type: 'scatter',
-        mode: 'markers',
-        name: 'X (SP)',
-        x: supportX,
-        y: currentTrajSetpoints.map((b) => b.xSupport),
-        marker: { color: 'red', size: 8, symbol: 'square' },
-      },
-      // Y Position
-      {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Y (C)',
-        x: positionSollData.map((d) => d.x),
-        y: positionSollData.map((d) => d.yPos),
-        line: { color: 'green', width: 2 },
-      },
-      {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Y (M)',
-        x: positionIstData.map((d) => d.x),
-        y: positionIstData.map((d) => d.yPos),
-        line: { color: 'darkgreen', width: 2 },
-      },
-      {
-        type: 'scatter',
-        mode: 'markers',
-        name: 'Y (S)',
-        x: currentTrajSetpoints.map(
-          (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
-        ),
-        y: currentTrajSetpoints.map((b) => b.yReached),
-        marker: { color: 'green', size: 12, symbol: 'circle' },
-      },
-      {
-        type: 'scatter',
-        mode: 'markers',
-        name: 'Y (SP)',
-        x: supportX,
-        y: currentTrajSetpoints.map((b) => b.ySupport),
-        marker: { color: 'green', size: 8, symbol: 'square' },
-      },
-      // Z Position
-      {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Z (C)',
-        x: positionSollData.map((d) => d.x),
-        y: positionSollData.map((d) => d.zPos),
-        line: { color: 'blue', width: 2 },
-      },
-      {
-        type: 'scatter',
-        mode: 'lines',
-        name: 'Z (M)',
-        x: positionIstData.map((d) => d.x),
-        y: positionIstData.map((d) => d.zPos),
-        line: { color: 'darkblue', width: 2 },
-      },
-      {
-        type: 'scatter',
-        mode: 'markers',
-        name: 'Z (S)',
-        x: currentTrajSetpoints.map(
-          (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
-        ),
-        y: currentTrajSetpoints.map((b) => b.zReached),
-        marker: { color: 'blue', size: 12, symbol: 'circle' },
-      },
-      {
-        type: 'scatter',
-        mode: 'markers',
-        name: 'Z (SP)',
-        x: supportX,
-        y: currentTrajSetpoints.map((b) => b.zSupport),
-        marker: { color: 'blue', size: 8, symbol: 'square' },
-      },
-    ];
-
-    return { plotData, maxTimePos };
-  };
-
-  const { plotData: combinedPositionPlotData, maxTimePos: positionMaxTime } =
-    createCombinedPositionPlot();
-
-  const combinedPositionLayout: Partial<Layout> = {
-    title: { text: 'Position' },
-    font: {
-      family: 'Helvetica',
-    },
-    xaxis: {
-      title: { text: 's' },
-      range: [0, positionMaxTime],
-      tickformat: '.2f',
-    },
-    yaxis: { title: { text: 'mm' } },
-    legend: { orientation: 'h', y: -0.15 }, // Legende näher zum Plot
-    hovermode: 'x unified',
-    margin: { l: 60, r: 20, b: 80, t: 50 }, // Kleinere Margins = mehr Platz für Plot
-    uirevision: 'true',
-  };
-
-  return (
-    <div className="w-full">
-      <Plot
-        data={combinedPositionPlotData}
-        layout={combinedPositionLayout}
-        useResizeHandler
-        config={{
-          displaylogo: false,
-          modeBarButtonsToRemove: [
-            'toImage',
-            'orbitRotation',
-            'lasso2d',
-            'zoomIn2d',
-            'zoomOut2d',
-            'autoScale2d',
-            'pan2d',
-            'select2d',
-          ],
-          responsive: true,
-        }}
-        style={{ width: '100%', height: '500px' }}
-      />
-    </div>
-  );
-};
+Position2DPlot.displayName = "Position2DPlot";

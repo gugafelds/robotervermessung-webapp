@@ -107,26 +107,19 @@ async def _filter_seg_ids_by_calibration(
     """
     if not min_calibration_date or not seg_ids:
         return seg_ids
+    # ponytail: one query instead of two — carries the pass/fail flag per row
+    # instead of re-joining the same unnest+traj_info a second time just to
+    # find out which seg_ids exist at all.
     rows = await conn.fetch("""
-        SELECT s.seg_id
+        SELECT s.seg_id,
+               (t.transformation_matrix IS NULL OR t.transformation_matrix >= $2) AS ok
         FROM (SELECT unnest($1::text[]) AS seg_id) s
         JOIN motion.traj_info t
           ON t.traj_id = LEFT(s.seg_id, LENGTH(s.seg_id) - POSITION('_' IN REVERSE(s.seg_id)))
-        WHERE t.transformation_matrix IS NULL
-           OR t.transformation_matrix >= $2
     """, seg_ids, min_calibration_date)
-    allowed = {str(r["seg_id"]) for r in rows}
+    found = {str(r["seg_id"]): r["ok"] for r in rows}
     # seg_ids not found in traj_info are kept (unknown = not filtered)
-    found_ids = set()
-    for r in await conn.fetch("""
-        SELECT s.seg_id
-        FROM (SELECT unnest($1::text[]) AS seg_id) s
-        JOIN motion.traj_info t
-          ON t.traj_id = LEFT(s.seg_id, LENGTH(s.seg_id) - POSITION('_' IN REVERSE(s.seg_id)))
-    """, seg_ids):
-        found_ids.add(str(r["seg_id"]))
-    unknown_ids = set(str(s) for s in seg_ids) - found_ids
-    kept = [s for s in seg_ids if str(s) in allowed or str(s) in unknown_ids]
+    kept = [s for s in seg_ids if str(s) not in found or found[str(s)]]
     n_dropped = len(seg_ids) - len(kept)
     if n_dropped:
         logger.info("[correction] calibration filter dropped %d/%d segments (< %s)",

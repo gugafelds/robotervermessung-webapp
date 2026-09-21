@@ -72,7 +72,11 @@ class ShapeSearcher:
 
             where_clause = " AND ".join(where_conditions)
 
-            await self.connection.execute("SET hnsw.ef_search = 500;")
+            # ponytail: SET is per-session; skip it once already applied on this
+            # pooled connection instead of re-issuing it on every call.
+            if not getattr(self.connection, '_hnsw_ef_search_set', False):
+                await self.connection.execute("SET hnsw.ef_search = 500;")
+                self.connection._hnsw_ef_search_set = True
 
             if candidate_ids is not None and len(candidate_ids) > 0:
                 where_conditions.append("e.seg_id = ANY($4)")

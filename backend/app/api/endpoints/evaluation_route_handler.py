@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/evaluation_info/{traj_id}")
+@cache(expire=2400)
 async def get_evaluation_info_by_id(
         traj_id: str,
         conn=Depends(get_db)
@@ -68,6 +69,7 @@ async def get_evaluation_info_by_id(
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @router.get("/evaluation_info")
+@cache(expire=2400)
 async def get_evaluation_info(
         page: int = Query(1, ge=1, description="Seitennummer"),
         page_size: int = Query(20, ge=1, le=100, description="Anzahl der Einträge pro Seite"),

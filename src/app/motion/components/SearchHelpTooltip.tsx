@@ -56,6 +56,10 @@ const SearchHelpTooltip = () => {
                     • <code className="rounded bg-gray-100 px-1">filename</code>{' '}
                     - search in filename
                   </li>
+                  <li>
+                    • <code className="rounded bg-gray-100 px-1">tagname</code>{' '}
+                    - search by tag
+                  </li>
                 </ul>
               </div>
 
@@ -86,11 +90,6 @@ const SearchHelpTooltip = () => {
                       velocity=250
                     </code>{' '}
                     - velocity
-                  </li>
-                  <li>
-                    •{' '}
-                    <code className="rounded bg-gray-100 px-1">t=tagname</code>{' '}
-                    - filter by tag
                   </li>
                   <li>
                     • <code className="rounded bg-gray-100 px-1">d=2024</code> -

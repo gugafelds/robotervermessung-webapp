@@ -1,27 +1,27 @@
-'use client';
+"use client";
 
-import { useParams } from 'next/navigation';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useParams } from "next/navigation";
+import React, { useCallback, useEffect, useState } from "react";
 
 import {
   checkOrientationDataAvailability,
   checkPositionDataAvailability,
-} from '@/src/actions/evaluation.service';
+} from "@/src/actions/evaluation.service";
 import {
   getTrajInfoById,
   getTrajMetadataById,
-} from '@/src/actions/motion.service';
-import { DeviationsPlot } from '@/src/app/evaluation/components/DeviationsPlot';
-import { MetricsPanel } from '@/src/app/evaluation/components/MetricsPanel';
-import { TrajectoryInfo } from '@/src/app/motion/components/TrajectoryInfo';
-import { useTrajectory } from '@/src/providers/trajectory.provider';
+} from "@/src/actions/motion.service";
+import { DeviationsPlot } from "@/src/app/evaluation/components/DeviationsPlot";
+import { MetricsPanel } from "@/src/app/evaluation/components/MetricsPanel";
+import { TrajectoryInfo } from "@/src/app/motion/components/TrajectoryInfo";
+import { useTrajectory } from "@/src/providers/trajectory.provider";
 
 export function EvaluationWrapper() {
   const [hasDeviationData, setHasDeviationData] = useState(false);
   const [hasOrientationData, setHasOrientationData] = useState(false);
 
   // Zentraler State für Segmentauswahl
-  const [selectedSegment, setSelectedSegment] = useState<string>('total');
+  const [selectedSegment, setSelectedSegment] = useState<string>("total");
 
   const params = useParams();
   const id = params?.id as string;
@@ -40,10 +40,11 @@ export function EvaluationWrapper() {
     try {
       // Lade Bahn-Info direkt für diese ID
       // Prüfe, ob Abweichungsdaten verfügbar sind
-      const hasData = await checkPositionDataAvailability(id);
+      const [hasData, hasOrientationDataCheck] = await Promise.all([
+        checkPositionDataAvailability(id),
+        checkOrientationDataAvailability(id),
+      ]);
       setHasDeviationData(hasData);
-      const hasOrientationDataCheck =
-        await checkOrientationDataAvailability(id);
       setHasOrientationData(hasOrientationDataCheck);
     } catch (error) {
       /* empty */
@@ -54,7 +55,7 @@ export function EvaluationWrapper() {
   useEffect(() => {
     loadBahnDetails();
     // Reset segment selection when changing trajectory
-    setSelectedSegment('total');
+    setSelectedSegment("total");
   }, [loadBahnDetails]);
 
   // Lade Bahn-Info wenn sie noch nicht geladen ist
@@ -95,6 +96,7 @@ export function EvaluationWrapper() {
           hasOrientationData={hasOrientationData}
           trajID={id}
           selectedSegment={selectedSegment}
+          trajInfo={currentTrajInfo}
         />
       </div>
     </>

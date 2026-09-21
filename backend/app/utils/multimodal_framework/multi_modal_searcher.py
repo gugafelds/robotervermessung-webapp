@@ -10,6 +10,12 @@ from .filter_searcher import FilterSearcher
 
 logger = logging.getLogger(__name__)
 
+# ponytail: each segment search internally acquires several pool connections
+# (per-mode search + prefilter + enrich); an unbounded gather over many
+# segments can request far more connections than the pool holds. Same cap as
+# _BATCH_CONCURRENCY in similarity_route_handler.py, applied here too.
+_SEGMENT_CONCURRENCY = asyncio.Semaphore(10)
+
 
 class _SingleConnContext:
     def __init__(self, conn: asyncpg.Connection):
@@ -119,22 +125,23 @@ class MultiModalSearcher:
             result['metadata']['target_segments_count'] = len(target_segments)
 
             async def _search_one_segment(seg_id: str) -> Dict:
-                features, seg_result = await asyncio.gather(
-                    self._get_features(seg_id, metric),
-                    self._search_segments(
-                        target_seg_id=seg_id,
-                        modes=modes,
-                        weights=weights,
-                        limit=limit,
-                        prefilter_features=prefilter_features,
-                        metric=metric,
-                        buffer_factor=buffer_factor,
-                        include_tags=include_tags,
-                        exclude_tags=exclude_tags,
-                        exclude_ids=exclude_ids,
-                        include_ids=include_ids,
-                    ),
-                )
+                async with _SEGMENT_CONCURRENCY:
+                    features, seg_result = await asyncio.gather(
+                        self._get_features(seg_id, metric),
+                        self._search_segments(
+                            target_seg_id=seg_id,
+                            modes=modes,
+                            weights=weights,
+                            limit=limit,
+                            prefilter_features=prefilter_features,
+                            metric=metric,
+                            buffer_factor=buffer_factor,
+                            include_tags=include_tags,
+                            exclude_tags=exclude_tags,
+                            exclude_ids=exclude_ids,
+                            include_ids=include_ids,
+                        ),
+                    )
                 return {
                     'target_segment': seg_id,
                     'target_segment_features': features,

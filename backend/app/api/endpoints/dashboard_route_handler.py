@@ -1,8 +1,9 @@
+import asyncio
 import os
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from ...database import get_db
+from ...database import get_db, get_db_pool
 import logging
 from fastapi_cache.decorator import cache
 
@@ -33,69 +34,93 @@ async def get_available_tags(conn=Depends(get_db)):
 
 @router.get("/data")
 @cache(expire=1800)
-async def get_dashboard_data(tag: list[str] = Query(None), conn=Depends(get_db)):
+async def get_dashboard_data(tag: list[str] = Query(None), pool=Depends(get_db_pool)):
     try:
         tc, tp = _tf(tag or None)
 
-        segments_count = await conn.fetchval(
-            f"SELECT SUM(number_setpoints) FROM motion.traj_info bi WHERE source_data_act = 'leica_at960' {tc}", *tp)
-        trajs_count = await conn.fetchval(
-            f"SELECT COUNT(DISTINCT traj_id) FROM motion.traj_info bi WHERE source_data_act = 'leica_at960' {tc}", *tp)
-        median_sidtw = await conn.fetchval(f"""
-            SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY sidtw_average_distance)
-            FROM evaluation.sidtw_info i INNER JOIN motion.traj_info bi ON i.traj_id = bi.traj_id
-            WHERE i.traj_id = i.seg_id AND i.sidtw_average_distance IS NOT NULL
-            AND bi.source_data_act = 'leica_at960' {tc}""", *tp)
-        mean_sidtw = await conn.fetchval(f"""
-            SELECT AVG(sidtw_average_distance)
-            FROM evaluation.sidtw_info i INNER JOIN motion.traj_info bi ON i.traj_id = bi.traj_id
-            WHERE i.traj_id = i.seg_id AND i.sidtw_average_distance IS NOT NULL
-            AND bi.source_data_act = 'leica_at960' {tc}""", *tp)
+        # All 10 queries below are independent of each other (none reads another's
+        # result), so they run concurrently over separate pooled connections
+        # instead of one-by-one on a single connection.
+        (
+            segments_count, trajs_count, median_sidtw, mean_sidtw,
+            vrows, wrows, wprows, sidtw_max, sprows, mtrows,
+        ) = await asyncio.gather(
+            pool.fetchval(
+                f"SELECT SUM(number_setpoints) FROM motion.traj_info bi WHERE source_data_act = 'leica_at960' {tc}", *tp),
+            pool.fetchval(
+                f"SELECT COUNT(DISTINCT traj_id) FROM motion.traj_info bi WHERE source_data_act = 'leica_at960' {tc}", *tp),
+            pool.fetchval(f"""
+                SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY sidtw_average_distance)
+                FROM evaluation.sidtw_info i INNER JOIN motion.traj_info bi ON i.traj_id = bi.traj_id
+                WHERE i.traj_id = i.seg_id AND i.sidtw_average_distance IS NOT NULL
+                AND bi.source_data_act = 'leica_at960' {tc}""", *tp),
+            pool.fetchval(f"""
+                SELECT AVG(sidtw_average_distance)
+                FROM evaluation.sidtw_info i INNER JOIN motion.traj_info bi ON i.traj_id = bi.traj_id
+                WHERE i.traj_id = i.seg_id AND i.sidtw_average_distance IS NOT NULL
+                AND bi.source_data_act = 'leica_at960' {tc}""", *tp),
+            pool.fetch(f"""
+                SELECT CASE WHEN max_vel < 500 THEN 1 WHEN max_vel < 1000 THEN 2
+                            WHEN max_vel < 1500 THEN 3 WHEN max_vel < 2000 THEN 4
+                            WHEN max_vel < 2500 THEN 5 WHEN max_vel < 3000 THEN 6 ELSE 7 END AS bucket, COUNT(*)
+                FROM motion.traj_metadata m INNER JOIN motion.traj_info bi ON m.traj_id = bi.traj_id
+                WHERE m.traj_id != m.seg_id AND m.max_vel IS NOT NULL {tc}
+                GROUP BY bucket ORDER BY bucket""", *tp),
+            pool.fetch(f"""
+                SELECT weight AS bucket, COUNT(*) FROM motion.traj_info bi
+                WHERE source_data_act = 'leica_at960' {tc} GROUP BY bucket ORDER BY bucket""", *tp),
+            pool.fetch(f"""
+                SELECT number_setpoints AS bucket, COUNT(*) FROM motion.traj_info bi
+                WHERE source_data_act = 'leica_at960' {tc} GROUP BY bucket ORDER BY bucket""", *tp),
+            pool.fetchval(f"""
+                SELECT MAX(i.sidtw_average_distance) FROM evaluation.sidtw_info i
+                INNER JOIN motion.traj_info bi ON i.traj_id = bi.traj_id
+                WHERE i.traj_id != i.seg_id AND i.sidtw_average_distance IS NOT NULL {tc}""", *tp),
+            pool.fetch(f"""
+                SELECT sp.stop_point AS bucket, COUNT(*) FROM motion.traj_setpoints sp
+                INNER JOIN motion.traj_info bi ON sp.traj_id = bi.traj_id
+                WHERE sp.stop_point IS NOT NULL {tc}
+                GROUP BY bucket ORDER BY bucket""", *tp),
+            pool.fetch(f"""
+                SELECT m.movement_type AS bucket, COUNT(*) FROM motion.traj_metadata m
+                INNER JOIN motion.traj_info bi ON m.traj_id = bi.traj_id
+                WHERE m.traj_id != m.seg_id AND m.movement_type IN ('linear', 'circular') {tc}
+                GROUP BY bucket ORDER BY bucket""", *tp),
+        )
 
-        stats = {}
-
-        vrows = await conn.fetch(f"""
-            SELECT CASE WHEN max_vel < 500 THEN 1 WHEN max_vel < 1000 THEN 2
-                        WHEN max_vel < 1500 THEN 3 WHEN max_vel < 2000 THEN 4
-                        WHEN max_vel < 2500 THEN 5 WHEN max_vel < 3000 THEN 6 ELSE 7 END AS bucket, COUNT(*)
-            FROM motion.traj_metadata m INNER JOIN motion.traj_info bi ON m.traj_id = bi.traj_id
-            WHERE m.traj_id != m.seg_id AND m.max_vel IS NOT NULL {tc}
-            GROUP BY bucket ORDER BY bucket""", *tp)
-        stats["velocityDistribution"] = {
-            "data": [{"bucket": r["bucket"], "count": r["count"]} for r in vrows],
-            "meta": {"useRanges": True, "min": 0, "max": 3500, "numBuckets": 7, "unit": "mm/s", "label": "Velocity"}
+        stats = {
+            "velocityDistribution": {
+                "data": [{"bucket": r["bucket"], "count": r["count"]} for r in vrows],
+                "meta": {"useRanges": True, "min": 0, "max": 3500, "numBuckets": 7, "unit": "mm/s", "label": "Velocity"}
+            },
+            "weightDistribution": {
+                "data": [{"bucket": r["bucket"], "count": r["count"]} for r in wrows],
+                "meta": {"useRanges": False, "unit": "kg", "label": "Payload"}
+            },
+            "waypointDistribution": {
+                "data": [{"bucket": r["bucket"], "count": r["count"]} for r in wprows],
+                "meta": {"useRanges": False, "unit": "-", "label": "Setpoint"}
+            },
+            "stopPointDistribution": {
+                "data": [{"bucket": r["bucket"], "count": r["count"]} for r in sprows],
+                "meta": {"useRanges": False, "unit": "%", "label": "Stop point"}
+            },
+            "segmentTypeDistribution": {
+                "data": [{"bucket": r["bucket"], "count": r["count"]} for r in mtrows],
+                "meta": {"useRanges": False, "unit": "-", "label": "Type"}
+            },
         }
 
-        wrows = await conn.fetch(f"""
-            SELECT weight AS bucket, COUNT(*) FROM motion.traj_info bi
-            WHERE source_data_act = 'leica_at960' {tc} GROUP BY bucket ORDER BY bucket""", *tp)
-        stats["weightDistribution"] = {
-            "data": [{"bucket": r["bucket"], "count": r["count"]} for r in wrows],
-            "meta": {"useRanges": False, "unit": "kg", "label": "Payload"}
-        }
-
-        wprows = await conn.fetch(f"""
-            SELECT number_setpoints AS bucket, COUNT(*) FROM motion.traj_info bi
-            WHERE source_data_act = 'leica_at960' {tc} GROUP BY bucket ORDER BY bucket""", *tp)
-        stats["waypointDistribution"] = {
-            "data": [{"bucket": r["bucket"], "count": r["count"]} for r in wprows],
-            "meta": {"useRanges": False, "unit": "-", "label": "Setpoint"}
-        }
-
-        sidtw_max = await conn.fetchval(f"""
-            SELECT MAX(i.sidtw_average_distance) FROM evaluation.sidtw_info i
-            INNER JOIN motion.traj_info bi ON i.traj_id = bi.traj_id
-            WHERE i.traj_id != i.seg_id AND i.sidtw_average_distance IS NOT NULL {tc}""", *tp)
-
+        # Depends on sidtw_max, so it runs after the batch above.
         if tp:
-            srows = await conn.fetch("""
+            srows = await pool.fetch("""
                 SELECT width_bucket(i.sidtw_average_distance, 0, $1::float, 11) AS bucket, COUNT(*)
                 FROM evaluation.sidtw_info i INNER JOIN motion.traj_info bi ON i.traj_id = bi.traj_id
                 WHERE i.traj_id != i.seg_id AND i.sidtw_average_distance IS NOT NULL
                 AND bi.tag = ANY($2::text[])
                 GROUP BY bucket ORDER BY bucket""", float(sidtw_max or 2.0), tp[0])
         else:
-            srows = await conn.fetch("""
+            srows = await pool.fetch("""
                 SELECT width_bucket(i.sidtw_average_distance, 0, $1::float, 11) AS bucket, COUNT(*)
                 FROM evaluation.sidtw_info i INNER JOIN motion.traj_info bi ON i.traj_id = bi.traj_id
                 WHERE i.traj_id != i.seg_id AND i.sidtw_average_distance IS NOT NULL
@@ -103,26 +128,6 @@ async def get_dashboard_data(tag: list[str] = Query(None), conn=Depends(get_db))
         stats["performanceSIDTWDistribution"] = {
             "data": [{"bucket": r["bucket"], "count": r["count"]} for r in srows],
             "meta": {"useRanges": True, "min": 0, "max": float(sidtw_max or 2.0), "numBuckets": 11, "unit": "mm", "label": "Accuracy"}
-        }
-
-        sprows = await conn.fetch(f"""
-            SELECT sp.stop_point AS bucket, COUNT(*) FROM motion.traj_setpoints sp
-            INNER JOIN motion.traj_info bi ON sp.traj_id = bi.traj_id
-            WHERE sp.stop_point IS NOT NULL {tc}
-            GROUP BY bucket ORDER BY bucket""", *tp)
-        stats["stopPointDistribution"] = {
-            "data": [{"bucket": r["bucket"], "count": r["count"]} for r in sprows],
-            "meta": {"useRanges": False, "unit": "%", "label": "Stop point"}
-        }
-
-        mtrows = await conn.fetch(f"""
-            SELECT m.movement_type AS bucket, COUNT(*) FROM motion.traj_metadata m
-            INNER JOIN motion.traj_info bi ON m.traj_id = bi.traj_id
-            WHERE m.traj_id != m.seg_id AND m.movement_type IN ('linear', 'circular') {tc}
-            GROUP BY bucket ORDER BY bucket""", *tp)
-        stats["segmentTypeDistribution"] = {
-            "data": [{"bucket": r["bucket"], "count": r["count"]} for r in mtrows],
-            "meta": {"useRanges": False, "unit": "-", "label": "Type"}
         }
 
         return {
@@ -274,6 +279,7 @@ async def get_tag_info(tag: list[str] = Query(None), conn=Depends(get_db)):
 
 
 @router.get("/workarea/data")
+@cache(expire=1800)
 async def get_workarea_data(tag: list[str] = Query(None), conn=Depends(get_db)):
     """
     With tags  → all setpoints for those tags + workspace bounds from tag_info.

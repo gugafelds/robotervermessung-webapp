@@ -34,11 +34,12 @@ logging.basicConfig(level=logging.WARNING, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 DATABASE_URL   = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost/dbname')
-#DATASETS       = ['paper-norm', 'paper-random', 'paper-full', 'paper-kdtree', 'paper-auto']
-DATASETS = ['paper-geometry']
+DATASETS       = ['paper-norm', 'paper-random', 'paper-full', 'paper-kdtree', 'paper-auto', 'paper-geometry2', 'paper-geometry', 'paper-doptimal']
 SEARCH_MODES   = ['position', 'joint', 'orientation', 'velocity', 'metadata']
 EPSILON        = 1e-9
-DEFAULT_STEPS  = [25, 50, 75, 100]
+DEFAULT_STEPS  = [25, 50, 75, 100, 125, 150]
+VAL_N          = 200   # only used when --val-mode random
+VAL_SEED       = 256   # seed for the matched-random draw
 
 
 # ── DB ────────────────────────────────────────────────────────────────────────
@@ -78,6 +79,48 @@ async def fetch_validation_trajs(conn: asyncpg.Connection, tag: str) -> List[Tup
     return [(r['traj_id'], float(r['mean_distance'])) for r in rows if r['mean_distance'] is not None]
 
 
+async def fetch_matched_validation_trajs(
+    conn: asyncpg.Connection, exclude_tags: List[str], n: int, seed: int, match_velocity: bool,
+) -> List[Tuple[str, float]]:
+    """Random trajectories (any tag, excluding exclude_tags) whose setpoints fall
+    inside the workspace bounds (and, if match_velocity, also the velocity range)
+    registered for exclude_tags in motion.tag_info -- location/speed-matched to
+    the compared datasets, but not tied to any single dataset's own output
+    distribution. Same idea as mlp-test/cnn-mlp-rv2.py's fetch_matched_validation_ids,
+    ported to asyncpg."""
+    row = await conn.fetchrow("""
+        SELECT MIN(ws_x_min), MAX(ws_x_max), MIN(ws_y_min), MAX(ws_y_max),
+               MIN(ws_z_min), MAX(ws_z_max), MIN(vel_min), MAX(vel_max)
+        FROM motion.tag_info WHERE tag = ANY($1::text[])
+    """, exclude_tags)
+    x_min, x_max, y_min, y_max, z_min, z_max, v_min, v_max = row
+
+    having = [
+        "MIN(ts.x_reached) >= $2 AND MAX(ts.x_reached) <= $3",
+        "MIN(ts.y_reached) >= $4 AND MAX(ts.y_reached) <= $5",
+        "MIN(ts.z_reached) >= $6 AND MAX(ts.z_reached) <= $7",
+    ]
+    params = [exclude_tags, x_min, x_max, y_min, y_max, z_min, z_max]
+    if match_velocity:
+        having.append(f"MIN(ts.vel_set) >= ${len(params) + 1} AND MAX(ts.vel_set) <= ${len(params) + 2}")
+        params += [v_min, v_max]
+    params.append(n)
+
+    await conn.execute("SELECT setseed($1)", (seed % 1000) / 1000.0)
+    id_rows = await conn.fetch(f"""
+        SELECT ts.traj_id
+        FROM motion.traj_setpoints ts
+        JOIN motion.traj_info ti ON ti.traj_id = ts.traj_id
+        WHERE NOT (ti.tag = ANY($1::text[]))
+        GROUP BY ts.traj_id
+        HAVING {' AND '.join(having)}
+        ORDER BY RANDOM()
+        LIMIT ${len(params)}
+    """, *params)
+    ids = [r['traj_id'] for r in id_rows]
+    return await fetch_actuals_for_ids(conn, ids)
+
+
 def _temp_tag(base_tag: str, n: int) -> str:
     return f'{base_tag}-first-{n}'
 
@@ -102,6 +145,27 @@ async def cleanup_all_temp_tags(conn: asyncpg.Connection, datasets: List[str]) -
             UPDATE motion.traj_info SET tag = $1
             WHERE tag LIKE $2
         """, base_tag, f'{base_tag}-first-%')
+
+
+async def build_validation_set(
+    conn: asyncpg.Connection, val_mode: str, val_tags: List[str], datasets: List[str],
+    val_n: int, val_seed: int, match_velocity: bool,
+) -> Dict[str, List[Tuple[str, float]]]:
+    """val_mode='tag': one validation set per tag in val_tags (old behaviour).
+    val_mode='random': one matched-random validation set (excludes datasets,
+    location/speed-matched to them), see fetch_matched_validation_trajs."""
+    all_val: Dict[str, List[Tuple[str, float]]] = {}
+    if val_mode == 'random':
+        trajs = await fetch_matched_validation_trajs(conn, datasets, val_n, val_seed, match_velocity)
+        label = f'matched-random(n={val_n}, seed={val_seed}, velocity={"on" if match_velocity else "off"})'
+        all_val[label] = trajs
+        print(f'  {label}: {len(trajs)} validation trajectories')
+    else:
+        for vtag in val_tags:
+            trajs = await fetch_validation_trajs(conn, vtag)
+            all_val[vtag] = trajs
+            print(f'  {vtag}: {len(trajs)} validation trajectories')
+    return all_val
 
 
 # ── Search ────────────────────────────────────────────────────────────────────
@@ -182,7 +246,8 @@ def ncs(rows):        return [abs(h - a) / max(s, EPSILON) for h, a, s in rows]
 # ── Normal run ────────────────────────────────────────────────────────────────
 
 async def run(limit: int, datasets: List[str], stages: List[int], batch_size: int,
-              val_tags: List[str]) -> None:
+              val_tags: List[str], val_mode: str = 'tag', val_n: int = VAL_N,
+              val_seed: int = VAL_SEED, match_velocity: bool = True) -> None:
     pool = await asyncpg.create_pool(
         DATABASE_URL, min_size=5, max_size=20,
         server_settings={'search_path': 'motion, public'},
@@ -191,11 +256,9 @@ async def run(limit: int, datasets: List[str], stages: List[int], batch_size: in
     async with pool.acquire() as conn:
         for tag in datasets:
             print(f'  {tag}: {await fetch_tag_count(conn, tag)} trajectories')
-        all_val: Dict[str, List[Tuple[str, float]]] = {}
-        for vtag in val_tags:
-            trajs = await fetch_validation_trajs(conn, vtag)
-            all_val[vtag] = trajs
-            print(f'  {vtag}: {len(trajs)} validation trajectories')
+        all_val = await build_validation_set(
+            conn, val_mode, val_tags, datasets, val_n, val_seed, match_velocity
+        )
 
     print()
     all_val = {k: v for k, v in all_val.items() if v}
@@ -216,7 +279,8 @@ async def run(limit: int, datasets: List[str], stages: List[int], batch_size: in
 
 async def run_learning_curve(
     limit: int, datasets: List[str], stages: List[int], batch_size: int, steps: List[int],
-    val_tags: List[str] = None,
+    val_tags: List[str] = None, val_mode: str = 'tag', val_n: int = VAL_N,
+    val_seed: int = VAL_SEED, match_velocity: bool = True,
 ) -> None:
     if val_tags is None:
         val_tags = ['paper-lhs']
@@ -231,11 +295,9 @@ async def run_learning_curve(
         for tag in datasets:
             counts[tag] = await fetch_tag_count(conn, tag)
             print(f'  {tag}: {counts[tag]} trajectories')
-        all_val: Dict[str, List[Tuple[str, float]]] = {}
-        for vtag in val_tags:
-            trajs = await fetch_validation_trajs(conn, vtag)
-            all_val[vtag] = trajs
-            print(f'  {vtag}: {len(trajs)} validation trajectories')
+        all_val = await build_validation_set(
+            conn, val_mode, val_tags, datasets, val_n, val_seed, match_velocity
+        )
         await cleanup_all_temp_tags(conn, datasets)
 
     print()
@@ -469,6 +531,12 @@ if __name__ == '__main__':
     parser.add_argument('--batch',            type=int,  default=5,   help='Trajectories per parallel batch (default: 5)')
     parser.add_argument('--datasets',         nargs='+', default=None, help='Dataset tags (space- or comma-separated)')
     parser.add_argument('--validation-tags',  nargs='+', default=None, help='Validation set tags (space- or comma-separated, default: rv2-dataset-validation)')
+    parser.add_argument('--val-mode',         choices=['tag', 'random'], default='tag',
+                         help="'tag' = fixed --validation-tags (default), "
+                              "'random' = matched-random validation set (excludes --datasets, location/speed-matched)")
+    parser.add_argument('--val-n',            type=int, default=VAL_N,    help='Validation set size for --val-mode random (default: %(default)s)')
+    parser.add_argument('--val-seed',         type=int, default=VAL_SEED, help='Seed for --val-mode random (default: %(default)s)')
+    parser.add_argument('--no-match-velocity', action='store_true',       help='--val-mode random: only match workspace bounds, ignore velocity range')
     parser.add_argument('--no-stage2',        action='store_true',     help='Skip Stage 2 (DTW)')
     parser.add_argument('--learning-curve',   action='store_true',     help='Run learning curve vs external validation set')
     parser.add_argument('--loo-curve',        action='store_true',     help='Run LOO learning curve within each dataset')
@@ -481,6 +549,10 @@ if __name__ == '__main__':
     datasets = _pl(args.datasets, DATASETS)
     steps    = [int(s) for s in _pl(args.steps, DEFAULT_STEPS)]
     val_tags = _pl(args.validation_tags, ['paper-lhs'])
+    val_kwargs = dict(
+        val_mode=args.val_mode, val_n=args.val_n, val_seed=args.val_seed,
+        match_velocity=not args.no_match_velocity,
+    )
 
     if args.loo_curve:
         asyncio.run(run_loo_curve(
@@ -490,10 +562,10 @@ if __name__ == '__main__':
     elif args.learning_curve:
         asyncio.run(run_learning_curve(
             limit=args.limit, datasets=datasets, stages=stages,
-            batch_size=args.batch, steps=steps, val_tags=val_tags,
+            batch_size=args.batch, steps=steps, val_tags=val_tags, **val_kwargs,
         ))
     else:
         asyncio.run(run(
             limit=args.limit, datasets=datasets, stages=stages,
-            batch_size=args.batch, val_tags=val_tags,
+            batch_size=args.batch, val_tags=val_tags, **val_kwargs,
         ))

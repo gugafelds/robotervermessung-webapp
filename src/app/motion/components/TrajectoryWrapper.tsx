@@ -230,10 +230,12 @@ export function TrajectoryWrapper() {
         ).then(() => updateLoadingState('accelCmd', true)),
       ];
 
-      // Ausführung in Prioritätsgruppen
-      await Promise.all(highPriorityFetches);
-      await Promise.all(mediumPriorityFetches);
-      await Promise.all(lowPriorityFetches);
+      // Alle Fetches sind unabhängig, jede setzt ihren eigenen State/Loading-Flag
+      await Promise.all([
+        ...highPriorityFetches,
+        ...mediumPriorityFetches,
+        ...lowPriorityFetches,
+      ]);
     } catch (err) {
       setError('Plotdaten konnten nicht abgerufen werden');
     }

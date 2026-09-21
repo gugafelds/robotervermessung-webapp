@@ -1,5 +1,7 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from ...database import get_db
+from ...database import get_db, get_db_pool
 import logging
 from fastapi_cache.decorator import cache
 
@@ -14,19 +16,21 @@ router = APIRouter()
 async def get_traj_info(
         page: int = Query(1, ge=1, description="Seitennummer"),
         page_size: int = Query(20, ge=1, le=100, description="Anzahl der Einträge pro Seite"),
-        conn=Depends(get_db)
+        pool=Depends(get_db_pool)
 ):
     try:
         # Berechne den Offset für die SQL-Abfrage
         offset = (page - 1) * page_size
 
-        # Zähle die Gesamtanzahl der Einträge für die Metadaten
-        count_query = "SELECT COUNT(*) FROM motion.traj_info"
-        total_count = await conn.fetchval(count_query)
-
-        # Abfrage mit LIMIT und OFFSET für Pagination
-        query = "SELECT * FROM motion.traj_info ORDER BY recording_date DESC LIMIT $1 OFFSET $2"
-        rows = await conn.fetch(query, page_size, offset)
+        # Count und Seite sind unabhängig voneinander, laufen also parallel
+        # statt nacheinander auf derselben Connection.
+        total_count, rows = await asyncio.gather(
+            pool.fetchval("SELECT COUNT(*) FROM motion.traj_info"),
+            pool.fetch(
+                "SELECT * FROM motion.traj_info ORDER BY recording_date DESC LIMIT $1 OFFSET $2",
+                page_size, offset,
+            ),
+        )
 
         traj_info_list = [dict(row) for row in rows]
 
@@ -65,7 +69,7 @@ async def search_traj_info(
         recording_date: str = Query(None, description="Datumsfilter"),
         sidtw_distance: float = Query(None, description="SIDTW Distance (±10% Toleranz)"),
         tag: str = Query(None, description="Tag-Filter"),
-        conn=Depends(get_db)
+        pool=Depends(get_db_pool)
 ):
     try:
         # Basis-Query erstellen
@@ -95,6 +99,11 @@ async def search_traj_info(
 
             # Datum
             search_conditions.append(f"b.recording_date ILIKE ${param_index}")
+            params.append(f"%{query}%")
+            param_index += 1
+
+            # Tag (teilweise Übereinstimmung)
+            search_conditions.append(f"b.tag ILIKE ${param_index}")
             params.append(f"%{query}%")
             param_index += 1
 
@@ -163,15 +172,16 @@ async def search_traj_info(
             params.extend([sidtw_distance - tolerance, sidtw_distance + tolerance])
             param_index += 2
 
-        # Zähle Gesamtanzahl für Pagination
+        # Count und die paginierte Suche sind unabhängig, laufen also parallel.
+        # Eigene Parameterlisten, da die Suche 2 zusätzliche (LIMIT/OFFSET) braucht.
         count_query = f"SELECT COUNT(*) FROM ({base_query}) AS filtered_data"
-        total_count = await conn.fetchval(count_query, *params)
+        search_query = base_query + f" ORDER BY b.recording_date DESC LIMIT ${param_index} OFFSET ${param_index + 1}"
+        search_params = params + [page_size, (page - 1) * page_size]
 
-        # Füge Sortierung und Pagination hinzu
-        query = base_query + f" ORDER BY b.recording_date DESC LIMIT ${param_index} OFFSET ${param_index + 1}"
-        params.extend([page_size, (page - 1) * page_size])
-
-        rows = await conn.fetch(query, *params)
+        total_count, rows = await asyncio.gather(
+            pool.fetchval(count_query, *params),
+            pool.fetch(search_query, *search_params),
+        )
         traj_info_list = [dict(row) for row in rows]
 
         # Keine Ergebnisse und Seite > 1
@@ -215,7 +225,8 @@ async def get_traj_info_by_id(traj_id: str, conn = Depends(get_db)):
 @cache(expire=2400)
 async def get_traj_pose_ist_by_id(traj_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM motion.traj_pose_act WHERE traj_id = $1 ORDER BY timestamp ASC",
+        """SELECT timestamp, x_act, y_act, z_act, qx_act, qy_act, qz_act, qw_act
+           FROM motion.traj_pose_act WHERE traj_id = $1 ORDER BY timestamp ASC""",
         traj_id
     )
     return [dict(row) for row in rows]
@@ -224,7 +235,7 @@ async def get_traj_pose_ist_by_id(traj_id: str, conn = Depends(get_db)):
 @cache(expire=2400)
 async def get_traj_twist_ist_by_id(traj_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM motion.traj_vel_act WHERE traj_id = $1 ORDER BY timestamp ASC",
+        "SELECT timestamp, tcp_vel_act FROM motion.traj_vel_act WHERE traj_id = $1 ORDER BY timestamp ASC",
         traj_id
     )
     return [dict(row) for row in rows]
@@ -233,7 +244,7 @@ async def get_traj_twist_ist_by_id(traj_id: str, conn = Depends(get_db)):
 @cache(expire=2400)
 async def get_traj_accel_ist_by_id(traj_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM motion.traj_accel_act WHERE traj_id = $1 ORDER BY timestamp ASC",
+        "SELECT timestamp, tcp_accel_act FROM motion.traj_accel_act WHERE traj_id = $1 ORDER BY timestamp ASC",
         traj_id
     )
     return [dict(row) for row in rows]
@@ -242,7 +253,7 @@ async def get_traj_accel_ist_by_id(traj_id: str, conn = Depends(get_db)):
 @cache(expire=2400)
 async def get_traj_accel_soll_by_id(traj_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM motion.traj_accel_cmd WHERE traj_id = $1 ORDER BY timestamp ASC",
+        "SELECT timestamp, tcp_accel_cmd FROM motion.traj_accel_cmd WHERE traj_id = $1 ORDER BY timestamp ASC",
         traj_id
     )
     return [dict(row) for row in rows]
@@ -251,7 +262,8 @@ async def get_traj_accel_soll_by_id(traj_id: str, conn = Depends(get_db)):
 @cache(expire=2400)
 async def get_traj_position_soll_by_id(traj_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM motion.traj_position_cmd WHERE traj_id = $1 ORDER BY timestamp ASC",
+        """SELECT timestamp, x_cmd, y_cmd, z_cmd
+           FROM motion.traj_position_cmd WHERE traj_id = $1 ORDER BY timestamp ASC""",
         traj_id
     )
     return [dict(row) for row in rows]
@@ -260,7 +272,8 @@ async def get_traj_position_soll_by_id(traj_id: str, conn = Depends(get_db)):
 @cache(expire=2400)
 async def get_segment_position_soll_by_id(segment_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM motion.traj_position_cmd WHERE seg_id = $1 ORDER BY timestamp ASC",
+        """SELECT timestamp, x_cmd, y_cmd, z_cmd
+           FROM motion.traj_position_cmd WHERE seg_id = $1 ORDER BY timestamp ASC""",
         segment_id
     )
     return [dict(row) for row in rows]
@@ -270,7 +283,8 @@ async def get_segment_position_soll_by_id(segment_id: str, conn = Depends(get_db
 @cache(expire=2400)
 async def get_traj_orientation_soll_by_id(traj_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM motion.traj_orientation_cmd WHERE traj_id = $1 ORDER BY timestamp ASC",
+        """SELECT timestamp, qx_cmd, qy_cmd, qz_cmd, qw_cmd
+           FROM motion.traj_orientation_cmd WHERE traj_id = $1 ORDER BY timestamp ASC""",
         traj_id
     )
     return [dict(row) for row in rows]
@@ -288,7 +302,8 @@ async def get_traj_twist_soll_by_id(traj_id: str, conn = Depends(get_db)):
 @cache(expire=2400)
 async def get_traj_joint_states_by_id(traj_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM motion.traj_joint_states WHERE traj_id = $1 ORDER BY timestamp ASC",
+        """SELECT timestamp, joint_1, joint_2, joint_3, joint_4, joint_5, joint_6
+           FROM motion.traj_joint_states WHERE traj_id = $1 ORDER BY timestamp ASC""",
         traj_id
     )
     return [dict(row) for row in rows]
@@ -297,7 +312,12 @@ async def get_traj_joint_states_by_id(traj_id: str, conn = Depends(get_db)):
 @cache(expire=2400)
 async def get_traj_events_by_id(traj_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM motion.traj_setpoints WHERE traj_id = $1 ORDER BY timestamp ASC",
+        """SELECT timestamp, x_reached, y_reached, z_reached,
+                  qx_reached, qy_reached, qz_reached, qw_reached,
+                  x_support, y_support, z_support,
+                  qx_support, qy_support, qz_support, qw_support,
+                  vel_set, stop_point, timestamp_support
+           FROM motion.traj_setpoints WHERE traj_id = $1 ORDER BY timestamp ASC""",
         traj_id
     )
     return [dict(row) for row in rows]
@@ -306,7 +326,11 @@ async def get_traj_events_by_id(traj_id: str, conn = Depends(get_db)):
 @cache(expire=2400)
 async def get_traj_metadata_by_id(traj_id: str, conn = Depends(get_db)):
     rows = await conn.fetch(
-        "SELECT * FROM motion.traj_metadata WHERE traj_id = $1 ORDER BY seg_id ASC",
+        """SELECT seg_id, traj_id, movement_type, duration, weight, length,
+                  min_vel, max_vel, mean_vel, median_vel, std_vel,
+                  min_accel, max_accel, mean_accel, median_accel, std_accel,
+                  position_x, position_y, position_z
+           FROM motion.traj_metadata WHERE traj_id = $1 ORDER BY seg_id ASC""",
         traj_id
     )
     return [dict(row) for row in rows]
