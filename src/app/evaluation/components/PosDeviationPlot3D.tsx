@@ -1,23 +1,23 @@
 /* eslint-disable no-nested-ternary */
 
-"use client";
+'use client';
 
-import dynamic from "next/dynamic";
-import type { Layout, PlotData } from "plotly.js";
-import React, { useMemo } from "react";
+import dynamic from 'next/dynamic';
+import type { Layout, PlotData } from 'plotly.js';
+import React, { useMemo } from 'react';
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 const methodColors = {
   ED: {
-    cmd: "#003560",
-    act: "#0066b8",
-    connection: "rgba(0, 53, 96, 0.7)",
+    cmd: '#003560',
+    act: '#0066b8',
+    connection: 'rgba(0, 53, 96, 0.7)',
   },
   SIDTW: {
-    cmd: "#e63946",
-    act: "#ff6b6b",
-    connection: "rgba(230, 57, 70, 0.7)",
+    cmd: '#e63946',
+    act: '#ff6b6b',
+    connection: 'rgba(230, 57, 70, 0.7)',
   },
 };
 
@@ -50,7 +50,7 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = React.memo(
     const filterDataBySegment = (data: any[]) => {
       if (!data?.length) return [];
 
-      if (selectedSegment === "total") {
+      if (selectedSegment === 'total') {
         // Alte Struktur: nur Zeilen wo trajID === segID
         // Neue Struktur: alle Zeilen der aktuellen Bahn
         const hasOldStructure = data.some((d) => d.trajID === d.segID);
@@ -62,14 +62,14 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = React.memo(
         return data;
       }
 
-      const segmentNum = selectedSegment.split("_")[1];
+      const segmentNum = selectedSegment.split('_')[1];
       return data.filter((d) => d.segID === `${d.trajID}_${segmentNum}`);
     };
 
     // Helper für 3D Traces
     const addMethodTraces = (
       data: any[],
-      methodName: "ED" | "SIDTW",
+      methodName: 'ED' | 'SIDTW',
       colors: any,
     ): Partial<PlotData>[] => {
       const filteredData = filterDataBySegment(data);
@@ -95,34 +95,34 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = React.memo(
 
       // Soll trajectory
       traces.push({
-        type: "scatter3d",
-        mode: "lines",
+        type: 'scatter3d',
+        mode: 'lines',
         name: `${methodName} (C)`,
         x: sortedData.map((d) => d[cmdFields.x]),
         y: sortedData.map((d) => d[cmdFields.y]),
         z: sortedData.map((d) => d[cmdFields.z]),
         line: { color: colors.cmd, width: 3 },
         hovertemplate:
-          "X: %{x:.2f}mm<br>Y: %{y:.2f}mm<br>Z: %{z:.2f}mm<br><extra></extra>",
+          'X: %{x:.2f}mm<br>Y: %{y:.2f}mm<br>Z: %{z:.2f}mm<br><extra></extra>',
       });
 
       // Ist trajectory
       traces.push({
-        type: "scatter3d",
-        mode: "lines",
+        type: 'scatter3d',
+        mode: 'lines',
         name: `${methodName} (M)`,
         x: sortedData.map((d) => d[actFields.x]),
         y: sortedData.map((d) => d[actFields.y]),
         z: sortedData.map((d) => d[actFields.z]),
         line: { color: colors.act, width: 4 },
         hovertemplate:
-          "X: %{x:.2f}mm<br>Y: %{y:.2f}mm<br>Z: %{z:.2f}mm<br><extra></extra>",
+          'X: %{x:.2f}mm<br>Y: %{y:.2f}mm<br>Z: %{z:.2f}mm<br><extra></extra>',
       });
 
       // Verbindungslinien
       traces.push({
-        type: "scatter3d",
-        mode: "lines",
+        type: 'scatter3d',
+        mode: 'lines',
         name: `${methodName} deviation`,
         showlegend: true,
         x: sortedData.flatMap((point) => [
@@ -143,7 +143,7 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = React.memo(
         line: {
           color: colors.connection,
           width: 2,
-          dash: "solid",
+          dash: 'solid',
         },
         hovertemplate: `${methodName} Deviation: %{text:.2f}mm<br><extra></extra>`,
         text: sortedData.flatMap((point) => [
@@ -166,7 +166,7 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = React.memo(
         currentEDDeviation?.length
       ) {
         plotData = plotData.concat(
-          addMethodTraces(currentEDDeviation, "ED", methodColors.ED),
+          addMethodTraces(currentEDDeviation, 'ED', methodColors.ED),
         );
       }
       if (
@@ -175,7 +175,7 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = React.memo(
         currentSIDTWDeviation?.length
       ) {
         plotData = plotData.concat(
-          addMethodTraces(currentSIDTWDeviation, "SIDTW", methodColors.SIDTW),
+          addMethodTraces(currentSIDTWDeviation, 'SIDTW', methodColors.SIDTW),
         );
       }
 
@@ -200,51 +200,51 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = React.memo(
 
           // Ermittle das Feld-Präfix der ersten sichtbaren Metrik
           const methodPrefix =
-            metrics.ED.isLoaded && metrics.ED.visible ? "ED" : "SIDTW";
+            metrics.ED.isLoaded && metrics.ED.visible ? 'ED' : 'SIDTW';
 
           // Start (grün)
           plotData.push({
-            type: "scatter3d",
-            mode: "markers",
-            name: "Start",
+            type: 'scatter3d',
+            mode: 'markers',
+            name: 'Start',
             x: [firstPoint[`${methodPrefix}ActX`]],
             y: [firstPoint[`${methodPrefix}ActY`]],
             z: [firstPoint[`${methodPrefix}ActZ`]],
             marker: {
               size: 4,
-              color: "green",
-              symbol: "diamond",
+              color: 'green',
+              symbol: 'diamond',
               opacity: 1,
               line: {
-                color: "darkgreen",
+                color: 'darkgreen',
                 width: 2,
               },
             },
             hovertemplate:
-              "Start<br>X: %{x:.2f}mm<br>Y: %{y:.2f}mm<br>Z: %{z:.2f}mm<extra></extra>",
+              'Start<br>X: %{x:.2f}mm<br>Y: %{y:.2f}mm<br>Z: %{z:.2f}mm<extra></extra>',
           });
 
           // End (rot)
           plotData.push({
-            type: "scatter3d",
-            mode: "markers",
-            name: "End",
+            type: 'scatter3d',
+            mode: 'markers',
+            name: 'End',
             x: [lastPoint[`${methodPrefix}ActX`]],
             y: [lastPoint[`${methodPrefix}ActY`]],
             z: [lastPoint[`${methodPrefix}ActZ`]],
-            uirevision: "true",
+            uirevision: 'true',
             marker: {
               size: 4,
-              color: "red",
-              symbol: "circle",
+              color: 'red',
+              symbol: 'circle',
               opacity: 1,
               line: {
-                color: "darkred",
+                color: 'darkred',
                 width: 2,
               },
             },
             hovertemplate:
-              "End<br>X: %{x:.2f}mm<br>Y: %{y:.2f}mm<br>Z: %{z:.2f}mm<extra></extra>",
+              'End<br>X: %{x:.2f}mm<br>Y: %{y:.2f}mm<br>Z: %{z:.2f}mm<extra></extra>',
           });
         }
       }
@@ -256,9 +256,9 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = React.memo(
     const get3DLayout = (): Partial<Layout> => ({
       title: {
         text:
-          selectedSegment === "total"
-            ? "3D-Deviation (Trajectory)"
-            : `3D-Deviation (Segment ${selectedSegment.split("_")[1]})`,
+          selectedSegment === 'total'
+            ? '3D-Deviation (Trajectory)'
+            : `3D-Deviation (Segment ${selectedSegment.split('_')[1]})`,
       },
       autosize: true,
       height: 600,
@@ -268,20 +268,20 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = React.memo(
           center: { x: 0, y: 0, z: -0.1 },
           eye: { x: 1.15, y: 1, z: 1 },
         },
-        aspectmode: "cube",
-        dragmode: "orbit",
-        xaxis: { title: { text: "X [mm]" }, showgrid: true, zeroline: true },
-        yaxis: { title: { text: "Y [mm]" }, showgrid: true, zeroline: true },
-        zaxis: { title: { text: "Z [mm]" }, showgrid: true, zeroline: true },
+        aspectmode: 'cube',
+        dragmode: 'orbit',
+        xaxis: { title: { text: 'X [mm]' }, showgrid: true, zeroline: true },
+        yaxis: { title: { text: 'Y [mm]' }, showgrid: true, zeroline: true },
+        zaxis: { title: { text: 'Z [mm]' }, showgrid: true, zeroline: true },
       },
       margin: { t: 50, b: 20, l: 20, r: 20 },
       showlegend: true,
       legend: {
-        orientation: "h",
+        orientation: 'h',
         y: -0.15,
         x: 0.5,
-        xanchor: "center",
-        bgcolor: "rgba(255,255,255,0.8)",
+        xanchor: 'center',
+        bgcolor: 'rgba(255,255,255,0.8)',
       },
     });
 
@@ -310,16 +310,16 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = React.memo(
               config={{
                 displaylogo: false,
                 modeBarButtonsToRemove: [
-                  "toImage",
-                  "orbitRotation",
-                  "zoom3d",
-                  "tableRotation",
-                  "pan3d",
-                  "resetCameraDefault3d",
+                  'toImage',
+                  'orbitRotation',
+                  'zoom3d',
+                  'tableRotation',
+                  'pan3d',
+                  'resetCameraDefault3d',
                 ],
                 responsive: true,
               }}
-              style={{ width: "100%", height: "600px" }}
+              style={{ width: '100%', height: '600px' }}
             />
           ) : (
             <div className="flex items-center justify-center text-gray-500">
@@ -332,4 +332,4 @@ export const PosDeviationPlot3D: React.FC<PosDeviationPlot3DProps> = React.memo(
   },
 );
 
-PosDeviationPlot3D.displayName = "PosDeviationPlot3D";
+PosDeviationPlot3D.displayName = 'PosDeviationPlot3D';

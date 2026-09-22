@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import dynamic from "next/dynamic";
-import type { Layout, PlotData } from "plotly.js";
-import React, { useMemo } from "react";
+import dynamic from 'next/dynamic';
+import type { Layout, PlotData } from 'plotly.js';
+import React, { useMemo } from 'react';
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 const methodColors = {
-  ED: { line: "#003560" },
-  SIDTW: { line: "#e63946" },
+  ED: { line: '#003560' },
+  SIDTW: { line: '#e63946' },
 };
 
 interface MetricState {
@@ -42,7 +42,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = React.memo(
     const filterDataBySegment = (data: any[]) => {
       if (!data?.length) return [];
 
-      if (selectedSegment === "total") {
+      if (selectedSegment === 'total') {
         // Alte Struktur: nur Zeilen wo trajID === segID
         // Neue Struktur: alle Zeilen der aktuellen Bahn
         const hasOldStructure = data.some((d) => d.trajID === d.segID);
@@ -54,12 +54,12 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = React.memo(
         return data;
       }
 
-      const segmentNum = selectedSegment.split("_")[1];
+      const segmentNum = selectedSegment.split('_')[1];
       return data.filter((d) => d.segID === `${d.trajID}_${segmentNum}`);
     };
 
     // Zeitarray generieren basierend auf pointsOrder
-    const getTimeArray = (data: any[], metricType: "ED" | "SIDTW") => {
+    const getTimeArray = (data: any[], metricType: 'ED' | 'SIDTW') => {
       if (!data.length) return [];
 
       if (!currentBahnInfo?.startTime || !currentBahnInfo?.endTime) {
@@ -73,7 +73,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = React.memo(
       const allEDData = currentEDDeviation || [];
       const totalPoints = Math.max(...allEDData.map((d) => d.pointsOrder));
 
-      if (metricType === "ED") {
+      if (metricType === 'ED') {
         return data.map((d) => {
           return ((d.pointsOrder / totalPoints) * duration) / 1000;
         });
@@ -103,16 +103,16 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = React.memo(
         const sortedED = [...filteredData].sort(
           (a, b) => a.pointsOrder - b.pointsOrder,
         );
-        const timePoints = getTimeArray(sortedED, "ED");
+        const timePoints = getTimeArray(sortedED, 'ED');
 
         plots.push({
-          type: "scatter",
-          mode: "lines",
-          name: "Euclidean Distance",
+          type: 'scatter',
+          mode: 'lines',
+          name: 'Euclidean Distance',
           x: timePoints,
           y: sortedED.map((d) => d.EDDistances),
           line: { color: methodColors.ED.line, width: 2 },
-          hovertemplate: "Zeit: %{x:.2f}s<br>ED: %{y:.2f}mm<extra></extra>",
+          hovertemplate: 'Zeit: %{x:.2f}s<br>ED: %{y:.2f}mm<extra></extra>',
         });
       }
 
@@ -121,16 +121,16 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = React.memo(
         const sortedSIDTW = [...filteredData].sort(
           (a, b) => a.pointsOrder - b.pointsOrder,
         );
-        const timePoints = getTimeArray(sortedSIDTW, "SIDTW");
+        const timePoints = getTimeArray(sortedSIDTW, 'SIDTW');
 
         plots.push({
-          type: "scatter",
-          mode: "lines",
-          name: "SIDTW",
+          type: 'scatter',
+          mode: 'lines',
+          name: 'SIDTW',
           x: timePoints,
           y: sortedSIDTW.map((d) => d.SIDTWDistances),
           line: { color: methodColors.SIDTW.line, width: 2 },
-          hovertemplate: "Zeit: %{x:.2f}s<br>SIDTW: %{y:.2f}mm<extra></extra>",
+          hovertemplate: 'Zeit: %{x:.2f}s<br>SIDTW: %{y:.2f}mm<extra></extra>',
         });
       }
       /*
@@ -160,18 +160,18 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = React.memo(
     const get2DLayout = (): Partial<Layout> => ({
       title: {
         text:
-          selectedSegment === "total"
-            ? "Position (Trajectory)"
-            : `Position (Segment ${selectedSegment.split("_")[1]})`,
+          selectedSegment === 'total'
+            ? 'Position (Trajectory)'
+            : `Position (Segment ${selectedSegment.split('_')[1]})`,
       },
-      font: { family: "Helvetica" },
-      xaxis: { title: { text: "Time [s]" } },
-      yaxis: { title: { text: "Deviation [mm]" }, rangemode: "tozero" },
-      hovermode: "x unified",
+      font: { family: 'Helvetica' },
+      xaxis: { title: { text: 'Time [s]' } },
+      yaxis: { title: { text: 'Deviation [mm]' }, rangemode: 'tozero' },
+      hovermode: 'x unified',
       height: 600,
       margin: { t: 40, b: 40, l: 60, r: 20 },
       showlegend: true,
-      legend: { orientation: "h", y: -0.2 },
+      legend: { orientation: 'h', y: -0.2 },
     });
 
     const anyMetricVisible = Object.values(metrics).some(
@@ -205,18 +205,18 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = React.memo(
               config={{
                 displaylogo: false,
                 modeBarButtonsToRemove: [
-                  "toImage",
-                  "orbitRotation",
-                  "lasso2d",
-                  "zoomIn2d",
-                  "zoomOut2d",
-                  "autoScale2d",
-                  "pan2d",
-                  "select2d",
+                  'toImage',
+                  'orbitRotation',
+                  'lasso2d',
+                  'zoomIn2d',
+                  'zoomOut2d',
+                  'autoScale2d',
+                  'pan2d',
+                  'select2d',
                 ],
                 responsive: true,
               }}
-              style={{ width: "100%", height: "600px" }}
+              style={{ width: '100%', height: '600px' }}
             />
           ) : (
             <div className="flex items-center justify-center text-gray-500">
@@ -229,4 +229,4 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = React.memo(
   },
 );
 
-PosDeviationPlot2D.displayName = "PosDeviationPlot2D";
+PosDeviationPlot2D.displayName = 'PosDeviationPlot2D';

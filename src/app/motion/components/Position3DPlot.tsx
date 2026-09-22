@@ -1,15 +1,15 @@
-import dynamic from "next/dynamic";
-import type { Layout, PlotData } from "plotly.js";
-import React from "react";
+import dynamic from 'next/dynamic';
+import type { Layout, PlotData } from 'plotly.js';
+import React from 'react';
 
-import { dataPlotConfig, plotLayoutConfig } from "@/src/lib/plot-config";
+import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
 import type {
   TrajPoseAct,
   TrajPositionCmd,
   TrajSetpoints,
-} from "@/types/motion.types";
+} from '@/types/motion.types';
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 interface Position3DPlotProps {
   currentTrajPoseAct: TrajPoseAct[];
@@ -22,107 +22,107 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = React.memo(
     const realTrajectory = currentTrajPoseAct;
 
     const realTrajectoryData: Partial<PlotData> = {
-      ...dataPlotConfig("lines", "ist", 4, "darkblue"),
+      ...dataPlotConfig('lines', 'ist', 4, 'darkblue'),
       x: realTrajectory.map((row) => (row as TrajPoseAct).xAct),
       y: realTrajectory.map((row) => (row as TrajPoseAct).yAct),
       z: realTrajectory.map((row) => (row as TrajPoseAct).zAct),
-      name: "Trajectory (M)",
+      name: 'Trajectory (M)',
     };
 
     const idealTrajectoryData: Partial<PlotData> = {
-      ...dataPlotConfig("lines", "soll", 3, "blue"),
+      ...dataPlotConfig('lines', 'soll', 3, 'blue'),
       x: idealTrajectory.map((row) => row.xCmd),
       y: idealTrajectory.map((row) => row.yCmd),
       z: idealTrajectory.map((row) => row.zCmd),
-      name: "Trajectory (C)",
+      name: 'Trajectory (C)',
     };
 
     // Startpunkt für Ist-Daten
-    const getStartPointCoordinate = (coordinate: "x" | "y" | "z"): number => {
+    const getStartPointCoordinate = (coordinate: 'x' | 'y' | 'z'): number => {
       if (realTrajectory.length === 0) return 0;
 
       const firstPoint = idealTrajectory[0];
       const istPoint = firstPoint as TrajPositionCmd;
-      if (coordinate === "x") return istPoint.xCmd;
-      if (coordinate === "y") return istPoint.yCmd;
+      if (coordinate === 'x') return istPoint.xCmd;
+      if (coordinate === 'y') return istPoint.yCmd;
       return istPoint.zCmd;
     };
 
     const startPointData: Partial<PlotData> = {
-      type: "scatter3d",
-      mode: "markers",
-      name: "Start",
-      x: [getStartPointCoordinate("x")],
-      y: [getStartPointCoordinate("y")],
-      z: [getStartPointCoordinate("z")],
+      type: 'scatter3d',
+      mode: 'markers',
+      name: 'Start',
+      x: [getStartPointCoordinate('x')],
+      y: [getStartPointCoordinate('y')],
+      z: [getStartPointCoordinate('z')],
       marker: {
         size: 4,
-        color: "green",
-        symbol: "diamond",
+        color: 'green',
+        symbol: 'diamond',
         opacity: 1,
         line: {
-          color: "darkgreen",
+          color: 'darkgreen',
           width: 2,
         },
       },
       hoverlabel: {
-        bgcolor: "green",
+        bgcolor: 'green',
       },
       visible: true,
     };
 
     // Zielpunkte
     const targetPointsData: Partial<PlotData> = {
-      type: "scatter3d",
-      mode: "markers",
-      name: "Setpoints",
+      type: 'scatter3d',
+      mode: 'markers',
+      name: 'Setpoints',
       x: currentTrajSetpoints.map((row) => row.xReached),
       y: currentTrajSetpoints.map((row) => row.yReached),
       z: currentTrajSetpoints.map((row) => row.zReached),
       marker: {
         size: 4,
-        color: "red",
-        symbol: "circle",
+        color: 'red',
+        symbol: 'circle',
         opacity: 1,
         sizeref: 2,
       },
       hoverlabel: {
-        bgcolor: "red",
+        bgcolor: 'red',
       },
       visible: true,
     };
 
     // Stützpunkte
     const supportPointsData: Partial<PlotData> = {
-      type: "scatter3d",
-      mode: "markers",
-      name: "Support",
+      type: 'scatter3d',
+      mode: 'markers',
+      name: 'Support',
       x: currentTrajSetpoints.map((row) => row.xSupport),
       y: currentTrajSetpoints.map((row) => row.ySupport),
       z: currentTrajSetpoints.map((row) => row.zSupport),
       marker: {
         size: 2,
-        color: "blue",
-        symbol: "square",
+        color: 'blue',
+        symbol: 'square',
         opacity: 1,
         sizeref: 2,
       },
       hoverlabel: {
-        bgcolor: "blue",
+        bgcolor: 'blue',
       },
       visible: true,
     };
 
     // Verbindungslinien zwischen den Zielpunkten
     const targetLinesData: Partial<PlotData> = {
-      type: "scatter3d",
-      mode: "lines",
-      name: "Setpoints-Connection",
+      type: 'scatter3d',
+      mode: 'lines',
+      name: 'Setpoints-Connection',
       x: currentTrajSetpoints.map((row) => row.xReached),
       y: currentTrajSetpoints.map((row) => row.yReached),
       z: currentTrajSetpoints.map((row) => row.zReached),
       line: {
-        color: "rgba(255, 0, 0, 0.3)",
+        color: 'rgba(255, 0, 0, 0.3)',
         width: 2,
       },
       showlegend: false,
@@ -130,7 +130,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = React.memo(
 
     const layout: Partial<Layout> = {
       ...plotLayoutConfig,
-      title: { text: "3D position" },
+      title: { text: '3D position' },
       autosize: true,
       height: 500,
       scene: {
@@ -139,22 +139,22 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = React.memo(
           center: { x: 0, y: 0, z: -0.1 },
           eye: { x: 1.15, y: 1, z: 1 },
         },
-        aspectmode: "cube",
-        dragmode: "orbit",
-        xaxis: { title: { text: "X [mm]" }, showgrid: true, zeroline: true },
-        yaxis: { title: { text: "Y [mm]" }, showgrid: true, zeroline: true },
-        zaxis: { title: { text: "Z [mm]" }, showgrid: true, zeroline: true },
+        aspectmode: 'cube',
+        dragmode: 'orbit',
+        xaxis: { title: { text: 'X [mm]' }, showgrid: true, zeroline: true },
+        yaxis: { title: { text: 'Y [mm]' }, showgrid: true, zeroline: true },
+        zaxis: { title: { text: 'Z [mm]' }, showgrid: true, zeroline: true },
       },
       margin: { t: 50, b: 20, l: 20, r: 20 },
-      uirevision: "true",
+      uirevision: 'true',
       showlegend: true,
       width: 600,
       legend: {
-        orientation: "h",
+        orientation: 'h',
         y: -0.15,
         x: 0.5,
-        xanchor: "center",
-        bgcolor: "rgba(255,255,255,0.8)",
+        xanchor: 'center',
+        bgcolor: 'rgba(255,255,255,0.8)',
       },
     };
 
@@ -175,17 +175,17 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = React.memo(
           ]}
           layout={layout}
           useResizeHandler
-          style={{ width: "100%", height: "100%" }}
+          style={{ width: '100%', height: '100%' }}
           className="border border-gray-400"
           config={{
             displaylogo: false,
             modeBarButtonsToRemove: [
-              "toImage",
-              "orbitRotation",
-              "zoom3d",
-              "tableRotation",
-              "pan3d",
-              "resetCameraDefault3d",
+              'toImage',
+              'orbitRotation',
+              'zoom3d',
+              'tableRotation',
+              'pan3d',
+              'resetCameraDefault3d',
             ],
             responsive: true,
           }}
@@ -195,4 +195,4 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = React.memo(
   },
 );
 
-Position3DPlot.displayName = "Position3DPlot";
+Position3DPlot.displayName = 'Position3DPlot';

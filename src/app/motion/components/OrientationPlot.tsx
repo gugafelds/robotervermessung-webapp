@@ -1,17 +1,17 @@
-"use client";
+'use client';
 
-import dynamic from "next/dynamic";
-import type { Layout, PlotData } from "plotly.js";
-import React, { useMemo } from "react";
+import dynamic from 'next/dynamic';
+import type { Layout, PlotData } from 'plotly.js';
+import React, { useMemo } from 'react';
 
-import { quaternionToEuler } from "@/src/lib/functions";
+import { quaternionToEuler } from '@/src/lib/functions';
 import type {
   TrajOrientationCmd,
   TrajPoseAct,
   TrajSetpoints,
-} from "@/types/motion.types";
+} from '@/types/motion.types';
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 interface OrientationPlotProps {
   currentTrajPoseAct: TrajPoseAct[];
@@ -161,123 +161,123 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = React.memo(
         const plotData: Partial<PlotData>[] = [
           // Roll (X-Rotation) - Blau-Töne wie X-Position
           {
-            type: "scatter",
-            mode: "lines",
-            name: "Roll (C)",
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Roll (C)',
             x: timestampsSoll,
             y: eulerAnglesSoll.map((angles) => angles[0]),
-            line: { color: "blue", width: 2 },
+            line: { color: 'blue', width: 2 },
           },
           {
-            type: "scatter",
-            mode: "lines",
-            name: "Roll (M)",
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Roll (M)',
             x: timestampsIst,
             y: eulerAnglesAct.map((angles) => angles[0]),
-            line: { color: "darkblue", width: 2 },
+            line: { color: 'darkblue', width: 2 },
           },
           {
-            type: "scatter",
-            mode: "markers",
-            name: "Roll (S)",
+            type: 'scatter',
+            mode: 'markers',
+            name: 'Roll (S)',
             x: eventEulerAngles.map((e) => e.time),
             y: eventEulerAngles.map((e) => e.angles[0]),
-            marker: { color: "blue", size: 12, symbol: "circle" },
+            marker: { color: 'blue', size: 12, symbol: 'circle' },
           },
           {
-            type: "scatter",
-            mode: "markers",
-            name: "Roll (SP)",
+            type: 'scatter',
+            mode: 'markers',
+            name: 'Roll (SP)',
             x: supportEulerAngles.map((e) => e.time),
             y: supportEulerAngles.map((e) => e.angles[0]),
-            marker: { color: "blue", size: 8, symbol: "square" },
+            marker: { color: 'blue', size: 8, symbol: 'square' },
           },
 
           // Pitch (Y-Rotation) - Grün-Töne wie Y-Position
           {
-            type: "scatter",
-            mode: "lines",
-            name: "Pitch (C)",
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Pitch (C)',
             x: timestampsSoll,
             y: eulerAnglesSoll.map((angles) => angles[1]),
-            line: { color: "green", width: 2 },
+            line: { color: 'green', width: 2 },
           },
           {
-            type: "scatter",
-            mode: "lines",
-            name: "Pitch (M)",
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Pitch (M)',
             x: timestampsIst,
             y: eulerAnglesAct.map((angles) => angles[1]),
-            line: { color: "darkgreen", width: 2 },
+            line: { color: 'darkgreen', width: 2 },
           },
           {
-            type: "scatter",
-            mode: "markers",
-            name: "Pitch (S)",
+            type: 'scatter',
+            mode: 'markers',
+            name: 'Pitch (S)',
             x: eventEulerAngles.map((e) => e.time),
             y: eventEulerAngles.map((e) => e.angles[1]),
-            marker: { color: "green", size: 12, symbol: "circle" },
+            marker: { color: 'green', size: 12, symbol: 'circle' },
           },
           {
-            type: "scatter",
-            mode: "markers",
-            name: "Pitch (SP)",
+            type: 'scatter',
+            mode: 'markers',
+            name: 'Pitch (SP)',
             x: supportEulerAngles.map((e) => e.time),
             y: supportEulerAngles.map((e) => e.angles[1]),
-            marker: { color: "green", size: 8, symbol: "square" },
+            marker: { color: 'green', size: 8, symbol: 'square' },
           },
 
           // Yaw (Z-Rotation) - Rot-Töne wie Z-Position
           {
-            type: "scatter",
-            mode: "lines",
-            name: "Yaw (C)",
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Yaw (C)',
             x: timestampsSoll,
             y: eulerAnglesSoll.map((angles) => angles[2]),
-            line: { color: "red", width: 2 },
+            line: { color: 'red', width: 2 },
           },
           {
-            type: "scatter",
-            mode: "lines",
-            name: "Yaw (M)",
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Yaw (M)',
             x: timestampsIst,
             y: eulerAnglesAct.map((angles) => angles[2]),
-            line: { color: "darkred", width: 2 },
+            line: { color: 'darkred', width: 2 },
           },
           {
-            type: "scatter",
-            mode: "markers",
-            name: "Yaw (S)",
+            type: 'scatter',
+            mode: 'markers',
+            name: 'Yaw (S)',
             x: eventEulerAngles.map((e) => e.time),
             y: eventEulerAngles.map((e) => e.angles[2]),
-            marker: { color: "red", size: 12, symbol: "circle" },
+            marker: { color: 'red', size: 12, symbol: 'circle' },
           },
           {
-            type: "scatter",
-            mode: "markers",
-            name: "Yaw (SP)",
+            type: 'scatter',
+            mode: 'markers',
+            name: 'Yaw (SP)',
             x: supportEulerAngles.map((e) => e.time),
             y: supportEulerAngles.map((e) => e.angles[2]),
-            marker: { color: "red", size: 8, symbol: "square" },
+            marker: { color: 'red', size: 8, symbol: 'square' },
           },
         ];
         return { plotData, maxTimeOrientation: computedMaxTimeOrientation };
       }, [currentTrajPoseAct, currentTrajOrientationCmd, currentTrajSetpoints]);
 
     const combinedEulerLayout: Partial<Layout> = {
-      title: { text: "Euler-Winkel" },
+      title: { text: 'Euler-Winkel' },
       font: {
-        family: "Helvetica",
+        family: 'Helvetica',
       },
       xaxis: {
-        title: { text: "s" },
-        tickformat: ".2f",
+        title: { text: 's' },
+        tickformat: '.2f',
         range: [0, maxTimeOrientation],
       },
-      yaxis: { title: { text: "°" } },
-      legend: { orientation: "h", y: -0.2 },
-      hovermode: "x unified",
-      uirevision: "true",
+      yaxis: { title: { text: '°' } },
+      legend: { orientation: 'h', y: -0.2 },
+      hovermode: 'x unified',
+      uirevision: 'true',
     };
 
     return (
@@ -289,22 +289,22 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = React.memo(
           config={{
             displaylogo: false,
             modeBarButtonsToRemove: [
-              "toImage",
-              "orbitRotation",
-              "lasso2d",
-              "zoomIn2d",
-              "zoomOut2d",
-              "autoScale2d",
-              "pan2d",
-              "select2d",
+              'toImage',
+              'orbitRotation',
+              'lasso2d',
+              'zoomIn2d',
+              'zoomOut2d',
+              'autoScale2d',
+              'pan2d',
+              'select2d',
             ],
             responsive: true,
           }}
-          style={{ width: "100%", height: "500px" }}
+          style={{ width: '100%', height: '500px' }}
         />
       </div>
     );
   },
 );
 
-OrientationPlot.displayName = "OrientationPlot";
+OrientationPlot.displayName = 'OrientationPlot';

@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import dynamic from "next/dynamic";
-import type { Layout, PlotData } from "plotly.js";
-import React, { useMemo } from "react";
+import dynamic from 'next/dynamic';
+import type { Layout, PlotData } from 'plotly.js';
+import React, { useMemo } from 'react';
 
 import type {
   TrajPoseAct,
   TrajPositionCmd,
   TrajSetpoints,
-} from "@/types/motion.types";
+} from '@/types/motion.types';
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 interface Position2DPlotProps {
   idealTrajectory: TrajPositionCmd[];
@@ -116,108 +116,108 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = React.memo(
         const plotData: Partial<PlotData>[] = [
           // X Position
           {
-            type: "scatter",
-            mode: "lines",
-            name: "X (C)",
+            type: 'scatter',
+            mode: 'lines',
+            name: 'X (C)',
             x: positionSollData.map((d) => d.x),
             y: positionSollData.map((d) => d.xPos),
-            line: { color: "red", width: 2 },
+            line: { color: 'red', width: 2 },
           },
           {
-            type: "scatter",
-            mode: "lines",
-            name: "X (M)",
+            type: 'scatter',
+            mode: 'lines',
+            name: 'X (M)',
             x: positionIstData.map((d) => d.x),
             y: positionIstData.map((d) => d.xPos),
-            line: { color: "darkred", width: 2 },
+            line: { color: 'darkred', width: 2 },
           },
           {
-            type: "scatter",
-            mode: "markers",
-            name: "X (S)",
+            type: 'scatter',
+            mode: 'markers',
+            name: 'X (S)',
             x: currentTrajSetpoints.map(
               (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
             ),
             y: currentTrajSetpoints.map((b) => b.xReached),
-            marker: { color: "red", size: 12, symbol: "circle" },
+            marker: { color: 'red', size: 12, symbol: 'circle' },
           },
           {
-            type: "scatter",
-            mode: "markers",
-            name: "X (SP)",
+            type: 'scatter',
+            mode: 'markers',
+            name: 'X (SP)',
             x: supportX,
             y: currentTrajSetpoints.map((b) => b.xSupport),
-            marker: { color: "red", size: 8, symbol: "square" },
+            marker: { color: 'red', size: 8, symbol: 'square' },
           },
           // Y Position
           {
-            type: "scatter",
-            mode: "lines",
-            name: "Y (C)",
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Y (C)',
             x: positionSollData.map((d) => d.x),
             y: positionSollData.map((d) => d.yPos),
-            line: { color: "green", width: 2 },
+            line: { color: 'green', width: 2 },
           },
           {
-            type: "scatter",
-            mode: "lines",
-            name: "Y (M)",
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Y (M)',
             x: positionIstData.map((d) => d.x),
             y: positionIstData.map((d) => d.yPos),
-            line: { color: "darkgreen", width: 2 },
+            line: { color: 'darkgreen', width: 2 },
           },
           {
-            type: "scatter",
-            mode: "markers",
-            name: "Y (S)",
+            type: 'scatter',
+            mode: 'markers',
+            name: 'Y (S)',
             x: currentTrajSetpoints.map(
               (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
             ),
             y: currentTrajSetpoints.map((b) => b.yReached),
-            marker: { color: "green", size: 12, symbol: "circle" },
+            marker: { color: 'green', size: 12, symbol: 'circle' },
           },
           {
-            type: "scatter",
-            mode: "markers",
-            name: "Y (SP)",
+            type: 'scatter',
+            mode: 'markers',
+            name: 'Y (SP)',
             x: supportX,
             y: currentTrajSetpoints.map((b) => b.ySupport),
-            marker: { color: "green", size: 8, symbol: "square" },
+            marker: { color: 'green', size: 8, symbol: 'square' },
           },
           // Z Position
           {
-            type: "scatter",
-            mode: "lines",
-            name: "Z (C)",
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Z (C)',
             x: positionSollData.map((d) => d.x),
             y: positionSollData.map((d) => d.zPos),
-            line: { color: "blue", width: 2 },
+            line: { color: 'blue', width: 2 },
           },
           {
-            type: "scatter",
-            mode: "lines",
-            name: "Z (M)",
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Z (M)',
             x: positionIstData.map((d) => d.x),
             y: positionIstData.map((d) => d.zPos),
-            line: { color: "darkblue", width: 2 },
+            line: { color: 'darkblue', width: 2 },
           },
           {
-            type: "scatter",
-            mode: "markers",
-            name: "Z (S)",
+            type: 'scatter',
+            mode: 'markers',
+            name: 'Z (S)',
             x: currentTrajSetpoints.map(
               (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
             ),
             y: currentTrajSetpoints.map((b) => b.zReached),
-            marker: { color: "blue", size: 12, symbol: "circle" },
+            marker: { color: 'blue', size: 12, symbol: 'circle' },
           },
           {
-            type: "scatter",
-            mode: "markers",
-            name: "Z (SP)",
+            type: 'scatter',
+            mode: 'markers',
+            name: 'Z (SP)',
             x: supportX,
             y: currentTrajSetpoints.map((b) => b.zSupport),
-            marker: { color: "blue", size: 8, symbol: "square" },
+            marker: { color: 'blue', size: 8, symbol: 'square' },
           },
         ];
 
@@ -225,20 +225,20 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = React.memo(
       }, [idealTrajectory, currentTrajSetpoints, currentTrajPoseAct]);
 
     const combinedPositionLayout: Partial<Layout> = {
-      title: { text: "Position" },
+      title: { text: 'Position' },
       font: {
-        family: "Helvetica",
+        family: 'Helvetica',
       },
       xaxis: {
-        title: { text: "s" },
+        title: { text: 's' },
         range: [0, positionMaxTime],
-        tickformat: ".2f",
+        tickformat: '.2f',
       },
-      yaxis: { title: { text: "mm" } },
-      legend: { orientation: "h", y: -0.15 }, // Legende näher zum Plot
-      hovermode: "x unified",
+      yaxis: { title: { text: 'mm' } },
+      legend: { orientation: 'h', y: -0.15 }, // Legende näher zum Plot
+      hovermode: 'x unified',
       margin: { l: 60, r: 20, b: 80, t: 50 }, // Kleinere Margins = mehr Platz für Plot
-      uirevision: "true",
+      uirevision: 'true',
     };
 
     return (
@@ -250,22 +250,22 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = React.memo(
           config={{
             displaylogo: false,
             modeBarButtonsToRemove: [
-              "toImage",
-              "orbitRotation",
-              "lasso2d",
-              "zoomIn2d",
-              "zoomOut2d",
-              "autoScale2d",
-              "pan2d",
-              "select2d",
+              'toImage',
+              'orbitRotation',
+              'lasso2d',
+              'zoomIn2d',
+              'zoomOut2d',
+              'autoScale2d',
+              'pan2d',
+              'select2d',
             ],
             responsive: true,
           }}
-          style={{ width: "100%", height: "500px" }}
+          style={{ width: '100%', height: '500px' }}
         />
       </div>
     );
   },
 );
 
-Position2DPlot.displayName = "Position2DPlot";
+Position2DPlot.displayName = 'Position2DPlot';

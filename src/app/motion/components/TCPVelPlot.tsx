@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import dynamic from "next/dynamic";
-import type { Layout, PlotData } from "plotly.js";
-import React, { useMemo } from "react";
+import dynamic from 'next/dynamic';
+import type { Layout, PlotData } from 'plotly.js';
+import React, { useMemo } from 'react';
 
-import type { TrajVelAct, TrajVelCmd } from "@/types/motion.types";
+import type { TrajVelAct, TrajVelCmd } from '@/types/motion.types';
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 interface TCPSpeedPlotProps {
   currentTrajVelAct: TrajVelAct[];
@@ -52,27 +52,27 @@ export const TCPVelPlot: React.FC<TCPSpeedPlotProps> = React.memo(
       const computedMaxTimeSpeed = maxTime;
 
       const istPlot: Partial<PlotData> = {
-        type: "scatter",
-        mode: "lines",
+        type: 'scatter',
+        mode: 'lines',
         x: timestampsIst,
         y: currentTrajVelAct.map((traj) => traj.tcpSpeedAct),
         line: {
-          color: "blue",
+          color: 'blue',
           width: 3,
         },
-        name: "Measured",
+        name: 'Measured',
       };
 
       const sollPlot: Partial<PlotData> = {
-        type: "scatter",
-        mode: "lines",
+        type: 'scatter',
+        mode: 'lines',
         x: timestampsSoll,
         y: currentTrajVelCmd.map((traj) => traj.tcpSpeedCmd),
         line: {
-          color: "lightblue",
+          color: 'lightblue',
           width: 3,
         },
-        name: "Commanded",
+        name: 'Commanded',
       };
 
       return {
@@ -82,19 +82,19 @@ export const TCPVelPlot: React.FC<TCPSpeedPlotProps> = React.memo(
     }, [currentTrajVelAct, currentTrajVelCmd]);
 
     const tcpSpeedLayout: Partial<Layout> = {
-      title: { text: "Velocity" },
+      title: { text: 'Velocity' },
       font: {
-        family: "Helvetica",
+        family: 'Helvetica',
       },
       xaxis: {
-        title: { text: "s" },
-        tickformat: ".2f",
+        title: { text: 's' },
+        tickformat: '.2f',
         range: [0, maxTimeSpeed],
       },
-      yaxis: { title: { text: "mm/s" } },
-      legend: { orientation: "h", y: -0.2 },
-      hovermode: "x unified",
-      uirevision: "true",
+      yaxis: { title: { text: 'mm/s' } },
+      legend: { orientation: 'h', y: -0.2 },
+      hovermode: 'x unified',
+      uirevision: 'true',
     };
 
     return (
@@ -106,21 +106,21 @@ export const TCPVelPlot: React.FC<TCPSpeedPlotProps> = React.memo(
           config={{
             displaylogo: false,
             modeBarButtonsToRemove: [
-              "toImage",
-              "orbitRotation",
-              "lasso2d",
-              "zoomIn2d",
-              "zoomOut2d",
-              "autoScale2d",
-              "pan2d",
+              'toImage',
+              'orbitRotation',
+              'lasso2d',
+              'zoomIn2d',
+              'zoomOut2d',
+              'autoScale2d',
+              'pan2d',
             ],
             responsive: true,
           }}
-          style={{ width: "100%", height: "500px" }}
+          style={{ width: '100%', height: '500px' }}
         />
       </div>
     );
   },
 );
 
-TCPVelPlot.displayName = "TCPVelPlot";
+TCPVelPlot.displayName = 'TCPVelPlot';

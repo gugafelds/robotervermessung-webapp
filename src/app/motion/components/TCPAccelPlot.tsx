@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import dynamic from "next/dynamic";
-import type { Layout, PlotData } from "plotly.js";
-import React, { useMemo } from "react";
+import dynamic from 'next/dynamic';
+import type { Layout, PlotData } from 'plotly.js';
+import React, { useMemo } from 'react';
 
-import type { TrajAccelAct, TrajAccelCmd } from "@/types/motion.types";
+import type { TrajAccelAct, TrajAccelCmd } from '@/types/motion.types';
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 interface TCPAccelerationPlotProps {
   currentTrajAccelAct: TrajAccelAct[];
@@ -75,16 +75,16 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = React.memo(
 
       if (hasIstData) {
         const viconPlot: Partial<PlotData> = {
-          type: "scatter",
-          mode: "lines",
+          type: 'scatter',
+          mode: 'lines',
           visible: true,
           x: timestampsIst,
           y: currentTrajAccelAct.map((traj) => traj.tcpAccelAct), // Convert to mm/s²
           line: {
-            color: "green",
+            color: 'green',
             width: 3,
           },
-          name: "Measured",
+          name: 'Measured',
         };
         plotData.push(viconPlot);
       }
@@ -92,16 +92,16 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = React.memo(
       // Add SOLL data
       if (hasSollData) {
         const sollPlot: Partial<PlotData> = {
-          type: "scatter",
-          mode: "lines",
+          type: 'scatter',
+          mode: 'lines',
           visible: true,
           x: timestampsSoll,
           y: currentTrajAccelCmd.map((traj) => traj.tcpAccelCmd), // Convert to mm/s²
           line: {
-            color: "lightgreen",
+            color: 'lightgreen',
             width: 3,
           },
-          name: "Commanded",
+          name: 'Commanded',
         };
         plotData.push(sollPlot);
       }
@@ -113,23 +113,23 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = React.memo(
     }, [currentTrajAccelAct, currentTrajAccelCmd]);
 
     const tcpAccelLayout: Partial<Layout> = {
-      title: { text: "Acceleration" },
+      title: { text: 'Acceleration' },
       font: {
-        family: "Helvetica",
+        family: 'Helvetica',
       },
       xaxis: {
-        title: { text: "Zeit (s)" },
-        tickformat: ".2f",
+        title: { text: 'Zeit (s)' },
+        tickformat: '.2f',
         range: [0, maxTimeAccel],
       },
       yaxis: {
-        title: { text: "mm/s²" },
-        rangemode: "tozero",
+        title: { text: 'mm/s²' },
+        rangemode: 'tozero',
       },
-      legend: { orientation: "h", y: -0.2 },
-      hovermode: "x unified",
+      legend: { orientation: 'h', y: -0.2 },
+      hovermode: 'x unified',
       margin: { l: 60, r: 30, t: 50, b: 70 },
-      uirevision: "true",
+      uirevision: 'true',
     };
 
     return (
@@ -141,21 +141,21 @@ export const TCPAccelPlot: React.FC<TCPAccelerationPlotProps> = React.memo(
           config={{
             displaylogo: false,
             modeBarButtonsToRemove: [
-              "toImage",
-              "orbitRotation",
-              "lasso2d",
-              "zoomIn2d",
-              "zoomOut2d",
-              "autoScale2d",
-              "pan2d",
+              'toImage',
+              'orbitRotation',
+              'lasso2d',
+              'zoomIn2d',
+              'zoomOut2d',
+              'autoScale2d',
+              'pan2d',
             ],
             responsive: true,
           }}
-          style={{ width: "100%", height: "500px" }}
+          style={{ width: '100%', height: '500px' }}
         />
       </div>
     );
   },
 );
 
-TCPAccelPlot.displayName = "TCPAccelPlot";
+TCPAccelPlot.displayName = 'TCPAccelPlot';
