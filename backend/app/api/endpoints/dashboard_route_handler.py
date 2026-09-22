@@ -5,12 +5,23 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from ...database import get_db, get_db_pool
 import logging
+from fastapi_cache import FastAPICache
 from fastapi_cache.decorator import cache
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@router.post("/refresh")
+async def refresh_dashboard_cache():
+    """Clears all cached dashboard responses so the next request recomputes
+    fresh data. Called by the frontend's refresh button before re-fetching —
+    without this, a refresh click hits the same cache key as the previous
+    load and just gets the stale cached response back."""
+    await FastAPICache.clear(namespace="dashboard")
+    return {"status": "cleared"}
 
 METRIC_MAP = {
     'sidtw': ('evaluation.sidtw_info', 'sidtw_average_distance'),
@@ -24,7 +35,7 @@ def _tf(tags, alias="bi", p=1):
 
 
 @router.get("/tags")
-@cache(expire=3600)
+@cache(expire=3600, namespace="dashboard")
 async def get_available_tags(conn=Depends(get_db)):
     rows = await conn.fetch(
         "SELECT DISTINCT tag FROM motion.traj_info WHERE tag IS NOT NULL ORDER BY tag"
@@ -33,7 +44,7 @@ async def get_available_tags(conn=Depends(get_db)):
 
 
 @router.get("/data")
-@cache(expire=1800)
+@cache(expire=1800, namespace="dashboard")
 async def get_dashboard_data(tag: list[str] = Query(None), pool=Depends(get_db_pool)):
     try:
         tc, tp = _tf(tag or None)
@@ -144,7 +155,7 @@ async def get_dashboard_data(tag: list[str] = Query(None), pool=Depends(get_db_p
 
 
 @router.get("/performers")
-@cache(expire=1800)
+@cache(expire=1800, namespace="dashboard")
 async def get_performers(
     metric: str = Query("sidtw"),
     with_trajectory: bool = Query(False),
@@ -196,7 +207,7 @@ async def get_performers(
 
 
 @router.get("/timeline")
-@cache(expire=3600)
+@cache(expire=3600, namespace="dashboard")
 async def get_dashboard_timeline(metric: str = Query("sidtw"), conn=Depends(get_db)):
     """Returns per (date, tag) rows. Client aggregates for selected tags."""
     if metric not in METRIC_MAP:
@@ -224,7 +235,7 @@ async def get_dashboard_timeline(metric: str = Query("sidtw"), conn=Depends(get_
 
 
 @router.get("/influence")
-@cache(expire=3600)
+@cache(expire=3600, namespace="dashboard")
 async def get_dashboard_influence(metric: str = Query("sidtw"), conn=Depends(get_db)):
     """Returns 5000 samples with tag field. Client filters by tag."""
     if metric not in METRIC_MAP:
@@ -255,7 +266,7 @@ async def get_dashboard_influence(metric: str = Query("sidtw"), conn=Depends(get
 
 
 @router.get("/tag-info")
-@cache(expire=3600)
+@cache(expire=3600, namespace="dashboard")
 async def get_tag_info(tag: list[str] = Query(None), conn=Depends(get_db)):
     if not tag:
         rows = await conn.fetch("SELECT * FROM motion.tag_info ORDER BY tag")
@@ -279,7 +290,7 @@ async def get_tag_info(tag: list[str] = Query(None), conn=Depends(get_db)):
 
 
 @router.get("/workarea/data")
-@cache(expire=1800)
+@cache(expire=1800, namespace="dashboard")
 async def get_workarea_data(tag: list[str] = Query(None), conn=Depends(get_db)):
     """
     With tags  → all setpoints for those tags + workspace bounds from tag_info.
@@ -342,7 +353,7 @@ async def get_workarea_data(tag: list[str] = Query(None), conn=Depends(get_db)):
     }
 
 @router.get("/influence/binned")
-@cache(expire=3600)
+@cache(expire=3600, namespace="dashboard")
 async def get_influence_binned(
     metric: str = Query("sidtw"),
     tag: list[str] = Query(None),
@@ -449,7 +460,7 @@ def _parse_ascii_stl(path: str):
 
 
 @router.get("/workarea/robot-mesh")
-@cache(expire=86400)
+@cache(expire=86400, namespace="dashboard")
 async def get_robot_mesh(tag: list[str] = Query(None), conn=Depends(get_db)):
     """Returns Plotly mesh3d data for the robot workspace STL of the given tag(s)."""
     if tag:

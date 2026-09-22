@@ -36,6 +36,17 @@ async function apiFetch(url: string) {
   return response.json();
 }
 
+// Clears the backend's cached dashboard responses. Call before re-fetching
+// on an explicit refresh action — otherwise the next fetch just hits the
+// same cache key as before and returns the stale response.
+export const refreshDashboardCache = async (): Promise<void> => {
+  try {
+    await fetch(`${API_BASE_URL}/dashboard/refresh`, { method: 'POST' });
+  } catch (error) {
+    console.error('Error clearing dashboard cache:', error);
+  }
+};
+
 export const getAvailableTags = async (): Promise<{ tags: string[] }> => {
   try {
     return await apiFetch(`${API_BASE_URL}/dashboard/tags`);

@@ -11,6 +11,7 @@ import {
   getDashboardData,
   getMetricTimeline,
   getPerformers,
+  refreshDashboardCache,
 } from '@/src/actions/dashboard.service';
 import { AccuracyCard } from '@/src/app/dashboard/components/AccuracyCard';
 import { AccuracyTimeline } from '@/src/app/dashboard/components/AccuracyTimeline';
@@ -84,6 +85,12 @@ export default function DashboardClient() {
       .finally(() => setRefreshing(false));
   }, [selectedTags]);
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refreshDashboardCache();
+    setSelectedTags((prev) => [...prev]);
+  };
+
   const togglePending = (t: string) => {
     setPendingTags((prev) =>
       prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
@@ -133,7 +140,10 @@ export default function DashboardClient() {
             <p className="text-xs font-bold uppercase text-gray-800">Tag</p>
             <button
               type="button"
-              onClick={() => setSelectedTags((prev) => [...prev])}
+              onClick={() => {
+                // eslint-disable-next-line no-void
+                void handleRefresh();
+              }}
               disabled={refreshing}
               title="Refresh data for selected tag"
               className="rounded-md p-1 text-gray-500 hover:bg-gray-100 disabled:opacity-40"
