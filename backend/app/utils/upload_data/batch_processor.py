@@ -66,7 +66,14 @@ class BatchProcessor:
                     file_results.append({
                         "filename": file_info['filename'],
                         "segmentsFound": len(processed_data_list),
-                        "success": True
+                        "success": True,
+                        # Ordered the same way processed_data_list came back
+                        # from CSVProcessor -- i.e. file/chronological order,
+                        # the same order reference_position segmentation
+                        # produced them in. Callers that know which candidate
+                        # (e.g. AutoMode 'none' sim_data_batch_<n>.json) maps
+                        # to which position in that order can zip them up.
+                        "traj_ids": [d['traj_info_data'][0] for d in processed_data_list],
                     })
                     logger.info(
                         f"Processed {file_info['filename']} successfully, found {len(processed_data_list)} trajectories")

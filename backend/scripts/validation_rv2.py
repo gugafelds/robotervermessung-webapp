@@ -34,11 +34,11 @@ logging.basicConfig(level=logging.WARNING, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 DATABASE_URL   = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost/dbname')
-DATASETS       = ['paper-norm', 'paper-random', 'paper-full', 'paper-kdtree', 'paper-auto', 'paper-geometry2', 'paper-geometry', 'paper-doptimal']
+DATASETS       = ['paper-random', 'paper-kdtree', 'paper-norm', 'paper-auto', 'paper-auto2', 'paper-donly', 'paper-full', 'paper-geometry', 'paper-geometry2', 'paper-doptimal', 'paper-gpucb']
 SEARCH_MODES   = ['position', 'joint', 'orientation', 'velocity', 'metadata']
 EPSILON        = 1e-9
 DEFAULT_STEPS  = [25, 50, 75, 100, 125, 150]
-VAL_N          = 200   # only used when --val-mode random
+VAL_N          = 1000   # only used when --val-mode random
 VAL_SEED       = 256   # seed for the matched-random draw
 
 
