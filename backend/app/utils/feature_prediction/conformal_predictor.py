@@ -456,8 +456,9 @@ async def compute_conformal_intervals(
 
         query_seg_id = group.get('target_segment', '')
         prediction   = group.get('prediction') or {}
-        pl = float(
-            prediction.get('query_path_length')
+        pl = float(  # same weight as predictor's trajectory p_hat (duration), else path length
+            prediction.get('aggregation_weight')
+            or prediction.get('query_path_length')
             or path_length_map.get(query_seg_id, 0.0)
             or 0.0
         )
@@ -609,7 +610,8 @@ async def compute_stage1_conformal_interval(
 
         group['conformal_interval'] = interval
         seg_intervals.append(interval)
-        seg_path_lengths.append(float(prediction.get('query_path_length') or 0.0))
+        seg_path_lengths.append(float(prediction.get('aggregation_weight')  # same weight as predictor's p_hat
+                                      or prediction.get('query_path_length') or 0.0))
 
     q_traj_decomp, mm_traj_decomp = await get_calibration_quantile_for_tags(
         conn, cfg_decomp, tags, coverage, 'trajectory'

@@ -10,6 +10,16 @@ Stage 2 (DTW): inverse distance weighting with RAW DTW distances,
 Stage 1 (RRF): rank-decay weighting (eq. isr).
                w_i ∝ 1 / r_i²
                d_min_per_path_length = 1 / best_rrf_score  (match-quality proxy)
+
+p_hat per segment is the WEIGHTED MEDIAN of the neighbours' values (same
+weights), and the trajectory ('decomposed') p_hat averages the segments by
+DURATION, not path length. The measured trajectory value
+(sidtw_average_distance) is time-weighted over its segments; path-length
+weighting over-weighted fast, high-error segments, and the weighted mean was
+pulled up by the right-skewed errors -- together a systematic overestimate of
+~+0.03 (robotervermessung-recorder scripts/active-learning/SESSION_NOTES.md,
+"Ursache der Überschätzung"). Median + duration lowered the MAE by 8-26 %
+depending on the reference-set size.
 """
 
 from __future__ import annotations
@@ -55,6 +65,16 @@ def _build_path_length_lookup(seg_batch: Dict[str, Any]) -> Dict[str, float]:
 # Core prediction functions
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _weighted_median(values: List[float], weights: List[float]) -> float:
+    order = sorted(range(len(values)), key=lambda i: values[i])
+    half, acc = 0.5 * sum(weights), 0.0
+    for i in order:
+        acc += weights[i]
+        if acc >= half:
+            return values[i]
+    return values[order[-1]]
+
+
 def _predict_segment(
     seg_results:       List[Dict[str, Any]],
     query_path_length: float = 0.0,
@@ -84,8 +104,7 @@ def _predict_segment(
     perf_values = [v['perf_value']   for v in valid]
 
     weights = [1.0 / (d + EPSILON) for d in dtw_dists]
-    w_sum   = sum(weights)
-    p_hat   = sum(w * p for w, p in zip(weights, perf_values)) / w_sum
+    p_hat   = _weighted_median(perf_values, weights)
 
     n        = len(perf_values)
     mean_p   = sum(perf_values) / n
@@ -132,8 +151,7 @@ def _predict_stage1_rrf(
     weights     = [v['rrf_score'] for v in valid]
     perf_values = [v['perf_value'] for v in valid]
 
-    w_sum = sum(weights)
-    p_hat    = sum(w * p for w, p in zip(weights, perf_values)) / w_sum
+    p_hat    = _weighted_median(perf_values, weights)
     n        = len(perf_values)
     mean_p   = sum(perf_values) / n
     perf_std = math.sqrt(sum((p - mean_p) ** 2 for p in perf_values) / (n - 1))
@@ -183,8 +201,7 @@ def _predict_direct(
     perf_values = [v['perf_value']   for v in valid]
 
     weights = [1.0 / (d + EPSILON) for d in dtw_dists]
-    w_sum   = sum(weights)
-    p_hat   = sum(w * p for w, p in zip(weights, perf_values)) / w_sum
+    p_hat   = _weighted_median(perf_values, weights)
 
     n        = len(perf_values)
     mean_p   = sum(perf_values) / n
@@ -208,12 +225,13 @@ def _predict_direct(
 
 def _aggregate_trajectory_decomposed(
     seg_predictions: List[Optional[Dict[str, Any]]],
-    path_lengths:    List[float],
+    weights:         List[float],
     sigma_floor:     float = 0.005,
 ) -> Optional[Dict[str, Any]]:
+    """Segment predictions averaged with `weights` = segment durations (see module docstring)."""
     valid = [
         (pred, pl)
-        for pred, pl in zip(seg_predictions, path_lengths)
+        for pred, pl in zip(seg_predictions, weights)
         if pred is not None and pl > EPSILON
     ]
     if not valid:
@@ -264,6 +282,7 @@ async def predict_performance(
     segment_groups:    list                 = result.get('segment_similarity', [])
     seg_predictions:   List[Optional[Dict]] = []
     seg_path_lengths:  List[float]          = []
+    seg_agg_weights:   List[float]          = []  # segment duration (fallback: path length)
     seg_query_ids:     List[str]            = []
     seg_neighbor_ids:  List[List[str]]      = []
     stage1_seg_preds:  List[Dict]           = []
@@ -286,6 +305,8 @@ async def predict_performance(
             query_path_len = sum(valid_nl) / len(valid_nl) if valid_nl else 1.0
         if query_path_len > EPSILON:
             path_length_map[query_seg_id] = query_path_len
+        seg_duration = float(seg_features.get('duration') or 0.0)
+        agg_weight   = seg_duration if seg_duration > EPSILON else query_path_len
 
         if stage2_active:
             prediction = _predict_segment(
@@ -299,6 +320,7 @@ async def predict_performance(
 
         if prediction is not None:
             prediction['query_path_length'] = query_path_len if query_path_len > EPSILON else None
+            prediction['aggregation_weight'] = agg_weight
 
         # Always compute RRF prediction for stage1 calibration rows (Bug 1+2 fix)
         s1_pred = (
@@ -313,18 +335,20 @@ async def predict_performance(
             'd_max':             s1_pred.get('d_max')        if s1_pred else None,
             'd_normalized':      s1_pred.get('d_normalized') if s1_pred else None,
             'query_path_length': query_path_len if query_path_len > EPSILON else None,
+            'aggregation_weight': agg_weight,
         })
 
         nids = [str(r['seg_id']) for r in seg_results if r.get('seg_id')]
         group['prediction'] = prediction
         seg_predictions.append(prediction)
         seg_path_lengths.append(query_path_len)
+        seg_agg_weights.append(agg_weight)
         seg_query_ids.append(query_seg_id)
         seg_neighbor_ids.append(nids)
 
     decomposed_prediction = _aggregate_trajectory_decomposed(
         seg_predictions=seg_predictions,
-        path_lengths=seg_path_lengths,
+        weights=seg_agg_weights,
         sigma_floor=sigma_floor,
     )
 
@@ -345,7 +369,7 @@ async def predict_performance(
         s1_direct_prediction['neighbor_ids']      = traj_neighbor_ids
         s1_direct_prediction['query_path_length'] = total_query_path_length or None
 
-    # Stage 1 decomposed: length-weighted aggregate of segment-level RRF predictions
+    # Stage 1 decomposed: duration-weighted aggregate of segment-level RRF predictions
     s1_decomposed_prediction = _aggregate_trajectory_decomposed(
         seg_predictions=[
             {'p_hat': s.get('p_hat'), 'sigma': s.get('sigma'),
@@ -354,7 +378,7 @@ async def predict_performance(
             if s.get('p_hat') is not None else None
             for s in stage1_seg_preds
         ],
-        path_lengths=seg_path_lengths,
+        weights=seg_agg_weights,
         sigma_floor=sigma_floor,
     )
 

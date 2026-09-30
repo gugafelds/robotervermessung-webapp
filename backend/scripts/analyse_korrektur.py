@@ -317,42 +317,43 @@ def print_stats(errors_df: pd.DataFrame, movement_types: dict, label: str):
         print(pd.DataFrame(rows).to_string(index=False))
 
 
-def print_factors(errors_df: pd.DataFrame):
+def correction_factor(mean_ctrl: float, mean_corr: float) -> tuple[float, str]:
     """
-    Empfohlene Korrekturfaktoren aus den Vektor-Residuen.
+    Faktor, mit dem die in diesem Lauf angewandte Korrektur hätte skaliert
+    werden müssen, damit das Residuum 0 wird (lineare Annahme).
 
-    Idee:
-    - residuum_ctrl  = mittlere Abweichung (act - ref) der Control-Bahn pro Achse
-    - residuum_corr  = mittlere Abweichung (act - ref) der Korrektur-Bahn pro Achse
-    - Die Korrektur hat residuum_ctrl - residuum_corr bereits wegkorrigiert.
-    - Wenn residuum_corr noch != 0, dann war die Korrektur zu schwach (>1) oder zu stark (<1).
-    - Faktor = residuum_ctrl / residuum_corr  (wie viel stärker müsste man korrigieren)
-    - Vorzeichen-Wechsel → Überkompensation, Faktor wird auf 0.0 gesetzt mit Warnung.
+    - residuum_ctrl = mittlere Abweichung (act - ref) der Control-Bahn
+    - residuum_corr = dasselbe für die Korrektur-Bahn
+    - Wirkung der Korrektur: residuum_ctrl - residuum_corr
+    - residuum(f) = residuum_ctrl - f * (residuum_ctrl - residuum_corr) = 0
+      → f = residuum_ctrl / (residuum_ctrl - residuum_corr)
+    f > 1: zu schwach, 0 < f < 1: Überkompensation, f < 0: Korrektur wirkte in die falsche Richtung.
+    Relativ zum im Lauf verwendeten CORRECTION_*_FAC — neuer Wert = alter Wert * f.
     """
+    effect = mean_ctrl - mean_corr
+    if abs(effect) < 1e-6:
+        return float("nan"), "(Korrektur ohne messbare Wirkung — Faktor nicht bestimmbar)"
+    f = mean_ctrl / effect
+    if f < 0:
+        return f, "⚠ Korrektur wirkte in die falsche Richtung"
+    if f < 1:
+        return f, "Überkompensation"
+    return f, ""
+
+
+def print_factors(errors_df: pd.DataFrame):
+    """Empfohlene Korrekturfaktoren aus den Vektor-Residuen, siehe correction_factor()."""
     ctrl = errors_df[errors_df["mode"] == "control"]
     corr = errors_df[errors_df["mode"] == "correction"]
 
     print(f"\n{'='*60}")
-    print("  Empfohlene Korrekturfaktoren")
+    print("  Empfohlene Korrekturfaktoren (relativ zum im Lauf verwendeten Faktor)")
     print(f"{'='*60}")
 
     for axis in ["x", "y", "z"]:
         mean_ctrl = ctrl[f"d{axis}"].mean()
         mean_corr = corr[f"d{axis}"].mean()
-
-        if abs(mean_ctrl) < 1e-6:
-            factor = 1.0
-            note = "(kein Fehler in Control)"
-        elif mean_ctrl * mean_corr < 0:
-            factor = 0.0
-            note = "⚠ Überkompensation — Korrektur dreht Vorzeichen um"
-        elif abs(mean_corr) < 1e-6:
-            factor = 1.0
-            note = "(perfekt korrigiert)"
-        else:
-            factor = round(mean_ctrl / mean_corr, 4)
-            note = ""
-
+        factor, note = correction_factor(mean_ctrl, mean_corr)
         print(f"  CORRECTION_{axis.upper()}_FAC = {factor:.4f}  "
               f"[ctrl={mean_ctrl:+.3f} mm, corr={mean_corr:+.3f} mm]  {note}")
 

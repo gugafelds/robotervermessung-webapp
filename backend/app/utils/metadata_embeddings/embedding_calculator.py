@@ -392,6 +392,10 @@ def build_candidate_embeddings_segmented(
 
     rows = [full_row]
 
+    # Optional pro Segment 'linear'/'circular' (wie motion.traj_metadata je
+    # Segment) — ohne das bekäme jedes Segment den Gesamt-String (z. B. 'llc').
+    seg_types = payload.get('segment_movement_types') or []
+
     # ── Pro Segment ───────────────────────────────────────────────────────
     boundaries = [0] + segment_indices
     for i in range(len(segment_indices)):
@@ -406,7 +410,7 @@ def build_candidate_embeddings_segmented(
                 "quats":      quats[start:end],
                 "joints":     joints[start:end],
             },
-            "movement_type": payload['movement_type'],
+            "movement_type": seg_types[i] if i < len(seg_types) else payload['movement_type'],
             "weight":        payload['weight'],
         }
 

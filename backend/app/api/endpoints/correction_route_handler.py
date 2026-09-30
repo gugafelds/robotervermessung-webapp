@@ -60,6 +60,7 @@ class CorrectionRequest(BaseModel):
     stage2_active:     bool  = True
     mode:              Literal["relative", "linear"] = "relative"
     segment_indices:   list[int] = []
+    segment_movement_types: list[str] = []  # 'linear'/'circular' per segment, see build_candidate_embeddings_segmented
     include_tags:      list[str] = []
     exclude_tags:      list[str] = []
     calibration_date:       str        = ""
@@ -214,6 +215,7 @@ async def predict_correction(
                 "movement_type":  request.movement_type,
                 "weight":         request.weight,
                 "segment_indices": request.segment_indices,
+                "segment_movement_types": request.segment_movement_types,
             },
             external_embedding_calculator=embedding_calculator,
             pool=pool,
