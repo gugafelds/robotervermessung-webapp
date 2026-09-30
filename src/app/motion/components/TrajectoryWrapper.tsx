@@ -13,6 +13,7 @@ import {
   getTrajPoseActById,
   getTrajPositionCmdById,
   getTrajSetpointsById,
+  getTrajSimById,
   getTrajVelActById,
   getTrajVelCmdById,
 } from '@/src/actions/motion.service';
@@ -113,6 +114,8 @@ export function TrajectoryWrapper() {
     setCurrentTrajVelCmd,
     setCurrentTrajJointStates,
     setCurrentTrajSetpoints,
+    setCurrentTrajSim,
+    setShowSim,
   } = useTrajectory();
 
   const updateLoadingState = useCallback(
@@ -261,6 +264,18 @@ export function TrajectoryWrapper() {
 
     fetchInfoData();
   }, [id, fetchInfoData, currentTrajInfo, currentTrajMetadata]);
+
+  useEffect(() => {
+    setCurrentTrajSim(null);
+    setShowSim(false);
+    let cancelled = false;
+    getTrajSimById(id)
+      .then((sim) => !cancelled && setCurrentTrajSim(sim))
+      .catch(() => {}); // Sim ist optional, Fehler = kein Sim-Button
+    return () => {
+      cancelled = true;
+    };
+  }, [id, setCurrentTrajSim, setShowSim]);
 
   useEffect(() => {
     if (!isInfoLoaded) {

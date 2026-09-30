@@ -26,6 +26,7 @@ import type {
   TrajPoseAct,
   TrajPositionCmd,
   TrajSetpoints,
+  TrajSim,
   TrajVelAct,
   TrajVelCmd,
 } from '@/types/motion.types';
@@ -280,19 +281,41 @@ export const getSegmentSetpointsById = async (
   }
 };
 
+const splitMetadata = (raw: any[]): TrajMetadataResult => {
+  const all = transformTrajMetadataResult(raw);
+  return {
+    trajectory: all.find((m) => m.segID === m.trajID)!,
+    segments: all.filter((m) => m.segID !== m.trajID),
+  };
+};
+
 export const getTrajMetadataById = async (
   id: string,
 ): Promise<TrajMetadataResult> => {
   try {
     const result = await fetchFromAPI(`/traj/traj_metadata/${id}`);
-    const all = transformTrajMetadataResult(result);
-    return {
-      trajectory: all.find((m) => m.segID === m.trajID)!,
-      segments: all.filter((m) => m.segID !== m.trajID),
-    };
+    return splitMetadata(result);
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error fetching Traj metadata by ID:', error);
+    throw error;
+  }
+};
+
+export const getTrajSimById = async (id: string): Promise<TrajSim> => {
+  try {
+    const r = await fetchFromAPI(`/traj/traj_sim/${id}`);
+    return {
+      position: transformTrajPositionCmdResult(r.position),
+      orientation: transformTrajOrientationCmdResult(r.orientation),
+      velocity: transformTrajVelCmdResult(r.velocity),
+      jointStates: transformTrajJointStatesResult(r.joint_states),
+      setpoints: transformTrajSetpointsResult(r.setpoints),
+      metadata: r.metadata.length ? splitMetadata(r.metadata) : null,
+    };
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching Traj sim by ID:', error);
     throw error;
   }
 };

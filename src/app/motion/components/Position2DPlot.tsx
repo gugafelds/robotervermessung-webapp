@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import type { Layout, PlotData } from 'plotly.js';
 import React, { useMemo } from 'react';
 
+import { hasSupport } from '@/src/lib/functions';
 import type {
   TrajPoseAct,
   TrajPositionCmd,
@@ -16,10 +17,18 @@ interface Position2DPlotProps {
   idealTrajectory: TrajPositionCmd[];
   currentTrajSetpoints: TrajSetpoints[];
   currentTrajPoseAct: TrajPoseAct[];
+  sim?: TrajPositionCmd[];
+  simSetpoints?: TrajSetpoints[];
 }
 
 export const Position2DPlot: React.FC<Position2DPlotProps> = React.memo(
-  ({ idealTrajectory, currentTrajSetpoints, currentTrajPoseAct }) => {
+  ({
+    idealTrajectory,
+    currentTrajSetpoints,
+    currentTrajPoseAct,
+    sim,
+    simSetpoints,
+  }) => {
     const { plotData: combinedPositionPlotData, maxTimePos: positionMaxTime } =
       useMemo((): {
         plotData: Partial<PlotData>[];
@@ -89,7 +98,8 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = React.memo(
           })),
         );
 
-        const supportX = currentTrajSetpoints.map(
+        const withSupport = currentTrajSetpoints.filter(hasSupport);
+        const supportX = withSupport.map(
           (b) => (Number(b.timestampSupport) - globalStartTime) / 1e9,
         );
 
@@ -111,7 +121,10 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = React.memo(
           return maxTime;
         };
 
-        const maxTimePos = getMaxTimePos();
+        const simX = (sim ?? []).map(
+          (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
+        );
+        const maxTimePos = Math.max(getMaxTimePos(), ...simX.slice(-1));
 
         const plotData: Partial<PlotData>[] = [
           // X Position
@@ -146,7 +159,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = React.memo(
             mode: 'markers',
             name: 'X (SP)',
             x: supportX,
-            y: currentTrajSetpoints.map((b) => b.xSupport),
+            y: withSupport.map((b) => b.xSupport),
             marker: { color: 'red', size: 8, symbol: 'square' },
           },
           // Y Position
@@ -181,7 +194,7 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = React.memo(
             mode: 'markers',
             name: 'Y (SP)',
             x: supportX,
-            y: currentTrajSetpoints.map((b) => b.ySupport),
+            y: withSupport.map((b) => b.ySupport),
             marker: { color: 'green', size: 8, symbol: 'square' },
           },
           // Z Position
@@ -216,13 +229,82 @@ export const Position2DPlot: React.FC<Position2DPlotProps> = React.memo(
             mode: 'markers',
             name: 'Z (SP)',
             x: supportX,
-            y: currentTrajSetpoints.map((b) => b.zSupport),
+            y: withSupport.map((b) => b.zSupport),
             marker: { color: 'blue', size: 8, symbol: 'square' },
           },
         ];
 
+        if (sim) {
+          (
+            [
+              ['X', 'red', 'xCmd'],
+              ['Y', 'green', 'yCmd'],
+              ['Z', 'blue', 'zCmd'],
+            ] as const
+          ).forEach(([axis, color, key]) => {
+            plotData.push({
+              type: 'scatter',
+              mode: 'lines',
+              name: `${axis} (Sim)`,
+              x: simX,
+              y: sim.map((b) => b[key]),
+              line: { color, width: 2, dash: 'dash' },
+            });
+          });
+
+          const spX = (simSetpoints ?? []).map(
+            (b) => (Number(b.timestamp) - globalStartTime) / 1e9,
+          );
+          const simSupport = (simSetpoints ?? []).filter(hasSupport);
+          const spSupportX = simSupport.map(
+            (b) => (Number(b.timestampSupport) - globalStartTime) / 1e9,
+          );
+          (
+            [
+              ['X', 'red', 'xReached', 'xSupport'],
+              ['Y', 'green', 'yReached', 'ySupport'],
+              ['Z', 'blue', 'zReached', 'zSupport'],
+            ] as const
+          ).forEach(([axis, color, reached, support]) => {
+            plotData.push(
+              {
+                type: 'scatter',
+                mode: 'markers',
+                name: `${axis} (Sim S)`,
+                x: spX,
+                y: (simSetpoints ?? []).map((b) => b[reached]),
+                marker: {
+                  color,
+                  size: 12,
+                  symbol: 'circle-open',
+                  line: { width: 2 },
+                },
+              },
+              {
+                type: 'scatter',
+                mode: 'markers',
+                name: `${axis} (Sim SP)`,
+                x: spSupportX,
+                y: simSupport.map((b) => b[support]),
+                marker: {
+                  color,
+                  size: 8,
+                  symbol: 'square-open',
+                  line: { width: 2 },
+                },
+              },
+            );
+          });
+        }
+
         return { plotData, maxTimePos };
-      }, [idealTrajectory, currentTrajSetpoints, currentTrajPoseAct]);
+      }, [
+        idealTrajectory,
+        currentTrajSetpoints,
+        currentTrajPoseAct,
+        sim,
+        simSetpoints,
+      ]);
 
     const combinedPositionLayout: Partial<Layout> = {
       title: { text: 'Position' },

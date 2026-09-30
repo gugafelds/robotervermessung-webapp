@@ -49,7 +49,7 @@ export type MetricType = 'sidtw' | 'ed' | 'qdtw' | 'gd';
 
 export const METRICS: Record<MetricType, { label: string; unit: string }> = {
   sidtw: { label: 'SIDTW', unit: 'mm' },
-  ed:    { label: 'ED',    unit: 'mm' },
-  qdtw:  { label: 'QDTW', unit: '°' },
-  gd:    { label: 'GD',   unit: '°' },
+  ed: { label: 'ED', unit: 'mm' },
+  qdtw: { label: 'QDTW', unit: '°' },
+  gd: { label: 'GD', unit: '°' },
 };

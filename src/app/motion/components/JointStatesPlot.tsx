@@ -10,10 +10,11 @@ const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 interface JointStatesPlotProps {
   currentTrajJointStates: TrajJointStates[];
+  sim?: TrajJointStates[];
 }
 
 export const JointStatesPlot: React.FC<JointStatesPlotProps> = React.memo(
-  ({ currentTrajJointStates }) => {
+  ({ currentTrajJointStates, sim }) => {
     const { plotData: jointStatesPlotData, maxTimeJoints } = useMemo((): {
       plotData: Partial<PlotData>[];
       maxTimeJoints: number;
@@ -43,7 +44,13 @@ export const JointStatesPlot: React.FC<JointStatesPlotProps> = React.memo(
         return maxTime;
       };
 
-      const computedMaxTimeJoints = getMaxTimeJoints();
+      const timestampsSim = (sim ?? []).map(
+        (traj) => (Number(traj.timestamp) - globalStartTime) / 1e9,
+      );
+      const computedMaxTimeJoints = Math.max(
+        getMaxTimeJoints(),
+        ...timestampsSim.slice(-1),
+      );
 
       const plotData: Partial<PlotData>[] = [
         {
@@ -96,11 +103,28 @@ export const JointStatesPlot: React.FC<JointStatesPlotProps> = React.memo(
         },
       ];
 
+      if (sim) {
+        const colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown'];
+        colors.forEach((color, i) => {
+          plotData.push({
+            type: 'scatter',
+            mode: 'lines',
+            x: timestampsSim,
+            y: sim.map(
+              (traj) =>
+                traj[`joint${i + 1}` as keyof TrajJointStates] as number,
+            ),
+            line: { color, width: 2, dash: 'dash' },
+            name: `Joint ${i + 1} (Sim)`,
+          });
+        });
+      }
+
       return {
         plotData,
         maxTimeJoints: computedMaxTimeJoints,
       };
-    }, [currentTrajJointStates]);
+    }, [currentTrajJointStates, sim]);
 
     const jointStatesLayout: Partial<Layout> = {
       title: { text: 'Joint States' },

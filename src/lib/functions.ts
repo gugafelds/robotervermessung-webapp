@@ -1,3 +1,7 @@
+// Lineare Segmente haben keinen Stützpunkt (NULL) -> nicht plotten
+export const hasSupport = (sp: { xSupport: number | null }) =>
+  sp.xSupport != null;
+
 export const formatDate = (dateString: string) => {
   const date = new Date(dateString);
   const day = date.getDate();

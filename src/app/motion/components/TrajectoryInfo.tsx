@@ -3,7 +3,11 @@
 
 'use client';
 
-import { ChartBarIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import {
+  ChartBarIcon,
+  CubeTransparentIcon,
+  DocumentTextIcon,
+} from '@heroicons/react/24/outline';
 import ErrorIcon from '@heroicons/react/24/outline/FaceFrownIcon';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -12,6 +16,7 @@ import React, { useState } from 'react';
 import { Typography } from '@/src/components/Typography';
 import { formatDate, formatNumber } from '@/src/lib/functions';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
+import type { TrajMetadataResult } from '@/types/motion.types';
 
 interface InfoRowProps {
   label: string;
@@ -53,17 +58,45 @@ const InfoSection: React.FC<InfoSectionProps> = ({ title, children }) => (
 );
 
 export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
-  const { currentTrajInfo } = useTrajectory();
-  const { currentTrajMetadata } = useTrajectory();
+  const {
+    currentTrajInfo,
+    currentTrajMetadata,
+    currentTrajSim,
+    showSim,
+    setShowSim,
+  } = useTrajectory();
   const pathname = usePathname();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const selectedMeta =
+  const pickMeta = (meta?: TrajMetadataResult | null) =>
     selectedId && selectedId !== currentTrajInfo!.trajID
-      ? currentTrajMetadata?.segments.find((s) => s.segID === selectedId)
-      : currentTrajMetadata?.trajectory;
+      ? meta?.segments.find((seg) => seg.segID === selectedId)
+      : meta?.trajectory;
+
+  const selectedMeta = pickMeta(currentTrajMetadata);
+  const simMeta = showSim ? pickMeta(currentTrajSim?.metadata) : undefined;
+
+  // Hauptwert mit Einheit, Sim-Wert klein in Klammern (ohne Einheit)
+  const withSim = (
+    key: 'duration' | 'length' | 'maxVel' | 'maxAccel',
+    unit: string,
+    whole = true,
+  ) => {
+    const fmt = (v?: number) =>
+      whole && v != null ? Math.round(v) : formatNumber(v);
+    return (
+      <>
+        {fmt(selectedMeta?.[key])} {unit}
+        {simMeta && (
+          <span className="ml-1 text-sm font-normal text-orange-500">
+            ({fmt(simMeta[key])})
+          </span>
+        )}
+      </>
+    );
+  };
 
   // Prüfe, ob wir uns auf der Auswertungsseite befinden
   const isOnEvaluationPage = pathname.includes('/evaluation');
@@ -126,29 +159,42 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
             </div>
 
             {/* Kontextabhängiger Button */}
-            <div className="my-2 flex w-fit rounded-lg bg-primary px-4 py-1 font-medium text-white transition duration-300 ease-in-out hover:bg-gray-800">
-              {currentTrajInfo && (
-                <Link
-                  href={
-                    isOnEvaluationPage
-                      ? `/motion/${currentTrajInfo.trajID}`
-                      : `/evaluation/${currentTrajInfo.trajID}`
-                  }
-                  className="flex items-center"
+            <div className="my-2 flex flex-wrap gap-1.5">
+              <div className="flex w-fit rounded-lg bg-primary px-3 py-1 text-sm font-medium text-white transition duration-300 ease-in-out hover:bg-gray-800">
+                {currentTrajInfo && (
+                  <Link
+                    href={
+                      isOnEvaluationPage
+                        ? `/motion/${currentTrajInfo.trajID}`
+                        : `/evaluation/${currentTrajInfo.trajID}`
+                    }
+                    className="flex items-center"
+                  >
+                    {isOnEvaluationPage ? (
+                      <>
+                        <DocumentTextIcon className="mr-1.5 size-4" />
+                        <span>Motion</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChartBarIcon className="mr-1.5 size-4" />
+                        <span>Evaluation</span>
+                      </>
+                    )}
+                  </Link>
+                )}
+              </div>
+              {!isOnEvaluationPage && currentTrajSim?.position.length ? (
+                <button
+                  onClick={() => setShowSim((prev) => !prev)}
+                  className={`flex w-fit items-center rounded-lg px-3 py-1 text-sm font-medium text-white transition duration-300 ease-in-out ${
+                    showSim ? 'bg-orange-500' : 'bg-primary hover:bg-gray-800'
+                  }`}
                 >
-                  {isOnEvaluationPage ? (
-                    <>
-                      <DocumentTextIcon className="mr-2 size-5" />
-                      <span>Motion</span>
-                    </>
-                  ) : (
-                    <>
-                      <ChartBarIcon className="mr-2 size-5" />
-                      <span>Evaluation</span>
-                    </>
-                  )}
-                </Link>
-              )}
+                  <CubeTransparentIcon className="mr-1.5 size-4" />
+                  <span>Simulation</span>
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -157,22 +203,10 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
               label="Movement Type"
               value={selectedMeta?.movType || '-'}
             />
-            <InfoRow
-              label="Duration"
-              value={`${selectedMeta?.duration || '-'} s`}
-            />
-            <InfoRow
-              label="Length"
-              value={`${formatNumber(selectedMeta?.length) || '-'} mm`}
-            />
-            <InfoRow
-              label="Max. Velocity"
-              value={`${formatNumber(selectedMeta?.maxVel) || '-'} mm/s`}
-            />
-            <InfoRow
-              label="Max. Accel."
-              value={`${formatNumber(selectedMeta?.maxAccel) || '-'} mm/s²`}
-            />
+            <InfoRow label="Duration" value={withSim('duration', 's', false)} />
+            <InfoRow label="Length" value={withSim('length', 'mm')} />
+            <InfoRow label="Max. Velocity" value={withSim('maxVel', 'mm/s')} />
+            <InfoRow label="Max. Accel." value={withSim('maxAccel', 'mm/s²')} />
             <InfoRow
               label="Load"
               value={`${formatNumber(selectedMeta?.weight) || '-'} kg`}

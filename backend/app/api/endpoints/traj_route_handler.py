@@ -335,3 +335,66 @@ async def get_traj_metadata_by_id(traj_id: str, conn = Depends(get_db)):
     )
     return [dict(row) for row in rows]
 
+
+
+@router.get("/traj_sim/{traj_id}")
+@cache(expire=2400)
+async def get_traj_sim_by_id(traj_id: str, conn = Depends(get_db)):
+    """Simulated copy of a trajectory. Sim timestamps are seconds since traj start;
+    shifted to the real (ns) time base so the frontend plots treat them like *_cmd data."""
+    t0 = int(await conn.fetchval(
+        "SELECT MIN(timestamp::numeric) FROM motion.traj_position_cmd WHERE traj_id = $1",
+        traj_id
+    ) or 0)
+
+    async def fetch(cols: str, table: str):
+        rows = await conn.fetch(
+            f"SELECT timestamp, {cols} FROM simulation.{table} WHERE traj_id = $1 ORDER BY timestamp ASC",
+            traj_id
+        )
+        return [dict(r) for r in rows]
+
+    def to_ns(sec: float) -> str:
+        return str(t0 + round(sec * 1e9))
+
+    def series(rows):
+        return [{**r, "timestamp": to_ns(r["timestamp"])} for r in rows]
+
+    position = await fetch("seg_id, x_cmd, y_cmd, z_cmd", "sim_position")
+
+    # Sim setpoints have no timestamps: reached = end of its segment,
+    # support = nearest sim sample. ponytail: nearest-sample is approximate (~1 sample raster)
+    setpoints = []
+    for sp in await conn.fetch(
+        """SELECT seg_id, x_reached, y_reached, z_reached, qx_reached, qy_reached, qz_reached, qw_reached,
+                  x_support, y_support, z_support, qx_support, qy_support, qz_support, qw_support,
+                  vel_set, stop_point
+           FROM simulation.sim_setpoints WHERE traj_id = $1""",
+        traj_id
+    ):
+        pts = [p for p in position if p["seg_id"] == sp["seg_id"]]
+        if not pts:
+            continue
+        # linear segments have no support point (NULL) -> keep reached time, plot skips NULL y
+        near = pts[-1] if sp["x_support"] is None else min(
+            pts, key=lambda p: (p["x_cmd"] - sp["x_support"]) ** 2
+            + (p["y_cmd"] - sp["y_support"]) ** 2 + (p["z_cmd"] - sp["z_support"]) ** 2)
+        setpoints.append({**sp, "timestamp": to_ns(pts[-1]["timestamp"]),
+                          "timestamp_support": to_ns(near["timestamp"])})
+    setpoints.sort(key=lambda r: int(r["timestamp"]))
+
+    return {
+        "position": series(position),
+        "orientation": series(await fetch("qx_cmd, qy_cmd, qz_cmd, qw_cmd", "sim_orientation")),
+        "velocity": series(await fetch("tcp_vel_sim AS tcp_vel_cmd", "sim_velocity")),
+        "joint_states": series(await fetch("joint_1, joint_2, joint_3, joint_4, joint_5, joint_6", "sim_joint_states")),
+        "setpoints": setpoints,
+        "metadata": [dict(r) for r in await conn.fetch(
+            """SELECT seg_id, traj_id, movement_type, duration, weight, length,
+                      min_vel, max_vel, mean_vel, median_vel, std_vel,
+                      min_accel, max_accel, mean_accel, median_accel, std_accel,
+                      position_x, position_y, position_z
+               FROM simulation.sim_metadata WHERE traj_id = $1 ORDER BY seg_id ASC""",
+            traj_id
+        )],
+    }

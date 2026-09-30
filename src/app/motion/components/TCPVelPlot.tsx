@@ -11,10 +11,11 @@ const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 interface TCPSpeedPlotProps {
   currentTrajVelAct: TrajVelAct[];
   currentTrajVelCmd: TrajVelCmd[];
+  sim?: TrajVelCmd[];
 }
 
 export const TCPVelPlot: React.FC<TCPSpeedPlotProps> = React.memo(
-  ({ currentTrajVelAct, currentTrajVelCmd }) => {
+  ({ currentTrajVelAct, currentTrajVelCmd, sim }) => {
     const { plotData: tcpSpeedPlotData, maxTimeSpeed } = useMemo((): {
       plotData: Partial<PlotData>[];
       maxTimeSpeed: number;
@@ -41,8 +42,15 @@ export const TCPVelPlot: React.FC<TCPSpeedPlotProps> = React.memo(
         return elapsedNanoseconds / 1e9;
       });
 
+      const timestampsSim = (sim ?? []).map(
+        (traj) => (Number(traj.timestamp) - globalStartTime) / 1e9,
+      );
+
       // Direkte Berechnung von maxTimeSpeed
       let maxTime = 0;
+      timestampsSim.forEach((time) => {
+        maxTime = Math.max(maxTime, time);
+      });
       timestampsIst.forEach((time) => {
         maxTime = Math.max(maxTime, time);
       });
@@ -75,11 +83,20 @@ export const TCPVelPlot: React.FC<TCPSpeedPlotProps> = React.memo(
         name: 'Commanded',
       };
 
+      const simPlot: Partial<PlotData> = {
+        type: 'scatter',
+        mode: 'lines',
+        x: timestampsSim,
+        y: (sim ?? []).map((traj) => traj.tcpSpeedCmd),
+        line: { color: 'orange', width: 3, dash: 'dash' },
+        name: 'Simulated',
+      };
+
       return {
-        plotData: [istPlot, sollPlot],
+        plotData: sim ? [istPlot, sollPlot, simPlot] : [istPlot, sollPlot],
         maxTimeSpeed: computedMaxTimeSpeed,
       };
-    }, [currentTrajVelAct, currentTrajVelCmd]);
+    }, [currentTrajVelAct, currentTrajVelCmd, sim]);
 
     const tcpSpeedLayout: Partial<Layout> = {
       title: { text: 'Velocity' },

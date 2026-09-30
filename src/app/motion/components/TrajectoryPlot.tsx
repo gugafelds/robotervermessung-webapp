@@ -39,7 +39,10 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
     currentTrajJointStates,
     currentTrajVelCmd,
     currentTrajSetpoints,
+    currentTrajSim,
+    showSim,
   } = useTrajectory();
+  const sim = showSim ? currentTrajSim : null;
 
   const hasAnyPlotAvailable = Object.values(plotAvailability).some(Boolean);
 
@@ -68,11 +71,14 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
               currentTrajSetpoints={currentTrajSetpoints}
               idealTrajectory={currentTrajPositionCmd}
               currentTrajPoseAct={currentTrajPoseAct}
+              sim={sim?.position}
+              simSetpoints={sim?.setpoints}
             />
             <Position3DPlot
               currentTrajPoseAct={currentTrajPoseAct}
               currentTrajSetpoints={currentTrajSetpoints}
               idealTrajectory={currentTrajPositionCmd}
+              sim={sim?.position}
             />
           </>
         )}
@@ -82,17 +88,23 @@ export const TrajectoryPlot: React.FC<TrajectoryPlotProps> = ({
             currentTrajOrientationCmd={currentTrajOrientationCmd}
             currentTrajPoseAct={currentTrajPoseAct}
             currentTrajSetpoints={currentTrajSetpoints}
+            sim={sim?.orientation}
+            simSetpoints={sim?.setpoints}
           />
         )}
 
         {plotAvailability.joints && (
-          <JointStatesPlot currentTrajJointStates={currentTrajJointStates} />
+          <JointStatesPlot
+            currentTrajJointStates={currentTrajJointStates}
+            sim={sim?.jointStates}
+          />
         )}
 
         {plotAvailability.velocity && (
           <TCPVelPlot
             currentTrajVelAct={currentTrajVelAct}
             currentTrajVelCmd={currentTrajVelCmd}
+            sim={sim?.velocity}
           />
         )}
 

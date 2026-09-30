@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import type { Layout, PlotData } from 'plotly.js';
 import React, { useMemo } from 'react';
 
-import { quaternionToEuler } from '@/src/lib/functions';
+import { hasSupport, quaternionToEuler } from '@/src/lib/functions';
 import type {
   TrajOrientationCmd,
   TrajPoseAct,
@@ -17,10 +17,18 @@ interface OrientationPlotProps {
   currentTrajPoseAct: TrajPoseAct[];
   currentTrajOrientationCmd: TrajOrientationCmd[];
   currentTrajSetpoints: TrajSetpoints[];
+  sim?: TrajOrientationCmd[];
+  simSetpoints?: TrajSetpoints[];
 }
 
 export const OrientationPlot: React.FC<OrientationPlotProps> = React.memo(
-  ({ currentTrajPoseAct, currentTrajOrientationCmd, currentTrajSetpoints }) => {
+  ({
+    currentTrajPoseAct,
+    currentTrajOrientationCmd,
+    currentTrajSetpoints,
+    sim,
+    simSetpoints,
+  }) => {
     const { plotData: combinedEulerPlotData, maxTimeOrientation } =
       useMemo((): {
         plotData: Partial<PlotData>[];
@@ -121,8 +129,9 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = React.memo(
           ),
         );
 
+        const withSupport = currentTrajSetpoints.filter(hasSupport);
         const processedSupportEulerAngles = fixGimbalLockBatch(
-          currentTrajSetpoints.map((event) =>
+          withSupport.map((event) =>
             quaternionToEuler(
               event.qxSupport,
               event.qySupport,
@@ -137,7 +146,7 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = React.memo(
           angles: processedEulerAngles[index],
         }));
 
-        const supportEulerAngles = currentTrajSetpoints.map((event, index) => ({
+        const supportEulerAngles = withSupport.map((event, index) => ({
           time: (Number(event.timestampSupport) - globalStartTime) / 1e9,
           angles: processedSupportEulerAngles[index],
         }));
@@ -156,7 +165,18 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = React.memo(
           return maxTime;
         };
 
-        const computedMaxTimeOrientation = getMaxTimeOrientation();
+        const timestampsSim = (sim ?? []).map(
+          (traj) => (Number(traj.timestamp) - globalStartTime) / 1e9,
+        );
+        const eulerAnglesSim = fixGimbalLockBatch(
+          (sim ?? []).map((traj) =>
+            quaternionToEuler(traj.qxCmd, traj.qyCmd, traj.qzCmd, traj.qwCmd),
+          ),
+        );
+        const computedMaxTimeOrientation = Math.max(
+          getMaxTimeOrientation(),
+          ...timestampsSim.slice(-1),
+        );
 
         const plotData: Partial<PlotData>[] = [
           // Roll (X-Rotation) - Blau-Töne wie X-Position
@@ -261,8 +281,91 @@ export const OrientationPlot: React.FC<OrientationPlotProps> = React.memo(
             marker: { color: 'red', size: 8, symbol: 'square' },
           },
         ];
+        if (sim) {
+          (
+            [
+              ['Roll', 'blue'],
+              ['Pitch', 'green'],
+              ['Yaw', 'red'],
+            ] as const
+          ).forEach(([name, color], i) => {
+            plotData.push({
+              type: 'scatter',
+              mode: 'lines',
+              name: `${name} (Sim)`,
+              x: timestampsSim,
+              y: eulerAnglesSim.map((angles) => angles[i]),
+              line: { color, width: 2, dash: 'dash' },
+            });
+          });
+
+          const toEuler = (
+            rows: TrajSetpoints[],
+            kind: 'Reached' | 'Support',
+          ) =>
+            fixGimbalLockBatch(
+              rows.map((e) =>
+                quaternionToEuler(
+                  e[`qx${kind}`],
+                  e[`qy${kind}`],
+                  e[`qz${kind}`],
+                  e[`qw${kind}`],
+                ),
+              ),
+            );
+          const sps = simSetpoints ?? [];
+          const reachedEuler = toEuler(sps, 'Reached');
+          const simSupport = sps.filter(hasSupport);
+          const supportEuler = toEuler(simSupport, 'Support');
+          (
+            [
+              ['Roll', 'blue'],
+              ['Pitch', 'green'],
+              ['Yaw', 'red'],
+            ] as const
+          ).forEach(([name, color], i) => {
+            plotData.push(
+              {
+                type: 'scatter',
+                mode: 'markers',
+                name: `${name} (Sim S)`,
+                x: sps.map(
+                  (e) => (Number(e.timestamp) - globalStartTime) / 1e9,
+                ),
+                y: reachedEuler.map((angles) => angles[i]),
+                marker: {
+                  color,
+                  size: 12,
+                  symbol: 'circle-open',
+                  line: { width: 2 },
+                },
+              },
+              {
+                type: 'scatter',
+                mode: 'markers',
+                name: `${name} (Sim SP)`,
+                x: simSupport.map(
+                  (e) => (Number(e.timestampSupport) - globalStartTime) / 1e9,
+                ),
+                y: supportEuler.map((angles) => angles[i]),
+                marker: {
+                  color,
+                  size: 8,
+                  symbol: 'square-open',
+                  line: { width: 2 },
+                },
+              },
+            );
+          });
+        }
         return { plotData, maxTimeOrientation: computedMaxTimeOrientation };
-      }, [currentTrajPoseAct, currentTrajOrientationCmd, currentTrajSetpoints]);
+      }, [
+        currentTrajPoseAct,
+        currentTrajOrientationCmd,
+        currentTrajSetpoints,
+        sim,
+        simSetpoints,
+      ]);
 
     const combinedEulerLayout: Partial<Layout> = {
       title: { text: 'Euler-Winkel' },

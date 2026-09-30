@@ -2,6 +2,7 @@ import dynamic from 'next/dynamic';
 import type { Layout, PlotData } from 'plotly.js';
 import React from 'react';
 
+import { hasSupport } from '@/src/lib/functions';
 import { dataPlotConfig, plotLayoutConfig } from '@/src/lib/plot-config';
 import type {
   TrajPoseAct,
@@ -15,10 +16,11 @@ interface Position3DPlotProps {
   currentTrajPoseAct: TrajPoseAct[];
   idealTrajectory: TrajPositionCmd[];
   currentTrajSetpoints: TrajSetpoints[];
+  sim?: TrajPositionCmd[];
 }
 
 export const Position3DPlot: React.FC<Position3DPlotProps> = React.memo(
-  ({ currentTrajPoseAct, idealTrajectory, currentTrajSetpoints }) => {
+  ({ currentTrajPoseAct, idealTrajectory, currentTrajSetpoints, sim }) => {
     const realTrajectory = currentTrajPoseAct;
 
     const realTrajectoryData: Partial<PlotData> = {
@@ -35,6 +37,16 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = React.memo(
       y: idealTrajectory.map((row) => row.yCmd),
       z: idealTrajectory.map((row) => row.zCmd),
       name: 'Trajectory (C)',
+    };
+
+    const simTrajectoryData: Partial<PlotData> = {
+      type: 'scatter3d',
+      mode: 'lines',
+      name: 'Trajectory (Sim)',
+      x: (sim ?? []).map((row) => row.xCmd),
+      y: (sim ?? []).map((row) => row.yCmd),
+      z: (sim ?? []).map((row) => row.zCmd),
+      line: { color: 'orange', width: 3, dash: 'dash' },
     };
 
     // Startpunkt für Ist-Daten
@@ -93,13 +105,14 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = React.memo(
     };
 
     // Stützpunkte
+    const withSupport = currentTrajSetpoints.filter(hasSupport);
     const supportPointsData: Partial<PlotData> = {
       type: 'scatter3d',
       mode: 'markers',
       name: 'Support',
-      x: currentTrajSetpoints.map((row) => row.xSupport),
-      y: currentTrajSetpoints.map((row) => row.ySupport),
-      z: currentTrajSetpoints.map((row) => row.zSupport),
+      x: withSupport.map((row) => row.xSupport),
+      y: withSupport.map((row) => row.ySupport),
+      z: withSupport.map((row) => row.zSupport),
       marker: {
         size: 2,
         color: 'blue',
@@ -172,6 +185,7 @@ export const Position3DPlot: React.FC<Position3DPlotProps> = React.memo(
             targetPointsData,
             supportPointsData,
             startPointData,
+            ...(sim ? [simTrajectoryData] : []),
           ]}
           layout={layout}
           useResizeHandler

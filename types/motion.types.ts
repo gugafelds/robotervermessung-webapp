@@ -308,3 +308,12 @@ export interface TrajMetadataResult {
   trajectory: TrajMetadata;
   segments: TrajMetadata[];
 }
+
+export interface TrajSim {
+  position: TrajPositionCmd[];
+  orientation: TrajOrientationCmd[];
+  velocity: TrajVelCmd[];
+  jointStates: TrajJointStates[];
+  setpoints: TrajSetpoints[];
+  metadata: TrajMetadataResult | null;
+}

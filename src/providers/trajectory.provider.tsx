@@ -21,6 +21,7 @@ import type {
   TrajPoseAct,
   TrajPositionCmd,
   TrajSetpoints,
+  TrajSim,
   TrajVelAct,
   TrajVelCmd,
 } from '@/types/motion.types';
@@ -62,6 +63,10 @@ export interface TrajectoryState {
     React.SetStateAction<TrajJointStates[]>
   >;
   currentTrajSetpoints: TrajSetpoints[];
+  currentTrajSim: TrajSim | null;
+  setCurrentTrajSim: React.Dispatch<React.SetStateAction<TrajSim | null>>;
+  showSim: boolean;
+  setShowSim: React.Dispatch<React.SetStateAction<boolean>>;
   setCurrentTrajSetpoints: React.Dispatch<
     React.SetStateAction<TrajSetpoints[]>
   >;
@@ -111,6 +116,9 @@ export const TrajectoryProvider = ({
   const [currentTrajSetpoints, setCurrentTrajSetpoints] = useState<
     TrajSetpoints[]
   >([]);
+
+  const [currentTrajSim, setCurrentTrajSim] = useState<TrajSim | null>(null);
+  const [showSim, setShowSim] = useState(false);
 
   useEffect(() => {
     setTrajInfo(initialTrajInfo);
@@ -185,6 +193,10 @@ export const TrajectoryProvider = ({
       setCurrentTrajSetpoints,
       currentTrajMetadata,
       setCurrentTrajMetadata,
+      currentTrajSim,
+      setCurrentTrajSim,
+      showSim,
+      setShowSim,
     }),
     [
       trajInfo,
@@ -204,6 +216,8 @@ export const TrajectoryProvider = ({
       currentTrajJointStates,
       currentTrajSetpoints,
       currentTrajMetadata,
+      currentTrajSim,
+      showSim,
     ],
   );
 
