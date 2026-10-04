@@ -50,7 +50,7 @@ REACH_Z_MIN = 400.0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Metadata → 15D Feature-Vektor  (identisch zu compute_metadata_embedding)
+# Metadata → 15D Feature-Vektor  (früheres compute_metadata_embedding, heute 10D z-standardisiert)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def metadata_to_vector(row: Dict) -> np.ndarray:

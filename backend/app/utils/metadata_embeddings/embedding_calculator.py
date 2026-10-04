@@ -1,32 +1,52 @@
 # backend/scripts/calculators/embedding_calculator.py
 
+import json
 import numpy as np
+from functools import lru_cache
+from pathlib import Path
 from typing import List, Dict, Optional, Any
 import logging
 
 logger = logging.getLogger(__name__)
 
+# Metadata embedding: z-scale (mean/std) and weights (sqrt of ExtraTrees importances for the SIDTW) fitted on
+# the measured DB by backend/scripts/update_metadata_embeddings.py, separately for segments and whole
+# trajectories -- no robot constants. Stored vectors depend on this file: refit and recompute together.
+METADATA_SCALE_PATH = Path(__file__).with_name('metadata_scale.json')
+METADATA_FEATURES = ['circular', 'max_vel', 'mean_vel', 'std_vel', 'duration', 'length', 'weight',
+                     'position_x', 'position_y', 'position_z']
+
+
+@lru_cache(maxsize=1)
+def _metadata_scale() -> Dict[str, Dict[str, np.ndarray]]:
+    raw = json.loads(METADATA_SCALE_PATH.read_text())
+    assert raw['features'] == METADATA_FEATURES, f'{METADATA_SCALE_PATH} was fitted for other features'
+    return {level: {k: np.asarray(raw[level][k]) for k in ('mean', 'std', 'weight')} for level in ('segment', 'trajectory')}
+
+
+def metadata_features(metadata: Dict) -> np.ndarray:
+    """Raw METADATA_FEATURES of one motion.traj_metadata-shaped row; circular = share of circular segments."""
+    movement = (metadata.get('movement_type') or '').lower().strip()
+    if movement in ('linear', 'circular'):
+        circular = float(movement == 'circular')
+    else:  # 'l' / 'c' / per-segment string like 'llc'
+        n = movement.count('l') + movement.count('c')
+        circular = movement.count('c') / n if n else 0.0
+    return np.array([circular] + [float(metadata.get(f) or 0.0) for f in METADATA_FEATURES[1:]])
+
 
 class EmbeddingCalculator:
     """
     Universal Embedding Calculator
-    Berechnet Joint, Position, Orientation, Velocity und Acceleration Embeddings
+    Berechnet Joint, Position, Orientation, Velocity und Metadata Embeddings
     """
 
     def __init__(
             self,
             n_samples: int = 10,
-            robot_info: Optional[Dict] = None  # neu
+            robot_info: Optional[Dict] = None  # unused since the metadata embedding is z-scored (metadata_scale.json)
     ):
         self.n_samples = n_samples
-
-        info = robot_info or {}
-        self.vel_max = info.get('vel_max', 3200.0)
-        self.accel_max = info.get('accel_max', 10200.0)
-        self.reach_xy = info.get('reach_xy', 1955.0)
-        self.reach_z_max = info.get('reach_z_max', 2140.0)
-        self.reach_z_min = info.get('reach_z_min', -290.0)
-        self.max_payload = info.get('max_payload', 60.0)
 
     def compute_joint_embedding(self, data: List[Dict]) -> Optional[np.ndarray]:
         if len(data) < 10:
@@ -144,77 +164,13 @@ class EmbeddingCalculator:
         return self._l2_normalize(flat)
 
     def compute_metadata_embedding(self, metadata: Dict) -> Optional[np.ndarray]:
-        vel_max   = self.vel_max
-        accel_max = self.accel_max
-        reach_xy  = self.reach_xy
-        reach_z_max = self.reach_z_max
-        reach_z_min = self.reach_z_min
-        max_payload = self.max_payload
- 
-        movement_str = metadata.get('movement_type', '').lower().strip()
- 
-        if movement_str in ('linear', 'l'):
-            linear_ratio   = 1.0
-            circular_ratio = 0.0
-        elif movement_str in ('circular', 'c'):
-            linear_ratio   = 0.0
-            circular_ratio = 1.0
-        else:
-            linear_count   = movement_str.count('l')
-            circular_count = movement_str.count('c')
-            total = linear_count + circular_count
-            if total > 0:
-                linear_ratio   = linear_count / total
-                circular_ratio = circular_count / total
-            else:
-                linear_ratio   = 0.0
-                circular_ratio = 0.0
- 
-        # Payload
-        weight_norm = np.clip(metadata.get('weight', 0.0) / max_payload, 0, 1)
- 
-        # Position — normalisiert durch physikalische Reichweite
-        pos_x = metadata.get('position_x', 0.0)
-        pos_y = metadata.get('position_y', 0.0)
-        pos_z = metadata.get('position_z', 0.0)
-        pos_x_norm = np.clip(pos_x / reach_xy, -1, 1)
-        pos_y_norm = np.clip(pos_y / reach_xy, -1, 1)
-        pos_z_norm = np.clip((pos_z - reach_z_min) / (reach_z_max - reach_z_min), 0, 1)
- 
-        # Velocity Stats — cmd-basiert, immer >= 0
-        max_vel_norm    = np.clip(metadata.get('max_vel',    0.0) / vel_max, 0, 1)
-        mean_vel_norm   = np.clip(metadata.get('mean_vel',   0.0) / vel_max, 0, 1)
-        median_vel_norm = np.clip(metadata.get('median_vel', 0.0) / vel_max, 0, 1)
-        std_vel_norm    = np.clip(metadata.get('std_vel',    0.0) / vel_max, 0, 1)
- 
-        # Acceleration Stats — cmd-basiert, kann negativ sein (Bremsen)
-        # abs() weil wir Magnitude wollen, nicht Richtung
-        min_accel_norm    = np.clip(abs(metadata.get('min_accel',    0.0)) / accel_max, 0, 1)
-        max_accel_norm    = np.clip(abs(metadata.get('max_accel',    0.0)) / accel_max, 0, 1)
-        mean_accel_norm   = np.clip(abs(metadata.get('mean_accel',   0.0)) / accel_max, 0, 1)
-        median_accel_norm = np.clip(abs(metadata.get('median_accel', 0.0)) / accel_max, 0, 1)
-        std_accel_norm    = np.clip(metadata.get('std_accel',        0.0) / accel_max, 0, 1)
- 
-        # 15D Embedding
-        features = np.array([
-            linear_ratio,
-            circular_ratio,
-            weight_norm,
-            pos_x_norm,
-            pos_y_norm,
-            pos_z_norm,
-            max_vel_norm,
-            mean_vel_norm,
-            median_vel_norm,
-            std_vel_norm,
-            min_accel_norm,
-            max_accel_norm,
-            mean_accel_norm,
-            median_accel_norm,
-            std_accel_norm,
-        ], dtype=np.float32)
- 
-        return self._l2_normalize(features)
+        """10-D (METADATA_FEATURES), z-scored and weighted with metadata_scale.json -- whole-trajectory rows
+        (seg_id == traj_id) with the trajectory scale. No accelerations: for simulated candidates they disagree
+        with the stored values (r 0.2-0.6), and they carry no information beyond the velocities."""
+        level = 'trajectory' if metadata.get('seg_id') == metadata.get('traj_id') else 'segment'
+        s = _metadata_scale()[level]
+        z = (metadata_features(metadata) - s['mean']) / s['std'] * s['weight']
+        return self._l2_normalize(z.astype(np.float32))
 
 
     # Helper methods
