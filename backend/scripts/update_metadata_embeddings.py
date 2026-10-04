@@ -10,7 +10,9 @@ Replaces ONLY motion.traj_embeddings.metadata_embedding -- joint/position/orient
               kept in motion.traj_embeddings_metadata_backup (seg_id, metadata_embedding) unless --no-backup.
 
 --db has no default on purpose (never the production DB from .env by accident). The stored vectors depend on the
-scale: after a refit, recompute (both steps in one call).
+scale: after a refit, recompute (both steps in one call). Duration: the UPDATE rewrites every row, so the other
+four HNSW indexes get new entries too -- 218k rows on the production DB took 30 min (04.10.2026), during which
+motion.traj_embeddings is locked (searches wait). Run it when no measurement campaign is active.
 
 Usage:
     python update_metadata_embeddings.py --fit postgresql://...remote... --db postgresql://...localhost.../rmpd_local
