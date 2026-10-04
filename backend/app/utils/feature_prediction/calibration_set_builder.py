@@ -215,6 +215,7 @@ async def get_all_traj_ids(
     metric: str,
     max_trajectories: Optional[int] = None,
     include_tags: Optional[List[str]] = None,
+    seed: int = 0,
 ) -> List[Tuple[str, float]]:
     metric     = validate_metric(metric)
     table_name = f"evaluation.{metric}_info"
@@ -231,8 +232,9 @@ async def get_all_traj_ids(
 
     limit_sql = ""
     if max_trajectories:
-        limit_sql = f"ORDER BY RANDOM() LIMIT ${len(args)+1}"
-        args.append(max_trajectories)
+        # random but reproducible: the same seed draws the same trajectories for every config (paired comparisons)
+        limit_sql = f"ORDER BY md5(m.traj_id || ${len(args)+1}::text) LIMIT ${len(args)+2}"
+        args.extend([str(seed), max_trajectories])
     else:
         limit_sql = "ORDER BY m.traj_id"
 
@@ -248,19 +250,6 @@ async def get_all_traj_ids(
         {limit_sql}
     """, *args)
     return [(r['traj_id'], float(r['mean_distance'])) for r in rows]
-
-
-async def get_all_segments_for_trajectories(
-    conn: asyncpg.Connection, traj_ids: List[str],
-) -> Dict[str, List[str]]:
-    rows = await conn.fetch("""
-        SELECT traj_id, seg_id FROM motion.traj_metadata
-        WHERE traj_id = ANY($1::text[]) AND seg_id != traj_id
-    """, traj_ids)
-    result: Dict[str, List[str]] = {}
-    for r in rows:
-        result.setdefault(r['traj_id'], []).append(r['seg_id'])
-    return result
 
 
 async def get_segment_actual_values_for_trajectories(
@@ -700,12 +689,12 @@ async def process_trajectory_bundle(
     *, traj_id: str, p_actual_traj: float, split_role: SplitRole,
     pool: asyncpg.Pool, cfg: CalibrationConfig,
     stage1_mode: bool,
-    own_segment_ids: Sequence[str],
     segment_actuals: Dict[str, float],
     include_tags: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:
-    exclude_ids = list(dict.fromkeys([traj_id, *own_segment_ids]))
-
+    # No exclude_ids: the searcher already drops the query's own trajectory and its segments
+    # (shape_searcher: e.traj_id != parent traj). Passing them made the pre-filter ship the id list of the
+    # whole DB with every mode query (~6 s per trajectory for tag 'all').
     try:
         async with pool.acquire() as conn:
             result = await run_similarity_pipeline(
@@ -719,7 +708,6 @@ async def process_trajectory_bundle(
                 prefilter_features=[],
                 metric=cfg.metric,
                 include_tags=include_tags,
-                exclude_ids=exclude_ids,
                 stage2_active=not stage1_mode,
                 dtw_mode=cfg.dtw_mode if not stage1_mode else 'position',  # dtw_mode irrelevant for stage1
                 prognosis_active=True,
@@ -808,9 +796,9 @@ async def run_calibration(
             conn, cfg.metric,
             max_trajectories=max_trajectories,
             include_tags=include_tags,
+            seed=cfg.split_seed,
         )
         traj_ids        = [t for t, _ in all_trajs]
-        traj_to_seg_ids = await get_all_segments_for_trajectories(conn, traj_ids)
         segment_actuals = await get_segment_actual_values_for_trajectories(
             conn, traj_ids, cfg.metric,
         )
@@ -840,7 +828,6 @@ async def run_calibration(
                 process_trajectory_bundle(
                     traj_id=tid, p_actual_traj=p, split_role=role,
                     pool=pool, cfg=cfg, stage1_mode=stage1_mode,
-                    own_segment_ids=traj_to_seg_ids.get(tid, []),
                     segment_actuals=segment_actuals,
                     include_tags=include_tags,
                 )
