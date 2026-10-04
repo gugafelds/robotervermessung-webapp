@@ -22,17 +22,19 @@ pulled up by the right-skewed errors -- together a systematic overestimate of
 depending on the reference-set size.
 
 Which neighbours predict (switch rule, 04.10.2026): per segment the metadata-mode neighbours (z-scored 10-D vector,
-`meta_groups`), unless Stage 2 found a near-identical path -- best DTW distance per path length below
-DTW_SWITCH_D_PER_LENGTH -- then the DTW neighbours. Calibration 'all' (10k trajectories, measured queries), test
-split, trajectory MAE: switch 36.4 um vs metadata only 47.6, DTW 54.6, Stage 1 five modes 55.7. Simulated candidates
-(AutoMode) practically never fall below the threshold (their DTW distances are 10-20x larger; DTW alone 125 um), so
-they get the metadata prognosis (42.3 um). Refit the threshold on the calibration rows after a rebuild.
+`meta_groups`), unless Stage 2 found a near-identical path -- best DTW distance per path length below the
+threshold 'dtw_switch_d_per_length' in prognosis.confidence_info (fitted per calibration tag by
+calibration_set_builder.py; no row -> metadata only) -- then the DTW neighbours. Calibration 'all' (10k trajectories,
+measured queries), test split, trajectory MAE: switch 36.4 um vs metadata only 47.6, DTW 54.6, Stage 1 five modes 55.7.
+Simulated candidates (AutoMode) practically never fall below the threshold (their DTW distances are 10-20x larger;
+DTW alone 125 um), so they get the metadata prognosis (42.3 um).
 """
 
 from __future__ import annotations
 
 import logging
 import math
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import asyncpg
@@ -43,7 +45,26 @@ from .conformal_predictor import compute_conformal_intervals, compute_stage1_con
 logger = logging.getLogger(__name__)
 
 EPSILON = 1e-6
-DTW_SWITCH_D_PER_LENGTH = 1.29  # best DTW distance / path length below which the DTW neighbours predict (see above)
+SWITCH_KEY = 'dtw_switch_d_per_length'
+_switch_cache: Dict[str, Tuple[Optional[float], float]] = {}
+SWITCH_CACHE_TTL = 300  # s, like quality_match.py -- a calibration run takes effect within 5 minutes
+
+
+async def dtw_switch_threshold(conn: Optional[asyncpg.Connection], calibration_tag: str) -> Optional[float]:
+    """Switch threshold for this calibration tag, falling back to 'all'; None (no row/table): metadata only."""
+    hit = _switch_cache.get(calibration_tag)
+    if hit and time.time() - hit[1] < SWITCH_CACHE_TTL:
+        return hit[0]
+    value = None
+    if conn is not None:
+        try:
+            value = await conn.fetchval(
+                "SELECT value FROM prognosis.confidence_info WHERE key = $1 AND calibration_tag = ANY($2::text[]) "
+                "ORDER BY calibration_tag = $3 DESC LIMIT 1", SWITCH_KEY, [calibration_tag, 'all'], calibration_tag)
+        except asyncpg.UndefinedTableError:
+            pass
+    _switch_cache[calibration_tag] = (value, time.time())
+    return value
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -298,6 +319,8 @@ async def predict_performance(
     seg_neighbor_ids:  List[List[str]]      = []
     stage1_seg_preds:  List[Dict]           = []
 
+    switch_thr = await dtw_switch_threshold(conn, calibration_tag) if stage2_active and meta_groups else None
+
     for group in segment_groups:
         query_seg_id = group.get('target_segment', '')
         seg_results  = group.get('similar_segments', {}).get('results', [])
@@ -335,11 +358,14 @@ async def predict_performance(
             )
             if dtw_pred is not None:
                 dtw_pred['source'] = 'dtw'
-            near_identical = dtw_pred is not None and dtw_pred['d_min'] < DTW_SWITCH_D_PER_LENGTH * query_path_len
+                dtw_pred['p_hat_dtw'] = dtw_pred['p_hat']  # kept for refitting the threshold (calibration rows)
+            near_identical = (dtw_pred is not None and switch_thr is not None
+                              and dtw_pred['d_min'] < switch_thr * query_path_len)
             if near_identical or meta_pred is None:
                 prediction = dtw_pred
             else:  # metadata p_hat/sigma; d_* stay DTW distances (match quality, refitting the threshold)
-                prediction = {**meta_pred, **({k: dtw_pred[k] for k in ('d_min', 'd_max', 'd_normalized')} if dtw_pred else {})}
+                prediction = {**meta_pred, **({k: dtw_pred[k] for k in ('d_min', 'd_max', 'd_normalized', 'p_hat_dtw')}
+                                              if dtw_pred else {})}
         else:
             prediction = s1_pred
 
@@ -431,6 +457,7 @@ async def predict_performance(
                 'query_path_length': pred.get('query_path_length'),
                 'neighbor_ids':      nids,
                 'source':            pred.get('source', 'rrf'),
+                'p_hat_dtw':         pred.get('p_hat_dtw'),
             })
         else:
             segments.append({'seg_id': sid, 'p_hat': None})

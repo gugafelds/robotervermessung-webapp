@@ -1,9 +1,12 @@
 """Run from backend/:  python -m app.utils.feature_prediction.test_predictor"""
 import asyncio
+import time
 
 from app.utils.feature_prediction.predictor import (
-    DTW_SWITCH_D_PER_LENGTH, _aggregate_trajectory_decomposed, _weighted_median, predict_performance,
+    _aggregate_trajectory_decomposed, _switch_cache, _weighted_median, predict_performance,
 )
+
+THR = 1.29  # stands in for prognosis.confidence_info (cached lookup, no DB in this test)
 
 
 def test_weighted_median():
@@ -18,7 +21,7 @@ def test_duration_weighting():
     assert _aggregate_trajectory_decomposed(segs, weights=[3.0, 1.0])['p_hat'] == 0.3
 
 
-def _prognosis(stage2: bool, best_dtw: float) -> dict:
+def _prognosis(stage2: bool, best_dtw: float, thr=THR) -> dict:
     """One 100 mm segment: shape neighbours measured 0.5, metadata neighbours measured 0.2."""
     shape = [{'seg_id': f's{i}', 'rrf_score': 0.03, 'dtw_distance': best_dtw + i, 'features': {'mean_distance': 0.5}}
              for i in range(3)]
@@ -26,20 +29,23 @@ def _prognosis(stage2: bool, best_dtw: float) -> dict:
     result = {'stage2_active': stage2, 'segment_similarity': [{
         'target_segment': 'q_1', 'target_segment_features': {'length': 100.0, 'duration': 1.0},
         'similar_segments': {'results': shape}}]}
+    _switch_cache['all'] = (thr, time.time())
     out = asyncio.run(predict_performance(result, {}, conn=None, conformal_active=False, meta_groups={'q_1': meta}))
     return out['prognosis']
 
 
 def test_switch_rule():
-    near, far = 0.5 * DTW_SWITCH_D_PER_LENGTH * 100, 2 * DTW_SWITCH_D_PER_LENGTH * 100
+    near, far = 0.5 * THR * 100, 2 * THR * 100
     p = _prognosis(stage2=True, best_dtw=near)            # near-identical path -> DTW neighbours
     assert p['segments'][0]['source'] == 'dtw' and p['decomposed']['p_hat'] == 0.5
     p = _prognosis(stage2=True, best_dtw=far)             # otherwise metadata neighbours, DTW match stats kept
     seg = p['segments'][0]
     assert seg['source'] == 'metadata' and seg['p_hat'] == 0.2 and seg['d_min'] == far
-    assert seg['neighbor_ids'] == ['m0', 'm1', 'm2']
+    assert seg['neighbor_ids'] == ['m0', 'm1', 'm2'] and seg['p_hat_dtw'] == 0.5
     p = _prognosis(stage2=False, best_dtw=near)           # Stage 1 always metadata
     assert p['segments'][0]['source'] == 'metadata' and p['s1_decomposed']['p_hat'] == 0.2
+    p = _prognosis(stage2=True, best_dtw=near, thr=None)  # no confidence_info row -> metadata only
+    assert p['segments'][0]['source'] == 'metadata'
 
 
 if __name__ == '__main__':

@@ -190,6 +190,19 @@ async def ensure_calibration_tables(conn: asyncpg.Connection) -> None:
             ON prognosis.confidence_quantiles
             (metric, dtw_mode, retrieval_strategy, level,
              config_k, search_modes, calibration_tag, coverage, config_stage);
+
+        -- pure DTW prediction of Stage 2 segment rows (p_predicted holds the switch), for refitting the threshold
+        ALTER TABLE prognosis.confidence_calibration ADD COLUMN IF NOT EXISTS p_dtw FLOAT;
+
+        -- aggregated values read online, e.g. the switch threshold (predictor.py, key 'dtw_switch_d_per_length')
+        CREATE TABLE IF NOT EXISTS prognosis.confidence_info (
+            calibration_tag  TEXT        NOT NULL,
+            key              TEXT        NOT NULL,
+            value            FLOAT       NOT NULL,
+            n_samples        INT,
+            computed_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (calibration_tag, key)
+        );
     """)
     logger.info("Calibration tables ready.")
 
@@ -308,12 +321,12 @@ async def insert_calibration_batch(conn: asyncpg.Connection, batch: List[Dict[st
             level, entity_id, traj_id, split_role, retrieval_strategy, calibration_tag, config_stage,
             p_actual, p_predicted, prediction_error, sigma, nonconformity_score,
             d_min, d_max, d_normalized, query_path_length, neighbor_ids,
-            config_hash, config_k, config_dtw_mode, config_metric, search_modes
+            config_hash, config_k, config_dtw_mode, config_metric, search_modes, p_dtw
         ) VALUES (
             $1,$2,$3,$4,$5,$6,$7,
             $8,$9,$10,$11,$12,
             $13,$14,$15,$16,$17,
-            $18,$19,$20,$21,$22
+            $18,$19,$20,$21,$22,$23
         )
         ON CONFLICT (level, entity_id, config_hash, calibration_tag, config_stage) DO UPDATE SET
             split_role          = EXCLUDED.split_role,
@@ -333,6 +346,7 @@ async def insert_calibration_batch(conn: asyncpg.Connection, batch: List[Dict[st
             config_dtw_mode     = EXCLUDED.config_dtw_mode,
             config_metric       = EXCLUDED.config_metric,
             search_modes        = EXCLUDED.search_modes,
+            p_dtw               = EXCLUDED.p_dtw,
             computed_at         = NOW()
     """, [
         (
@@ -343,7 +357,7 @@ async def insert_calibration_batch(conn: asyncpg.Connection, batch: List[Dict[st
             _r6(r.get('d_min')), _r6(r.get('d_max')), _r6(r.get('d_normalized')),
             _r6(r.get('query_path_length')), r['neighbor_ids'],
             r['config_hash'], r['config_k'],
-            r['config_dtw_mode'], r['config_metric'], r['search_modes'],
+            r['config_dtw_mode'], r['config_metric'], r['search_modes'], _r6(r.get('p_dtw')),
         )
         for r in batch
     ])
@@ -466,6 +480,50 @@ async def compute_and_store_quantiles(
         )
 
 
+async def store_switch_info(conn: asyncpg.Connection, s2_hash: str, s1_hash: str, calibration_tag: str) -> None:
+    """Fits the switch threshold of predictor.py on the segment rows of one run -- Stage 2 (pure DTW prediction,
+    best DTW distance) against Stage 1 decomposed (metadata prediction) -- and stores it with aggregated errors in
+    prognosis.confidence_info: threshold = minimal segment MAE on split 'calibration', errors reported on 'test'."""
+    rows = await conn.fetch("""
+        SELECT s2.split_role = 'test' AS test, s2.p_actual, COALESCE(s2.p_dtw, s2.p_predicted) AS p_dtw,
+               s1.p_predicted AS p_meta, s2.d_min / s2.query_path_length AS dn
+        FROM prognosis.confidence_calibration s2
+        JOIN prognosis.confidence_calibration s1
+          ON s1.entity_id = s2.entity_id AND s1.level = 'segment' AND s1.config_hash = $2
+         AND s1.calibration_tag = s2.calibration_tag AND s1.config_stage = 1
+        WHERE s2.level = 'segment' AND s2.config_hash = $1 AND s2.calibration_tag = $3 AND s2.config_stage = 2
+          AND s2.d_min IS NOT NULL AND s2.query_path_length > 0
+    """, s2_hash, s1_hash, calibration_tag)
+    if len(rows) < 100:
+        logger.warning(f"switch threshold: only {len(rows)} segment rows for tag={calibration_tag} -- not stored")
+        return
+    test, y, p_dtw, p_meta, dn = (np.array([r[k] for r in rows], dtype=float) for k in ('test', 'p_actual', 'p_dtw', 'p_meta', 'dn'))
+    test = test.astype(bool)
+    cal = ~test
+    candidates = np.unique(np.quantile(dn[cal], np.linspace(0, 1, 201)))
+    mae = lambda thr, m: float(np.abs(np.where(dn[m] < thr, p_dtw[m], p_meta[m]) - y[m]).mean())
+    thr = float(min(candidates, key=lambda c: mae(c, cal)))
+    # ponytail: fixed 1 % margin against fitting noise; within one campaign there are hardly any repeats, then the
+    # tag stores no threshold and the lookup falls back to 'all' ('all' itself stores 0 = never DTW).
+    if mae(thr, cal) > 0.99 * mae(0.0, cal):
+        thr = 0.0
+    info = {'dtw_switch_share_test': float((dn[test] < thr).mean()),
+            'segment_mae_test_switch': mae(thr, test),
+            'segment_mae_test_metadata': float(np.abs(p_meta[test] - y[test]).mean()),
+            'segment_mae_test_dtw': float(np.abs(p_dtw[test] - y[test]).mean())}
+    if thr > 0 or calibration_tag == 'all':
+        info['dtw_switch_d_per_length'] = thr
+    else:
+        await conn.execute("DELETE FROM prognosis.confidence_info WHERE calibration_tag = $1 AND key = 'dtw_switch_d_per_length'",
+                           calibration_tag)
+    await conn.executemany("""
+        INSERT INTO prognosis.confidence_info (calibration_tag, key, value, n_samples) VALUES ($1, $2, $3, $4)
+        ON CONFLICT (calibration_tag, key) DO UPDATE SET value = EXCLUDED.value, n_samples = EXCLUDED.n_samples,
+                                                         computed_at = NOW()
+    """, [(calibration_tag, k, v, len(rows)) for k, v in info.items()])
+    logger.info(f"confidence_info [{calibration_tag}]: " + ', '.join(f'{k}={v:.4g}' for k, v in info.items()))
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # Row builders — Stage 2 (DTW)
 # ═════════════════════════════════════════════════════════════════════════════
@@ -499,6 +557,7 @@ def build_segment_rows_stage2(
             'd_normalized':      seg_pred.get('d_normalized'),
             'query_path_length': seg_pred.get('query_path_length'),
             'neighbor_ids':      list(seg_pred.get('neighbor_ids') or []),
+            'p_dtw':             seg_pred.get('p_hat_dtw'),
             'config_hash':       cfg.hash(),
             'config_k':          cfg.k,
             'config_dtw_mode':   cfg.dtw_mode,
@@ -711,6 +770,7 @@ async def process_trajectory_bundle(
                 stage2_active=not stage1_mode,
                 dtw_mode=cfg.dtw_mode if not stage1_mode else 'position',  # dtw_mode irrelevant for stage1
                 prognosis_active=True,
+                calibration_tag=cfg.calibration_tag,  # the switch threshold of this tag (confidence_info)
                 coverage=0.90,
                 conformal_active=False,
             )
@@ -870,6 +930,7 @@ async def run_calibration(
             await compute_and_store_quantiles(conn, cfg_s2_decomp, coverages, 'segment',    2)
             await compute_and_store_quantiles(conn, cfg_s2_decomp, coverages, 'trajectory', 2)
             await compute_and_store_quantiles(conn, cfg_s2_direct,  coverages, 'trajectory', 2)
+            await store_switch_info(conn, cfg_s2_decomp.hash(), cfg_s1_decomp.hash(), cfg.calibration_tag)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
