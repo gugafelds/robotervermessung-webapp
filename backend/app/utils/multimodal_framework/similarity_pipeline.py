@@ -164,6 +164,18 @@ async def run_similarity_pipeline(
         result['stage2_active'] = False
         return result
 
+    # Prognosis neighbours come from the metadata mode alone (z-scored 10-D vector), whatever the retrieval modes:
+    # the SIDTW depends on circular share, velocity, payload and position, not on the path shape (predictor.py).
+    meta_groups = None
+    if prognosis_active:
+        meta = result if list(modes or []) == ['metadata'] else await searcher.search_similar(
+            target_id=target_id, modes=['metadata'], weights={'metadata': 1.0}, limit=limit,
+            buffer_factor=buffer_factor, prefilter_features=prefilter_features, metric=metric,
+            include_tags=include_tags, exclude_tags=exclude_tags, exclude_ids=exclude_ids, include_ids=include_ids,
+        )
+        meta_groups = {g.get('target_segment'): (g.get('similar_segments') or {}).get('results') or []
+                       for g in meta.get('segment_similarity', [])}
+
     _normalize_stage1_ranks(result)
     result['timing'] = {'stage1_ms': round(stage1_ms, 1)}
 
@@ -180,6 +192,7 @@ async def run_similarity_pipeline(
             search_modes=tuple(sorted(modes or [])),
             dtw_mode=dtw_mode,
             metric=metric,
+            meta_groups=meta_groups,
         )
         result['timing']['total_ms'] = round((time.time() - t_start) * 1000, 1)
         return result
@@ -346,6 +359,7 @@ async def run_similarity_pipeline(
             search_modes=tuple(sorted(modes or [])),
             dtw_mode=dtw_mode,
             metric=metric,
+            meta_groups=meta_groups,
         )
 
     result['timing']['data_loading_ms'] = round(data_load_ms, 1)

@@ -20,6 +20,13 @@ pulled up by the right-skewed errors -- together a systematic overestimate of
 ~+0.03 (robotervermessung-recorder scripts/active-learning/SESSION_NOTES.md,
 "Ursache der Überschätzung"). Median + duration lowered the MAE by 8-26 %
 depending on the reference-set size.
+
+Which neighbours predict (switch rule, 04.10.2026): per segment the metadata-mode neighbours (z-scored 10-D vector,
+`meta_groups`), unless Stage 2 found a near-identical path -- best DTW distance per path length below
+DTW_SWITCH_D_PER_LENGTH -- then the DTW neighbours. Calibration 'all' (10k trajectories, measured queries), test
+split, trajectory MAE: switch 36.4 um vs metadata only 47.6, DTW 54.6, Stage 1 five modes 55.7. Simulated candidates
+(AutoMode) practically never fall below the threshold (their DTW distances are 10-20x larger; DTW alone 125 um), so
+they get the metadata prognosis (42.3 um). Refit the threshold on the calibration rows after a rebuild.
 """
 
 from __future__ import annotations
@@ -36,6 +43,7 @@ from .conformal_predictor import compute_conformal_intervals, compute_stage1_con
 logger = logging.getLogger(__name__)
 
 EPSILON = 1e-6
+DTW_SWITCH_D_PER_LENGTH = 1.29  # best DTW distance / path length below which the DTW neighbours predict (see above)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -274,7 +282,10 @@ async def predict_performance(
     search_modes:     Optional[Tuple[str, ...]] = None,
     dtw_mode:         str                       = 'position',
     metric:           str                       = 'sidtw',
+    meta_groups:      Optional[Dict[str, List[Dict[str, Any]]]] = None,
 ) -> Dict[str, Any]:
+    """meta_groups: target segment id -> metadata-mode neighbours (prognosis neighbours, see module docstring);
+    None keeps the retrieval neighbours."""
     sigma_floor     = 0.005
     stage2_active   = bool(result.get('stage2_active'))
     path_length_map = _build_path_length_lookup(seg_batch or {})
@@ -308,25 +319,33 @@ async def predict_performance(
         seg_duration = float(seg_features.get('duration') or 0.0)
         agg_weight   = seg_duration if seg_duration > EPSILON else query_path_len
 
+        meta_results = (meta_groups or {}).get(query_seg_id)
+        meta_pred = _predict_stage1_rrf(
+            results=meta_results, feature=feature, sigma_floor=sigma_floor,
+        ) if meta_results else None
+        if meta_pred is not None:
+            meta_pred['source'] = 'metadata'
+        # Stage 1 prognosis (also the stage1 calibration rows): metadata neighbours, retrieval neighbours as fallback
+        s1_pred = meta_pred or _predict_stage1_rrf(results=seg_results, feature=feature, sigma_floor=sigma_floor)
+
         if stage2_active:
-            prediction = _predict_segment(
+            dtw_pred = _predict_segment(
                 seg_results=seg_results, query_path_length=query_path_len,
                 feature=feature, sigma_floor=sigma_floor,
             )
+            if dtw_pred is not None:
+                dtw_pred['source'] = 'dtw'
+            near_identical = dtw_pred is not None and dtw_pred['d_min'] < DTW_SWITCH_D_PER_LENGTH * query_path_len
+            if near_identical or meta_pred is None:
+                prediction = dtw_pred
+            else:  # metadata p_hat/sigma; d_* stay DTW distances (match quality, refitting the threshold)
+                prediction = {**meta_pred, **({k: dtw_pred[k] for k in ('d_min', 'd_max', 'd_normalized')} if dtw_pred else {})}
         else:
-            prediction = _predict_stage1_rrf(
-                results=seg_results, feature=feature, sigma_floor=sigma_floor,
-            )
+            prediction = s1_pred
 
         if prediction is not None:
             prediction['query_path_length'] = query_path_len if query_path_len > EPSILON else None
             prediction['aggregation_weight'] = agg_weight
-
-        # Always compute RRF prediction for stage1 calibration rows (Bug 1+2 fix)
-        s1_pred = (
-            prediction if not stage2_active
-            else _predict_stage1_rrf(results=seg_results, feature=feature, sigma_floor=sigma_floor)
-        )
         stage1_seg_preds.append({
             'seg_id':            query_seg_id,
             'p_hat':             s1_pred.get('p_hat')        if s1_pred else None,
@@ -338,7 +357,8 @@ async def predict_performance(
             'aggregation_weight': agg_weight,
         })
 
-        nids = [str(r['seg_id']) for r in seg_results if r.get('seg_id')]
+        used = meta_results if prediction is not None and prediction.get('source') == 'metadata' else seg_results
+        nids = [str(r['seg_id']) for r in used if r.get('seg_id')]
         group['prediction'] = prediction
         seg_predictions.append(prediction)
         seg_path_lengths.append(query_path_len)
@@ -410,6 +430,7 @@ async def predict_performance(
                 'd_normalized':      pred.get('d_normalized'),
                 'query_path_length': pred.get('query_path_length'),
                 'neighbor_ids':      nids,
+                'source':            pred.get('source', 'rrf'),
             })
         else:
             segments.append({'seg_id': sid, 'p_hat': None})
