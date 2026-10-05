@@ -55,17 +55,13 @@ class MatchQuality:
     calibration_tag_used: str
 
 
-def _tier_for_bucket(bucket_error: float, best_error: float) -> str:
-    if best_error <= 0:
-        return _TIER_EXCELLENT
-    ratio = bucket_error / best_error
-    if ratio <= 1.2:
-        return _TIER_EXCELLENT
-    if ratio <= 2.0:
-        return _TIER_GOOD
-    if ratio <= 4.0:
-        return _TIER_MODERATE
-    return _TIER_POOR
+# Fixed upper bounds (mm) of the expected error per tier -- the same meaning for every config and tag, whatever
+# the error distribution of its calibration rows looks like.
+TIER_BOUNDS_MM = ((0.03, _TIER_EXCELLENT), (0.05, _TIER_GOOD), (0.08, _TIER_MODERATE))
+
+
+def _tier_for_error(expected_error: float) -> str:
+    return next((tier for bound, tier in TIER_BOUNDS_MM if expected_error <= bound), _TIER_POOR)
 
 
 def _make_search_modes_str(search_modes: Tuple[str, ...]) -> str:
@@ -147,8 +143,7 @@ async def get_match_quality(
     if match is None:
         match = buckets[0] if d_min < buckets[0]['d_min_lower'] else buckets[-1]
 
-    best_error = min(b['median_error'] for b in buckets)
-    tier       = _tier_for_bucket(match['median_error'], best_error)
+    tier = _tier_for_error(float(match['median_error']))
 
     return MatchQuality(
         expected_error_mm    = round(float(match['median_error']), 4),
