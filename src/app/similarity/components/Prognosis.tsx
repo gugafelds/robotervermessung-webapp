@@ -175,6 +175,34 @@ const PrognosisCard: React.FC<PrognosisCardProps> = ({
   </div>
 );
 
+// How the prediction came about (predictor.py: metadata neighbours, DTW only for near-identical paths)
+const PrognosisOrigin: React.FC<{
+  prognosis: Prognosis;
+  stage2Active: boolean;
+}> = ({ prognosis, stage2Active }) => {
+  const segs = prognosis.segments ?? [];
+  const nDtw = segs.filter((s) => s.source === 'dtw').length;
+  const thr = prognosis.dtw_switch_d_per_length;
+  return (
+    <div className="space-y-0.5 border-t px-6 py-2 text-xs text-gray-500">
+      <p>
+        <span className="font-medium text-gray-700">Decomposed:</span> per
+        segment from the nearest measured segments in metadata space (circular,
+        velocity, duration, length, payload, position)
+        {stage2Active &&
+          (thr != null
+            ? `; DTW neighbours where the path is near-identical (DTW distance / length < ${thr.toFixed(2)}): ${nDtw} of ${segs.length} segments`
+            : '; no DTW switch calibrated, metadata only')}
+        .
+      </p>
+      <p>
+        <span className="font-medium text-gray-700">Direct:</span> trajectory
+        neighbours of the search ({stage2Active ? 'RRF + DTW' : 'RRF'}).
+      </p>
+    </div>
+  );
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Main component
 // ═══════════════════════════════════════════════════════════════════════════
@@ -261,12 +289,7 @@ const PrognosisView: React.FC<PrognosisViewProps> = ({
         />
       </div>
 
-      {/* Stage 1 note: decomposed has no conformal interval */}
-      {isStage1 && prognosis.decomposed != null && (
-        <p className="border-t px-6 py-2 text-xs text-gray-400">
-          Conformal interval for decomposed prediction requires Stage 2 (DTW).
-        </p>
-      )}
+      <PrognosisOrigin prognosis={prognosis} stage2Active={stage2Active} />
     </div>
   );
 };

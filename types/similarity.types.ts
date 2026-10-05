@@ -165,6 +165,7 @@ export interface SegmentPrognosis {
   d_max: number | null;
   d_normalized: number | null;
   query_path_length: number | null;
+  source?: 'metadata' | 'dtw' | 'rrf'; // which neighbours predicted this segment
 }
 
 export interface TrajectoryPrognosis {
@@ -191,6 +192,7 @@ export interface Prognosis {
   s1_direct_conformal_interval: ConformalInterval | null;
   s1_decomposed_conformal_interval: ConformalInterval | null;
   segments: SegmentPrognosis[];
+  dtw_switch_d_per_length?: number | null; // DTW neighbours below this DTW distance / path length
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -478,6 +478,7 @@ async def predict_performance(
         's1_direct_conformal_interval':     None,
         's1_decomposed_conformal_interval': None,
         'segments':                         segments,
+        'dtw_switch_d_per_length':          switch_thr,  # None: metadata only (shown in the frontend)
     }
 
     if conformal_active:
