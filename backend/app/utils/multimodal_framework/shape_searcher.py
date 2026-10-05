@@ -96,15 +96,22 @@ class ShapeSearcher:
                     limit,
                 )
             else:
+                # The HNSW index only serves ORDER BY distance alone: with the seg_id tie-break inside, Postgres
+                # sorted the whole table (~70 ms vs ~4 ms per query, recall@50 >= 0.997 at ef_search 500). The
+                # tie-break (deterministic order of equal distances) is applied to the top `limit` outside.
+                # The filtered branch above stays exact: HNSW filters after the scan and could return too few rows.
                 query = f"""
-                    SELECT 
-                        e.seg_id,
-                        e.traj_id,
-                        e.{embedding_col} <=> $1::vector as distance
-                    FROM motion.traj_embeddings e
-                    WHERE {where_clause}
-                    ORDER BY distance, e.seg_id
-                    LIMIT $4
+                    SELECT * FROM (
+                        SELECT
+                            e.seg_id,
+                            e.traj_id,
+                            e.{embedding_col} <=> $1::vector as distance
+                        FROM motion.traj_embeddings e
+                        WHERE {where_clause}
+                        ORDER BY distance
+                        LIMIT $4
+                    ) s
+                    ORDER BY distance, seg_id
                 """
                 results = await self.connection.fetch(
                     query,
