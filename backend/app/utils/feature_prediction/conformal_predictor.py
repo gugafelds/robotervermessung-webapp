@@ -571,7 +571,7 @@ async def compute_stage1_conformal_interval(
             sigma = max(float(sigma), sigma_floor, EPSILON)
             direct_interval = _build_interval(float(p_hat), sigma, q_direct, coverage,
                                               mm_direct, 'direct')
-            mq = await get_match_quality(conn, s1_dir.get('d_min'), 'trajectory', cfg_direct)
+            mq = await get_match_quality(conn, sigma, 'trajectory', cfg_direct)  # Stage 1 buckets on sigma
             if mq is not None:
                 direct_interval['match_quality'] = mq.__dict__
 
@@ -604,7 +604,7 @@ async def compute_stage1_conformal_interval(
 
         sigma    = max(float(sigma), sigma_floor, EPSILON)
         interval = _build_interval(float(p_hat), sigma, q_seg, coverage, mm_seg, 'decomposed')
-        mq       = await get_match_quality(conn, prediction.get('d_min'), 'segment', cfg_decomp)
+        mq       = await get_match_quality(conn, sigma, 'segment', cfg_decomp)  # Stage 1 buckets on sigma
         if mq is not None:
             interval['match_quality'] = mq.__dict__
 
@@ -628,7 +628,7 @@ async def compute_stage1_conformal_interval(
 
     if traj_interval is not None:
         s1_decomp = prognosis.get('s1_decomposed') or {}
-        mq = await get_match_quality(conn, s1_decomp.get('d_min'), 'trajectory', cfg_decomp)
+        mq = await get_match_quality(conn, s1_decomp.get('sigma'), 'trajectory', cfg_decomp)  # Stage 1: sigma
         if mq is not None:
             traj_interval['match_quality'] = mq.__dict__
 

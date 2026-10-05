@@ -155,6 +155,12 @@ async def build_buckets_for_level(
 
     All rows are used regardless of split_role — more data means more
     stable bucket boundaries and higher n_samples per bucket.
+
+    Stage 1 buckets on sigma (spread of the neighbours' measured values) instead of d_min: the Stage 1 d_min is
+    the best RRF score 1/(60 + rank) -- constant 1/61 with a single mode (metadata), i.e. one bucket that always
+    reads 'excellent'. sigma separates the error well (calibration 'all', metadata: median segment error 11 um in
+    the lowest decile, 94 um in the highest); the distance in metadata space does not (Spearman 0.04).
+    The d_min_lower/d_min_upper columns then hold sigma bounds. Existing buckets of the level/tag are replaced.
     """
     tag_clause = "AND calibration_tag = $2" if tag_filter else ""
     params: List = [level]
@@ -172,11 +178,11 @@ async def build_buckets_for_level(
             calibration_tag,
             config_stage,
             retrieval_strategy,
-            d_min,
+            CASE WHEN config_stage = 1 THEN sigma ELSE d_min END AS d_min,
             prediction_error
         FROM {SCHEMA}.confidence_calibration
         WHERE level = $1
-          AND d_min IS NOT NULL
+          AND CASE WHEN config_stage = 1 THEN sigma ELSE d_min END IS NOT NULL
           {tag_clause}
         ORDER BY config_metric, config_dtw_mode, retrieval_strategy,
                  config_k, search_modes, calibration_tag, config_stage,
@@ -248,6 +254,9 @@ async def build_buckets_for_level(
         )
         return 0
 
+    # replace, not upsert: a rebuild with fewer buckets must not leave stale ones behind
+    await conn.execute(f"DELETE FROM {SCHEMA}.confidence_match_quality WHERE level = $1 AND calibration_tag = ANY($2::text[])",
+                       level, sorted({r['calibration_tag'] for r in rows}))
     await conn.executemany(f"""
         INSERT INTO {SCHEMA}.confidence_match_quality (
             metric, dtw_mode, retrieval_strategy, level, config_k, search_modes,

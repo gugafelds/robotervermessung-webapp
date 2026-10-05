@@ -1,7 +1,8 @@
 """
 quality_match.py
 =================
-Empirical match-quality lookup based on d_min_per_path_length buckets.
+Empirical match-quality lookup based on d_min_per_path_length buckets (Stage 2) or sigma buckets (Stage 1,
+see match_quality_builder.build_buckets_for_level).
 
 Complements conformal intervals: instead of a statistically calibrated
 coverage guarantee, this answers "matches like this one historically had
