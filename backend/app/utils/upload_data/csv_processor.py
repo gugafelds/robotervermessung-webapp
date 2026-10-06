@@ -1,4 +1,6 @@
 import csv
+
+import numpy as np
 import re
 from datetime import datetime
 
@@ -10,10 +12,53 @@ class CSVProcessor:
         self.file_path = file_path
         self.mappings = MAPPINGS
 
+    @staticmethod
+    def _segment_spans(rows, seg_col, xyz):
+        """{segment id: (timestamps [s], positions (n, 3))} of the rows with valid positions."""
+        out = {}
+        for row in rows:
+            try:
+                p = [float(row[c]) for c in xyz]
+                t = float(row['timestamp']) / 1e9
+            except (KeyError, TypeError, ValueError):
+                continue
+            if any(v != v for v in p):  # NaN
+                continue
+            out.setdefault(row.get(seg_col), ([], []))
+            out[row.get(seg_col)][0].append(t)
+            out[row.get(seg_col)][1].append(p)
+        return {k: (np.array(t), np.array(p)) for k, (t, p) in out.items()}
+
+    @staticmethod
+    def _bahn_incomplete(segs, ist, soll, min_points=10, max_median_mm=5.0):
+        """Reason why a trajectory must not be uploaded, or None: every segment needs IST and SOLL data, the IST data
+        must cover at least half of the segment's SOLL time (small start/end shifts of 0.1-0.6 s occur and evaluate
+        normally), and the IST points must lie near the SOLL path (median distance <= max_median_mm; real path
+        errors are < 1 mm)."""
+        from scipy.spatial import cKDTree
+        for s in segs:
+            if s not in soll or len(soll[s][0]) < min_points:
+                return f"Segment {s}: keine/zu wenige SOLL-Daten"
+            if s not in ist or len(ist[s][0]) < min_points:
+                return f"Segment {s}: keine/zu wenige IST-Daten (Lasertracker)"
+            (ti, pi), (tc, pc) = ist[s], soll[s]
+            overlap = min(ti.max(), tc.max()) - max(ti.min(), tc.min())
+            if overlap < 0.5 * (tc.max() - tc.min()):
+                return f"Segment {s}: IST deckt nur {max(overlap, 0):.2f} von {tc.max() - tc.min():.2f} s der SOLL-Zeit ab"
+            d = np.median(cKDTree(pc).query(pi)[0])
+            if d > max_median_mm:
+                return f"Segment {s}: IST liegt im Median {d:.1f} mm neben der SOLL-Bahn"
+        return None
+
     def process_csv(self, robot_model, path_planning, source_data_act,
                     source_data_cmd, record_filename, segmentation_method="fixed_segments",
-                    num_segments=3, reference_position=None):
-        """Verarbeitet die CSV-Datei und bereitet Daten für den Datenbankupload vor."""
+                    num_segments=3, reference_position=None, expected_segments=None, check_complete=False):
+        """Verarbeitet die CSV-Datei und bereitet Daten für den Datenbankupload vor.
+        expected_segments: wenn gesetzt (z. B. AutoMode batch_size), werden bei reference_position nur Bahnen mit genau
+        so vielen Segmenten übernommen -- eine Bahn mit fehlendem/zusätzlichem Stützpunkt wird nicht hochgeladen.
+        check_complete: bei reference_position nur Bahnen übernehmen, deren Segmente alle IST- und SOLL-Daten über
+        dieselbe Zeitspanne haben und deren IST-Punkte nahe der SOLL-Bahn liegen (_bahn_complete) -- sonst wird die
+        Auswertung unsinnig (z. B. Lasertracker-Lücke am Anfang: ein Segment ohne IST, SIDTW > 50 mm)."""
 
         print(f'Verarbeite CSV-Datei: {record_filename}')
         try:
@@ -225,11 +270,22 @@ class CSVProcessor:
                 valid_bahnen = []
                 removed_bahnen = []
 
+                seg_ist = self._segment_spans(rows_act, 'segment_id_ist', ('pt_x', 'pt_y', 'pt_z')) if check_complete else None
+                seg_soll = self._segment_spans(rows_cmd, 'segment_id_soll', ('ps_x', 'ps_y', 'ps_z')) if check_complete else None
                 for i, traj_segs in enumerate(bahnen):
-                    if len(traj_segs) > min_segments_per_bahn:
+                    ok = len(traj_segs) == expected_segments if expected_segments else len(traj_segs) > min_segments_per_bahn
+                    if ok and check_complete:
+                        why = self._bahn_incomplete(traj_segs, seg_ist, seg_soll)
+                        if why:
+                            print(f"Nicht hochgeladen (Bahn {i} unvollständig): {why}")
+                            ok = False
+                    if ok:
                         valid_bahnen.append(traj_segs)
                     else:
                         removed_bahnen.append((i, traj_segs))
+                if expected_segments and removed_bahnen:
+                    print(f"Nicht hochgeladen ({len(removed_bahnen)} Bahn(en) mit != {expected_segments} Segmenten): "
+                          + '; '.join(f"Bahn {i}: {len(s)} Segmente" for i, s in removed_bahnen))
 
                 # print(f"\nDefiniere {len(bahnen)} Bahnen basierend auf Referenzpunkten:")
                 # for i, traj_segs in enumerate(bahnen):

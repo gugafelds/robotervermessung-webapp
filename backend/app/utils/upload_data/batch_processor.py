@@ -31,6 +31,8 @@ class BatchProcessor:
             conn,
             reference_position=None,  # Tuple mit (x, y, z)
             tag=None,
+            expected_segments=None,  # nur Bahnen mit genau so vielen Segmenten (CSVProcessor)
+            check_complete=False,  # nur Bahnen mit vollständigen, plausiblen IST/SOLL-Daten (CSVProcessor)
     ):
         """Process multiple CSV files in a batch and upload them at once"""
 
@@ -56,7 +58,8 @@ class BatchProcessor:
                     None,
                     lambda p=file_info['path'], fn=file_info['filename']: CSVProcessor(p).process_csv(
                         robot_model, path_planning, source_data_act, source_data_cmd,
-                        fn, segmentation_method, num_segments, reference_position
+                        fn, segmentation_method, num_segments, reference_position, expected_segments,
+                        check_complete
                     )
                 )
 
