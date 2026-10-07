@@ -23,7 +23,7 @@ export interface PerformerData {
   metric_value: number;
   weight: number;
   waypoints: number;
-  stop_point: number;
+  stop_point: string | null; // segment stop points, e.g. "1/5/100"
   max_velocity: number;
   max_acceleration: number;
   tag?: string;

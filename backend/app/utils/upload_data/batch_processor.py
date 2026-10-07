@@ -245,17 +245,18 @@ class BatchProcessor:
                                 'number_pose_act', 'number_vel_act', 'number_accel_act', 'number_position_cmd', 'number_orientation_cmd',
                                 'number_vel_cmd', 'number_joint_states', 'weight',
                                 'transformation_matrix',
-                                'number_accel_cmd', 'freq_accel_cmd', 'setted_velocity', 'stop_point', 'tag'
+                                'number_accel_cmd', 'freq_accel_cmd',
+                                'x_start', 'y_start', 'z_start', 'qx_start', 'qy_start', 'qz_start', 'qw_start', 'tag'
                             ]
 
                             padded_records = []
                             for record in filtered_traj_info:
                                 padded_record = list(record)
-                                # record hat 30 Felder aus CSVProcessor
-                                # auf 30 auffüllen falls weniger
-                                if len(padded_record) < 30:
-                                    padded_record.extend([None] * (30 - len(padded_record)))
-                                # tag anhängen als 31. Feld
+                                # record hat 35 Felder aus CSVProcessor (28 + Startpunkt x..qw)
+                                # auf 35 auffüllen falls weniger
+                                if len(padded_record) < 35:
+                                    padded_record.extend([None] * (35 - len(padded_record)))
+                                # tag anhängen als 36. Feld
                                 padded_record.append(tag or None)
                                 padded_records.append(tuple(padded_record))
 

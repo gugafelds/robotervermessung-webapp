@@ -28,8 +28,6 @@ export interface TrajInfo {
   numberPointsJointStates: number;
   weight: number;
   transfMatrix: string;
-  settedVelocity: number;
-  stopPoint: number;
   waitTime: number;
   tag: string | null;
 }
@@ -63,9 +61,7 @@ export interface TrajInfoRaw {
   number_joint_states: number;
   weight: number;
   freq_accel_cmd: number;
-  setted_velocity: number;
   transformation_matrix: string;
-  stop_point: number;
   wait_time: number;
   tag: string | null;
 }

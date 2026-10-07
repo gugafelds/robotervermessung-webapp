@@ -171,7 +171,9 @@ async def get_performers(
 
     base = f"""
         SELECT i.traj_id, i.seg_id, i.{col} as metric_value,
-               bi.weight, bi.number_setpoints as waypoints, bi.stop_point,
+               bi.weight, bi.number_setpoints as waypoints,
+               (SELECT string_agg(DISTINCT s.stop_point::int::text, '/') FROM motion.traj_setpoints s
+                WHERE s.traj_id = bi.traj_id) AS stop_point,
                m.max_vel as max_velocity, m.max_accel as max_acceleration,
                bi.tag
         FROM {table} i

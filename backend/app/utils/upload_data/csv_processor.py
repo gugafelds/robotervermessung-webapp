@@ -601,8 +601,7 @@ class CSVProcessor:
                     matrix_info,
                     traj_point_counts['number_accel_cmd'],
                     traj_frequencies['freq_accel_cmd'],
-                    traj_comments.get('velocity'),
-                    traj_comments.get('stop_point'),
+                    *self._start_point(traj_data, traj_comments.get('waypoints', [])),
                 ]
 
                 traj_info_data = tuple(base_info)
@@ -1015,6 +1014,31 @@ class CSVProcessor:
                         logger.warning(f'Could not parse waypoint line: {line} — {e}')
 
         return result
+
+    @staticmethod
+    def _start_point(traj_data: dict, waypoints: list[dict]) -> list:
+        """Start of segment 1 as [x, y, z, qx, qy, qz, qw] (traj_info.x_start .. qw_start), for reference_position and
+        num_segments alike. Preferred: the point programmed right before segment 1's target in the program's waypoint
+        list (exact), accepted only if it lies within 2 mm of the first CMD positions (measured 06.10.2026: <= 0.4 mm)
+        -- guards against moves that are not in the list (e.g. Home between batches). Otherwise: mean of the first 5
+        CMD positions rounded to the 0.5 mm setpoint grid + first CMD orientation (434 trajectories: 97 % exact,
+        else 0.5 mm off in one axis; orientation <= 0.02 deg)."""
+        pos = traj_data.get('POSITION_CMD_MAPPING') or []
+        if not pos:
+            return [None] * 7
+        cmd = [sum(float(r[3 + k]) for r in pos[:5]) / len(pos[:5]) for k in range(3)]
+        sp = traj_data.get('RAPID_SETPOINTS_MAPPING') or []
+        first = next((r for r in sp if str(r[1]).endswith('_1')), sp[0] if sp else None)
+        if first is not None and first[3] is not None:
+            target = [float(v) for v in first[3:6]]
+            for prev, wp in zip(waypoints, waypoints[1:]):
+                if 'pos' in wp and max(abs(a - b) for a, b in zip(wp['pos'], target)) < 0.1:
+                    if 'pos' in prev and 'quat' in prev and max(abs(a - b) for a, b in zip(prev['pos'], cmd)) < 2.0:
+                        w, x, y, z = prev['quat']  # waypoint quaternion is [w, x, y, z]
+                        return [*map(float, prev['pos']), float(x), float(y), float(z), float(w)]
+                    break
+        ori = traj_data.get('ORIENTATION_CMD_MAPPING') or []
+        return [round(c * 2) / 2 for c in cmd] + ([float(v) for v in ori[0][3:7]] if ori else [None] * 4)
 
     def _match_waypoints_to_setpoints(
         self,

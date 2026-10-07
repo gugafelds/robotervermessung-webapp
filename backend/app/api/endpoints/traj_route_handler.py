@@ -122,7 +122,8 @@ async def search_traj_info(
             param_index += 2
 
         if setted_velocity is not None:
-            base_query += f" AND (b.setted_velocity = ${param_index})"
+            base_query += (f" AND EXISTS (SELECT 1 FROM motion.traj_setpoints s"
+                           f" WHERE s.traj_id = b.traj_id AND s.vel_set = ${param_index})")
             params.append(setted_velocity)
             param_index += 1
 
