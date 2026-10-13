@@ -11,6 +11,7 @@ import {
   getTrajInfoById,
   getTrajMetadataById,
 } from '@/src/actions/motion.service';
+import { AccPositionInfo } from '@/src/app/evaluation/components/AccPositionInfo';
 import { DeviationsPlot } from '@/src/app/evaluation/components/DeviationsPlot';
 import { MetricsPanel } from '@/src/app/evaluation/components/MetricsPanel';
 import { TrajectoryInfo } from '@/src/app/motion/components/TrajectoryInfo';
@@ -86,6 +87,7 @@ export function EvaluationWrapper() {
       <TrajectoryInfo />
 
       <div className="h-fullscreen w-full flex-row justify-items-stretch overflow-y-auto p-2">
+        <AccPositionInfo trajID={id} selectedSegment={selectedSegment} />
         <MetricsPanel
           trajID={id}
           selectedSegment={selectedSegment}

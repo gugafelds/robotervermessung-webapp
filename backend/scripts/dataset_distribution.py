@@ -15,7 +15,6 @@ import argparse
 import asyncio
 import os
 import statistics
-import sys
 from collections import Counter
 from typing import Dict, List
 

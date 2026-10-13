@@ -91,8 +91,6 @@ async def _insert_pos_deviations(conn, method: str, traj_id: str,
     """Schreibt Positions-Abweichungen (ED, SIDTW)."""
     table = f'{method}_evaluation'
     dev_col   = f'{method}_deviation'
-    cmd_cols  = f'{method}_cmd_x, {method}_cmd_y, {method}_cmd_z'
-    act_cols  = f'{method}_act_x, {method}_act_y, {method}_act_z'
 
     records = []
     for k in range(len(distances)):

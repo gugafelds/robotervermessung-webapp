@@ -1,13 +1,11 @@
-import json
 import sys
 
 sys.path.append(
     r"c:\Users\muell\Desktop\Arbeit\Robotervermessung\robotervermessung-webapp\backend\scripts"
 )
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from database import get_db
 import logging
-from fastapi_cache.decorator import cache
 import csv
 
 logging.basicConfig(level=logging.INFO)

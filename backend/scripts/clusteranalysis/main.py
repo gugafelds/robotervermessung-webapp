@@ -2,8 +2,6 @@ import pandas as pd
 import numpy as np
 import random
 import trimesh
-import collections
-from helper import calculate_end_point, calculate_clusterdistance, descale
 
 random.seed(42)
 

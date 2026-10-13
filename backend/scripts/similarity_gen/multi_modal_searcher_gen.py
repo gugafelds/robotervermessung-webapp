@@ -2,8 +2,6 @@ import sys
 import asyncpg
 from typing import Dict, List, Optional, Union
 import asyncio
-import asyncpg
-from typing import Dict, List, Optional, Union
 import logging
 import ast
 import json

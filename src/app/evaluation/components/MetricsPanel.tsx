@@ -169,7 +169,7 @@ export const MetricsPanel: React.FC<MetrikenPanelProps> = ({
   return (
     <div className="mx-4 h-fit rounded-lg border border-gray-500 bg-white p-6">
       <div className="mb-3 flex items-center justify-between">
-        <Typography as="h2">Position</Typography>
+        <Typography as="h2">Path accuracy</Typography>
 
         <div className="relative">
           <button
@@ -197,6 +197,9 @@ export const MetricsPanel: React.FC<MetrikenPanelProps> = ({
         </div>
       </div>
 
+      <Typography as="h3" className="mb-1">
+        Position [mm]
+      </Typography>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
@@ -273,8 +276,8 @@ export const MetricsPanel: React.FC<MetrikenPanelProps> = ({
       </div>
 
       {GDMetrics && (
-        <Typography as="h2" className="mt-4">
-          Orientation
+        <Typography as="h3" className="mb-1 mt-4">
+          Orientation [°]
         </Typography>
       )}
 

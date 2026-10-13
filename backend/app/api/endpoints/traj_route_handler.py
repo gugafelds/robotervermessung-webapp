@@ -143,7 +143,7 @@ async def search_traj_info(
                         base_query += f" AND b.recording_date LIKE ${param_index}"
                         params.append(f"{postgres_date}%")
                         param_index += 1
-                except Exception as e:
+                except Exception:
                     logger.warning(f"Invalid date format: {recording_date}")
 
             elif '.' in recording_date and ':' in recording_date:
@@ -159,7 +159,7 @@ async def search_traj_info(
                         base_query += f" AND b.recording_date LIKE ${param_index}"
                         params.append(f"{datetime_pattern}%")
                         param_index += 1
-                except Exception as e:
+                except Exception:
                     logger.warning(f"Invalid datetime format: {recording_date}")
         
         if tag is not None:

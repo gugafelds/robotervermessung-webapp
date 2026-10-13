@@ -134,7 +134,7 @@ class FilterSearcher:
             if include_ids:
                 if need_join:
                     rows = await self.connection.fetch(
-                        f"""
+                        """
                         SELECT tm.seg_id FROM motion.traj_metadata tm
                         JOIN motion.traj_info ti ON tm.traj_id = ti.traj_id
                         WHERE tm.traj_id = ANY($1) AND tm.seg_id != $2
@@ -143,7 +143,7 @@ class FilterSearcher:
                     )
                 else:
                     rows = await self.connection.fetch(
-                        f"""
+                        """
                         SELECT seg_id FROM motion.traj_metadata
                         WHERE traj_id = ANY($1) AND seg_id != $2
                         """,

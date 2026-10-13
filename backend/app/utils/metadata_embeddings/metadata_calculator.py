@@ -188,7 +188,7 @@ class MetadataCalculatorService:
         support_rows = await conn.fetch(support_query, traj_id)
         circular_seg_ids = {row['seg_id'] for row in support_rows}
 
-        joint_query = f"""
+        joint_query = """
             WITH numbered AS (
                 SELECT seg_id,
                        joint_1, joint_2, joint_3, joint_4, joint_5, joint_6,
@@ -208,7 +208,7 @@ class MetadataCalculatorService:
         """
         joints = await conn.fetch(joint_query, traj_id)
 
-        orientation_query = f"""
+        orientation_query = """
             WITH numbered AS (
                 SELECT seg_id, qw_cmd, qx_cmd, qy_cmd, qz_cmd,
                        ROW_NUMBER() OVER (PARTITION BY seg_id ORDER BY timestamp) as rn

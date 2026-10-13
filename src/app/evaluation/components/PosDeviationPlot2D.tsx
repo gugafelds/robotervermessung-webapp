@@ -112,7 +112,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = React.memo(
           x: timePoints,
           y: sortedED.map((d) => d.EDDistances),
           line: { color: methodColors.ED.line, width: 2 },
-          hovertemplate: 'Zeit: %{x:.2f}s<br>ED: %{y:.2f}mm<extra></extra>',
+          hovertemplate: 'Time: %{x:.2f} s<br>ED: %{y:.2f} mm<extra></extra>',
         });
       }
 
@@ -130,7 +130,8 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = React.memo(
           x: timePoints,
           y: sortedSIDTW.map((d) => d.SIDTWDistances),
           line: { color: methodColors.SIDTW.line, width: 2 },
-          hovertemplate: 'Zeit: %{x:.2f}s<br>SIDTW: %{y:.2f}mm<extra></extra>',
+          hovertemplate:
+            'Time: %{x:.2f} s<br>SIDTW: %{y:.2f} mm<extra></extra>',
         });
       }
       /*
@@ -148,7 +149,7 @@ export const PosDeviationPlot2D: React.FC<PosDeviationPlot2DProps> = React.memo(
         x: timePoints,
         y: sortedDTW.map((d) => d.DTWDistances),
         line: { color: methodColors.DTW.line, width: 2 },
-        hovertemplate: 'Zeit: %{x:.2f}s<br>DTW: %{y:.2f}mm<extra></extra>',
+        hovertemplate: 'Time: %{x:.2f} s<br>DTW: %{y:.2f} mm<extra></extra>',
         uirevision: 'true',
       });
     } */

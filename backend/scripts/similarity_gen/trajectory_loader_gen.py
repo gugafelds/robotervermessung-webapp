@@ -4,7 +4,7 @@ import logging
 import ast
 import json
 import numpy as np
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

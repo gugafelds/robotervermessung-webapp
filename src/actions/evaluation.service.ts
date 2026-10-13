@@ -16,6 +16,9 @@ import {
 } from '@/src/lib/transformer.evaluation';
 import { transformTrajInfoResult } from '@/src/lib/transformer.motion';
 import type {
+  AccApproach,
+  AccPosition,
+  AccPositionRaw,
   EDPosition,
   EDPositionRaw,
   GDOrientation,
@@ -269,5 +272,72 @@ export const getGDOrientationById = async (
   } catch (error) {
     console.error('Error fetching GD orientation data:', error);
     throw error;
+  }
+};
+
+// Positioning accuracy per segment; empty if the trajectory is not in evaluation.acc_position yet
+export const getAccPositionById = async (
+  id: string,
+): Promise<AccPosition[]> => {
+  try {
+    const result = await fetchFromAPI<{ acc_position: AccPositionRaw[] }>(
+      `/evaluation/acc_position/${id}`,
+    );
+    return result.acc_position.map((r) => ({
+      segmentID: r.segment_id,
+      trajID: r.traj_id,
+      stopPoint: r.stop_point,
+      posMode: r.pos_mode,
+      dx: r.dx,
+      dy: r.dy,
+      dz: r.dz,
+      p: r.p,
+      qDeg: r.q_deg,
+      nRest: r.n_rest,
+      tRestMs: r.t_rest_ms,
+      vMinMmS: r.v_min_mm_s,
+      p1SIDTW: r.p1_sidtw,
+    }));
+  } catch (error) {
+    console.error('Error fetching positioning accuracy:', error);
+    return [];
+  }
+};
+
+export const getAccApproachById = async (
+  id: string,
+): Promise<AccApproach[]> => {
+  try {
+    const result = await fetchFromAPI<{
+      approach: {
+        segment_id: string;
+        t: number[];
+        distance: number[];
+        along: number[];
+        across: number[];
+        speed: (number | null)[];
+        along_dp: number;
+        across_dp: number;
+        sidtw_t: number | null;
+        sidtw_distance: number | null;
+        sidtw_deviation: number | null;
+      }[];
+    }>(`/evaluation/acc_position_approach/${id}`);
+    return result.approach.map((a) => ({
+      segmentID: a.segment_id,
+      t: a.t,
+      distance: a.distance,
+      along: a.along,
+      across: a.across,
+      alongDp: a.along_dp,
+      acrossDp: a.across_dp,
+      sidtwT: a.sidtw_t,
+      sidtwDistance: a.sidtw_distance,
+      sidtwDeviation: a.sidtw_deviation,
+      speed: a.speed,
+    }));
+  } catch (error) {
+    console.error('Error fetching approach data:', error);
+    return [];
   }
 };

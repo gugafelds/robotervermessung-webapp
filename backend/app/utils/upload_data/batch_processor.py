@@ -52,7 +52,6 @@ class BatchProcessor:
 
         for file_info in files_and_paths:
             try:
-                csv_processor = CSVProcessor(file_info['path'])
                 loop = asyncio.get_event_loop()
                 processed_data_list = await loop.run_in_executor(
                     None,
@@ -305,7 +304,7 @@ class BatchProcessor:
                             else:
                                 logger.info(f"No new records to insert into {table_name}")
 
-                    logger.info(f"Successfully inserted all batch data")
+                    logger.info("Successfully inserted all batch data")
                 except Exception as e:
                     logger.error(f"Error during batch database insertion: {str(e)}")
                     # Mark files as unsuccessful

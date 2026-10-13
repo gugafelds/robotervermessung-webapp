@@ -112,7 +112,7 @@ export const OriDeviationPlot2D: React.FC<OriDeviationPlot2DProps> = React.memo(
           x: timePoints,
           y: sortedGD.map((d) => d.GDDistances),
           line: { color: methodColors.GD.line, width: 2 },
-          hovertemplate: 'Zeit: %{x:.2f}s<br>GD: %{y:.2f}°<extra></extra>',
+          hovertemplate: 'Time: %{x:.2f} s<br>GD: %{y:.2f}°<extra></extra>',
         });
       }
 
@@ -130,7 +130,7 @@ export const OriDeviationPlot2D: React.FC<OriDeviationPlot2DProps> = React.memo(
           x: timePoints,
           y: sortedQDTW.map((d) => d.QDTWDistances),
           line: { color: methodColors.QDTW.line, width: 2 },
-          hovertemplate: 'Zeit: %{x:.2f}s<br>QDTW: %{y:.2f}°<extra></extra>',
+          hovertemplate: 'Time: %{x:.2f} s<br>QDTW: %{y:.2f}°<extra></extra>',
         });
       }
 

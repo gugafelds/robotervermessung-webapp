@@ -232,9 +232,9 @@ async def run(
 
                     # Segment-Sequenz des Query-Segments laden
                     seg_data = await conn.fetch(
-                        f"SELECT seg_id, x_cmd, y_cmd, z_cmd FROM motion.traj_position_cmd WHERE seg_id = $1 ORDER BY timestamp"
+                        "SELECT seg_id, x_cmd, y_cmd, z_cmd FROM motion.traj_position_cmd WHERE seg_id = $1 ORDER BY timestamp"
                         if dtw_mode == 'position' else
-                        f"SELECT seg_id, joint_1, joint_2, joint_3, joint_4, joint_5, joint_6 FROM motion.traj_joint_states WHERE seg_id = $1 ORDER BY timestamp",
+                        "SELECT seg_id, joint_1, joint_2, joint_3, joint_4, joint_5, joint_6 FROM motion.traj_joint_states WHERE seg_id = $1 ORDER BY timestamp",
                         seg_id,
                     )
                     if not seg_data:
@@ -317,7 +317,7 @@ async def run(
     gt = np.array(all_gt)
 
     print(f'\n╔{"═"*62}╗')
-    print(f'║  kNN METADATA BASELINE                                       ║')
+    print('║  kNN METADATA BASELINE                                       ║')
     print(f'╚{"═"*62}╝\n')
     print(f'  Tag:     {tag}')
     print(f'  K:       {k}')

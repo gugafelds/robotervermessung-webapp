@@ -210,6 +210,38 @@ class EmbeddingCalculator:
 
 CANDIDATE_SEG_ID = 'externalcandidate'
 
+# How the recorder gets motion.traj_vel_cmd / traj_accel_cmd (robotervermessung-recorder
+# data_processor/motion_regression.compute_motion_parameters, socket positions at ~500 Hz): speed = norm of a
+# quadratic regression over +-45 raw samples (0.18 s) at every 3rd sample; acceleration = regression slope of
+# that speed over +-30 speed values (0.36 s) at every 2nd one. Savitzky-Golay (order 2) on uniform samples is
+# the same regression.
+RECORDER_RATE = 500.0
+RECORDER_REST_S = 0.5   # the recording holds the robot at rest before/after; the windows need ~0.27 s of it
+
+
+def recorder_speed_accel(timestamps, positions) -> tuple:
+    """(speed, accel) of a simulated path as the recorder computes them from measured socket data, i.e. the
+    values motion.traj_metadata is built from -- not finite differences, which give ~1.5x the stored
+    accelerations (spikes where segments join)."""
+    from scipy.signal import savgol_filter
+    t = np.asarray(timestamps, dtype=np.float64)
+    p = np.asarray(positions, dtype=np.float64)
+    if len(t) < 2 or t[-1] <= t[0]:
+        return np.zeros(0), np.zeros(0)
+    dt = 1.0 / RECORDER_RATE
+    tt = np.arange(t[0], t[-1] + dt / 2, dt)
+    n = int(round(RECORDER_REST_S * RECORDER_RATE))
+    pp = np.stack([np.interp(tt, t, p[:, k]) for k in range(3)], axis=1)
+    pp = np.concatenate([np.repeat(pp[:1], n, 0), pp, np.repeat(pp[-1:], n, 0)])
+    rows = np.arange(0, len(pp), 3)
+    rows = rows[(rows >= 45) & (rows < len(pp) - 45)]
+    speed = np.linalg.norm(savgol_filter(pp, 91, 2, deriv=1, delta=dt, axis=0), axis=1)[rows]
+    k = np.arange(0, len(speed), 2)
+    k = k[(k >= 30) & (k < len(speed) - 30)]
+    accel = savgol_filter(speed, 61, 2, deriv=1, delta=3 * dt)[k]
+    inside = lambda r: (r >= n) & (r < n + len(tt))   # drop the padding
+    return speed[inside(rows)], accel[inside(rows[k])]
+
 def _build_candidate_metadata(payload: Dict[str, Any], seg_id: str = CANDIDATE_SEG_ID) -> Dict[str, Any]:
     """
     Computes metadata features for an unsaved, simulated candidate segment.
@@ -218,21 +250,17 @@ def _build_candidate_metadata(payload: Dict[str, Any], seg_id: str = CANDIDATE_S
     for a single segment. If that method's arithmetic ever changes, this
     needs updating too — kept separate because that method is written for
     multi-segment DB trajectories, not single-payload candidates.
+    Speed / acceleration stats as the recorder computes them (recorder_speed_accel), so they are comparable to
+    the stored ones; the positions should be the simulator's raw timing.
     """
     traj       = payload['trajectory']
     positions  = np.array(traj['positions'],  dtype=np.float64)
     timestamps = np.array(traj['timestamps'], dtype=np.float64)
 
-    deltas      = np.diff(positions, axis=0)
-    dt          = np.diff(timestamps)
-    dt[dt == 0] = 1e-6
+    length   = float(np.sum(np.linalg.norm(np.diff(positions, axis=0), axis=1)))
+    duration = float(timestamps[-1] - timestamps[0])
 
-    seg_lengths = np.linalg.norm(deltas, axis=1)
-    length      = float(np.sum(seg_lengths))
-    duration    = float(timestamps[-1] - timestamps[0])
-
-    twist = seg_lengths / dt
-    accel = np.diff(twist) / dt[1:] if len(twist) > 1 else np.array([0.0])
+    twist, accel = recorder_speed_accel(timestamps, positions)
     centroid = positions.mean(axis=0)
 
     return {

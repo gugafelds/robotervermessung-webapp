@@ -241,3 +241,51 @@ export interface EvaluationInfo {
     info_euclidean: EDInfo[];
   };
 }
+
+// Positioning accuracy per segment (evaluation.acc_position): measured - target in mm
+export interface AccPositionRaw {
+  segment_id: string;
+  traj_id: string;
+  stop_point: number | null;
+  pos_mode: 'rest' | 'nearest' | 'all'; // 'all' = whole trajectory (segment_id = traj_id)
+  dx: number | null;
+  dy: number | null;
+  dz: number | null;
+  p: number;
+  q_deg: number | null;
+  n_rest: number | null;
+  t_rest_ms: number | null;
+  v_min_mm_s: number | null;
+  p1_sidtw: number | null;
+}
+
+export interface AccPosition {
+  segmentID: string;
+  trajID: string;
+  stopPoint: number | null;
+  posMode: 'rest' | 'nearest' | 'all';
+  dx: number | null;
+  dy: number | null;
+  dz: number | null;
+  p: number;
+  qDeg: number | null;
+  nRest: number | null;
+  tRestMs: number | null;
+  vMinMmS: number | null;
+  p1SIDTW: number | null;
+}
+
+// Approach to the target per segment (+-0.2 s around the segment end): time [s], distance [mm], speed [mm/s]
+export interface AccApproach {
+  segmentID: string;
+  t: number[];
+  distance: number[];
+  along: number[]; // signed along the approach direction: < 0 short of the target, > 0 overshoot [mm]
+  across: number[]; // across the approach direction [mm]
+  alongDp: number; // the same split at the table's Δp point
+  acrossDp: number;
+  sidtwT: number | null; // time of the measured point of the segment's last SIDTW pair [s]
+  sidtwDistance: number | null; // its distance to the target [mm]
+  sidtwDeviation: number | null; // SIDTW deviation of that pair (= 'SIDTW at end') [mm]
+  speed: (number | null)[];
+}

@@ -1,4 +1,3 @@
-import os
 from typing import Dict, Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -350,6 +349,98 @@ async def check_orientation_data(traj_id: str, conn=Depends(get_db)):
 
     except Exception as e:
         logger.error(f"Error checking orientation data: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/acc_position/{traj_id}")
+@cache(expire=2400)
+async def get_acc_position_by_id(traj_id: str, conn=Depends(get_db)):
+    """Positioning accuracy per segment (evaluation.acc_position, filled by the recorder's
+    scripts/evaluation/acc_position_fill.py). Empty list if the trajectory has not been processed yet."""
+    try:
+        rows = await conn.fetch("""
+            SELECT segment_id, traj_id, stop_point, pos_mode, dx, dy, dz, p, q_deg,
+                   n_rest, t_rest_ms, v_min_mm_s, p1_sidtw
+            FROM evaluation.acc_position
+            WHERE traj_id = $1
+            ORDER BY segment_id
+            """, traj_id)
+        return {"acc_position": [dict(row) for row in rows]}
+    except Exception as e:
+        logger.error(f"Error fetching positioning accuracy: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/acc_position_approach/{traj_id}")
+@cache(expire=2400)
+async def get_acc_position_approach(traj_id: str, conn=Depends(get_db)):
+    """Approach to the target per segment for the 'Position accuracy' plots: measured deviation from the programmed
+    target (traj_setpoints x/y/z_reached) split into the signed component along the approach direction (< 0 short of
+    the target, > 0 overshoot) and the component across it, plus the measured TCP speed (traj_vel_act), over time
+    +-0.2 s around the segment end (the window of evaluation.acc_position); along_dp / across_dp = the same split at the
+    table's Delta p point (mean at rest, else the closest sample)."""
+    import numpy as np
+    window_s = 0.2
+    try:
+        targets = await conn.fetch(
+            "SELECT seg_id, x_reached, y_reached, z_reached FROM motion.traj_setpoints "
+            "WHERE traj_id = $1 AND seg_id <> $1 ORDER BY timestamp", traj_id)
+        pose = await conn.fetch(
+            "SELECT seg_id, timestamp, x_act, y_act, z_act FROM motion.traj_pose_act WHERE traj_id = $1 ORDER BY timestamp",
+            traj_id)
+        vel = await conn.fetch(
+            "SELECT timestamp, tcp_vel_act FROM motion.traj_vel_act WHERE traj_id = $1 ORDER BY timestamp", traj_id)
+        # last SIDTW pair of every segment (its measured point is what 'SIDTW at end' looks at)
+        sidtw_last = {r["seg_id"]: r for r in await conn.fetch(
+            "SELECT DISTINCT ON (seg_id) seg_id, sidtw_act_x, sidtw_act_y, sidtw_act_z, sidtw_deviation "
+            "FROM evaluation.sidtw_evaluation WHERE traj_id = $1 ORDER BY seg_id, points_order DESC", traj_id)}
+        if not targets or not pose:
+            return {"approach": []}
+        seg = np.array([r["seg_id"] for r in pose])
+        t = np.array([float(r["timestamp"]) for r in pose]) / 1e9
+        P = np.array([[r["x_act"], r["y_act"], r["z_act"]] for r in pose], float)
+        v = (np.interp(t, np.array([float(r["timestamp"]) for r in vel]) / 1e9, np.array([float(r["tcp_vel_act"]) for r in vel]))
+             if vel else np.full(len(t), np.nan))
+        out = []
+        for tg in targets:
+            idx = np.flatnonzero(seg == tg["seg_id"])
+            if not len(idx):
+                continue
+            t_end = t[idx[-1]]
+            w = np.flatnonzero(np.abs(t - t_end) <= window_s)
+            tgt = np.array([tg["x_reached"], tg["y_reached"], tg["z_reached"]], float)
+            e = P[w] - tgt
+            d = np.linalg.norm(e, axis=1)
+            # approach direction: from the last sample before the segment end that is still >= 2 mm away to the target
+            far = np.flatnonzero((t[w] <= t_end) & (d >= 2.0))
+            u = tgt - P[w][far[-1]] if len(far) else e[0] * -1
+            u = u / max(np.linalg.norm(u), 1e-9)
+            along = e @ u  # signed: < 0 not yet at the target, > 0 beyond it (overshoot)
+            across = np.linalg.norm(e - np.outer(along, u), axis=1)
+            # decomposition at the table's point: mean at rest (>= 5 samples < 5 mm/s) or else the closest sample
+            rest = np.flatnonzero(v[w] < 5.0)
+            e_dp = e[rest].mean(0) if len(rest) >= 5 else e[int(np.argmin(d))]
+            # time of the measured sample closest to the measured point of the last SIDTW pair
+            sl = sidtw_last.get(tg["seg_id"])
+            sidtw_t = sidtw_d = sidtw_dev = None
+            if sl is not None:
+                q = np.array([sl["sidtw_act_x"], sl["sidtw_act_y"], sl["sidtw_act_z"]], float)
+                k = int(np.argmin(np.linalg.norm(P[w] - q, axis=1)))
+                sidtw_t = round(float(t[w][k] - t_end), 4)
+                sidtw_d = round(float(np.linalg.norm(q - tgt)), 5)
+                sidtw_dev = round(float(sl["sidtw_deviation"]), 5)
+            out.append({"segment_id": tg["seg_id"],
+                        "sidtw_t": sidtw_t, "sidtw_distance": sidtw_d, "sidtw_deviation": sidtw_dev,
+                        "t": np.round(t[w] - t_end, 4).tolist(),
+                        "distance": np.round(d, 5).tolist(),
+                        "along": np.round(along, 5).tolist(),
+                        "across": np.round(across, 5).tolist(),
+                        "speed": [None if np.isnan(x) else round(float(x), 2) for x in v[w]],
+                        "along_dp": round(float(e_dp @ u), 5),
+                        "across_dp": round(float(np.linalg.norm(e_dp - (e_dp @ u) * u)), 5)})
+        return {"approach": out}
+    except Exception as e:
+        logger.error(f"Error fetching approach data: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

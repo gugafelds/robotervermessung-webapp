@@ -3,10 +3,8 @@ import numpy as np
 import pandas as pd
 from ast import literal_eval
 from matplotlib.animation import FuncAnimation
-from sklearn.preprocessing import MinMaxScaler
 from tslearn.metrics import cdist_dtw
 import random
-import trimesh
 
 random.seed(42)
 

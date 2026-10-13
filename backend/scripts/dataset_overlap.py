@@ -104,7 +104,7 @@ async def run(validation_tag: str, datasets: List[str], limit: int, concurrency:
 
     print(f'\n{"=" * 70}')
     print(f'Nearest-neighbor DTW distance: {validation_tag} -> each dataset')
-    print(f'(lower = validation set looks more like that dataset)')
+    print('(lower = validation set looks more like that dataset)')
     print(f'{"=" * 70}')
     print(f'  {"dataset":20s} {"n":>5s} {"mean":>12s} {"median":>12s} {"std":>12s}')
     for ds, vals in distances.items():
