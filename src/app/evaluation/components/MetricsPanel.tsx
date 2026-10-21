@@ -149,7 +149,7 @@ export const MetricsPanel: React.FC<MetrikenPanelProps> = ({
 
   if (isLoading) {
     return (
-      <div className="m-4 rounded-lg border border-gray-500 bg-white p-6 shadow-sm">
+      <div className="rounded-lg border border-gray-500 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-center">
           <div className="size-5 animate-spin rounded-full border-b-2 border-gray-900" />
           <span className="ml-2">Loading metrics...</span>
@@ -160,14 +160,14 @@ export const MetricsPanel: React.FC<MetrikenPanelProps> = ({
 
   if (!EDMetrics && !SIDTWMetrics) {
     return (
-      <div className="m-4 rounded-lg border border-gray-500 bg-gray-200 p-6 text-center text-gray-500">
+      <div className="rounded-lg border border-gray-500 bg-gray-200 p-6 text-center text-gray-500">
         No metrics available for this trajectory.
       </div>
     );
   }
 
   return (
-    <div className="mx-4 h-fit rounded-lg border border-gray-500 bg-white p-6">
+    <div className="h-fit rounded-lg border border-gray-500 bg-white p-6">
       <div className="mb-3 flex items-center justify-between">
         <Typography as="h2">Path accuracy</Typography>
 

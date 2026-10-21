@@ -3,7 +3,11 @@ import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Query
 from ...database import get_db, get_db_pool
 import logging
+from fastapi_cache import FastAPICache
 from fastapi_cache.decorator import cache
+from pydantic import BaseModel
+
+from ...utils.admin_auth import require_admin_password
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -69,6 +73,7 @@ async def search_traj_info(
         recording_date: str = Query(None, description="Datumsfilter"),
         sidtw_distance: float = Query(None, description="SIDTW Distance (±10% Toleranz)"),
         tag: str = Query(None, description="Tag-Filter"),
+        robot: str = Query(None, description="Roboter (motion.traj_info.robot_model, z. B. abb_irb4400)"),
         pool=Depends(get_db_pool)
 ):
     try:
@@ -167,6 +172,11 @@ async def search_traj_info(
             params.append(tag)
             param_index += 1
 
+        if robot is not None:
+            base_query += f" AND b.robot_model = ${param_index}"
+            params.append(robot)
+            param_index += 1
+
         if sidtw_distance is not None:
             tolerance = sidtw_distance * 0.1  # 10% Toleranz
             base_query += f" AND i.sidtw_average_distance IS NOT NULL AND i.sidtw_average_distance BETWEEN ${param_index} AND ${param_index + 1}"
@@ -206,6 +216,27 @@ async def search_traj_info(
     except Exception as e:
         logger.error(f"Error searching Bahn info: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+
+class DeleteTrajRequest(BaseModel):
+    password: str
+
+
+@router.post("/delete/{traj_id}")
+async def delete_trajectory(traj_id: str, request: DeleteTrajRequest, pool=Depends(get_db_pool)):
+    """Deletes a trajectory and everything that belongs to it (password protected, see admin_auth). All tables with
+    traj_id reference motion.traj_info ON DELETE CASCADE, except prognosis.confidence_calibration (deleted here);
+    both in one transaction. Clears the response cache afterwards."""
+    require_admin_password(request.password)
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute("DELETE FROM prognosis.confidence_calibration WHERE traj_id = $1", traj_id)
+            status = await conn.execute("DELETE FROM motion.traj_info WHERE traj_id = $1", traj_id)
+    if status != "DELETE 1":
+        raise HTTPException(status_code=404, detail=f"Trajectory {traj_id} not found")
+    await FastAPICache.clear()
+    logger.info(f"Trajectory {traj_id} deleted")
+    return {"deleted": traj_id}
+
 
 @router.get("/traj_info/{traj_id}")
 @cache(expire=24000)

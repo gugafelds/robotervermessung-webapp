@@ -219,7 +219,8 @@ async def create_pool(url: str) -> asyncpg.Pool:
 
 
 async def get_all_tags(conn: asyncpg.Connection) -> List[str]:
-    rows = await conn.fetch("SELECT tag FROM motion.tag_info ORDER BY tag")
+    # tag_info has one row per (tag, robot) -- the reference tags exist for every robot
+    rows = await conn.fetch("SELECT DISTINCT tag FROM motion.tag_info ORDER BY tag")
     return [r['tag'] for r in rows]
 
 

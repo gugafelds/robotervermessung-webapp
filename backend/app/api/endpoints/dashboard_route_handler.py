@@ -1,4 +1,6 @@
 import asyncio
+import json
+import math
 import os
 import re
 
@@ -30,31 +32,50 @@ METRIC_MAP = {
     'gd':    ('evaluation.gd_info',    'gd_average_distance'),
 }
 
-def _tf(tags, alias="bi", p=1):
-    return (f"AND {alias}.tag = ANY(${p}::text[])", [tags]) if tags else ("", [])
+def _tf(tags, alias="bi", p=1, robot=None):
+    """' AND ...' fragment + params for the tag and robot filters, parameters numbered from $p."""
+    conds, params = [], []
+    if tags:
+        conds.append(f"{alias}.tag = ANY(${p + len(params)}::text[])")
+        params.append(tags)
+    if robot:
+        conds.append(f"{alias}.robot_model = ${p + len(params)}")
+        params.append(robot)
+    return (" AND " + " AND ".join(conds) if conds else ""), params
+
+
+@router.get("/robots")
+@cache(expire=3600, namespace="dashboard")
+async def get_robots(conn=Depends(get_db)):
+    """Robots from motion.robot_info (filter options)."""
+    rows = await conn.fetch("SELECT robot_model, description FROM motion.robot_info ORDER BY robot_model")
+    return {"robots": [{"robot_model": r["robot_model"], "description": r["description"]} for r in rows]}
 
 
 @router.get("/tags")
 @cache(expire=3600, namespace="dashboard")
-async def get_available_tags(conn=Depends(get_db)):
-    rows = await conn.fetch(
-        "SELECT DISTINCT tag FROM motion.traj_info WHERE tag IS NOT NULL ORDER BY tag"
-    )
-    return {"tags": [r["tag"] for r in rows]}
+async def get_available_tags(robot: str = Query(None), conn=Depends(get_db)):
+    """Tags (of the robot, if given) and the robots each tag contains."""
+    tc, tp = _tf(None, robot=robot)
+    rows = await conn.fetch(f"""
+        SELECT tag, array_agg(DISTINCT robot_model) AS robots FROM motion.traj_info bi
+        WHERE tag IS NOT NULL {tc} GROUP BY tag ORDER BY tag""", *tp)
+    return {"tags": [r["tag"] for r in rows],
+            "robots": {r["tag"]: [x for x in r["robots"] if x] for r in rows}}
 
 
 @router.get("/data")
 @cache(expire=1800, namespace="dashboard")
-async def get_dashboard_data(tag: list[str] = Query(None), pool=Depends(get_db_pool)):
+async def get_dashboard_data(tag: list[str] = Query(None), robot: str = Query(None), pool=Depends(get_db_pool)):
     try:
-        tc, tp = _tf(tag or None)
+        tc, tp = _tf(tag or None, robot=robot)
 
         # All 10 queries below are independent of each other (none reads another's
         # result), so they run concurrently over separate pooled connections
         # instead of one-by-one on a single connection.
         (
             segments_count, trajs_count, median_sidtw, mean_sidtw,
-            vrows, wrows, wprows, sidtw_max, sprows, mtrows,
+            vrows, wrows, wprows, sidtw_p99, sprows, mtrows,
         ) = await asyncio.gather(
             pool.fetchval(
                 f"SELECT SUM(number_setpoints) FROM motion.traj_info bi WHERE source_data_act = 'leica_at960' {tc}", *tp),
@@ -71,11 +92,9 @@ async def get_dashboard_data(tag: list[str] = Query(None), pool=Depends(get_db_p
                 WHERE i.traj_id = i.seg_id AND i.sidtw_average_distance IS NOT NULL
                 AND bi.source_data_act = 'leica_at960' {tc}""", *tp),
             pool.fetch(f"""
-                SELECT CASE WHEN max_vel < 500 THEN 1 WHEN max_vel < 1000 THEN 2
-                            WHEN max_vel < 1500 THEN 3 WHEN max_vel < 2000 THEN 4
-                            WHEN max_vel < 2500 THEN 5 WHEN max_vel < 3000 THEN 6 ELSE 7 END AS bucket, COUNT(*)
-                FROM motion.traj_metadata m INNER JOIN motion.traj_info bi ON m.traj_id = bi.traj_id
-                WHERE m.traj_id != m.seg_id AND m.max_vel IS NOT NULL {tc}
+                SELECT LEAST(FLOOR(sp.vel_set / 500)::int, 6) + 1 AS bucket, COUNT(*)
+                FROM motion.traj_setpoints sp INNER JOIN motion.traj_info bi ON sp.traj_id = bi.traj_id
+                WHERE sp.vel_set IS NOT NULL {tc}
                 GROUP BY bucket ORDER BY bucket""", *tp),
             pool.fetch(f"""
                 SELECT weight AS bucket, COUNT(*) FROM motion.traj_info bi
@@ -84,7 +103,8 @@ async def get_dashboard_data(tag: list[str] = Query(None), pool=Depends(get_db_p
                 SELECT number_setpoints AS bucket, COUNT(*) FROM motion.traj_info bi
                 WHERE source_data_act = 'leica_at960' {tc} GROUP BY bucket ORDER BY bucket""", *tp),
             pool.fetchval(f"""
-                SELECT MAX(i.sidtw_average_distance) FROM evaluation.sidtw_info i
+                SELECT PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY i.sidtw_average_distance)
+                FROM evaluation.sidtw_info i
                 INNER JOIN motion.traj_info bi ON i.traj_id = bi.traj_id
                 WHERE i.traj_id != i.seg_id AND i.sidtw_average_distance IS NOT NULL {tc}""", *tp),
             pool.fetch(f"""
@@ -102,43 +122,45 @@ async def get_dashboard_data(tag: list[str] = Query(None), pool=Depends(get_db_p
         stats = {
             "velocityDistribution": {
                 "data": [{"bucket": r["bucket"], "count": r["count"]} for r in vrows],
-                "meta": {"useRanges": True, "min": 0, "max": 3500, "numBuckets": 7, "unit": "mm/s", "label": "Velocity"}
+                "meta": {"useRanges": True, "min": 0, "max": 3500, "numBuckets": 7, "decimals": 0,
+                         "unit": "mm/s", "label": "Programmed velocity", "countLabel": "Segments"}
             },
             "weightDistribution": {
                 "data": [{"bucket": r["bucket"], "count": r["count"]} for r in wrows],
-                "meta": {"useRanges": False, "unit": "kg", "label": "Payload"}
+                "meta": {"useRanges": False, "unit": "kg", "label": "Payload", "countLabel": "Trajectories"}
             },
             "waypointDistribution": {
                 "data": [{"bucket": r["bucket"], "count": r["count"]} for r in wprows],
-                "meta": {"useRanges": False, "unit": "-", "label": "Setpoint"}
+                "meta": {"useRanges": False, "unit": "-", "label": "Setpoints per trajectory",
+                         "countLabel": "Trajectories"}
             },
             "stopPointDistribution": {
                 "data": [{"bucket": r["bucket"], "count": r["count"]} for r in sprows],
-                "meta": {"useRanges": False, "unit": "%", "label": "Stop point"}
+                "meta": {"useRanges": False, "unit": "%", "label": "Stop point", "countLabel": "Segments"}
             },
             "segmentTypeDistribution": {
                 "data": [{"bucket": r["bucket"], "count": r["count"]} for r in mtrows],
-                "meta": {"useRanges": False, "unit": "-", "label": "Type"}
+                "meta": {"useRanges": False, "unit": "-", "label": "Type", "countLabel": "Segments"}
             },
         }
 
-        # Depends on sidtw_max, so it runs after the batch above.
-        if tp:
-            srows = await pool.fetch("""
-                SELECT width_bucket(i.sidtw_average_distance, 0, $1::float, 11) AS bucket, COUNT(*)
-                FROM evaluation.sidtw_info i INNER JOIN motion.traj_info bi ON i.traj_id = bi.traj_id
-                WHERE i.traj_id != i.seg_id AND i.sidtw_average_distance IS NOT NULL
-                AND bi.tag = ANY($2::text[])
-                GROUP BY bucket ORDER BY bucket""", float(sidtw_max or 2.0), tp[0])
-        else:
-            srows = await pool.fetch("""
-                SELECT width_bucket(i.sidtw_average_distance, 0, $1::float, 11) AS bucket, COUNT(*)
-                FROM evaluation.sidtw_info i INNER JOIN motion.traj_info bi ON i.traj_id = bi.traj_id
-                WHERE i.traj_id != i.seg_id AND i.sidtw_average_distance IS NOT NULL
-                GROUP BY bucket ORDER BY bucket""", float(sidtw_max or 2.0))
+        # Classes of 0.1 mm (0.05 mm for small errors) up to the 99th percentile, one class ">= edge" above.
+        # Depends on sidtw_p99, so it runs after the batch above.
+        p99 = float(sidtw_p99 or 1.0)
+        step = 0.1 if p99 > 0.6 else 0.05
+        n_bins = max(1, math.ceil(p99 / step - 1e-9))
+        edge = round(n_bins * step, 2)
+        tc2, tp2 = _tf(tag or None, p=2, robot=robot)
+        srows = await pool.fetch(f"""
+            SELECT LEAST(width_bucket(i.sidtw_average_distance, 0, $1::float, {n_bins}), {n_bins + 1}) AS bucket,
+                   COUNT(*)
+            FROM evaluation.sidtw_info i INNER JOIN motion.traj_info bi ON i.traj_id = bi.traj_id
+            WHERE i.traj_id != i.seg_id AND i.sidtw_average_distance IS NOT NULL {tc2}
+            GROUP BY bucket ORDER BY bucket""", edge, *tp2)
         stats["performanceSIDTWDistribution"] = {
             "data": [{"bucket": r["bucket"], "count": r["count"]} for r in srows],
-            "meta": {"useRanges": True, "min": 0, "max": float(sidtw_max or 2.0), "numBuckets": 11, "unit": "mm", "label": "Accuracy"}
+            "meta": {"useRanges": True, "min": 0, "max": edge, "numBuckets": n_bins, "decimals": 2,
+                     "overflow": True, "unit": "mm", "label": "Accuracy (SIDTW)", "countLabel": "Segments"}
         }
 
         return {
@@ -160,13 +182,14 @@ async def get_performers(
     metric: str = Query("sidtw"),
     with_trajectory: bool = Query(False),
     tag: list[str] = Query(None),
+    robot: str = Query(None),
     conn=Depends(get_db)
 ):
     """Returns top performers. With tags: server-side filter, top 5. Without: top 100 for client-side use."""
     if metric not in METRIC_MAP:
         raise HTTPException(status_code=400, detail=f"Unknown metric: {metric}")
     table, col = METRIC_MAP[metric]
-    tc, tp = _tf(tag or None)
+    tc, tp = _tf(tag or None, robot=robot)
     limit = 10 if with_trajectory else (5 if tag else 100)
 
     base = f"""
@@ -211,14 +234,15 @@ async def get_performers(
 @router.get("/timeline")
 @cache(expire=3600, namespace="dashboard")
 async def get_dashboard_timeline(metric: str = Query("sidtw"), conn=Depends(get_db)):
-    """Returns per (date, tag) rows. Client aggregates for selected tags."""
+    """Returns per (hour, tag, robot) rows ('YYYY-MM-DD HH:00'). Client aggregates for the selected tags / robot."""
     if metric not in METRIC_MAP:
         raise HTTPException(status_code=400, detail=f"Unknown metric: {metric}")
     table, col = METRIC_MAP[metric]
 
     rows = await conn.fetch(f"""
-        SELECT DATE(bi.recording_date) as date,
+        SELECT to_char(date_trunc('hour', bi.recording_date::timestamp), 'YYYY-MM-DD HH24:00') as date,
                bi.tag as tag,
+               bi.robot_model as robot,
                AVG(info.{col}) as avg_val,
                MIN(info.{col}) as min_val,
                MAX(info.{col}) as max_val,
@@ -226,11 +250,11 @@ async def get_dashboard_timeline(metric: str = Query("sidtw"), conn=Depends(get_
         FROM motion.traj_info bi
         INNER JOIN {table} info ON bi.traj_id = info.traj_id AND bi.traj_id = info.seg_id
         WHERE bi.recording_date IS NOT NULL AND info.{col} IS NOT NULL
-        GROUP BY DATE(bi.recording_date), bi.tag
+        GROUP BY 1, bi.tag, bi.robot_model
         ORDER BY date ASC, bi.tag""")
 
     return {"timeline": [{
-        "date": str(r["date"]), "tag": r["tag"],  # tag may be None for untagged trajectories
+        "date": str(r["date"]), "tag": r["tag"], "robot": r["robot"],  # tag may be None for untagged trajectories
         "avg_val": float(r["avg_val"]), "min_val": float(r["min_val"]),
         "max_val": float(r["max_val"]), "count": int(r["count"]),
     } for r in rows]}
@@ -269,11 +293,11 @@ async def get_dashboard_influence(metric: str = Query("sidtw"), conn=Depends(get
 
 @router.get("/tag-info")
 @cache(expire=3600, namespace="dashboard")
-async def get_tag_info(tag: list[str] = Query(None), conn=Depends(get_db)):
-    if not tag:
-        rows = await conn.fetch("SELECT * FROM motion.tag_info ORDER BY tag")
-    else:
-        rows = await conn.fetch("SELECT * FROM motion.tag_info WHERE tag = ANY($1::text[]) ORDER BY tag", tag)
+async def get_tag_info(tag: list[str] = Query(None), robot: str = Query(None), conn=Depends(get_db)):
+    """One row per (tag, robot) -- the reference tags exist for every robot, with its own workspace."""
+    rows = await conn.fetch(
+        "SELECT * FROM motion.tag_info WHERE ($1::text[] IS NULL OR tag = ANY($1::text[])) "
+        "AND ($2::text IS NULL OR robot = $2) ORDER BY tag, robot", tag or None, robot)
     return {"tags": [{
         "tag": r["tag"], "robot": r["robot"], "type": r["type"], "plane": r["plane"],
         "vel_min": float(r["vel_min"]) if r["vel_min"] is not None else None,
@@ -291,30 +315,37 @@ async def get_tag_info(tag: list[str] = Query(None), conn=Depends(get_db)):
     } for r in rows]}
 
 
+# From this many trajectories on, the work area shows a fixed 1 % sample of the setpoints (the plot stays fast).
+WORKAREA_SAMPLE_FROM = 2000
+
+
 @router.get("/workarea/data")
 @cache(expire=1800, namespace="dashboard")
-async def get_workarea_data(tag: list[str] = Query(None), conn=Depends(get_db)):
+async def get_workarea_data(tag: list[str] = Query(None), robot: str = Query(None), conn=Depends(get_db)):
     """
-    With tags  → all setpoints for those tags + workspace bounds from tag_info.
-    Without    → 5000 random setpoints from whole DB, no bounds box.
+    Setpoints of the selected robot (and tags), coloured by their segment's SIDTW. With >= WORKAREA_SAMPLE_FROM
+    trajectories a fixed 1 % sample (abs(hashtext(seg_id)) % 100 = 0, the same points every time).
+    With tags: workspace bounds from tag_info (rows of this robot).
     """
-    if tag:
-        rows = await conn.fetch("""
-            SELECT be.x_reached, be.y_reached, be.z_reached,
-                   s.sidtw_average_distance, bi.tag
-            FROM motion.traj_setpoints be
-            JOIN evaluation.sidtw_info s ON be.traj_id = s.traj_id
-            JOIN motion.traj_info bi ON be.traj_id = bi.traj_id
-            WHERE bi.tag = ANY($1::text[])
-              AND s.traj_id <> s.seg_id
-              AND s.sidtw_average_distance IS NOT NULL
-              AND be.x_reached IS NOT NULL
-        """, tag)
+    tc, tp = _tf(tag or None, robot=robot)
+    n_traj = await conn.fetchval(f"SELECT COUNT(*) FROM motion.traj_info bi WHERE TRUE {tc}", *tp)
+    sampled = n_traj >= WORKAREA_SAMPLE_FROM
+    rows = await conn.fetch(f"""
+        SELECT be.x_reached, be.y_reached, be.z_reached, s.sidtw_average_distance, bi.tag
+        FROM motion.traj_setpoints be
+        JOIN evaluation.sidtw_info s ON s.seg_id = be.seg_id
+        JOIN motion.traj_info bi ON be.traj_id = bi.traj_id
+        WHERE be.x_reached IS NOT NULL AND be.y_reached IS NOT NULL AND be.z_reached IS NOT NULL
+          AND s.sidtw_average_distance IS NOT NULL {tc}
+          {"AND abs(hashtext(be.seg_id)) % 100 = 0" if sampled else ""}
+    """, *tp)
 
+    bounds = None
+    if tag:
         tag_rows = await conn.fetch(
-            "SELECT * FROM motion.tag_info WHERE tag = ANY($1::text[]) ORDER BY tag", tag
+            "SELECT * FROM motion.tag_info WHERE tag = ANY($1::text[]) AND ($2::text IS NULL OR robot = $2) "
+            "ORDER BY tag", tag, robot
         )
-        bounds = None
         if tag_rows:
             xs = [r["ws_x_min"] for r in tag_rows if r["ws_x_min"] is not None]
             xe = [r["ws_x_max"] for r in tag_rows if r["ws_x_max"] is not None]
@@ -328,30 +359,13 @@ async def get_workarea_data(tag: list[str] = Query(None), conn=Depends(get_db)):
                     "y_min": min(ys), "y_max": max(ye),
                     "z_min": min(zs), "z_max": max(ze),
                 }
-    else:
-        rows = await conn.fetch("""
-            WITH numbered AS (
-                SELECT be.x_reached, be.y_reached, be.z_reached,
-                       s.sidtw_average_distance, bi.tag,
-                       ROW_NUMBER() OVER (PARTITION BY be.traj_id ORDER BY be.timestamp) AS rn
-                FROM motion.traj_setpoints be
-                JOIN evaluation.sidtw_info s ON be.traj_id = s.traj_id
-                JOIN motion.traj_info bi ON be.traj_id = bi.traj_id
-                WHERE s.traj_id <> s.seg_id
-                  AND s.sidtw_average_distance IS NOT NULL
-                  AND be.x_reached IS NOT NULL
-                  AND be.y_reached IS NOT NULL
-                  AND be.z_reached IS NOT NULL
-            )
-            SELECT x_reached, y_reached, z_reached, sidtw_average_distance, tag
-            FROM numbered WHERE rn % 9 = 0
-        """)
-        bounds = None
 
     return {
         "points": [{"x": r["x_reached"], "y": r["y_reached"], "z": r["z_reached"],
                     "sidtw": r["sidtw_average_distance"], "tag": r["tag"]} for r in rows],
         "bounds": bounds,
+        "trajectories": n_traj,
+        "sampled": sampled,
     }
 
 @router.get("/influence/binned")
@@ -359,13 +373,14 @@ async def get_workarea_data(tag: list[str] = Query(None), conn=Depends(get_db)):
 async def get_influence_binned(
     metric: str = Query("sidtw"),
     tag: list[str] = Query(None),
+    robot: str = Query(None),
     conn=Depends(get_db),
 ):
     """Returns box-plot bins per parameter, pre-computed in DB."""
     if metric not in METRIC_MAP:
         raise HTTPException(status_code=400, detail=f"Unknown metric: {metric}")
     table, col = METRIC_MAP[metric]
-    tc, tp = _tf(tag or None, alias="bi", p=1)
+    tc, tp = _tf(tag or None, alias="bi", p=1, robot=robot)
     sample = "ORDER BY RANDOM() LIMIT 5000" if not tag else ""
 
     rows = await conn.fetch(f"""
@@ -463,28 +478,20 @@ def _parse_ascii_stl(path: str):
 
 @router.get("/workarea/robot-mesh")
 @cache(expire=86400, namespace="dashboard")
-async def get_robot_mesh(tag: list[str] = Query(None), conn=Depends(get_db)):
-    """Returns Plotly mesh3d data for the robot workspace STL of the given tag(s)."""
-    if tag:
-        row = await conn.fetchrow(
-            "SELECT DISTINCT robot FROM motion.tag_info WHERE tag = ANY($1::text[]) AND robot IS NOT NULL LIMIT 1", tag
-        )
-    else:
-        row = await conn.fetchrow(
-            "SELECT DISTINCT robot FROM motion.tag_info WHERE robot IS NOT NULL LIMIT 1"
-        )
-    if not row or not row["robot"]:
-        return {"mesh": None}
-
-    robot = row["robot"]
-    stl_path = os.path.normpath(os.path.join(_MODELS_DIR, f"{robot}_workspace.stl"))
-    # Safety: must stay within models dir
-    if not stl_path.startswith(os.path.normpath(_MODELS_DIR)):
+async def get_robot_mesh(robot: str = Query(...)):
+    """Plotly mesh3d data for the robot: its workspace envelope ({robot}_workspace.stl: reach within the
+    robot_info workspace, made by scripts/cut_workspace_envelopes.py) and, if present, the robot model in its
+    calibration position ({robot}_model.json: list of parts {name, color, x, y, z, i, j, k})."""
+    if not re.fullmatch(r"[a-z0-9_]+", robot):
         raise HTTPException(status_code=400, detail="Invalid robot model")
-    if not os.path.isfile(stl_path):
-        return {"mesh": None, "robot": robot}
-
-    xs, ys, zs, ii, jj, kk = _parse_ascii_stl(stl_path)
-    return {"mesh": {"x": xs, "y": ys, "z": zs, "i": ii, "j": jj, "k": kk}, "robot": robot}
-
-
+    stl_path = os.path.join(_MODELS_DIR, f"{robot}_workspace.stl")
+    model_path = os.path.join(_MODELS_DIR, f"{robot}_model.json")
+    mesh = None
+    if os.path.isfile(stl_path):
+        xs, ys, zs, ii, jj, kk = _parse_ascii_stl(stl_path)
+        mesh = {"x": xs, "y": ys, "z": zs, "i": ii, "j": jj, "k": kk}
+    model = None
+    if os.path.isfile(model_path):
+        with open(model_path) as f:
+            model = json.load(f)
+    return {"mesh": mesh, "model": model, "robot": robot}

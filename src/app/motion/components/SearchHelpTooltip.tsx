@@ -60,6 +60,14 @@ const SearchHelpTooltip = () => {
                     • <code className="rounded bg-gray-100 px-1">tagname</code>{' '}
                     - search by tag
                   </li>
+                  <li>
+                    • <code className="rounded bg-gray-100 px-1">irb4600</code>{' '}
+                    or{' '}
+                    <code className="rounded bg-gray-100 px-1">
+                      abb irb4400
+                    </code>{' '}
+                    - filter by robot
+                  </li>
                 </ul>
               </div>
 

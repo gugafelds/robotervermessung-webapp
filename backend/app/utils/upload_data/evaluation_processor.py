@@ -239,3 +239,38 @@ async def evaluate_and_upload(conn, traj_id: str, traj_data: dict):
 
     except Exception as e:
         logger.error(f'DB-Upload Evaluation fehlgeschlagen für {traj_id}: {e}')
+
+
+async def fill_acc_position(conn, traj_id: str):
+    """Fills evaluation.acc_position for a new trajectory (after SIDTW, which gives p1_sidtw). Same rows as
+    ~/robotervermessung-recorder/scripts/evaluation/acc_position_fill.py --write, whose segment_rows() is used."""
+    try:
+        fill_dir = os.path.expanduser('~/robotervermessung-recorder/scripts/evaluation')
+        if fill_dir not in sys.path:
+            sys.path.insert(0, fill_dir)
+        from acc_position_fill import COLS, segment_rows
+
+        sp = await conn.fetch(
+            'SELECT seg_id, x_reached, y_reached, z_reached, qx_reached, qy_reached, qz_reached, qw_reached, stop_point '
+            'FROM motion.traj_setpoints WHERE traj_id = $1 AND seg_id <> $1 ORDER BY timestamp', traj_id)
+        a = await conn.fetch(
+            'SELECT seg_id, timestamp, x_act, y_act, z_act, qx_act, qy_act, qz_act, qw_act FROM motion.traj_pose_act '
+            'WHERE traj_id = $1 ORDER BY timestamp', traj_id)
+        b = await conn.fetch(
+            'SELECT timestamp, tcp_vel_act FROM motion.traj_vel_act WHERE traj_id = $1 ORDER BY timestamp', traj_id)
+        s = await conn.fetch(
+            'SELECT DISTINCT ON (seg_id) seg_id, sidtw_deviation FROM evaluation.sidtw_evaluation '
+            'WHERE traj_id = $1 ORDER BY seg_id, points_order DESC', traj_id)
+        pose = (np.array([r[0] for r in a]), np.array([float(r[1]) for r in a]) / 1e9,
+                np.array([list(r[2:5]) for r in a], float).reshape(-1, 3),
+                np.array([list(r[5:9]) for r in a], float).reshape(-1, 4))
+        vel = (np.array([float(r[0]) for r in b]) / 1e9, np.array([float(r[1]) for r in b]))
+        rows = segment_rows(traj_id, [tuple(r) for r in sp], pose, vel,
+                            {r[0]: float(r[1]) for r in s if r[1] is not None})
+        await conn.executemany(
+            f'INSERT INTO evaluation.acc_position ({", ".join(COLS)}) '
+            f'VALUES ({", ".join(f"${i + 1}" for i in range(len(COLS)))}) ON CONFLICT (segment_id) DO NOTHING',
+            [tuple(r.get(c) for c in COLS) for r in rows])
+        logger.info(f'✓ acc_position: {len(rows)} rows for {traj_id}')
+    except Exception as e:  # never breaks the upload; acc_position_fill.py --write fills gaps later
+        logger.error(f'acc_position failed for {traj_id}: {e}')

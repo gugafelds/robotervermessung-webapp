@@ -14,6 +14,7 @@ const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 interface TimelinePoint {
   date: string;
   tag: string | null;
+  robot?: string | null;
   avg_val: number;
   min_val: number;
   max_val: number;
@@ -32,13 +33,19 @@ interface Props {
   allTimeline: TimelinePoint[];
   selectedTags: string[];
   metric: MetricType;
+  robot?: string;
 }
 
-function aggregate(rows: TimelinePoint[], tags: string[]): AggPoint[] {
-  const src =
-    tags.length > 0
-      ? rows.filter((r) => r.tag !== null && tags.includes(r.tag))
-      : rows;
+function aggregate(
+  rows: TimelinePoint[],
+  tags: string[],
+  robot?: string,
+): AggPoint[] {
+  const src = rows.filter(
+    (r) =>
+      (tags.length === 0 || (r.tag !== null && tags.includes(r.tag))) &&
+      (!robot || r.robot === robot),
+  );
   const byDate = new Map<
     string,
     { wsum: number; count: number; min: number; max: number }
@@ -68,7 +75,12 @@ function aggregate(rows: TimelinePoint[], tags: string[]): AggPoint[] {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-export function AccuracyTimeline({ allTimeline, selectedTags, metric }: Props) {
+export function AccuracyTimeline({
+  allTimeline,
+  selectedTags,
+  metric,
+  robot,
+}: Props) {
   const [metricTimeline, setMetricTimeline] =
     useState<TimelinePoint[]>(allTimeline);
   const [isLoading, setIsLoading] = useState(false);
@@ -89,8 +101,8 @@ export function AccuracyTimeline({ allTimeline, selectedTags, metric }: Props) {
 
   // Client-side tag aggregation — instant
   const data = useMemo(
-    () => aggregate(metricTimeline, selectedTags),
-    [metricTimeline, selectedTags],
+    () => aggregate(metricTimeline, selectedTags, robot),
+    [metricTimeline, selectedTags, robot],
   );
 
   const { label, unit } = METRICS[metric];
@@ -124,7 +136,7 @@ export function AccuracyTimeline({ allTimeline, selectedTags, metric }: Props) {
                 name: 'Average',
                 line: { color: '#003560', width: 3 },
                 marker: { size: 6 },
-                hovertemplate: `<b>Average ${label}</b><br>Date: %{x}<br>${label}: %{y:.3f} ${unit}<extra></extra>`,
+                hovertemplate: `<b>Average ${label}</b><br>%{x}<br>${label}: %{y:.3f} ${unit}<extra></extra>`,
               },
               {
                 x: data.map((d) => d.date),
@@ -133,7 +145,7 @@ export function AccuracyTimeline({ allTimeline, selectedTags, metric }: Props) {
                 mode: 'lines',
                 name: 'Minimum',
                 line: { color: '#10b981', width: 2, dash: 'dash' },
-                hovertemplate: `<b>Min ${label}</b><br>Date: %{x}<br>${label}: %{y:.3f} ${unit}<extra></extra>`,
+                hovertemplate: `<b>Min ${label}</b><br>%{x}<br>${label}: %{y:.3f} ${unit}<extra></extra>`,
               },
               {
                 x: data.map((d) => d.date),
@@ -142,7 +154,7 @@ export function AccuracyTimeline({ allTimeline, selectedTags, metric }: Props) {
                 mode: 'lines',
                 name: 'Maximum',
                 line: { color: '#ef4444', width: 2, dash: 'dash' },
-                hovertemplate: `<b>Max ${label}</b><br>Date: %{x}<br>${label}: %{y:.3f} ${unit}<extra></extra>`,
+                hovertemplate: `<b>Max ${label}</b><br>%{x}<br>${label}: %{y:.3f} ${unit}<extra></extra>`,
               },
             ]}
             layout={{
@@ -150,9 +162,14 @@ export function AccuracyTimeline({ allTimeline, selectedTags, metric }: Props) {
               height: 500,
               margin: { t: 20, r: 20, l: 80, b: 80 },
               xaxis: {
-                title: { text: 'Recording date' },
+                title: { text: 'Recording time (per hour)' },
                 type: 'date',
-                tickformat: '%d.%m.%Y',
+                // date in the overview, time of day once zoomed into a day
+                tickformatstops: [
+                  { dtickrange: [null, 86400000], value: '%d.%m. %H:%M' },
+                  { dtickrange: [86400000, null], value: '%d.%m.%Y' },
+                ],
+                hoverformat: '%d.%m.%Y %H:00',
               },
               yaxis: {
                 title: { text: `${label} [${unit}]` },

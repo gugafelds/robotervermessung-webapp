@@ -120,7 +120,7 @@ async def ensure_match_quality_table(conn: asyncpg.Connection) -> None:
 
 async def get_all_tags_from_motion(conn: asyncpg.Connection) -> List[str]:
     """Return every tag from motion.tag_info — mirrors calibration_set_builder behaviour."""
-    rows = await conn.fetch("SELECT tag FROM motion.tag_info ORDER BY tag")
+    rows = await conn.fetch("SELECT DISTINCT tag FROM motion.tag_info ORDER BY tag")  # one row per (tag, robot)
     return [r['tag'] for r in rows]
 
 

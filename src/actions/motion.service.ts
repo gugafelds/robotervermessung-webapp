@@ -77,6 +77,7 @@ export interface SearchTrajParams extends PaginationParams {
   recordingDate?: string;
   sidtwDistance?: number;
   tag?: string;
+  robot?: string;
 }
 
 export const searchTrajInfo = async (
@@ -110,6 +111,7 @@ export const searchTrajInfo = async (
     if (searchParams.recordingDate)
       queryParams.append('recording_date', searchParams.recordingDate);
     if (searchParams.tag) queryParams.append('tag', searchParams.tag);
+    if (searchParams.robot) queryParams.append('robot', searchParams.robot);
     if (searchParams.page)
       queryParams.append('page', searchParams.page.toString());
     if (searchParams.pageSize)
@@ -330,5 +332,28 @@ export const checkTransformedDataExists = async (
     // eslint-disable-next-line no-console
     console.error('Error checking transformed data:', error);
     return false;
+  }
+};
+
+// Deletes a trajectory and all its data (backend checks the admin password). Returns an error message or nothing.
+export const deleteTrajectory = async (
+  trajId: string,
+  password: string,
+): Promise<string | undefined> => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/traj/delete/${encodeURIComponent(trajId)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+        cache: 'no-store',
+      },
+    );
+    if (response.ok) return undefined;
+    const body = await response.json().catch(() => ({}));
+    return body.detail || `${response.status} ${response.statusText}`;
+  } catch (error) {
+    return 'Server not reachable';
   }
 };

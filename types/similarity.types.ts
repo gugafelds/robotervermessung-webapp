@@ -23,6 +23,7 @@ export interface MetadataCalculationRequest {
   traj_id?: string;
   start_time?: string;
   end_time?: string;
+  password?: string; // admin password, required for duplicate_handling 'replace'
 }
 
 export interface MetadataCalculationResponse {

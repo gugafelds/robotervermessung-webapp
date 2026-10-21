@@ -8,6 +8,9 @@ export interface DistributionMeta {
   min?: number;
   max?: number;
   numBuckets?: number;
+  decimals?: number; // of the range labels
+  overflow?: boolean; // bucket numBuckets + 1 = values >= max
+  countLabel?: string; // what is counted (y axis): trajectories, segments
   unit: string;
   label: string;
 }

@@ -21,12 +21,14 @@ interface Props {
   };
   selectedTags: string[];
   metric: MetricType;
+  robot?: string;
 }
 
 export function PerformersTable({
   initialPerformers,
   selectedTags,
   metric,
+  robot,
 }: Props) {
   const [performers, setPerformers] = useState(initialPerformers);
   const [loading, setLoading] = useState(false);
@@ -41,10 +43,10 @@ export function PerformersTable({
     const tags = selectedTags.length > 0 ? selectedTags : undefined;
     const isMetricChange = !tags; // simplification — spinner only on first metric change
     if (isMetricChange) setLoading(true);
-    getPerformers(metric, false, tags)
+    getPerformers(metric, false, tags, robot)
       .then((r) => setPerformers(r as typeof performers))
       .finally(() => setLoading(false));
-  }, [selectedTags, metric]);
+  }, [selectedTags, metric, robot]);
 
   const { label, unit } = METRICS[metric];
   const metricHeader = `${label} [${unit}]`;

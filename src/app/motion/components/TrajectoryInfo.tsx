@@ -7,14 +7,18 @@ import {
   ChartBarIcon,
   CubeTransparentIcon,
   DocumentTextIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import ErrorIcon from '@heroicons/react/24/outline/FaceFrownIcon';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import React, { useState } from 'react';
 
+import { deleteTrajectory } from '@/src/actions/motion.service';
+import { PasswordDialog } from '@/src/components/PasswordDialog';
 import { Typography } from '@/src/components/Typography';
 import { formatDate, formatNumber } from '@/src/lib/functions';
+import { displayName } from '@/src/lib/labels';
 import { useTrajectory } from '@/src/providers/trajectory.provider';
 import type { TrajMetadataResult } from '@/types/motion.types';
 
@@ -69,6 +73,7 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const pickMeta = (meta?: TrajMetadataResult | null) =>
     selectedId && selectedId !== currentTrajInfo!.trajID
@@ -116,7 +121,36 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
     <div className="flex h-full min-w-80 flex-col border-r border-gray-500 bg-gray-50 p-3 lg:h-fullscreen lg:overflow-scroll">
       {currentTrajInfo && Object.keys(currentTrajInfo).length !== 0 && (
         <>
-          <div className="rounded-xl p-4 text-primary ">
+          <div className="relative rounded-xl p-4 text-primary">
+            <button
+              type="button"
+              onClick={() => setDeleteOpen(true)}
+              title="Delete trajectory"
+              aria-label="Delete trajectory"
+              className="absolute right-2 top-2 rounded-md p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+            >
+              <TrashIcon className="size-5" />
+            </button>
+            <PasswordDialog
+              open={deleteOpen}
+              title={`Delete trajectory ${currentTrajInfo.trajID}`}
+              message="The trajectory and all its data (measurement, evaluation, simulation, metadata) are deleted permanently. Enter the admin password to continue."
+              confirmLabel="Delete"
+              danger
+              onConfirm={async (password) => {
+                const error = await deleteTrajectory(
+                  currentTrajInfo.trajID,
+                  password,
+                );
+                if (error) return error;
+                // reload: /motion opens the newest trajectory and the list is fresh
+                window.location.href = isOnEvaluationPage
+                  ? '/evaluation'
+                  : '/motion';
+                return undefined;
+              }}
+              onClose={() => setDeleteOpen(false)}
+            />
             <div className="text-sm font-medium">ID</div>
             <div className="relative">
               <button
@@ -200,6 +234,10 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
 
           <InfoSection title="General">
             <InfoRow
+              label="Robot"
+              value={displayName(currentTrajInfo.robotModel)}
+            />
+            <InfoRow
               label="Movement Type"
               value={selectedMeta?.movType || '-'}
             />
@@ -211,14 +249,13 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
               label="Load"
               value={`${formatNumber(selectedMeta?.weight) || '-'} kg`}
             />
-            <InfoRow label="Robot" value={currentTrajInfo.robotModel || '-'} />
             <InfoRow
               label="Source (M)"
-              value={currentTrajInfo.sourceDataAct || '-'}
+              value={displayName(currentTrajInfo.sourceDataAct)}
             />
             <InfoRow
               label="Source (C)"
-              value={currentTrajInfo.sourceDataCmd || '-'}
+              value={displayName(currentTrajInfo.sourceDataCmd)}
             />
             <InfoRow
               label="Start"

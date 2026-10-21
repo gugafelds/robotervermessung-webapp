@@ -54,9 +54,16 @@ export function DistributionCharts({ stats }: Props) {
   );
 
   const getBucketRange = (bucket: number) => {
-    const { min = 0, max = 1, numBuckets = 1 } = active.meta;
+    const {
+      min = 0,
+      max = 1,
+      numBuckets = 1,
+      decimals = 2,
+      overflow = false,
+    } = active.meta;
+    if (overflow && bucket > numBuckets) return `≥ ${max.toFixed(decimals)}`;
     const w = (max - min) / numBuckets;
-    return `${(min + (bucket - 1) * w).toFixed(2)}-${(min + bucket * w).toFixed(2)}`;
+    return `${(min + (bucket - 1) * w).toFixed(decimals)}–${(min + bucket * w).toFixed(decimals)}`;
   };
 
   const xLabels = active.meta.useRanges
@@ -98,7 +105,7 @@ export function DistributionCharts({ stats }: Props) {
             title: { text: `${active.meta.label} [${active.meta.unit}]` },
             type: 'category',
           },
-          yaxis: { title: { text: 'Amount' } },
+          yaxis: { title: { text: active.meta.countLabel ?? 'Amount' } },
         }}
         style={{ width: '100%' }}
         config={{

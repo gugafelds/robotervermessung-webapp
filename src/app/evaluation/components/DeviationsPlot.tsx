@@ -275,7 +275,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
 
   if (!hasDeviationData) {
     return (
-      <div className="m-4 rounded-lg border border-gray-500 bg-gray-200 p-6 text-center text-gray-500">
+      <div className="mt-4 rounded-lg border border-gray-500 bg-gray-200 p-6 text-center text-gray-500">
         Keine Abweichungsdaten verfügbar
       </div>
     );
@@ -285,7 +285,7 @@ export const DeviationsPlot: React.FC<DeviationsPlotProps> = ({
   const oriMetricLoaded = Object.values(oriMetrics).some((m) => m.isLoaded);
 
   return (
-    <div className="w-full space-y-4 p-4">
+    <div className="w-full space-y-4 pt-4">
       {/* Zentralisierte Kontrollen */}
       <div className="flex flex-wrap items-center gap-4 rounded-lg border border-gray-500 bg-white p-4">
         <div>Position:</div>

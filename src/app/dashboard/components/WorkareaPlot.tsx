@@ -7,6 +7,7 @@ import { useState } from 'react';
 
 import { getRobotMesh, getWorkareaData } from '@/src/actions/dashboard.service';
 import { Typography } from '@/src/components/Typography';
+import { displayName } from '@/src/lib/labels';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
@@ -34,8 +35,16 @@ interface Mesh {
   k: number[];
 }
 
+// Robot model part in its calibration position (backend: {robot}_model.json)
+interface ModelPart extends Mesh {
+  name: string;
+  color: string;
+}
+
 interface Props {
   selectedTags: string[];
+  robot: string | null; // robot_model code; null = none can be shown (see hint)
+  hint: string;
 }
 
 function makeWorkspaceBox(b: Bounds) {
@@ -132,39 +141,51 @@ function makeWorkspaceBox(b: Bounds) {
   };
 }
 
-export function WorkareaPlot({ selectedTags }: Props) {
+export function WorkareaPlot({ selectedTags, robot, hint }: Props) {
   const [points, setPoints] = useState<WorkareaPoint[]>([]);
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [mesh, setMesh] = useState<Mesh | null>(null);
+  const [model, setModel] = useState<ModelPart[] | null>(null);
+  const [info, setInfo] = useState<{ trajectories: number; sampled: boolean }>({
+    trajectories: 0,
+    sampled: false,
+  });
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [loadedFor, setLoadedFor] = useState<string[]>([]);
+  const [loadedFor, setLoadedFor] = useState('');
+
+  const selectionKey = `${robot}|${[...selectedTags].sort().join(',')}`;
 
   const handleLoad = async () => {
+    if (!robot) return;
     setLoading(true);
     const tags = selectedTags.length > 0 ? selectedTags : undefined;
     const [workareaRes, meshRes] = await Promise.all([
-      getWorkareaData(tags) as Promise<{
+      getWorkareaData(robot, tags) as Promise<{
         points: WorkareaPoint[];
         bounds: Bounds | null;
+        trajectories: number;
+        sampled: boolean;
       }>,
-      // Only fetch robot mesh when no tags selected (all tags view)
-      tags
-        ? Promise.resolve({ mesh: null })
-        : (getRobotMesh() as Promise<{ mesh: Mesh | null }>),
+      getRobotMesh(robot) as Promise<{
+        mesh: Mesh | null;
+        model: ModelPart[] | null;
+      }>,
     ]);
     setPoints(workareaRes.points ?? []);
     setBounds(workareaRes.bounds ?? null);
-    setMesh((meshRes as { mesh: Mesh | null }).mesh ?? null);
+    setInfo({
+      trajectories: workareaRes.trajectories ?? 0,
+      sampled: workareaRes.sampled ?? false,
+    });
+    setMesh(meshRes.mesh ?? null);
+    setModel(meshRes.model ?? null);
     setLoaded(true);
-    setLoadedFor([...selectedTags]);
+    setLoadedFor(selectionKey);
     setLoading(false);
   };
 
-  const tagsChanged =
-    loaded &&
-    JSON.stringify([...loadedFor].sort()) !==
-      JSON.stringify([...selectedTags].sort());
+  const selectionChanged = loaded && loadedFor !== selectionKey;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const traces: any[] = [];
@@ -185,6 +206,25 @@ export function WorkareaPlot({ selectedTags }: Props) {
       name: 'Robot workspace',
     });
   }
+
+  model?.forEach((part) =>
+    traces.push({
+      type: 'mesh3d',
+      x: part.x,
+      y: part.y,
+      z: part.z,
+      i: part.i,
+      j: part.j,
+      k: part.k,
+      color: part.color,
+      opacity: 1,
+      flatshading: false,
+      lighting: { ambient: 0.55, diffuse: 0.7, specular: 0.15 },
+      hoverinfo: 'skip',
+      showlegend: false,
+      name: part.name,
+    }),
+  );
 
   if (points.length > 0) {
     traces.push({
@@ -209,10 +249,23 @@ export function WorkareaPlot({ selectedTags }: Props) {
 
   if (bounds) traces.push(makeWorkspaceBox(bounds));
 
+  if (!robot) {
+    return (
+      <div className="flex flex-col rounded-2xl border border-gray-500 bg-white p-4">
+        <Typography as="h2" className="mb-3">
+          Work area
+        </Typography>
+        <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-gray-300 text-sm text-gray-400">
+          {hint}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col rounded-2xl border border-gray-500 bg-white p-4">
       <Typography as="h2" className="mb-3">
-        Work area
+        Work area · {displayName(robot)}
       </Typography>
 
       <div className="mb-4 flex items-center gap-3">
@@ -224,19 +277,17 @@ export function WorkareaPlot({ selectedTags }: Props) {
         >
           {loading ? 'Loading…' : 'Load data'}
         </button>
-        {selectedTags.length === 0 && !loaded && (
-          <span className="text-sm text-gray-400">
-            All tags — every 9th setpoint per trajectory + robot mesh
-          </span>
-        )}
-        {tagsChanged && !loading && (
+        {selectionChanged && !loading && (
           <span className="text-sm text-amber-600">
-            Tag selection changed — reload to update
+            Selection changed — reload to update
           </span>
         )}
-        {loaded && !tagsChanged && points.length > 0 && (
+        {loaded && !selectionChanged && points.length > 0 && (
           <span className="text-sm text-gray-500">
             {points.length.toLocaleString()} setpoints
+            {info.sampled
+              ? ` (1 % sample of ${info.trajectories.toLocaleString()} trajectories)`
+              : ` of ${info.trajectories.toLocaleString()} trajectories`}
           </span>
         )}
       </div>
@@ -247,7 +298,7 @@ export function WorkareaPlot({ selectedTags }: Props) {
         </div>
       ) : points.length === 0 ? (
         <div className="flex h-96 items-center justify-center text-sm text-gray-400">
-          No data for selected tag(s)
+          No data for the selection
         </div>
       ) : (
         <Plot
@@ -259,9 +310,10 @@ export function WorkareaPlot({ selectedTags }: Props) {
               xaxis: { title: { text: 'X [mm]' } },
               yaxis: { title: { text: 'Y [mm]' } },
               zaxis: { title: { text: 'Z [mm]' } },
+              aspectmode: 'data',
             },
             margin: { t: 10, r: 10, l: 10, b: 10 },
-            uirevision: loadedFor.join(','),
+            uirevision: loadedFor,
             showlegend: false,
           }}
           style={{ width: '100%' }}

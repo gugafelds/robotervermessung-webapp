@@ -9,7 +9,7 @@ from .csv_processor import CSVProcessor
 from .db_operations import DatabaseOperations
 from .db_config import DATABASE_URL
 from ..metadata_embeddings.metadata_calculator import MetadataCalculatorService
-from .evaluation_processor import evaluate_and_upload
+from .evaluation_processor import evaluate_and_upload, fill_acc_position
 
 
 class BatchProcessor:
@@ -380,6 +380,7 @@ class BatchProcessor:
                 )
                 if traj_data:
                     await evaluate_and_upload(conn, traj_id, traj_data)
+                    await fill_acc_position(conn, traj_id)
 
         if close_conn and conn:
             await conn.close()

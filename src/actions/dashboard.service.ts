@@ -47,19 +47,35 @@ export const refreshDashboardCache = async (): Promise<void> => {
   }
 };
 
-export const getAvailableTags = async (): Promise<{ tags: string[] }> => {
+// Robots from motion.robot_info (robot filter options)
+export const getRobots = async (): Promise<{
+  robots: { robot_model: string; description: string | null }[];
+}> => {
   try {
-    return await apiFetch(`${API_BASE_URL}/dashboard/tags`);
+    return await apiFetch(`${API_BASE_URL}/dashboard/robots`);
+  } catch (error) {
+    console.error('Error fetching robots:', error);
+    return { robots: [] };
+  }
+};
+
+// robot: robot_model code, undefined = all robots
+// tags (of the robot, if given) and the robots each tag contains
+export const getAvailableTags = async (
+  robot?: string,
+): Promise<{ tags: string[]; robots: Record<string, string[]> }> => {
+  try {
+    return await apiFetch(buildUrl('/dashboard/tags', { robot }));
   } catch (error) {
     console.error('Error fetching tags:', error);
-    return { tags: [] };
+    return { tags: [], robots: {} };
   }
 };
 
 // Re-fetched on tag change (KPIs + distributions only)
-export const getDashboardData = async (tags?: string[]) => {
+export const getDashboardData = async (tags?: string[], robot?: string) => {
   try {
-    return await apiFetch(buildUrl('/dashboard/data', { tag: tags }));
+    return await apiFetch(buildUrl('/dashboard/data', { tag: tags, robot }));
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
     return {};
@@ -73,6 +89,7 @@ export const getPerformers = async (
   metric: MetricType = 'sidtw',
   withTrajectory = false,
   tags?: string[],
+  robot?: string,
 ) => {
   try {
     return await apiFetch(
@@ -80,6 +97,7 @@ export const getPerformers = async (
         metric,
         with_trajectory: String(withTrajectory),
         tag: tags,
+        robot,
       }),
     );
   } catch (error) {
@@ -88,19 +106,24 @@ export const getPerformers = async (
   }
 };
 
-export const getTagInfo = async (tags?: string[]) => {
+// one row per (tag, robot); robot undefined = rows of every robot
+export const getTagInfo = async (tags?: string[], robot?: string) => {
   try {
-    return await apiFetch(buildUrl('/dashboard/tag-info', { tag: tags }));
+    return await apiFetch(
+      buildUrl('/dashboard/tag-info', { tag: tags, robot }),
+    );
   } catch (error) {
     console.error('Error fetching tag info:', error);
     return { tags: [] };
   }
 };
 
-// On-demand: with tags → all setpoints for those tags + bounds; without → 5000 random samples
-export const getWorkareaData = async (tags?: string[]) => {
+// On-demand: setpoints of the robot (and tags); from 2000 trajectories on a 1 % sample. Bounds with tags.
+export const getWorkareaData = async (robot: string, tags?: string[]) => {
   try {
-    return await apiFetch(buildUrl('/dashboard/workarea/data', { tag: tags }));
+    return await apiFetch(
+      buildUrl('/dashboard/workarea/data', { tag: tags, robot }),
+    );
   } catch (error) {
     console.error('Error fetching workarea data:', error);
     return { points: [], bounds: null };
@@ -117,15 +140,15 @@ export const getMetricTimeline = async (metric: MetricType = 'sidtw') => {
   }
 };
 
-// Returns Plotly mesh3d data for the robot workspace STL
-export const getRobotMesh = async (tags?: string[]) => {
+// Plotly mesh3d data: the robot's workspace envelope and (if available) the robot model
+export const getRobotMesh = async (robot: string) => {
   try {
     return await apiFetch(
-      buildUrl('/dashboard/workarea/robot-mesh', { tag: tags }),
+      buildUrl('/dashboard/workarea/robot-mesh', { robot }),
     );
   } catch (error) {
     console.error('Error fetching robot mesh:', error);
-    return { mesh: null };
+    return { mesh: null, model: null };
   }
 };
 
@@ -133,10 +156,11 @@ export const getRobotMesh = async (tags?: string[]) => {
 export const getInfluenceBinned = async (
   metric: MetricType = 'sidtw',
   tags?: string[],
+  robot?: string,
 ) => {
   try {
     return await apiFetch(
-      buildUrl('/dashboard/influence/binned', { metric, tag: tags }),
+      buildUrl('/dashboard/influence/binned', { metric, tag: tags, robot }),
     );
   } catch (error) {
     console.error('Error fetching binned influence data:', error);

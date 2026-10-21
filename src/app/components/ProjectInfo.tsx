@@ -5,6 +5,32 @@ import React from 'react';
 
 import { Typography } from '@/src/components/Typography';
 
+const PUBLICATIONS = [
+  {
+    authors: 'Barros, G.; Appel, N.; Kuhlenkötter, B.',
+    title: 'RMPD: Robot Motion and Performance Database',
+    venue: 'Dataset, Zenodo, 2026',
+    doi: '10.5281/zenodo.18549433',
+  },
+  {
+    authors: 'Barros, G.; Appel, N.; Thomas, F.; Kuhlenkötter, B.',
+    title:
+      'Data-Driven Trajectory Performance Prediction for Industrial Robots via Multi-Modal Retrieval',
+    venue:
+      'The International Journal of Advanced Manufacturing Technology, 2026',
+    doi: '10.1007/s00170-026-18597-2',
+  },
+  {
+    authors:
+      'Prasad, R.; Barros, G.; Appel, N.; Kuhlenkötter, B.; Wiederkehr, P.',
+    title:
+      'Prediction of End-Effector Motion in Industrial Robots Using LSTM Neural Networks: A Deep Learning Approach in Robot Dynamics',
+    venue:
+      '13th CIRP Global Web Conference - AI in Smart Manufacturing, Procedia CIRP Vol. 139, pp. 179–184, Elsevier, 2026',
+    doi: '10.1016/j.procir.2025.09.018',
+  },
+];
+
 export const ProjectInfo = () => {
   return (
     <section className="mx-auto mb-12 mt-8 max-w-xl text-pretty px-8 md:max-w-2xl xl:max-w-4xl">
@@ -68,6 +94,24 @@ export const ProjectInfo = () => {
           PostgreSQL database and provides interactive visualization of the
           stored measurement data.
         </Typography>
+      </div>
+
+      <div className="mt-8">
+        <Typography as="h2">Publications</Typography>
+        <ul className="mt-2 flex flex-col gap-3 font-light text-primary">
+          {PUBLICATIONS.map((p) => (
+            <li key={p.doi}>
+              {p.authors} <span className="font-semibold">{p.title}.</span>{' '}
+              <span className="italic">{p.venue}</span>.{' '}
+              <Link
+                href={`https://doi.org/${p.doi}`}
+                className="border-b-2 border-dotted border-b-black"
+              >
+                doi:{p.doi}
+              </Link>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="mt-8 flex flex-col rounded-lg bg-gray-100 p-4">

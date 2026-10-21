@@ -13,6 +13,7 @@ import { searchTrajInfo } from '@/src/actions/motion.service';
 import SearchFilter from '@/src/components/SearchFilter';
 import { Typography } from '@/src/components/Typography';
 import { formatDate } from '@/src/lib/functions';
+import { displayName, parseRobot } from '@/src/lib/labels';
 import type { TrajInfo } from '@/types/motion.types';
 import type { PaginationResult } from '@/types/pagination.types';
 
@@ -154,7 +155,14 @@ export const Sidebar = () => {
       return params;
     }
 
-    const filterParts = filter.trim().split(/\s+/);
+    // "irb4400", "abb irb4400", "IRB 4600" -> robot filter
+    const { robot, rest } = parseRobot(filter);
+    if (robot) params.robot = robot;
+    if (!rest.trim()) {
+      return params;
+    }
+
+    const filterParts = rest.trim().split(/\s+/);
 
     for (const part of filterParts) {
       if (/^\d+$/.test(part)) {
@@ -284,11 +292,18 @@ export const Sidebar = () => {
                           ? formatDate(traj.recordingDate)
                           : 'n. a.'}
                       </Typography>
-                      {traj.tag && (
-                        <span className="mt-0.5 inline-block rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700">
-                          {traj.tag}
-                        </span>
-                      )}
+                      <div className="mt-0.5 flex flex-wrap gap-1">
+                        {traj.robotModel && (
+                          <span className="inline-block rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
+                            {displayName(traj.robotModel)}
+                          </span>
+                        )}
+                        {traj.tag && (
+                          <span className="inline-block rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700">
+                            {traj.tag}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </Link>
                 </div>

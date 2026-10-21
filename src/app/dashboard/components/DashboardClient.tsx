@@ -1,16 +1,16 @@
-/* eslint-disable jsx-a11y/no-noninteractive-element-interactions */
 /* eslint-disable no-nested-ternary */
 
 'use client';
 
-import { ChevronDown, Loader, RefreshCw } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Loader, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   getAvailableTags,
   getDashboardData,
   getMetricTimeline,
   getPerformers,
+  getRobots,
   refreshDashboardCache,
 } from '@/src/actions/dashboard.service';
 import { AccuracyCard } from '@/src/app/dashboard/components/AccuracyCard';
@@ -21,6 +21,8 @@ import { ParameterCorrelation } from '@/src/app/dashboard/components/ParameterCo
 import { PerformersTable } from '@/src/app/dashboard/components/PerformersTable';
 import { TagInfoCard } from '@/src/app/dashboard/components/TagInfoCard';
 import { WorkareaPlot } from '@/src/app/dashboard/components/WorkareaPlot';
+import SearchFilter from '@/src/components/SearchFilter';
+import { displayName } from '@/src/lib/labels';
 import {
   type DashboardData,
   METRICS,
@@ -31,6 +33,7 @@ import {
 interface TimelinePoint {
   date: string;
   tag: string | null;
+  robot?: string | null;
   avg_val: number;
   min_val: number;
   max_val: number;
@@ -39,10 +42,16 @@ interface TimelinePoint {
 
 export default function DashboardClient() {
   // selectedTags = applied (drives data fetching)
-  // pendingTags  = what's shown in the dropdown (not yet applied)
+  // pendingTags  = marked in the tag list (not yet applied)
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [pendingTags, setPendingTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState('');
+  // robot_model code from motion.robot_info, 'all' = every robot
+  const [robot, setRobot] = useState('all');
+  const [robots, setRobots] = useState<string[]>([]);
+  // tag -> robots it contains (for the work area without a chosen robot)
+  const [tagRobots, setTagRobots] = useState<Record<string, string[]>>({});
   const [metric, setMetric] = useState<MetricType>('sidtw');
   const [basicData, setBasicData] = useState<DashboardData | null>(null);
   const [performersAll, setPerformersAll] = useState<{
@@ -52,8 +61,8 @@ export default function DashboardClient() {
   const [timelineData, setTimelineData] = useState<TimelinePoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const initialized = useRef(false);
+  const robotParam = robot === 'all' ? undefined : robot;
 
   useEffect(() => {
     Promise.all([
@@ -61,9 +70,12 @@ export default function DashboardClient() {
       getDashboardData(),
       getPerformers('sidtw', false),
       getMetricTimeline(),
+      getRobots(),
     ])
-      .then(([tags, data, tablePerformers, timeline]) => {
-        setAvailableTags((tags as { tags: string[] }).tags);
+      .then(([tags, data, tablePerformers, timeline, robotList]) => {
+        setAvailableTags(tags.tags);
+        setTagRobots(tags.robots ?? {});
+        setRobots(robotList.robots.map((r) => r.robot_model));
         setBasicData(data as DashboardData);
         setPerformersAll(tablePerformers as typeof performersAll);
         setTimelineData(
@@ -75,15 +87,51 @@ export default function DashboardClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-fetch KPI/distribution data when applied tags change (or on manual refresh)
+  // Re-fetch KPI/distribution data when applied tags or the robot change (or on manual refresh)
   useEffect(() => {
     if (!initialized.current) return;
-    const tagFilter = selectedTags.length > 0 ? selectedTags : undefined;
+    const tags = selectedTags.length > 0 ? selectedTags : undefined;
     setRefreshing(true);
-    getDashboardData(tagFilter)
+    getDashboardData(tags, robotParam)
       .then((data) => setBasicData(data as DashboardData))
       .finally(() => setRefreshing(false));
-  }, [selectedTags]);
+  }, [selectedTags, robotParam]);
+
+  // Tag list of the chosen robot; marked / applied tags of other robots are dropped
+  useEffect(() => {
+    if (!initialized.current) return;
+    getAvailableTags(robotParam).then(({ tags }) => {
+      setAvailableTags(tags);
+      setPendingTags((prev) => prev.filter((t) => tags.includes(t)));
+      setSelectedTags((prev) => {
+        const kept = prev.filter((t) => tags.includes(t));
+        return kept.length === prev.length ? prev : kept;
+      });
+    });
+  }, [robotParam]);
+
+  const visibleTags = useMemo(() => {
+    const q = tagFilter.trim().toLowerCase();
+    return [...availableTags]
+      .sort((a, b) => a.localeCompare(b))
+      .filter((t) => !q || t.toLowerCase().includes(q));
+  }, [availableTags, tagFilter]);
+
+  // Work area needs one robot: the chosen one, or the only robot of the applied tags
+  const workarea = useMemo((): { robot: string | null; hint: string } => {
+    if (robot !== 'all') return { robot, hint: '' };
+    if (selectedTags.length === 0)
+      return {
+        robot: null,
+        hint: 'Select a robot, or tags of a single robot, to show the work area',
+      };
+    const rs = [...new Set(selectedTags.flatMap((t) => tagRobots[t] ?? []))];
+    if (rs.length === 1) return { robot: rs[0], hint: '' };
+    return {
+      robot: null,
+      hint: `The selected tags contain several robots (${rs.map(displayName).join(', ')}) — select one robot`,
+    };
+  }, [robot, selectedTags, tagRobots]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -99,13 +147,11 @@ export default function DashboardClient() {
 
   const applyTags = () => {
     setSelectedTags([...pendingTags]);
-    setDropdownOpen(false);
   };
 
   const removeAll = () => {
     setPendingTags([]);
     setSelectedTags([]);
-    setDropdownOpen(false);
   };
 
   const hasPendingChanges =
@@ -124,107 +170,157 @@ export default function DashboardClient() {
     return <div className="p-6">Error: No data found</div>;
   }
 
-  const tagLabel =
-    selectedTags.length === 0
-      ? 'All tags'
-      : selectedTags.length === 1
-        ? selectedTags[0]
-        : `${selectedTags.length} tags`;
-
   return (
-    <div className="flex min-h-screen border-r border-gray-500 bg-gray-50">
-      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-      <aside className="sticky top-0 flex h-screen w-72 flex-col gap-6 overflow-y-auto border-r border-gray-500 bg-white p-4">
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-bold uppercase text-gray-800">Tag</p>
-            <button
-              type="button"
-              onClick={() => {
-                // eslint-disable-next-line no-void
-                void handleRefresh();
-              }}
-              disabled={refreshing}
-              title="Refresh data for selected tag"
-              className="rounded-md p-1 text-gray-500 hover:bg-gray-100 disabled:opacity-40"
-            >
-              <RefreshCw
-                className={`size-4 ${refreshing ? 'animate-spin' : ''}`}
-              />
-            </button>
-          </div>
-
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setDropdownOpen((o) => !o)}
-              className="flex w-full items-center justify-between rounded-lg border border-gray-500 bg-gray-50 px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              <span className="truncate">{tagLabel}</span>
-              <ChevronDown
-                className={`ml-1 size-4 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-
-            {dropdownOpen && (
-              <div className="absolute left-0 z-50 mt-1 w-full overflow-y-auto rounded-lg border border-gray-500 bg-white shadow-lg">
-                {/* Tag list */}
-                <div className="max-h-[28rem] overflow-y-auto py-1">
-                  <button
-                    type="button"
-                    onClick={() => setPendingTags([])}
-                    className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-gray-50 ${pendingTags.length === 0 ? 'font-semibold text-blue-950' : 'text-gray-700'}`}
-                  >
-                    All tags
-                  </button>
-                  {availableTags.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => togglePending(t)}
-                      className={`w-full px-3 py-1.5 text-left text-sm transition-colors hover:bg-gray-50 ${pendingTags.includes(t) ? 'font-semibold text-blue-950' : 'text-gray-700'}`}
-                    >
-                      {pendingTags.includes(t) ? '✓ ' : ''}
-                      {t}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-1 border-t border-gray-100 p-2">
-                  <button
-                    type="button"
-                    onClick={removeAll}
-                    className="flex-1 rounded-md border border-gray-200 px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                  >
-                    Remove all
-                  </button>
-                  <button
-                    type="button"
-                    onClick={applyTags}
-                    disabled={!hasPendingChanges}
-                    className="flex-1 rounded-md bg-blue-950 px-2 py-1.5 text-xs font-medium text-white hover:bg-blue-800 disabled:opacity-40"
-                  >
-                    Apply
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Applied tag chips */}
-          {selectedTags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {selectedTags.map((t) => (
-                <span
-                  key={t}
-                  className="rounded-full bg-blue-950 px-2 py-1 text-xs text-white"
-                >
-                  {t}
-                </span>
-              ))}
+    <div className="flex min-h-screen w-full bg-gray-50">
+      {/* ── Tags (search + list, like the Motion sidebar) ─────────────────── */}
+      <aside className="sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r border-gray-500 bg-white px-4 py-2">
+        <div className="flex items-center justify-between pl-1">
+          <span className="mt-2 text-2xl font-semibold text-primary">Tags</span>
+          <button
+            type="button"
+            onClick={() => {
+              // eslint-disable-next-line no-void
+              void handleRefresh();
+            }}
+            disabled={refreshing}
+            title="Refresh data"
+            className="mt-2 rounded-md p-1 text-gray-500 hover:bg-gray-200 disabled:opacity-40"
+          >
+            <RefreshCw
+              className={`size-4 ${refreshing ? 'animate-spin' : ''}`}
+            />
+          </button>
+        </div>
+        <SearchFilter
+          onFilterChange={setTagFilter}
+          placeholder="Filter tags..."
+        />
+        <div className="mt-3 flex gap-1">
+          <button
+            type="button"
+            onClick={removeAll}
+            disabled={pendingTags.length === 0 && selectedTags.length === 0}
+            className="flex-1 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+          >
+            Remove all
+          </button>
+          <button
+            type="button"
+            onClick={applyTags}
+            disabled={!hasPendingChanges}
+            className="flex-1 rounded-md bg-blue-950 px-2 py-1.5 text-xs font-medium text-white hover:bg-blue-800 disabled:opacity-40"
+          >
+            Apply
+          </button>
+        </div>
+        <div className="mt-2 pl-1 text-sm text-gray-600">
+          {selectedTags.length === 0
+            ? `All tags (${availableTags.length})`
+            : `${selectedTags.length} of ${availableTags.length} tags applied`}
+        </div>
+        <div className="mt-2 overflow-y-auto">
+          {visibleTags.length === 0 && (
+            <div className="py-4 text-center text-sm text-gray-500">
+              No tags found
             </div>
           )}
+          {visibleTags.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => togglePending(t)}
+              className={`mt-1 flex w-full items-center justify-between rounded-xl px-2 py-1.5 text-left text-sm transition-colors duration-200 ${
+                pendingTags.includes(t)
+                  ? 'bg-gray-300 font-semibold text-primary'
+                  : 'text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <span className="truncate">{t}</span>
+              {selectedTags.includes(t) && (
+                <span className="ml-2 rounded-full bg-blue-950 px-1.5 text-xs text-white">
+                  ✓
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </aside>
+
+      {/* ── Main content ────────────────────────────────────────────────── */}
+      <main className="flex-1 overflow-y-auto p-10">
+        <div className="mx-auto flex max-w-4xl flex-col gap-8">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <DataCard
+              componentName="Trajectories"
+              value={basicData.trajsCount}
+            />
+            <DataCard
+              componentName="Segments"
+              value={basicData.segmentsCount}
+            />
+            <AccuracyCard
+              medianSIDTW={basicData.medianSIDTW}
+              meanSIDTW={basicData.meanSIDTW}
+            />
+          </div>
+
+          <TagInfoCard
+            selectedTags={selectedTags}
+            robot={workarea.robot ?? undefined}
+          />
+
+          <DistributionCharts stats={basicData.stats} />
+
+          <PerformersTable
+            initialPerformers={performersAll}
+            selectedTags={selectedTags}
+            metric={metric}
+            robot={robotParam}
+          />
+
+          <ParameterCorrelation
+            selectedTags={selectedTags}
+            metric={metric}
+            robot={robotParam}
+          />
+
+          <AccuracyTimeline
+            allTimeline={timelineData}
+            selectedTags={selectedTags}
+            metric={metric}
+            robot={robotParam}
+          />
+
+          <WorkareaPlot
+            selectedTags={selectedTags}
+            robot={workarea.robot}
+            hint={workarea.hint}
+          />
+        </div>
+      </main>
+
+      {/* ── Robot + metric ───────────────────────────────────────────────── */}
+      <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col gap-6 overflow-y-auto border-l border-gray-500 bg-white p-4">
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase text-gray-800">
+            Robot
+          </p>
+          <div className="flex flex-col gap-1">
+            {['all', ...robots].map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRobot(r)}
+                className={`rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${
+                  robot === r
+                    ? 'bg-blue-950 text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {r === 'all' ? 'All' : displayName(r)}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div>
@@ -249,52 +345,6 @@ export default function DashboardClient() {
           </div>
         </div>
       </aside>
-
-      {/* ── Main content ────────────────────────────────────────────────── */}
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions */}
-      <main
-        className="flex-1 overflow-y-auto p-10"
-        onClick={() => {
-          if (dropdownOpen) setDropdownOpen(false);
-        }}
-      >
-        <div className="mx-auto flex max-w-4xl flex-col gap-8">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <DataCard
-              componentName="Trajectories"
-              value={basicData.trajsCount}
-            />
-            <DataCard
-              componentName="Segments"
-              value={basicData.segmentsCount}
-            />
-            <AccuracyCard
-              medianSIDTW={basicData.medianSIDTW}
-              meanSIDTW={basicData.meanSIDTW}
-            />
-          </div>
-
-          <TagInfoCard selectedTags={selectedTags} />
-
-          <DistributionCharts stats={basicData.stats} />
-
-          <PerformersTable
-            initialPerformers={performersAll}
-            selectedTags={selectedTags}
-            metric={metric}
-          />
-
-          <ParameterCorrelation selectedTags={selectedTags} metric={metric} />
-
-          <AccuracyTimeline
-            allTimeline={timelineData}
-            selectedTags={selectedTags}
-            metric={metric}
-          />
-
-          <WorkareaPlot selectedTags={selectedTags} />
-        </div>
-      </main>
     </div>
   );
 }

@@ -88,18 +88,21 @@ export function EvaluationWrapper() {
 
       <div className="h-fullscreen w-full flex-row justify-items-stretch overflow-y-auto p-2">
         <AccPositionInfo trajID={id} selectedSegment={selectedSegment} />
-        <MetricsPanel
-          trajID={id}
-          selectedSegment={selectedSegment}
-          onSegmentChange={handleSegmentChange}
-        />
-        <DeviationsPlot
-          hasDeviationData={hasDeviationData}
-          hasOrientationData={hasOrientationData}
-          trajID={id}
-          selectedSegment={selectedSegment}
-          trajInfo={currentTrajInfo}
-        />
+        {/* tinted frame around everything that belongs to path accuracy (metrics + deviation plots) */}
+        <section className="mx-4 mb-4 rounded-xl border border-gray-500 bg-gray-100 p-3">
+          <MetricsPanel
+            trajID={id}
+            selectedSegment={selectedSegment}
+            onSegmentChange={handleSegmentChange}
+          />
+          <DeviationsPlot
+            hasDeviationData={hasDeviationData}
+            hasOrientationData={hasOrientationData}
+            trajID={id}
+            selectedSegment={selectedSegment}
+            trajInfo={currentTrajInfo}
+          />
+        </section>
       </div>
     </>
   );

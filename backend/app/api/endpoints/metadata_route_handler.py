@@ -3,6 +3,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from ...database import get_db_pool
+from ...utils.admin_auth import require_admin_password
 from ...utils.metadata_embeddings.metadata_calculator import MetadataCalculatorService
 from ...utils.metadata_embeddings.background_tasks import (
     process_metadata_background,
@@ -24,6 +25,7 @@ class MetadataCalculationRequest(BaseModel):
     start_time: Optional[str] = None  # Format: "26.06.2025 12:12:10"
     end_time: Optional[str] = None
     duplicate_handling: str = "replace"  # "replace" oder "skip"
+    password: Optional[str] = None  # required for "replace" (overwrites existing metadata), see admin_auth
 
 class TaskStatusResponse(BaseModel):
     task_id: str
@@ -70,8 +72,10 @@ async def calculate_metadata(
 ):
     """
     Startet die Berechnung von Bahn-Metadaten als Background Task
-    Mit Duplikat-Prüfung
+    Mit Duplikat-Prüfung. Überschreiben (duplicate_handling "replace") nur mit Passwort.
     """
+    if request.duplicate_handling != "skip":
+        require_admin_password(request.password)
     try:
         # Cleanup alte Tasks
         cleanup_old_tasks()

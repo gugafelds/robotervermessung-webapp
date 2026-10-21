@@ -33,20 +33,21 @@ const PARAMS: { id: string; label: string }[] = [
 interface Props {
   selectedTags: string[];
   metric: MetricType;
+  robot?: string;
 }
 
-export function ParameterCorrelation({ selectedTags, metric }: Props) {
+export function ParameterCorrelation({ selectedTags, metric, robot }: Props) {
   const [data, setData] = useState<BinnedResult>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     const tags = selectedTags.length > 0 ? selectedTags : undefined;
-    getInfluenceBinned(metric, tags).then((res) => {
+    getInfluenceBinned(metric, tags, robot).then((res) => {
       setData((res as BinnedResult) ?? {});
       setLoading(false);
     });
-  }, [metric, selectedTags]);
+  }, [metric, selectedTags, robot]);
 
   if (loading) {
     return (

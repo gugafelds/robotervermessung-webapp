@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { getTagInfo } from '@/src/actions/dashboard.service';
+import { displayName } from '@/src/lib/labels';
 
 interface TagInfo {
   tag: string;
@@ -26,6 +27,7 @@ interface TagInfo {
 
 interface Props {
   selectedTags: string[];
+  robot?: string; // only this robot's rows; undefined = all (a tag of two robots: one card each)
 }
 
 function row(label: string, value: string | number | null | undefined) {
@@ -38,7 +40,7 @@ function row(label: string, value: string | number | null | undefined) {
   );
 }
 
-export function TagInfoCard({ selectedTags }: Props) {
+export function TagInfoCard({ selectedTags, robot }: Props) {
   const [infos, setInfos] = useState<TagInfo[]>([]);
 
   useEffect(() => {
@@ -46,10 +48,10 @@ export function TagInfoCard({ selectedTags }: Props) {
       setInfos([]);
       return;
     }
-    getTagInfo(selectedTags).then((r) =>
+    getTagInfo(selectedTags, robot).then((r) =>
       setInfos((r as { tags: TagInfo[] }).tags ?? []),
     );
-  }, [selectedTags]);
+  }, [selectedTags, robot]);
 
   if (selectedTags.length === 0 || infos.length === 0) return null;
 
@@ -57,12 +59,16 @@ export function TagInfoCard({ selectedTags }: Props) {
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       {infos.map((info) => (
         <div
-          key={info.tag}
+          key={`${info.tag}|${info.robot}`}
           className="rounded-2xl border border-gray-500 bg-white p-4"
         >
-          <p className="mb-3 text-lg font-bold text-blue-950">{info.tag}</p>
+          <p className="mb-3 text-lg font-bold text-blue-950">
+            {info.tag}
+            {infos.filter((i) => i.tag === info.tag).length > 1 &&
+              ` · ${displayName(info.robot)}`}
+          </p>
           <div className="space-y-0">
-            {row('Robot', info.robot)}
+            {row('Robot', displayName(info.robot))}
             {row('Type', info.type)}
             {row('Plane', info.plane)}
             {row(

@@ -5,6 +5,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { MetadataService } from '@/src/actions/metadata.service';
+import { PasswordDialog } from '@/src/components/PasswordDialog';
 import type {
   AvailableDate,
   MetadataCalculationRequest,
@@ -51,20 +52,17 @@ export const MetadataUpload: React.FC = () => {
     loadAvailableDates();
   }, [loadStats, loadAvailableDates]);
 
-  const handleStartUpload = useCallback(async () => {
-    if (selectedMode === 'single' && !trajID) {
-      return;
-    }
+  // Overwrite replaces existing metadata -> only with the admin password (checked by the backend)
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
-    if (selectedMode === 'timerange' && (!startDate || !endDate)) {
-      return;
-    }
-
-    try {
+  // Returns an error message for the password dialog (wrong password etc.), nothing on success
+  const runCalculation = useCallback(
+    async (password?: string): Promise<string | void> => {
       const request: MetadataCalculationRequest = {
         mode: selectedMode,
         duplicate_handling: duplicateHandling,
         batch_size: 100,
+        ...(password ? { password } : {}),
       };
 
       if (selectedMode === 'single') {
@@ -74,18 +72,41 @@ export const MetadataUpload: React.FC = () => {
         request.end_time = `${endDate} 23:59:59`;
       }
 
-      await MetadataService.calculateAndWait(request, (isRunning) => {
+      // the request itself is checked first (wrong password -> error here); the dialog closes once the task runs
+      let accepted = false;
+      const done = MetadataService.calculateAndWait(request, (isRunning) => {
+        if (isRunning) {
+          accepted = true;
+          setPasswordOpen(false);
+        }
         setIsLoading(isRunning);
       });
+      try {
+        await done;
+        await loadStats();
+      } catch (error: any) {
+        if (!accepted) return error?.message || 'Request failed';
+      } finally {
+        setIsLoading(false);
+      }
+      return undefined;
+    },
+    [selectedMode, trajID, startDate, endDate, duplicateHandling, loadStats],
+  );
 
-      // Stats neu laden nach Abschluss
-      await loadStats();
-    } catch (error: any) {
-      // Fehler stillschweigend behandeln
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedMode, trajID, startDate, endDate, duplicateHandling, loadStats]);
+  const handleStartUpload = useCallback(() => {
+    if (selectedMode === 'single' && !trajID) return;
+    if (selectedMode === 'timerange' && (!startDate || !endDate)) return;
+    if (duplicateHandling === 'replace') setPasswordOpen(true);
+    else runCalculation();
+  }, [
+    selectedMode,
+    trajID,
+    startDate,
+    endDate,
+    duplicateHandling,
+    runCalculation,
+  ]);
 
   return (
     <div className="mx-auto w-fit min-w-96 max-w-xl space-y-4 p-4">
@@ -290,6 +311,16 @@ export const MetadataUpload: React.FC = () => {
       >
         {isLoading ? 'Berechnung läuft...' : 'Metadaten berechnen'}
       </button>
+
+      <PasswordDialog
+        open={passwordOpen}
+        title="Overwrite metadata"
+        message="Existing metadata of the selected trajectories will be replaced. Enter the admin password to continue."
+        confirmLabel="Overwrite"
+        danger
+        onConfirm={runCalculation}
+        onClose={() => setPasswordOpen(false)}
+      />
     </div>
   );
 };
