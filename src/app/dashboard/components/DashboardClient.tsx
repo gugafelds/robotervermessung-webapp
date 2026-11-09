@@ -19,6 +19,7 @@ import { DataCard } from '@/src/app/dashboard/components/DataCard';
 import { DistributionCharts } from '@/src/app/dashboard/components/DistributionCharts';
 import { ParameterCorrelation } from '@/src/app/dashboard/components/ParameterCorrelation';
 import { PerformersTable } from '@/src/app/dashboard/components/PerformersTable';
+import { RobotTimeWeekly } from '@/src/app/dashboard/components/RobotTimeWeekly';
 import { TagInfoCard } from '@/src/app/dashboard/components/TagInfoCard';
 import { WorkareaPlot } from '@/src/app/dashboard/components/WorkareaPlot';
 import SearchFilter from '@/src/components/SearchFilter';
@@ -171,9 +172,9 @@ export default function DashboardClient() {
   }
 
   return (
-    <div className="flex min-h-screen w-full bg-gray-50">
+    <div className="flex h-fullscreen w-full overflow-hidden bg-gray-50">
       {/* ── Tags (search + list, like the Motion sidebar) ─────────────────── */}
-      <aside className="sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r border-gray-500 bg-white px-4 py-2">
+      <aside className="flex h-full w-72 shrink-0 flex-col border-r border-gray-500 bg-white px-4 py-2">
         <div className="flex items-center justify-between pl-1">
           <span className="mt-2 text-2xl font-semibold text-primary">Tags</span>
           <button
@@ -218,7 +219,7 @@ export default function DashboardClient() {
             ? `All tags (${availableTags.length})`
             : `${selectedTags.length} of ${availableTags.length} tags applied`}
         </div>
-        <div className="mt-2 overflow-y-auto">
+        <div className="mt-2 min-h-0 flex-1 overflow-y-auto">
           {visibleTags.length === 0 && (
             <div className="py-4 text-center text-sm text-gray-500">
               No tags found
@@ -249,7 +250,7 @@ export default function DashboardClient() {
       {/* ── Main content ────────────────────────────────────────────────── */}
       <main className="flex-1 overflow-y-auto p-10">
         <div className="mx-auto flex max-w-4xl flex-col gap-8">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <DataCard
               componentName="Trajectories"
               value={basicData.trajsCount}
@@ -258,9 +259,40 @@ export default function DashboardClient() {
               componentName="Segments"
               value={basicData.segmentsCount}
             />
+            <DataCard
+              componentName="Robot time"
+              value={basicData.robotTimeHours}
+              unit="h"
+              decimals={1}
+              note={`on ${basicData.recordingDays} measurement days`}
+            />
             <AccuracyCard
               medianSIDTW={basicData.medianSIDTW}
               meanSIDTW={basicData.meanSIDTW}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <DataCard
+              componentName="Measured poses"
+              value={basicData.posePoints}
+              note="laser tracker samples"
+            />
+            <DataCard
+              componentName="Joint states"
+              value={basicData.jointPoints}
+              note="controller samples"
+            />
+            <DataCard
+              componentName="Command poses"
+              value={basicData.cmdPoints}
+              note="controller samples"
+            />
+            <DataCard
+              componentName="Database size"
+              value={basicData.dbSizeBytes / 1e9}
+              unit="GB"
+              note="whole database"
             />
           </div>
 
@@ -291,6 +323,8 @@ export default function DashboardClient() {
             robot={robotParam}
           />
 
+          <RobotTimeWeekly weekly={basicData.robotTimeWeekly ?? []} />
+
           <WorkareaPlot
             selectedTags={selectedTags}
             robot={workarea.robot}
@@ -300,7 +334,7 @@ export default function DashboardClient() {
       </main>
 
       {/* ── Robot + metric ───────────────────────────────────────────────── */}
-      <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col gap-6 overflow-y-auto border-l border-gray-500 bg-white p-4">
+      <aside className="flex h-full w-56 shrink-0 flex-col gap-6 overflow-y-auto border-l border-gray-500 bg-white p-4">
         <div>
           <p className="mb-2 text-xs font-bold uppercase text-gray-800">
             Robot

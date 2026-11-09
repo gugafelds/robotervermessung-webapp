@@ -273,6 +273,7 @@ export const TrajectoryInfo: React.FC<TrajectoryInfoProps> = () => {
                   : '-'
               }
             />
+            <InfoRow label="Tag" value={currentTrajInfo.tag ?? '-'} />
           </InfoSection>
 
           <InfoSection title="Number of points">

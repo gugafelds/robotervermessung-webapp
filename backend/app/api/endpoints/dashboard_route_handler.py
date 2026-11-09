@@ -70,12 +70,12 @@ async def get_dashboard_data(tag: list[str] = Query(None), robot: str = Query(No
     try:
         tc, tp = _tf(tag or None, robot=robot)
 
-        # All 10 queries below are independent of each other (none reads another's
+        # All queries below are independent of each other (none reads another's
         # result), so they run concurrently over separate pooled connections
         # instead of one-by-one on a single connection.
         (
             segments_count, trajs_count, median_sidtw, mean_sidtw,
-            vrows, wrows, wprows, sidtw_p99, sprows, mtrows,
+            vrows, wrows, wprows, sidtw_p99, sprows, mtrows, usage, weekly, db_size,
         ) = await asyncio.gather(
             pool.fetchval(
                 f"SELECT SUM(number_setpoints) FROM motion.traj_info bi WHERE source_data_act = 'leica_at960' {tc}", *tp),
@@ -92,9 +92,9 @@ async def get_dashboard_data(tag: list[str] = Query(None), robot: str = Query(No
                 WHERE i.traj_id = i.seg_id AND i.sidtw_average_distance IS NOT NULL
                 AND bi.source_data_act = 'leica_at960' {tc}""", *tp),
             pool.fetch(f"""
-                SELECT LEAST(FLOOR(sp.vel_set / 500)::int, 6) + 1 AS bucket, COUNT(*)
-                FROM motion.traj_setpoints sp INNER JOIN motion.traj_info bi ON sp.traj_id = bi.traj_id
-                WHERE sp.vel_set IS NOT NULL {tc}
+                SELECT LEAST(FLOOR(m.max_vel / 100)::int + 1, 37) AS bucket, COUNT(*)  -- 100 mm/s classes of the segment's peak speed
+                FROM motion.traj_metadata m INNER JOIN motion.traj_info bi ON m.traj_id = bi.traj_id
+                WHERE m.traj_id != m.seg_id AND m.max_vel IS NOT NULL {tc}
                 GROUP BY bucket ORDER BY bucket""", *tp),
             pool.fetch(f"""
                 SELECT weight AS bucket, COUNT(*) FROM motion.traj_info bi
@@ -117,13 +117,28 @@ async def get_dashboard_data(tag: list[str] = Query(None), robot: str = Query(No
                 INNER JOIN motion.traj_info bi ON m.traj_id = bi.traj_id
                 WHERE m.traj_id != m.seg_id AND m.movement_type IN ('linear', 'circular') {tc}
                 GROUP BY bucket ORDER BY bucket""", *tp),
+            # robot time = measured motion (start to end of each recorded trajectory), and the samples behind it
+            pool.fetchrow(f"""
+                SELECT SUM(GREATEST(EXTRACT(EPOCH FROM (end_time::timestamp - start_time::timestamp)), 0)) / 3600.0
+                           AS hours,
+                       COUNT(DISTINCT start_time::timestamp::date) AS days,
+                       SUM(number_pose_act) AS pose, SUM(number_joint_states) AS joints,
+                       SUM(number_position_cmd) AS cmd
+                FROM motion.traj_info bi WHERE source_data_act = 'leica_at960' {tc}""", *tp),
+            pool.fetch(f"""
+                SELECT date_trunc('week', start_time::timestamp)::date AS week, robot_model AS robot,
+                       SUM(GREATEST(EXTRACT(EPOCH FROM (end_time::timestamp - start_time::timestamp)), 0)) / 3600.0
+                           AS hours
+                FROM motion.traj_info bi WHERE source_data_act = 'leica_at960' {tc}
+                GROUP BY 1, 2 ORDER BY 1, 2""", *tp),
+            pool.fetchval("SELECT pg_database_size(current_database())"),  # whole database, not filtered
         )
 
         stats = {
             "velocityDistribution": {
                 "data": [{"bucket": r["bucket"], "count": r["count"]} for r in vrows],
-                "meta": {"useRanges": True, "min": 0, "max": 3500, "numBuckets": 7, "decimals": 0,
-                         "unit": "mm/s", "label": "Programmed velocity", "countLabel": "Segments"}
+                "meta": {"useRanges": True, "min": 0, "max": 3600, "numBuckets": 36, "decimals": 0, "overflow": True,
+                         "unit": "mm/s", "label": "Achieved velocity (segment maximum)", "countLabel": "Segments"}
             },
             "weightDistribution": {
                 "data": [{"bucket": r["bucket"], "count": r["count"]} for r in wrows],
@@ -168,6 +183,14 @@ async def get_dashboard_data(tag: list[str] = Query(None), robot: str = Query(No
             "trajsCount": trajs_count,
             "medianSIDTW": median_sidtw,
             "meanSIDTW": mean_sidtw,
+            "robotTimeHours": float(usage["hours"] or 0),
+            "recordingDays": usage["days"],
+            "posePoints": usage["pose"] or 0,
+            "jointPoints": usage["joints"] or 0,
+            "cmdPoints": usage["cmd"] or 0,
+            "dbSizeBytes": db_size,
+            "robotTimeWeekly": [{"week": r["week"].isoformat(), "robot": r["robot"], "hours": float(r["hours"])}
+                                for r in weekly],
             "stats": stats,
         }
 

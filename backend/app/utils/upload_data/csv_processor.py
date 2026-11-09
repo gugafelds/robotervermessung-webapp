@@ -504,6 +504,7 @@ class CSVProcessor:
 
             # Kombiniere IST- und SOLL-Daten zu einer Liste von Bahnen pro Bahn-ID
             all_processed_data = []
+            self._wp_cursor = 0  # program-order position in the waypoint list (see _match_waypoints_to_setpoints)
 
             for traj_idx in range(max_bahnen + 1):
                 # Nehme die entsprechenden Daten für diese Bahn
@@ -1063,14 +1064,28 @@ class CSVProcessor:
                     return wp
             return None
 
+        # The same position can belong to several waypoints (one geometry at several speeds, a circle start that is
+        # also the lead-in end, a corner shared by two paths): take the trajectory's setpoints as one consecutive run
+        # of the program's waypoint list, searched forward from the previous trajectory (trajectories are processed in
+        # time order). Falls back to the first position match when no run is found.
+        def same(wp, r, tol=0.1):
+            return 'pos' in wp and r[3] is not None and all(abs(wp['pos'][k] - float(r[3 + k])) < tol for k in range(3))
+
+        n, run = len(setpoints_data), None
+        for j in range(getattr(self, '_wp_cursor', 0), len(waypoints) - n + 1):
+            if all(same(waypoints[j + k], setpoints_data[k]) for k in range(n)):
+                run = waypoints[j:j + n]
+                self._wp_cursor = j + n
+                break
+
         updated = []
-        for record in setpoints_data:
+        for i, record in enumerate(setpoints_data):
             seg_id = record[1]
             x = float(record[3]) if record[3] is not None else None
             y = float(record[4]) if record[4] is not None else None
             z = float(record[5]) if record[5] is not None else None
 
-            wp = find_wp(x, y, z)
+            wp = run[i] if run else find_wp(x, y, z)
 
             if wp and wp.get('move_type') == 'circular' and wp.get('support_pos'):
                 sp = wp['support_pos']

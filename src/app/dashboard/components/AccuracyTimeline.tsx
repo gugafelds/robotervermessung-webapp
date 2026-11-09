@@ -110,7 +110,7 @@ export function AccuracyTimeline({
   return (
     <div className="flex flex-col justify-center rounded-2xl border border-gray-500 bg-white p-6">
       <Typography as="h2" className="mb-2">
-        Accuracy Timeline
+        Accuracy timeline
       </Typography>
 
       <div className="mb-4 text-sm text-gray-600">

@@ -102,7 +102,11 @@ export function DistributionCharts({ stats }: Props) {
           height: 450,
           margin: { t: 20, r: 20, l: 80, b: 80 },
           xaxis: {
-            title: { text: `${active.meta.label} [${active.meta.unit}]` },
+            title: {
+              text: `${active.meta.label} [${active.meta.unit}]`,
+              standoff: 24, // keeps the title clear of rotated range labels
+            },
+            automargin: true,
             type: 'category',
           },
           yaxis: { title: { text: active.meta.countLabel ?? 'Amount' } },

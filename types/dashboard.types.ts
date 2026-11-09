@@ -38,6 +38,13 @@ export interface DashboardData {
   trajsCount: number;
   medianSIDTW?: number;
   meanSIDTW?: number;
+  robotTimeHours: number; // measured motion, start to end of each trajectory
+  recordingDays: number;
+  posePoints: number;
+  jointPoints: number;
+  cmdPoints: number;
+  dbSizeBytes: number; // whole database, not filtered
+  robotTimeWeekly: { week: string; robot: string; hours: number }[];
   stats: {
     velocityDistribution: Distribution;
     weightDistribution: Distribution;

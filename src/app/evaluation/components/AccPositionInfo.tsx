@@ -90,6 +90,11 @@ export const AccPositionInfo: React.FC<AccPositionInfoProps> = ({
                 return (
                   <tr
                     key={r.segmentID}
+                    title={
+                      shortRest
+                        ? `Rest phase only ${Math.round(r.tRestMs ?? 0)} ms (< ${SHORT_REST_MS} ms): the robot barely stops, so this value is not a reliable positioning error`
+                        : undefined
+                    }
                     className={`border-t ${selected ? 'bg-blue-50' : ''} ${shortRest ? 'text-gray-400' : 'text-primary'} ${all ? 'font-semibold' : ''}`}
                   >
                     <td className="py-3 text-left">
