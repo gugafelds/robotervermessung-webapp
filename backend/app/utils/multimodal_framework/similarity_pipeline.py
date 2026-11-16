@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Literal, Optional
 import asyncpg
 
 from .multi_modal_searcher import MultiModalSearcher, MultiModalSearcherCandidate
+from .shape_searcher import TRAJ_FILTER
 from ..metadata_embeddings.trajectory_loader import TrajectoryLoader, TrajectoryLoaderCandidate
 from ..metadata_embeddings.embedding_calculator import build_candidate_embeddings, build_candidate_embeddings_segmented, CANDIDATE_SEG_ID
 from ..feature_prediction.predictor import predict_performance
@@ -41,7 +42,49 @@ def _normalize_stage1_ranks(result: Dict[str, Any]) -> None:
                 r['rank_stage1'] = r.pop('rank')
 
 
-async def run_similarity_pipeline(
+POOL_VIEW = 'prognosis.pool_trajectories'  # (robot_model, traj_id), rule of analysis/prognosis_pool.py (recorder)
+
+
+async def _candidate_filter(conn, robot_model: Optional[str], candidate_set: str):
+    """(TRAJ_FILTER value, calibrated, neighbour robots): the target robot's trajectories of the set; if it has
+    none (unknown robot, no robot given), those of all other robots and calibrated False."""
+    src = POOL_VIEW if candidate_set == 'pool' else 'motion.traj_info'
+    same = bool(robot_model) and await conn.fetchval(f"SELECT EXISTS (SELECT 1 FROM {src} WHERE robot_model = $1)",
+                                                     robot_model)
+    robots = [robot_model] if same else [r['robot_model'] for r in await conn.fetch(
+        f"SELECT DISTINCT robot_model FROM {src} WHERE robot_model IS DISTINCT FROM $1 AND robot_model IS NOT NULL "
+        "ORDER BY 1", robot_model)]
+    return (src, robot_model, same), same, robots
+
+
+async def resolve_calibration_tag(conn, requested, robot_model: Optional[str]):
+    """An explicitly requested tag (or list) with calibration data is kept, otherwise the robot's own tag
+    'pool-<number>' (also for 'all'); no fallback to 'all' anywhere (Baustein 2)."""
+    explicit = [t for t in ([requested] if isinstance(requested, str) else list(requested or [])) if t and t != 'all']
+    if explicit and await conn.fetchval(
+            "SELECT EXISTS (SELECT 1 FROM prognosis.confidence_quantiles WHERE calibration_tag = ANY($1::text[])) "
+            "OR EXISTS (SELECT 1 FROM prognosis.confidence_info WHERE calibration_tag = ANY($1::text[]))", explicit):
+        return explicit[0] if len(explicit) == 1 else explicit
+    return f"pool-{(robot_model or 'none')[-4:]}"
+
+
+def _tag_prognosis(result: Dict[str, Any]) -> None:
+    """robot, set and calibration state also inside result['prognosis'] (the frontend view only gets that part)"""
+    if isinstance(result.get('prognosis'), dict):
+        for key in ('robot_model', 'candidate_set', 'calibrated', 'neighbour_robots', 'calibration_tag_used'):
+            result['prognosis'][key] = result.get(key)
+
+
+async def run_similarity_pipeline(**kwargs) -> Dict[str, Any]:
+    """_run_similarity_pipeline with the robot filter of this search confined to it (TRAJ_FILTER)"""
+    token = TRAJ_FILTER.set(None)
+    try:
+        return await _run_similarity_pipeline(**kwargs)
+    finally:
+        TRAJ_FILTER.reset(token)
+
+
+async def _run_similarity_pipeline(
     *,
     target_id: Optional[str] = None,
     pool: asyncpg.Pool,
@@ -72,12 +115,15 @@ async def run_similarity_pipeline(
     calibration_tag:  str   = 'all',
     coverage:         float = 0.90,
     conformal_active: bool  = True,
+
+    # Target robot and candidate set (Baustein 1/2, 13.11.2026)
+    robot_model:   Optional[str]                    = None,  # None: read from motion.traj_info (stored target)
+    candidate_set: Optional[Literal['pool', 'all']] = None,  # None: 'pool' with prognosis, else 'all'
 ) -> Dict[str, Any]:
     t_start = time.time()
 
     is_external = external_payload is not None
     if is_external:
-        target_id = CANDIDATE_SEG_ID
         if prefilter_features:
             raise ValueError("prefilter_features is not supported for external candidates")
     elif target_id is None:
@@ -85,6 +131,22 @@ async def run_similarity_pipeline(
 
     if prefilter_features is None:
         prefilter_features = []
+
+    # Neighbours only from the target robot; 'pool' = prognosis.pool_trajectories (no repetition tags, one
+    # trajectory per path), the set the prognosis tables were calibrated on. A robot without trajectories in the set
+    # gets the other robots' trajectories, a p-hat and no interval (calibrated: false).
+    if robot_model is None and not is_external:
+        robot_model = await conn.fetchval(
+            "SELECT i.robot_model FROM motion.traj_metadata m JOIN motion.traj_info i USING (traj_id) "
+            "WHERE m.seg_id = $1", target_id)
+    candidate_set = candidate_set or ('pool' if prognosis_active else 'all')
+    traj_filter, calibrated, neighbour_robots = await _candidate_filter(conn, robot_model, candidate_set)
+    TRAJ_FILTER.set(traj_filter)  # read by ShapeSearcher in every mode/segment search; reset by the wrapper below
+    if prognosis_active:
+        calibration_tag = await resolve_calibration_tag(conn, calibration_tag, robot_model)
+        conformal_active = conformal_active and calibrated
+    if is_external:
+        target_id = CANDIDATE_SEG_ID
 
     # ── Stage 1 ──────────────────────────────────────────────────────────
     t1 = time.time()
@@ -150,6 +212,9 @@ async def run_similarity_pipeline(
         include_ids=include_ids,
     )
     stage1_ms = (time.time() - t1) * 1000
+    result.update(robot_model=robot_model, candidate_set=candidate_set, calibrated=calibrated,
+                  neighbour_robots=neighbour_robots,
+                  calibration_tag_used=calibration_tag if prognosis_active else None)
 
     # Populate target_segment_features from pre-computed metadata for candidate segments
     if is_external and segment_indices:
@@ -194,6 +259,7 @@ async def run_similarity_pipeline(
             metric=metric,
             meta_groups=meta_groups,
         )
+        _tag_prognosis(result)
         result['timing']['total_ms'] = round((time.time() - t_start) * 1000, 1)
         return result
 
@@ -361,6 +427,7 @@ async def run_similarity_pipeline(
             metric=metric,
             meta_groups=meta_groups,
         )
+        _tag_prognosis(result)
 
     result['timing']['data_loading_ms'] = round(data_load_ms, 1)
     result['timing']['stage2_ms']       = round(stage2_ms, 1)

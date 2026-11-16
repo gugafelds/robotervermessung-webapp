@@ -15,7 +15,7 @@ def test_correction_factor():
     assert correction_factor(1.0, 1.5)[0] < 0
     # no effect -> undefined
     assert math.isnan(correction_factor(1.0, 1.0)[0])
-    # real numbers from corr-paper-full z (ctrl +0.074, corr +0.021): ~1.40, old output 3.53
+    # real numbers from corr-paper-4400-full z (ctrl +0.074, corr +0.021): ~1.40, old output 3.53
     assert math.isclose(correction_factor(0.074, 0.021)[0], 0.074 / 0.053)
 
 

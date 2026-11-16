@@ -230,6 +230,7 @@ async def get_all_traj_ids(
     max_trajectories: Optional[int] = None,
     include_tags: Optional[List[str]] = None,
     seed: int = 0,
+    include_ids: Optional[List[str]] = None,
 ) -> List[Tuple[str, float]]:
     metric     = validate_metric(metric)
     table_name = f"evaluation.{metric}_info"
@@ -243,6 +244,9 @@ async def get_all_traj_ids(
         tag_join  = "JOIN motion.traj_info tt ON m.traj_id = tt.traj_id"
         tag_where = f"AND tt.tag = ANY(${len(args)+1}::text[])"
         args.append(include_tags)
+    if include_ids:
+        tag_where += f" AND m.traj_id = ANY(${len(args)+1}::text[])"
+        args.append(include_ids)
 
     limit_sql = ""
     if max_trajectories:
@@ -751,6 +755,7 @@ async def process_trajectory_bundle(
     stage1_mode: bool,
     segment_actuals: Dict[str, float],
     include_tags: Optional[List[str]] = None,
+    include_ids: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:
     # No exclude_ids: the searcher already drops the query's own trajectory and its segments
     # (shape_searcher: e.traj_id != parent traj). Passing them made the pre-filter ship the id list of the
@@ -768,10 +773,12 @@ async def process_trajectory_bundle(
                 prefilter_features=[],
                 metric=cfg.metric,
                 include_tags=include_tags,
+                include_ids=include_ids,
                 stage2_active=not stage1_mode,
                 dtw_mode=cfg.dtw_mode if not stage1_mode else 'position',  # dtw_mode irrelevant for stage1
                 prognosis_active=True,
                 calibration_tag=cfg.calibration_tag,  # the switch threshold of this tag (confidence_info)
+                candidate_set='all',  # the set is defined by include_ids / include_tags (pool file), only the robot filter on top
                 coverage=0.90,
                 conformal_active=False,
             )
@@ -836,6 +843,7 @@ async def run_calibration(
     resume: bool, max_trajectories: Optional[int],
     coverages: Sequence[float],
     include_tags: Optional[List[str]] = None,
+    include_ids: Optional[List[str]] = None,
 ) -> None:
     # Stage 2 runs also write stage 1 rows, so resume tracks stage 2 as
     # the source of truth. A stage-1-only run tracks stage 1 separately.
@@ -858,6 +866,7 @@ async def run_calibration(
             max_trajectories=max_trajectories,
             include_tags=include_tags,
             seed=cfg.split_seed,
+            include_ids=include_ids,
         )
         traj_ids        = [t for t, _ in all_trajs]
         segment_actuals = await get_segment_actual_values_for_trajectories(
@@ -891,6 +900,7 @@ async def run_calibration(
                     pool=pool, cfg=cfg, stage1_mode=stage1_mode,
                     segment_actuals=segment_actuals,
                     include_tags=include_tags,
+                    include_ids=include_ids,
                 )
                 for tid, p, role in batch
             ]
@@ -955,6 +965,9 @@ async def main() -> None:
                         help='Calibration tag, e.g. "all", "bandit_v1"')
     parser.add_argument('--include-tags',  nargs='+',  default=None,
                         help='Only calibrate on trajectories with these DB tags')
+    parser.add_argument('--pool-file',     type=str,   default=None,
+                        help='traj_ids, one per line: queries are drawn from them and neighbours restricted to them '
+                             '(one robot, no repeated paths; recorder analysis/prognosis_pool.py)')
     parser.add_argument('--all-tags',      action='store_true', default=False,
                         help='Run calibration for every tag found in motion.tag_info')
     parser.add_argument('--stage1',        action='store_true', default=False,
@@ -1007,6 +1020,7 @@ async def main() -> None:
                 batch_size=args.batch, resume=resume,
                 max_trajectories=args.limit, coverages=args.coverage,
                 include_tags=args.include_tags,
+                include_ids=[l.strip() for l in open(args.pool_file) if l.strip()] if args.pool_file else None,
             )
     finally:
         await pool.close()

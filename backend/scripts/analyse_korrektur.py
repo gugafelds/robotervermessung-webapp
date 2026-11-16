@@ -4,7 +4,7 @@ analyse_korrektur.py
 Vergleicht Control- und Korrektur-Bahnen anhand eines Tags.
 
 Verwendung:
-    python analyse_korrektur.py --tag ba-mueller-correction-2
+    python analyse_korrektur.py --tag corr-4400-ba-2
     python analyse_korrektur.py --tag mein-tag --last-points 5
     python analyse_korrektur.py --tag mein-tag --ref cmd-mean
 """

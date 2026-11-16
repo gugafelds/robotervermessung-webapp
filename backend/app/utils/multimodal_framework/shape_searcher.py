@@ -1,11 +1,18 @@
 # backend/app/utils/multimodal_framework/shape_searcher.py
 
+import contextvars
+
 import asyncpg
 import numpy as np
 from typing import Dict, List, Optional
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Robot restriction of the candidate set (Baustein 1): (source table, robot_model, same_robot) or None. Set by
+# run_similarity_pipeline for one search; a subquery instead of an id list keeps the HNSW index usable (id lists
+# forced exact scans, 11-27x slower in T3, 15.11.2026). same_robot False = all other robots (no data for this one).
+TRAJ_FILTER: contextvars.ContextVar = contextvars.ContextVar('traj_filter', default=None)
 
 
 class ShapeSearcher:
@@ -59,6 +66,12 @@ class ShapeSearcher:
             embedding_col    = f"{mode}_embedding"
 
             # Baue WHERE Conditions
+            params = [target_embedding, target_id, parent_traj_id]
+
+            def arg(value):
+                params.append(value)
+                return f"${len(params)}"
+
             where_conditions = [
                 "e.seg_id != $2",
                 "e.traj_id != $3",
@@ -70,12 +83,18 @@ class ShapeSearcher:
             elif only_segments:
                 where_conditions.append("e.seg_id != e.traj_id")
 
-            where_clause = " AND ".join(where_conditions)
+            traj_filter = TRAJ_FILTER.get()
+            if traj_filter:
+                src, robot_model, same_robot = traj_filter
+                where_conditions.append(f"e.traj_id IN (SELECT traj_id FROM {src} WHERE robot_model "
+                                        f"{'=' if same_robot else 'IS DISTINCT FROM'} {arg(robot_model)})")
 
             await self.connection.execute("SET hnsw.ef_search = 500;")
+            # iterative scan: the HNSW index keeps searching until `limit` rows pass the robot filter
+            await self.connection.execute(f"SET hnsw.iterative_scan = {'relaxed_order' if traj_filter else 'off'};")
 
             if candidate_ids is not None and len(candidate_ids) > 0:
-                where_conditions.append("e.seg_id = ANY($4)")
+                where_conditions.append(f"e.seg_id = ANY({arg(candidate_ids)})")
                 where_clause = " AND ".join(where_conditions)
                 query = f"""
                     SELECT 
@@ -85,21 +104,16 @@ class ShapeSearcher:
                     FROM motion.traj_embeddings e
                     WHERE {where_clause}
                     ORDER BY distance, e.seg_id
-                    LIMIT $5
+                    LIMIT {arg(limit)}
                 """
-                results = await self.connection.fetch(
-                    query,
-                    target_embedding,
-                    target_id,
-                    parent_traj_id,
-                    candidate_ids,
-                    limit,
-                )
             else:
                 # The HNSW index only serves ORDER BY distance alone: with the seg_id tie-break inside, Postgres
                 # sorted the whole table (~70 ms vs ~4 ms per query, recall@50 >= 0.997 at ef_search 500). The
                 # tie-break (deterministic order of equal distances) is applied to the top `limit` outside.
                 # The filtered branch above stays exact: HNSW filters after the scan and could return too few rows.
+                # The robot filter (TRAJ_FILTER) stays on the index via iterative scan: recall@50 >= 0.996 against
+                # the exact filtered scan, ~10x faster (15.11.2026).
+                where_clause = " AND ".join(where_conditions)
                 query = f"""
                     SELECT * FROM (
                         SELECT
@@ -109,17 +123,11 @@ class ShapeSearcher:
                         FROM motion.traj_embeddings e
                         WHERE {where_clause}
                         ORDER BY distance
-                        LIMIT $4
+                        LIMIT {arg(limit)}
                     ) s
                     ORDER BY distance, seg_id
                 """
-                results = await self.connection.fetch(
-                    query,
-                    target_embedding,
-                    target_id,
-                    parent_traj_id,
-                    limit,
-                )
+            results = await self.connection.fetch(query, *params)
 
             ranked_results = []
             for rank, row in enumerate(results, start=1):

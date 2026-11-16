@@ -5,7 +5,7 @@ Validation: compare rv2-dataset-1/2/3/4 as knowledge bases against rv2-dataset-v
 Usage:
     python validation_rv2.py
     python validation_rv2.py --no-stage2
-    python validation_rv2.py --datasets rv2-dataset-1,rv2-dataset-4
+    python validation_rv2.py --datasets rv2-dataset-1,strat4400-ucb-4
     python validation_rv2.py --learning-curve
     python validation_rv2.py --learning-curve --steps 50,100,200,300,400
 """
@@ -34,7 +34,7 @@ logging.basicConfig(level=logging.WARNING, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 DATABASE_URL   = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost/dbname')
-DATASETS       = ['paper-random', 'paper-kdtree', 'paper-norm', 'paper-auto', 'paper-auto2', 'paper-donly', 'paper-full', 'paper-geometry', 'paper-geometry2', 'paper-doptimal', 'paper-gpucb']
+DATASETS       = ['strat4400-random', 'strat4400-kdtree', 'strat4400-norm', 'strat4400-auto', 'strat4400-auto2', 'strat4400-donly', 'strat4400-full', 'strat4400-geometry', 'strat4400-geometry2', 'strat4400-doptimal', 'strat4400-gpucb']
 SEARCH_MODES   = ['position', 'joint', 'orientation', 'velocity', 'metadata']
 EPSILON        = 1e-9
 DEFAULT_STEPS  = [25, 50, 75, 100, 125, 150]
@@ -283,7 +283,7 @@ async def run_learning_curve(
     val_seed: int = VAL_SEED, match_velocity: bool = True,
 ) -> None:
     if val_tags is None:
-        val_tags = ['paper-lhs']
+        val_tags = ['strat4400-lhs']
 
     pool = await asyncpg.create_pool(
         DATABASE_URL, min_size=5, max_size=20,
@@ -530,7 +530,7 @@ if __name__ == '__main__':
     parser.add_argument('--limit',            type=int,  default=10,  help='Similarity search k (default: 10)')
     parser.add_argument('--batch',            type=int,  default=5,   help='Trajectories per parallel batch (default: 5)')
     parser.add_argument('--datasets',         nargs='+', default=None, help='Dataset tags (space- or comma-separated)')
-    parser.add_argument('--validation-tags',  nargs='+', default=None, help='Validation set tags (space- or comma-separated, default: rv2-dataset-validation)')
+    parser.add_argument('--validation-tags',  nargs='+', default=None, help='Validation set tags (space- or comma-separated, default: strat4400-ucb-val)')
     parser.add_argument('--val-mode',         choices=['tag', 'random'], default='tag',
                          help="'tag' = fixed --validation-tags (default), "
                               "'random' = matched-random validation set (excludes --datasets, location/speed-matched)")
@@ -548,7 +548,7 @@ if __name__ == '__main__':
     stages   = [1] if args.no_stage2 else [1, 2]
     datasets = _pl(args.datasets, DATASETS)
     steps    = [int(s) for s in _pl(args.steps, DEFAULT_STEPS)]
-    val_tags = _pl(args.validation_tags, ['paper-lhs'])
+    val_tags = _pl(args.validation_tags, ['strat4400-lhs'])
     val_kwargs = dict(
         val_mode=args.val_mode, val_n=args.val_n, val_seed=args.val_seed,
         match_velocity=not args.no_match_velocity,

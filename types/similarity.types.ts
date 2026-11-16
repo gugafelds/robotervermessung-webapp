@@ -194,6 +194,13 @@ export interface Prognosis {
   s1_decomposed_conformal_interval: ConformalInterval | null;
   segments: SegmentPrognosis[];
   dtw_switch_d_per_length?: number | null; // DTW neighbours below this DTW distance / path length
+  // Neighbour set (backend similarity_pipeline.py): false = the robot has no calibrated set, neighbours come
+  // from neighbour_robots and no interval is given
+  robot_model?: string | null;
+  candidate_set?: 'pool' | 'all';
+  calibrated?: boolean;
+  neighbour_robots?: string[];
+  calibration_tag_used?: string | string[] | null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

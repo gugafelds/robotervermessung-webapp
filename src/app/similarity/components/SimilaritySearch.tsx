@@ -341,7 +341,7 @@ const SimilaritySearch: React.FC<SimilaritySearchProps> = ({
               <span className="text-sm font-medium text-gray-700">Tags:</span>
               <input
                 type="text"
-                placeholder="z.B. new-map-test, pa-juengst-1"
+                placeholder="z.B. new-map-test, pa4400-22-1"
                 value={includeTags}
                 onChange={(e) => setIncludeTags(e.target.value)}
                 className="w-56 rounded border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"

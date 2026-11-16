@@ -10,8 +10,8 @@ dtw_distance (not the error prediction). Lower mean distance = validation
 set "looks like" that dataset more.
 
 Usage:
-    python dataset_overlap.py --datasets rv2-dataset-1 rv2-dataset-7 rv2-dataset-8 rv2-dataset-9
-    python dataset_overlap.py --datasets rv2-dataset-1 rv2-dataset-7 --validation-tag rv2-dataset-validation
+    python dataset_overlap.py --datasets rv2-dataset-1 strat4400-ucb-7 strat4400-ucb-8 strat4400-ucb-9
+    python dataset_overlap.py --datasets rv2-dataset-1 strat4400-ucb-7 --validation-tag strat4400-ucb-val
 """
 
 from __future__ import annotations
@@ -117,7 +117,7 @@ async def run(validation_tag: str, datasets: List[str], limit: int, concurrency:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--validation-tag', default='rv2-dataset-validation')
+    parser.add_argument('--validation-tag', default='strat4400-ucb-val')
     parser.add_argument('--datasets', nargs='+', required=True)
     parser.add_argument('--limit', type=int, default=10)
     parser.add_argument('--concurrency', type=int, default=8)

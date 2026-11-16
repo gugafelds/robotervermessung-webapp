@@ -14,7 +14,7 @@ prognosis.confidence_match_quality. This module only reads them.
 
 Lookup strategy:
   1. Exact match on all key fields including config_stage
-  2. Fall back to calibration_tag='all' if the requested tag has no buckets
+  2. No buckets for the tag: None (no fallback to 'all', Baustein 2, 13.11.2026)
 
 config_hash is NOT used for lookup (audit only).
 
@@ -113,8 +113,7 @@ async def get_match_quality(
     """
     Look up the empirical match-quality tier for a given d_min.
 
-    Falls back to calibration_tag='all' if no buckets exist for the requested tag.
-    Returns None if no buckets found or d_min is None.
+    Returns None if the tag has no buckets (no fallback to 'all') or d_min is None.
     """
     if d_min is None:
         return None
@@ -122,17 +121,7 @@ async def get_match_quality(
     used_tag = cfg.calibration_tag
     buckets  = await _fetch_buckets(conn, cfg, level)
 
-    if not buckets and cfg.calibration_tag != 'all':
-        buckets = await _fetch_buckets(conn, cfg.with_tag('all'), level)
-        if buckets:
-            used_tag = 'all'
-            logger.warning(
-                f"[MatchQuality] stage={cfg.config_stage} tag='{cfg.calibration_tag}' has no buckets — "
-                f"fell back to tag='all' (level={level}, strategy={cfg.retrieval_strategy}). "
-                f"Run: python match_quality_builder.py --tag {cfg.calibration_tag}"
-            )
-
-    if not buckets:
+    if not buckets:  # no fallback to 'all' (Baustein 2, 13.11.2026)
         return None
 
     match = None

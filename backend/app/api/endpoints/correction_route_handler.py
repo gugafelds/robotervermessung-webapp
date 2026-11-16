@@ -36,7 +36,7 @@ CORRECTION_Y_FAC     = 1.0  # Skalierung der Y-Korrektur
 CORRECTION_Z_FAC     = 1.0  # Skalierung der Z-Korrektur
  
 # Drift-Offset: globaler additiver Drift zwischen historischen Daten und aktueller Messung.
-# Berechnet aus Duplikat-Paaren (ba-mueller vs. ba-mueller-correction-10/11/12, 2026-06-03 → 2026-07-24).
+# Berechnet aus Duplikat-Paaren (ba4400-19.5-1 vs. corr-4400-ba-10/11/12, 2026-06-03 → 2026-07-24).
 # Auf [0, 0, 0] setzen wenn kein Drift bekannt oder frische Daten verwendet werden.
 DRIFT_OFFSET_X =  0.0
 DRIFT_OFFSET_Y =  0.0
@@ -228,6 +228,7 @@ async def predict_correction(
             prognosis_active=False,
             include_tags=request.include_tags or None,
             exclude_tags=request.exclude_tags or None,
+            robot_model=request.robot_model,  # neighbours only from this robot (Baustein 1)
         )
  
         if similarity_result.get("error"):

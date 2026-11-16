@@ -5,8 +5,8 @@ and metadata (movement_type, weight, length) for all trajectories under a
 given tag. Terminal output only — no files/folders.
 
 Usage:
-    python dataset_distribution.py --tag rv2-dataset-validation
-    python dataset_distribution.py --tag rv2-dataset-1 rv2-dataset-validation
+    python dataset_distribution.py --tag strat4400-ucb-val
+    python dataset_distribution.py --tag rv2-dataset-1 strat4400-ucb-val
 """
 
 from __future__ import annotations

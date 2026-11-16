@@ -695,7 +695,8 @@ class MetadataCalculatorService:
                 min_vel, max_vel, mean_vel, 
                 median_vel, std_vel,
                 min_accel, max_accel, mean_accel,
-                median_accel, std_accel
+                median_accel, std_accel,
+                position_x, position_y, position_z
             FROM rmpd.motion.traj_metadata
             WHERE traj_id = $1
             ORDER BY seg_id

@@ -271,6 +271,15 @@ const PrognosisView: React.FC<PrognosisViewProps> = ({
         </div>
       </div>
 
+      {prognosis.calibrated === false && (
+        <p className="border-t bg-amber-50 px-6 py-2 text-xs text-amber-800">
+          Not calibrated: no measured trajectories of{' '}
+          {prognosis.robot_model ?? 'this robot'}, neighbours from{' '}
+          {(prognosis.neighbour_robots ?? []).join(', ') || 'other robots'}. No
+          interval.
+        </p>
+      )}
+
       {/* Cards */}
       <div className="grid grid-cols-2 gap-4 border-t p-4">
         <PrognosisCard

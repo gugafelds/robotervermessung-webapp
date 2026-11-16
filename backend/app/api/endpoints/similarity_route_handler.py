@@ -308,6 +308,7 @@ async def search_candidate(
             dtw_mode=request.dtw_mode,
             prognosis_active=request.prognosis_active,
             calibration_tag=request.calibration_tag,
+            robot_model=request.robot_model,  # neighbours only from this robot (Baustein 1)
             coverage=request.coverage,
         )
 
@@ -376,6 +377,7 @@ async def _search_one_candidate(request: SearchCandidateRequest, pool, robot_inf
                 dtw_mode=request.dtw_mode,
                 prognosis_active=request.prognosis_active,
                 calibration_tag=request.calibration_tag,
+                robot_model=request.robot_model,  # neighbours only from this robot (Baustein 1)
                 coverage=request.coverage,
             )
         except Exception as e:

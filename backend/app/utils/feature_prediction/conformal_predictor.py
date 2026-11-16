@@ -12,7 +12,7 @@ Lookup strategy (fuzzy fallback)
   1. Exact:  all key fields match
   2. k diff: nearest available k, same modes + tag + stage
   3. modes:  any modes, same tag + stage
-  4. tag:    tag='all', same stage
+  (no fallback to another tag: the pipeline resolves the tag per robot, Baustein 2, 13.11.2026)
 
 Each fallback attaches a CalibrationMismatch so the frontend can warn.
 """
@@ -236,27 +236,8 @@ async def get_calibration_quantile(
         logger.info(f"Fuzzy quantile: modes+k mismatch, using [{used_modes}] k={used_k}")
         return _store(q, mismatch)
 
-    # Step 4: Fallback to tag='all', same stage
-    if tag != 'all':
-        q = await _fetch_exact(conn, metric, dtw_mode, strategy, level, k, search_modes_str, 'all', coverage, stage)
-        if q is not None:
-            mismatch = CalibrationMismatch(
-                warning=f"calibration_tag '{tag}' not found, using tag='all'.",
-                requested_tag=tag, used_tag='all',
-            )
-            return _store(q, mismatch)
-
-        result3 = await _fetch_any_modes(conn, metric, dtw_mode, strategy, level, k, 'all', coverage, stage)
-        if result3 is not None:
-            q, used_k, used_modes = result3
-            mismatch = CalibrationMismatch(
-                warning=f"tag '{tag}' not found. Fell back to tag='all', k={used_k}, modes=[{used_modes}].",
-                requested_k=k, used_k=used_k,
-                requested_modes=search_modes_str, used_modes=used_modes,
-                requested_tag=tag, used_tag='all',
-            )
-            return _store(q, mismatch)
-
+    # No fallback to another tag (Baustein 2, 13.11.2026): a tag calibrates one robot's search, another tag's
+    # quantile would describe a different neighbour set. The pipeline resolves the tag per robot beforehand.
     logger.warning(
         f"No conformal quantile found — metric={metric} dtw_mode={dtw_mode} "
         f"strategy={strategy} level={level} k={k} modes={search_modes_str} "
@@ -276,7 +257,7 @@ async def get_calibration_quantile_for_tags(
     """
     Weighted-average quantile over multiple tags.
     Tags with n_calibration < MIN_N_CALIBRATION are skipped.
-    Falls back to tag='all' if no tag passes the threshold.
+    None if no tag passes the threshold.
     """
     MIN_N_CALIBRATION = 150
 
@@ -320,16 +301,7 @@ async def get_calibration_quantile_for_tags(
             )
         return q_avg, mismatch
 
-    # All tags skipped — fall back to 'all'
-    cfg_all = cfg.with_tag('all')
-    q, mm   = await get_calibration_quantile(conn, cfg_all, coverage, level)
-    if q is not None:
-        mm2 = CalibrationMismatch(
-            warning=f"All tags {tags} had insufficient calibration data. Using tag='all'.",
-            requested_tag=str(tags), used_tag='all',
-        )
-        return q, mm2
-    return None, None
+    return None, None  # all tags skipped; no fallback to 'all' (Baustein 2)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -51,7 +51,10 @@ SWITCH_CACHE_TTL = 300  # s, like quality_match.py -- a calibration run takes ef
 
 
 async def dtw_switch_threshold(conn: Optional[asyncpg.Connection], calibration_tag: str) -> Optional[float]:
-    """Switch threshold for this calibration tag, falling back to 'all'; None (no row/table): metadata only."""
+    """Switch threshold of this calibration tag (a list: its first tag); None (no row/table): metadata only.
+    No fallback to 'all' (Baustein 2, 13.11.2026): without a stored threshold the robot never switches."""
+    if not isinstance(calibration_tag, str):
+        calibration_tag = list(calibration_tag)[0] if calibration_tag else ''
     hit = _switch_cache.get(calibration_tag)
     if hit and time.time() - hit[1] < SWITCH_CACHE_TTL:
         return hit[0]
@@ -59,8 +62,8 @@ async def dtw_switch_threshold(conn: Optional[asyncpg.Connection], calibration_t
     if conn is not None:
         try:
             value = await conn.fetchval(
-                "SELECT value FROM prognosis.confidence_info WHERE key = $1 AND calibration_tag = ANY($2::text[]) "
-                "ORDER BY calibration_tag = $3 DESC LIMIT 1", SWITCH_KEY, [calibration_tag, 'all'], calibration_tag)
+                "SELECT value FROM prognosis.confidence_info WHERE key = $1 AND calibration_tag = $2",
+                SWITCH_KEY, calibration_tag)
         except asyncpg.UndefinedTableError:
             pass
     _switch_cache[calibration_tag] = (value, time.time())

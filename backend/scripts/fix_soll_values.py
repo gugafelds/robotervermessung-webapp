@@ -72,6 +72,9 @@ PRE_BUFFER   = 1       # so viele Samples VOR dem exakten Null-Dropout ebenfalls
                        # Null (siehe Chat-Beleg traj_id=1789659812, joint_4: 11.21->5.605->0.0).
                        # Ohne diesen Puffer wird die Baseline aus dem bereits korrumpierten
                        # Halbwert genommen und die Rückwärtssuche "fängt sich" zu früh.
+NORM_TOL     = 0.02    # Soll-Orientierung: |q| weicht um mehr als das von 1 ab -> kein gültiges Quaternion.
+                       # Fängt, was der Null-Test nicht sieht (Komponente -1.0 / -0.5 statt ~0, alle Komponenten ~0.001).
+SPIKE_DEG    = 30.0    # echte schnelle Umorientierung bleibt unter ~13 deg zum lokalen Median, Fehler liegen ab ~60 deg
 
 
 # ── Ausreißer-Erkennung (Null-Dropout + Aufhol-Rampe) ───────────────────────
@@ -149,6 +152,21 @@ def _find_support(mask: np.ndarray, start: int, end: int, n_support: int) -> lis
     return pre + post
 
 
+def _spike_mask(Q: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """Falsche Samples mit gültiger Länge direkt neben einem erkannten Block: mehr als SPIKE_DEG
+    vom lokalen Median der intakten Nachbarn (+-7) entfernt. Nur +-15 um erkannte Blöcke gesucht."""
+    out = np.zeros(len(Q), dtype=bool)
+    for i in np.flatnonzero(np.convolve(mask, np.ones(31), "same") > 0):
+        nb = [j for j in range(max(0, i - 7), min(len(Q), i + 8)) if j != i and not mask[j]]
+        if mask[i] or len(nb) < 4:
+            continue
+        w = Q[nb] * np.where(Q[nb] @ Q[nb[0]] < 0, -1.0, 1.0)[:, None]
+        m = np.median(w, axis=0)
+        m /= np.linalg.norm(m)
+        out[i] = np.degrees(2 * np.arccos(min(1.0, abs(float(Q[i] @ m))))) > SPIKE_DEG
+    return out
+
+
 # ── Korrektur ────────────────────────────────────────────────────────────────
 
 def fix_dropouts_scalar(df: pd.DataFrame, columns: list, n_support: int = N_SUPPORT) -> tuple:
@@ -186,11 +204,17 @@ def fix_dropouts_orientation(df: pd.DataFrame, columns: list, n_support: int = N
     """
     df = df.copy()
     Q = df[columns].to_numpy(dtype=float)
-    Q = Q / np.linalg.norm(Q, axis=1, keepdims=True)
+    norm = np.linalg.norm(Q, axis=1)
+    Q = Q / np.where(norm > 0, norm, 1.0)[:, None]  # (0,0,0,0) bleibt 0 statt NaN
 
-    mask = np.zeros(len(df), dtype=bool)
+    mask = np.abs(norm - 1.0) > NORM_TOL
     for c in range(4):
         mask |= _detect_dropout_span(Q[:, c])
+    for _ in range(3):
+        new = _spike_mask(Q, mask) if mask.any() else np.zeros(len(Q), dtype=bool)
+        if not new.any():
+            break
+        mask |= new
 
     changes = []
     if not mask.any():
@@ -259,6 +283,16 @@ async def fetch_traj_ids_by_date(conn, date_pattern: str, max_trajs: int | None)
     if max_trajs:
         ids = ids[:max_trajs]
     return ids
+
+
+async def fetch_traj_ids_by_norm(conn) -> list:
+    """Alle Bahnen mit mindestens einem ungültigen Soll-Quaternion (|q| != 1, siehe NORM_TOL)."""
+    rows = await conn.fetch("""
+        SELECT DISTINCT traj_id FROM motion.traj_orientation_cmd
+        WHERE abs(sqrt(qx_cmd*qx_cmd + qy_cmd*qy_cmd + qz_cmd*qz_cmd + qw_cmd*qw_cmd) - 1) > $1
+        ORDER BY traj_id
+    """, NORM_TOL)
+    return [r["traj_id"] for r in rows]
 
 
 async def apply_changes(conn, table: str, df: pd.DataFrame, changes: list, traj_id: str) -> int:
@@ -408,6 +442,9 @@ async def main(args) -> None:
     try:
         if args.traj_id:
             traj_ids = [args.traj_id]
+        elif args.norm_outliers:
+            traj_ids = await fetch_traj_ids_by_norm(conn)
+            print(f"{len(traj_ids)} Bahnen mit ungültigen Soll-Quaternionen")
         else:
             traj_ids = await fetch_traj_ids_by_date(conn, args.date, args.max_trajs)
             print(f"{len(traj_ids)} Bahnen für Muster '%{args.date}%'")
@@ -417,6 +454,8 @@ async def main(args) -> None:
             print(f"\n[{idx}/{len(traj_ids)}] Bahn-ID: {traj_id}")
             pending = []
             for label, (table, columns) in TABLES.items():
+                if args.norm_outliers and table != "traj_orientation_cmd":
+                    continue  # Null-Test auf Position/Gelenken meldet dort echte Werte um 0
                 df = await fetch_table(conn, table, columns, traj_id)
                 if df.empty:
                     continue
@@ -439,7 +478,7 @@ async def main(args) -> None:
             if not args.update:
                 continue
 
-            resp = input("  Enter = übernehmen, s + Enter = überspringen: ").strip().lower()
+            resp = "" if args.yes else input("  Enter = übernehmen, s + Enter = überspringen: ").strip().lower()
             if resp == "s":
                 print("  Übersprungen.")
                 continue
@@ -541,6 +580,23 @@ def _selftest() -> None:
 
     print("OK: fix_dropouts_orientation Mehrkomponenten-Dropout / untouched-rows selftest passed")
 
+    # Ungültige Quaternionen ohne exakte Null: Komponente -1.0 statt ~0, alle Komponenten ~0.001,
+    # und (0,0,0,0) -- letzteres ergab vorher NaN. Unveränderte Zeilen bleiben unangetastet.
+    qz_ok = np.linspace(0.36, 0.35, n_q)  # qz oben auf 0 gesetzt
+    qn = np.column_stack([qx, np.full(n_q, 0.004), qz_ok, np.sqrt(1 - qx**2 - 0.004**2 - qz_ok**2)])
+    good = qn.copy()
+    qn[8, 1] = -1.0
+    qn[20] = [-0.001, 0.001, 0.0005, 0.001]
+    qn[21] = [0.84, -0.3, 0.1, -0.4387]  # gültige Länge, aber falsch, direkt neben dem Block
+    qn[30] = 0.0
+    df_n = pd.DataFrame({"seg_id": ["s1"] * n_q, "timestamp": range(n_q), **{c: qn[:, k] for k, c in enumerate(["qx_cmd", "qy_cmd", "qz_cmd", "qw_cmd"])}})
+    out7, changes7 = fix_dropouts_orientation(df_n, ["qx_cmd", "qy_cmd", "qz_cmd", "qw_cmd"])
+    assert {i for _, i, _, _ in changes7} >= {8, 20, 21, 30}, changes7
+    got = out7[["qx_cmd", "qy_cmd", "qz_cmd", "qw_cmd"]].to_numpy(dtype=float)
+    assert np.isfinite(got).all() and np.abs(got[[8, 20, 21, 30]] - good[[8, 20, 21, 30]]).max() < 0.01, got[[8, 20, 21, 30]]
+
+    print("OK: fix_dropouts_orientation ungültige Quaternionen selftest passed")
+
     # Aufhol-Rampe: auf den Dropout folgt eine mehrsamplige Erholung, bevor
     # die Bahn wieder zur Baseline (56.58) zurückfindet -- die GESAMTE Rampe
     # muss mitkorrigiert werden, nicht nur der einzelne Nullpunkt (siehe
@@ -571,6 +627,9 @@ if __name__ == "__main__":
     parser.add_argument("--traj-id", help="Bahn-ID (einzelne Bahn)")
     parser.add_argument("--date", help="record_filename-Muster (LIKE %%wert%%), z.B. 20260724_15 "
                                         "-- iteriert alle passenden Bahnen")
+    parser.add_argument("--norm-outliers", action="store_true",
+                         help="Alle Bahnen mit ungültigen Soll-Quaternionen (|q| != 1) bearbeiten")
+    parser.add_argument("--yes", action="store_true", help="Mit --update: ohne Rückfrage pro Bahn schreiben")
     parser.add_argument("--max-trajs", type=int, help="Max. Anzahl Bahnen bei --date")
     parser.add_argument("--update", action="store_true",
                          help="Korrekturen nach Bestätigung (Enter) in die DB schreiben. "
@@ -581,7 +640,7 @@ if __name__ == "__main__":
 
     if args.selftest:
         _selftest()
-    elif args.traj_id or args.date:
+    elif args.traj_id or args.date or args.norm_outliers:
         asyncio.run(main(args))
     else:
-        parser.error("Entweder --traj-id, --date oder --selftest angeben.")
+        parser.error("Entweder --traj-id, --date, --norm-outliers oder --selftest angeben.")

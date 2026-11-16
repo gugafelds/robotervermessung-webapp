@@ -9,7 +9,7 @@ Aggregation: length-weighted (traj_metadata.length in mm)
 Prognose: inverse-distance weighted mean
 
 Verwendung:
-    python knn_baseline.py --tag ba-mueller --k 10 --queries 100
+    python knn_baseline.py --tag ba4400-19.5-1 --k 10 --queries 100
     python knn_baseline.py --tag rv2-dataset-off --k 10
     python knn_baseline.py --tag all --k 5 --queries 200
 """
@@ -340,7 +340,7 @@ async def run(
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--tag',      type=str, default='ba-mueller')
+    parser.add_argument('--tag',      type=str, default='ba4400-19.5-1')
     parser.add_argument('--k',        type=int, default=10)
     parser.add_argument('--queries',  type=int, default=None)
     parser.add_argument('--dtw-mode', type=str, default='position')
